@@ -2211,14 +2211,48 @@ function nativeTargetsValid(value, paths) {
         && Number.isSafeInteger(row.preimage.bytes) && row.preimage.bytes >= 0
         && Number.isFinite(row.preimage.mtimeMs) && Number.isFinite(row.preimage.ctimeMs) && SHA256.test(row.preimage.sha256)));
 }
-function captureNativeTargetPreimages(root, paths) {
+// E17 (ADR-0059 Decision 6): an out-of-root native target (the "cross-repository-target"
+// class) states its eligible path as an ABSOLUTE string, which every validator compares
+// against each preimage row's `path`. The preimages are bound to a physical root instead
+// -- the target repository's top level when the targets sit inside one, otherwise the
+// nearest existing directory of the single target -- and each ancestry is walked
+// RELATIVE to that root. The frame is derived from the record's own fields only, so
+// recording, planning, arming and consumption re-derive the identical root and relative
+// paths. Every in-root class keeps the caller's root and its relative paths unchanged.
+// A target that cannot be bound is a typed HGO-NATIVE-TARGET-UNRESOLVED failure.
+function nativeTargetFrame(root, commandClass, paths) {
+  if (commandClass !== "cross-repository-target") return { root, relatives: paths };
+  const unresolved = (why) => fail("HGO-NATIVE-TARGET-UNRESOLVED", `out-of-root native target cannot be bound to a physical root (${why})`);
+  if (!Array.isArray(paths) || paths.length < 1 || paths.length > NATIVE_TARGET_MAX_FILES
+    || paths.some((path) => typeof path !== "string" || !isAbsolute(path))) unresolved("path set");
+  let base;
+  try { base = physicalRoot(root); } catch { unresolved("root"); }
+  const inside = paths.map((path) => {
+    const rel = separatorNormalized(relative(base, path));
+    return rel === "" || rel === ".." || rel.startsWith("../") || isAbsolute(rel) ? null : rel;
+  });
+  if (inside.every((rel) => rel !== null)) return { root: base, relatives: inside };
+  if (paths.length !== 1) unresolved("targets span more than one directory tree");
+  const tail = [basename(paths[0])]; let dir = dirname(paths[0]);
+  for (;;) {
+    try { lstatSync(dir); break; } catch (error) {
+      const up = dirname(dir);
+      if (error.code !== "ENOENT" || up === dir) unresolved("ancestry cannot be observed");
+      tail.unshift(basename(dir)); dir = up;
+    }
+  }
+  try { return { root: physicalRoot(dir), relatives: [separatorNormalized(tail.join("/"))] }; } catch { return unresolved("directory"); }
+}
+function captureNativeTargetPreimages(root, paths, relatives = paths) {
   if (!Array.isArray(paths) || paths.length < 1 || paths.length > NATIVE_TARGET_MAX_FILES) fail("HGO-NATIVE-TARGET-BOUND", "native target set exceeds its closed bound");
+  if (!Array.isArray(relatives) || relatives.length !== paths.length || new Set(relatives).size !== relatives.length) fail("HGO-NATIVE-TARGET-PATH", "native target set is not canonical");
   const physical = physicalRoot(root); let total = 0;
   const targets = paths.map((path,index) => {
-    if (typeof path !== "string" || path === "" || (process.platform === "win32" && path.includes("\\")) || isAbsolute(path)
-      || path.split("/").some(part => part === "" || part === "." || part === "..")
+    const rel = relatives[index];
+    if (typeof path !== "string" || path === "" || typeof rel !== "string" || (process.platform === "win32" && rel.includes("\\")) || isAbsolute(rel)
+      || rel.split("/").some(part => part === "" || part === "." || part === "..")
       || (index > 0 && paths[index-1] >= path)) fail("HGO-NATIVE-TARGET-PATH", "native target set is not canonical");
-    const parts = path.split("/"), ancestors = []; let absent = false;
+    const parts = rel.split("/"), ancestors = []; let absent = false;
     for (let depth=0; depth<parts.length; depth+=1) {
       const rel = parts.slice(0,depth).join("/"), absolute = rel === "" ? physical : join(physical,rel);
       if (absent) { ancestors.push({path:rel,status:"absent"}); continue; }
@@ -2229,7 +2263,7 @@ function captureNativeTargetPreimages(root, paths) {
       if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(absolute) !== absolute) fail("HGO-NATIVE-TARGET-UNSAFE", "native target ancestry is unsafe");
       ancestors.push({path:rel,status:"directory",identity:nativeTargetStat(info)});
     }
-    const absolute = join(physical,path);
+    const absolute = join(physical,rel);
     if (absent) return {path,ancestors,preimage:{status:"absent"}};
     let info; try { info = lstatSync(absolute); } catch (error) {
       if (error.code === "ENOENT") return {path,ancestors,preimage:{status:"absent"}};
@@ -2248,7 +2282,7 @@ function captureNativeTargetPreimages(root, paths) {
     } finally { if (fd !== undefined) closeSync(fd); }
   });
   // A later target read must not conceal an ancestor replacement or an absent path appearing.
-  for (const target of targets) {
+  for (const [targetIndex, target] of targets.entries()) {
     for (const ancestor of target.ancestors) {
       const absolute = ancestor.path === "" ? physical : join(physical,ancestor.path);
       let info; try { info = lstatSync(absolute); } catch (error) {
@@ -2259,7 +2293,7 @@ function captureNativeTargetPreimages(root, paths) {
         || realpathSync(absolute) !== absolute || canonical(nativeTargetStat(info)) !== canonical(ancestor.identity)) fail("HGO-NATIVE-TARGET-DRIFT", "native target ancestry changed during observation");
     }
     if (target.preimage.status === "absent") {
-      try { lstatSync(join(physical,target.path)); } catch (error) { if (error.code === "ENOENT") continue; fail("HGO-NATIVE-TARGET-DRIFT", "native absence changed during observation"); }
+      try { lstatSync(join(physical,relatives[targetIndex])); } catch (error) { if (error.code === "ENOENT") continue; fail("HGO-NATIVE-TARGET-DRIFT", "native absence changed during observation"); }
       fail("HGO-NATIVE-TARGET-DRIFT", "native absent target appeared during observation");
     }
   }
@@ -2270,8 +2304,11 @@ function captureNativeTargetPreimages(root, paths) {
 const NATIVE_FILE_TOOLS = new Set(["Edit", "Write", "apply_patch"]);
 function assertNativeTargets(root, record) {
   if (!nativeTargetsValid(record.nativeTargets,record.eligiblePaths)
-    || !NATIVE_FILE_TOOLS.has(record.toolName)
-    || canonical(captureNativeTargetPreimages(root,record.eligiblePaths)) !== canonical(record.nativeTargets)) {
+    || !NATIVE_FILE_TOOLS.has(record.toolName)) {
+    fail("HGO-NATIVE-TARGET-DRIFT", "signed native target preimages changed");
+  }
+  const frame = nativeTargetFrame(root, record.commandClass, record.eligiblePaths);
+  if (canonical(captureNativeTargetPreimages(frame.root, record.eligiblePaths, frame.relatives)) !== canonical(record.nativeTargets)) {
     fail("HGO-NATIVE-TARGET-DRIFT", "signed native target preimages changed");
   }
 }
@@ -3527,9 +3564,12 @@ function preflightPatchBeforeSignature(repo, paths, requestSha256, spawn) {
   if (request.schema !== NATIVE_REQUEST_SCHEMA) {
     fail("HGO-PATCH-LEGACY", "request predates the stored patch text; record a fresh denial");
   }
-  const frozen = new Map(request.nativeTargets.targets.map((row) => [row.path, row.preimage]));
+  // E17: an out-of-root patch is read and checked against its own bound root, with the
+  // same relative names the preimages were captured under; an in-root request is unchanged.
+  const frame = nativeTargetFrame(repo.root, request.commandClass, request.eligiblePaths);
+  const frozen = new Map(request.nativeTargets.targets.map((row, index) => [frame.relatives[index], row.preimage]));
   const diff = convertPatchEnvelopeToUnifiedDiff(request.patchInput.command, (rawPath) => {
-    const safe = safePath(repo.root, rawPath);
+    const safe = safePath(frame.root, rawPath);
     const preimage = safe === null ? undefined : frozen.get(safe.relative);
     if (preimage === undefined) patchUnsupportedFail();
     if (preimage.status === "absent") return { path: safe.relative, text: null };
@@ -3544,11 +3584,11 @@ function preflightPatchBeforeSignature(repo, paths, requestSha256, spawn) {
   try {
     writeExclusive(scratch, Buffer.from(diff, "utf8"));
     applied = spawn("git", ["apply", "--check", "--unidiff-zero", "--whitespace=nowarn", "--", scratch], {
-      cwd: repo.root,
+      cwd: frame.root,
       encoding: "utf8",
       shell: false,
       timeout: 30000,
-      env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(repo.root) },
+      env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(frame.root) },
     });
   } finally {
     try { unlinkSync(scratch); } catch {}
@@ -3723,16 +3763,28 @@ export function recordHumanGuardDenial({
   const lifecycleRecovery = lifecycleNotReadyRecovery(denials);
   if (lifecycleRecovery !== null) return lifecycleRecovery;
   const physicalRootDir = physicalRoot(rootDir);
-  const eligible = eligibility(physicalRootDir, toolName, toolInput);
+  let eligible = eligibility(physicalRootDir, toolName, toolInput);
   const isLocalPluginInstall = eligible.eligible && eligible.mode === "global-plugin-install";
   // NVA-CROSSREPOLEDGER-1: bind command evaluation and ledger append to the guarded
   // command's actual cross-repository target repository, not this coordinating
   // session's own root -- see crossRepositoryTargetRoot()'s header. `null` covers both
   // an ordinary command AND an out-of-root target with no repository of its own; both
   // fall through unchanged to physicalRootDir exactly as before this fix.
-  const crossRepositoryRoot = eligible.eligible && eligible.commandClass === "cross-repository-target"
+  let crossRepositoryRoot = eligible.eligible && eligible.commandClass === "cross-repository-target"
     ? crossRepositoryTargetRoot(eligible.crossBoundaryTarget, spawn)
     : null;
+  // E17: a native Write/Edit/apply_patch under the cross-repository class binds its
+  // preimages to the resolved target root (nativeTargetFrame()). A target that cannot be
+  // bound is a typed refusal through the existing external-project-boundary route --
+  // never a throw, and never a request the human could not clear.
+  if (eligible.eligible && eligible.commandClass === "cross-repository-target" && NATIVE_FILE_TOOLS.has(toolName)) {
+    try { nativeTargetFrame(crossRepositoryRoot ?? physicalRootDir, eligible.commandClass, eligible.paths); }
+    catch (error) {
+      if (!(error instanceof HumanGuardOverrideError)) throw error;
+      eligible = { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: eligible.paths };
+      crossRepositoryRoot = null;
+    }
+  }
   const repo = isLocalPluginInstall
     ? controlPathTopology(physicalRootDir)
     : topology(crossRepositoryRoot ?? physicalRootDir, spawn);
@@ -3789,10 +3841,12 @@ export function recordHumanGuardDenial({
     commandClass,
     denials,
   });
-  const nativeTargets = NATIVE_FILE_TOOLS.has(toolName)
+  const nativeFrame = NATIVE_FILE_TOOLS.has(toolName)
     && (eligible.mode === "standard" || eligible.authorCandidate === true)
     && eligible.paths.length > 0
-    ? captureNativeTargetPreimages(repo.root, eligible.paths) : null;
+    ? nativeTargetFrame(repo.root, commandClass, eligible.paths) : null;
+  const nativeTargets = nativeFrame === null
+    ? null : captureNativeTargetPreimages(nativeFrame.root, eligible.paths, nativeFrame.relatives);
   if (nativeTargets !== null && toolName === "apply_patch"
     && (!object(toolInput) || typeof toolInput.command !== "string" || toolInput.command.length > NATIVE_TARGET_MAX_BYTES)) {
     fail("HGO-PATCH-BOUND", "patch input is outside its closed bound");

@@ -4644,7 +4644,10 @@ test("the rendered reason is bounded to typed tokens against any outcome shape",
 
 test("HGO multi-file apply binds one complete external-repository path set and fails closed across authority planes", () => {
   const root = fixture();
-  const target = fixture();
+  // ALF-B4-HGO (QG-04): the TARGET repository is a signature-mode fixture so the post-arming claims below
+  // (one complete path set, single use) arm through the signed route and stay live on every host, native
+  // Windows included -- the retired chat call could not reach the attended examiner without a real pty.
+  const target = fixtureSignature();
   const other = fixture();
   const nonRepository = mkdtempSync(join(tmpdir(), "hgo-multifile-nonrepo-"));
   const patchInput = (entries) => ({
@@ -4697,17 +4700,9 @@ test("HGO multi-file apply binds one complete external-repository path set and f
     });
     assert.deepEqual(plan.eligiblePaths, expected);
     assert.equal(plan.commandClass, "cross-repository-target");
-    const reason = "PO attended exact multi-file external repository patch";
-    const prepared = prepareHumanGuardOverrideAuthorization({
+    assert.equal(armBySignature({
       rootDir: recorded.root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256,
-      planSha256: plan.planSha256, reason, nowMs: 2000, scriptPath,
-    });
-    assert.equal(authorizeHumanGuardOverride({
-      rootDir: recorded.root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256,
-      planSha256: plan.planSha256, selectionSha256: prepared.selectionSha256,
-      reason, reasonSha256: reasonDigest(reason), activate: true,
-      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
-      nowMs: 3000, scriptPath,
+      planSha256: plan.planSha256, nowMs: 3000, scriptPath,
     }).status, "armed");
 
     const reorderedInput = patchInput([...paths].reverse());
@@ -4716,10 +4711,16 @@ test("HGO multi-file apply binds one complete external-repository path set and f
       expected,
       "path-set binding stays canonical even when patch sections are reordered",
     );
-    assert.equal(consumeHumanGuardOverride({
+    // ALF-B4-HGO (QG-04): a different tool input against an armed NATIVE capability now gets the newer
+    // typed verdict (replan / HGO-DRIFT, the same verdict the SIGDISCLOSE-1 F6 native case receives)
+    // instead of a bare "absent". The claim is unchanged: the reordered text is refused and consumes
+    // nothing -- the exact bound input still consumes just below.
+    const reorderedConsume = consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
       toolInput: reorderedInput, denials: denial, nowMs: 3500,
-    }).status, "absent", "the exact tool-input digest must reject reordered patch text");
+    });
+    assert.equal(reorderedConsume.status, "replan", "the exact tool-input digest must reject reordered patch text");
+    assert.equal(reorderedConsume.code, "HGO-DRIFT");
     assert.equal(consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
       toolInput: boundInput, denials: denial, nowMs: 4000,
@@ -4838,7 +4839,11 @@ test("NOVA-HGOELIG-3: an out-of-root capability binds one exact command -- a dif
     const mismatched = consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput: { command: otherCommand }, denials: denial, nowMs: 3500,
     });
-    assert.equal(mismatched.status, "absent");
+    // ALF-B4-HGO (QG-04): newer typed verdict -- a different command against an armed capability is
+    // refused as replan / HGO-INPUT-MISMATCH (not a bare "absent"); it still consumes nothing, which the
+    // exact bound command below proves.
+    assert.equal(mismatched.status, "replan");
+    assert.equal(mismatched.code, "HGO-INPUT-MISMATCH");
     // The exact bound command still consumes it, exactly once.
     const consumed = consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput: boundInput, denials: denial, nowMs: 4000,
