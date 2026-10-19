@@ -1461,7 +1461,10 @@ test("a real orphaned descriptor is repaired automatically through the top-level
     const barrier = initializeRestartRequiredRoot(path);
     clearRuntimeBarrier(path, barrier);
     completeKickoff(path);
-    const orphan = startSessionDescriptor(path, { sessionId: "session-e2e-bind-orphan" });
+    // The descriptor is created with ownerRuntime null because a live owner is
+    // observable and is never offered the zero-authority archive
+    // (WT-ORPHAN-ARCHIVE-OWNER-OBSERVABLE).
+    const orphan = startSessionDescriptor(path, { sessionId: "session-e2e-bind-orphan", ownerRuntime: null });
     // Unset the suite-wide fakeDeps stub (which always reports "not-needed")
     // so this one test exercises the REAL cleanup-recovery module instead.
     const realCleanupDeps = { ...fakeDeps, planSessionCleanupRecovery: undefined };
@@ -1474,9 +1477,32 @@ test("a real orphaned descriptor is repaired automatically through the top-level
     assert.deepEqual(listActiveSessionDescriptors(path), [
       { sessionId: orphan.sessionId, descriptorSha256: orphan.descriptorSha256 },
     ]);
-    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: path }).sessionCleanup, {
-      sessionId: orphan.sessionId, descriptorSha256: orphan.descriptorSha256,
-    });
+    // QG-04 -- examiner ADAPTED (superseded rule), not weakened. This assertion used to require that
+    // the bind-orphan repair BOUND the unbound descriptor during a `session` inspection.
+    // ALFRED-RDY-20261005 (PO decision "Readiness root fix", 2026-10-05; 0b9af703a, see
+    // foreignOrphanResidueWarning and partialCleanupRecoveryResultCore in project-onboarding-v3.mjs)
+    // supersedes it: SESSION readiness depends only on the requesting session's own descriptor, and a
+    // FOREIGN zero-authority residue is one typed `cleanup_residue_foreign` warning on a ready result
+    // carrying its digest-bound archive action -- never a binding, never a selection question. This
+    // fixture's descriptor is foreign by construction: startSessionDescriptor is given no ownerNonce, so
+    // no requester nonce can match it, and it holds no manifest, resources or intents. The auto-apply of
+    // a typed "ready" recovery plan keeps its own pin in the readiness case above (readyApplyCalls).
+    // Assertions one and two above are unchanged.
+    assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
+    const foreignResidue = observed.diagnostics.filter((entry) => entry.code === "cleanup_residue_foreign");
+    assert.equal(foreignResidue.length, 1, JSON.stringify(observed.diagnostics));
+    assert.equal(foreignResidue[0].severity, "warning");
+    // The action binds to the descriptor through its argv: the value after --session-descriptor is the
+    // session id and the value after --expected-descriptor-sha256 is the descriptor digest.
+    const archiveActions = foreignResidue[0].archiveActions;
+    assert.equal(Array.isArray(archiveActions) && archiveActions.length, 1, JSON.stringify(archiveActions));
+    const archiveArgv = archiveActions[0].argv;
+    assert.equal(archiveArgv[archiveArgv.indexOf("--session-descriptor") + 1], orphan.sessionId,
+      "the warning carries the digest-bound archive action for this very descriptor");
+    assert.equal(archiveArgv[archiveArgv.indexOf("--expected-descriptor-sha256") + 1], orphan.descriptorSha256,
+      "the warning carries the digest-bound archive action for this very descriptor");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: path }).sessionCleanup, null,
+      "a foreign zero-authority residue is warned about, never bound by a session inspection");
   } finally { dispose(path); }
 });
 
@@ -3414,14 +3440,28 @@ test("apply-portable-seed --activate seeds the machine's trust anchor into a fre
     );
     const guided = invoke(["apply-portable-seed", "--root", preexisting, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], machineHasKey);
     assert.equal(guided.code, 0);
-    assert.equal(guided.result.trustAnchorGuidanceAction.kind, "collect-input");
-    assert.equal(guided.result.trustAnchorGuidanceAction.mutation, false);
-    assert.match(guided.result.trustAnchorGuidanceAction.guidance, new RegExp(publicKeySha256, "u"));
-    assert.match(guided.result.trustAnchorGuidanceAction.guidance, /po-key-1/u);
-    assert.match(guided.result.trustAnchorGuidanceAction.guidance, /André/u);
-    assert.match(guided.result.trustAnchorGuidanceAction.guidance, /trustAnchors/u);
-    assert.match(guided.result.trustAnchorGuidanceAction.guidance, /guard-gate-strength\.mjs/u,
-      "must disclose that GS-2 forbids any agent write to this file");
+    // QG-04 -- examiner ADAPTED (superseded route), not weakened. A machine that holds a key,
+    // onboarding a repository that owns an anchorless policy, used to be handed human-edit guidance
+    // (collect-input text carrying the key's digest, reference and human name, plus the GS-2
+    // no-agent-write disclosure). The product now routes exactly that state to the fixed
+    // Source-owned, read-only public-anchor planner instead: project-onboarding-v3.mjs
+    // proposeTrustAnchorMaterializationAction -> `plan-existing-trust-anchor`, introduced in
+    // d02409a8a (a checkpoint commit) and documented at withPendingTrustAnchorGuidanceAsk
+    // ("routes to the fixed public-only planner ... rather than requiring a done/skip
+    // acknowledgment") and at the 2026-08-19 PO-decision block above observeLocalTrustAnchorPointer.
+    // That action carries no guidance text, so its shape is pinned instead, including the property
+    // the old case also protected: the key's filesystem location is never exposed. Block (c)'s
+    // silence assertion below is unchanged.
+    const guidedAnchor = guided.result.trustAnchorGuidanceAction;
+    assert.equal(guidedAnchor.kind, "command");
+    assert.equal(guidedAnchor.argv[1], "plan-existing-trust-anchor");
+    assert.ok(guidedAnchor.argv.includes("--root"));
+    assert.equal(guidedAnchor.mutation, false);
+    assert.notEqual(guidedAnchor.requiresConfirmation, true);
+    assert.equal(guidedAnchor.expected.schema, "pipeline.existing-public-trust-anchor-materialization.v1");
+    assert.deepEqual(guidedAnchor.expected.statuses, ["planned", "not-required"]);
+    assert.equal(JSON.stringify(guidedAnchor).includes(keyDir), false,
+      "the planner action never exposes the key's filesystem location as a caller selector");
 
     // (c) That same repository once the matching anchor is on record: no
     // proposal, silence is correct.
@@ -9471,6 +9511,43 @@ for (const runner of ["claude", "codex", "antigravity"]) {
   });
 }
 
+// 7f37cc916 (BOOTSTRAP-ACK-PLACEHOLDER-CONTENT, onboarding-continuity.mjs
+// bootstrapAcknowledgementPlan): the acknowledgement planner refuses a generated
+// staging PRD or specification that still carries one of the generator's
+// unfinished-draft shapes. A fixture standing for a human-authored staging
+// package must therefore complete the draft first. This mirrors the planner's own
+// `unfinished()` predicate shape by shape, so the refusal itself is still proven
+// by the cases that call the planner on the unmodified draft. Editing the
+// specification also leaves the PRD's technical Spec marker stale; the same
+// mechanical repair the final-package re-entry case above drives is applied so
+// the package stays valid.
+const GENERATED_DRAFT_BANNER = "<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.";
+const GENERATED_DRAFT_AC_LINE = /^- AC-01: WHEN <trigger>, the system SHALL <observable result>\.$/gmu;
+const generatedDraftIsUnfinished = (text) => text.includes(GENERATED_DRAFT_BANNER)
+  || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
+  || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
+  || new RegExp(GENERATED_DRAFT_AC_LINE.source, "mu").test(text);
+const completeGeneratedDraftText = (text) => text
+  .replaceAll(GENERATED_DRAFT_BANNER, "<!-- Reviewed draft: every value and all example paths were completed.")
+  .replaceAll(GENERATED_DRAFT_AC_LINE, "- AC-01: WHEN the PO reviews the staging package, the system SHALL bind exactly the reviewed bytes.")
+  .replaceAll("REPLACE: ", "Reviewed: ");
+function completeGeneratedStagingDraft({ path, observation, intakeDeps }) {
+  for (const relativePath of [observation.prd.path, observation.spec.path]) {
+    const absolutePath = join(path, relativePath);
+    const completed = completeGeneratedDraftText(readFileSync(absolutePath, "utf8"));
+    assert.equal(generatedDraftIsUnfinished(completed), false,
+      `${relativePath} still carries an unfinished-draft shape the acknowledgement planner refuses`);
+    writeFileSync(absolutePath, completed, "utf8");
+  }
+  const reinspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+  if (reinspected.nextAction?.argv?.[1] !== "intake-spec-marker-apply") return;
+  const argv = reinspected.nextAction.argv;
+  const code = onboardingCli(["intake-spec-marker-apply", "--root", path,
+    "--plan-sha256", argv[argv.indexOf("--plan-sha256") + 1], "--activate", "--runner", "codex"],
+  { deps: intakeDeps, write: () => {}, writeError: () => {} });
+  assert.equal(code, 0, "the stale technical Spec marker is repaired mechanically after the draft is completed");
+}
+
 test("bootstrap-binding-required routes a hand-authored staging PRD through its policy-selected acknowledgement and then binds", () => {
   const path = root();
   hostGit(path, ["init", "--initial-branch=main"]);
@@ -9492,8 +9569,14 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
     // Unlike the lifecycle-routing test above, this fixture supplies a
     // --profile so a real bootstrap-bind-plan/apply can actually be
     // exercised below -- reproducing the exact "generated" state the
-    // backlog measured, not merely a nextAction label.
-    const consented = invoke(["intake-consent-apply", "--root", path, "--granted", "--profile", "feature", "--language", "en", "--activate", "--runner", "codex"]);
+    // backlog measured, not merely a nextAction label. The profile is `mini`,
+    // as in the chat-acknowledgement case below: `feature` and `epic` are
+    // final-package profiles whose approval belongs to the later complete
+    // package, so v4Inspection deliberately binds them first (1bd1d7bf6,
+    // project-onboarding-v3.mjs finalPackageProfile). This case's premise is
+    // the policy-selected early acknowledgement of a hand-authored staging PRD,
+    // which only a non-final-package profile selects.
+    const consented = invoke(["intake-consent-apply", "--root", path, "--granted", "--profile", "mini", "--language", "en", "--activate", "--runner", "codex"]);
     assert.equal(consented.code, 0, stderr);
     const captured = invoke(["intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex"]);
     assert.equal(captured.code, 0, stderr);
@@ -9527,6 +9610,7 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
     // More than one final newline is legitimate authored content. The signed
     // acknowledgement receipt must survive binding without normalizing that
     // preimage away.
+    completeGeneratedStagingDraft({ path, observation: exemptObservation, intakeDeps });
     writeFileSync(prdAbsolutePath, `${readFileSync(prdAbsolutePath, "utf8")}\nOne line of prose nobody reviewed.\n\n\n`, "utf8");
     materializeArchitectureDesignFixture({
       rootDir: path,
@@ -9848,6 +9932,9 @@ test("chat acknowledgement consumes the one in-chat PO decision without a second
     });
     const observation = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
     const prdPath = join(path, observation.prd.path);
+    // 7f37cc916: the acknowledgement planner refuses a generated draft that still carries
+    // placeholders (BOOTSTRAP-ACK-PLACEHOLDER-CONTENT), so the reviewed package is completed first.
+    completeGeneratedStagingDraft({ path, observation, intakeDeps });
     writeFileSync(prdPath, `${readFileSync(prdPath, "utf8")}\nHuman-reviewed change.\n`, "utf8");
     const plan = planOnboardingBootstrapAcknowledgementChat({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
     assert.equal(plan.nextAction.kind, "command");
