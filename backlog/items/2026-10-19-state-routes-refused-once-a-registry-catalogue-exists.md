@@ -41,6 +41,15 @@ Push, close and verify-phase there are refused the same way.
 `pipeline-state.mjs` is protected (PB-SANCTIONED-WRITER), so a fix needs the PO's override
 ceremony.
 
+## Progress (2026-10-19, D53, not yet reviewed)
+
+- Done (426e4afbe): an unadopted route runs while a catalogue exists and no bound State
+  operation is in flight; its drift heals at the next boundary entry (D51 (1)). The refusal
+  names its reason and the repair. SAR06 pins `prepare-push-subject` and the unreadable-producer
+  refusal.
+- Open: the full pin dispatch → push-prepare → approve-push → close-feature, and a test of the
+  in-flight refusal.
+
 ## Acceptance
 
 - Push, close-feature and set-phase --verify-command work while a catalogue exists. Each is
