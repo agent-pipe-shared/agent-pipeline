@@ -5908,6 +5908,9 @@ function hgoSweepSelection(repository, nowMs) {
     }
   }
   const capabilities = before.groups.get("capabilities").map(row => {
+    // PF-53: a retired capability still holds its request back while it says armed.
+    const retired = hgoRetiredExpired(row, nowMs);
+    if (retired) return {requestSha256: retired.requestSha256, status: retired.status, retired: true};
     const value = validatedCapability(paths, row.path);
     if (!hasAuthorizedAuditEntry(paths, value)) fail("HGO-SWEEP-HELD", "capability has no authenticated original authorization");
     return value;
@@ -5915,6 +5918,12 @@ function hgoSweepSelection(repository, nowMs) {
   const eligible = [];
   for (const row of before.groups.get("requests")) {
     const digest = basename(row.path).slice(0, -5);
+    const retired = hgoRetiredExpired(row, nowMs);
+    if (retired) {
+      if (retired.root === repository.primaryRoot && sha(retired) === digest && !referenced.has(row.ref.path)
+          && !capabilities.some(value => value.requestSha256 === digest && value.status === "armed")) eligible.push(row);
+      continue;
+    }
     const request = validatedRequest(paths, digest, JSON.parse(row.bytes.toString("utf8")));
     const expiry = Date.parse(request.expiresAt);
     if (request.root !== repository.primaryRoot || !Number.isFinite(expiry)
@@ -6328,6 +6337,19 @@ function hgoAuthorityIndexedData(port, holdPath) {
     authorizationPath: join(repository.commonDir, record.authorizationPath), phase: "armed", holdPath,
     memberRef: originalMember.ref, memberHandle: null};
 }
+// A plugin update retires a schema, but never the artifacts an earlier version left behind. An
+// expired artifact of a retired schema can no longer be authorized or consumed (every such route
+// validates the current schema), so it is kept as an inventory fact without being validated; an
+// expired retired request is swept like any other expired request (PF-53).
+const HGO_RETIRED_SCHEMAS = new Set(["pipeline.human-guard-override-request.v2", "pipeline.human-guard-override-plan.v2",
+  "pipeline.human-guard-override-capability.v2"]);
+function hgoRetiredExpired(row, nowMs = Date.now()) {
+  let value;
+  try { value = JSON.parse(row.bytes.toString("utf8")); } catch { return false; }
+  if (!object(value) || !HGO_RETIRED_SCHEMAS.has(value.schema) || typeof value.expiresAt !== "string") return false;
+  const expiry = Date.parse(value.expiresAt);
+  return Number.isFinite(expiry) && new Date(expiry).toISOString() === value.expiresAt && expiry <= nowMs ? value : false;
+}
 function hgoAuthorityValidatedInventory(port, inventory) {
   const {repository} = hgoAuthorityPorts.get(port), indexed = new Map();
   for (const observed of inventory.groups.get("audit")) {
@@ -6339,9 +6361,11 @@ function hgoAuthorityValidatedInventory(port, inventory) {
   }
   for (const row of inventory.groups.get("requests")) {
     if (!/^[a-f0-9]{64}\.json$/u.test(basename(row.path))) hgoAuthorityFailure("hgo:unknown-request");
+    if (hgoRetiredExpired(row)) continue;
     validatedRequest(inventory.paths, basename(row.path).slice(0, -5));
   }
   for (const row of inventory.groups.get("plans")) {
+    if (hgoRetiredExpired(row)) continue;
     if (basename(row.path).endsWith(".disclosure.json")) {
       const index = validatedDisclosureIndex(row.path);
       if (index.root !== hgoAuthorityPorts.get(port).repository.primaryRoot) hgoAuthorityFailure("hgo:disclosure-index-root");
@@ -6353,6 +6377,7 @@ function hgoAuthorityValidatedInventory(port, inventory) {
   const legacyOperations = [];
   for (const observed of inventory.groups.get("capabilities")) {
     if (!/^[a-f0-9]{64}\.json$/u.test(basename(observed.path))) hgoAuthorityFailure("hgo:unknown-capability");
+    if (hgoRetiredExpired(observed) && !indexed.has(observed.path)) continue;
     const capability = validatedCapability(inventory.paths, observed.path);
     if (!hasAuthorizedAuditEntry(inventory.paths, capability)) hgoAuthorityFailure("hgo:capability-audit-unavailable");
     const data = indexed.get(observed.path);
@@ -6715,6 +6740,7 @@ export function createHumanGuardOverrideAuthorityProducerPort({repository: input
           // silently discharged by an observer, expiry, or process liveness.
           if (member.association?.state !== "unbound" || member.phase === "released") hgoAuthorityFailure("hgo:member-without-source-index");
           const match = inventory.groups.get("capabilities").find(row => {
+            if (hgoRetiredExpired(row)) return false;
             const cap = validatedCapability(inventory.paths, row.path);
             return cap.status === "armed" && sha({repository, association: member.association, capabilitySha256: row.ref.sha256}) === member.bindingSha256;
           });

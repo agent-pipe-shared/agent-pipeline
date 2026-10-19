@@ -54,7 +54,10 @@ import {
   repairHumanGuardOverrideAudit,
   refreezeHumanGuardOverridePlan,
   verifyHumanGuardOverrideAudit,
+  createHumanGuardOverrideAuthorityProducerPort,
+  sweepHumanGuardOverrideRequests,
 } from "./human-guard-override.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 import { probeSymlinkCapability, symlinkCapability, symlinkSkip } from "./symlink-capability.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
@@ -7129,3 +7132,32 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     } finally { live.cleanup(); }
   });
 }
+
+test("PF-53: expired artifacts of a retired schema do not block the authority inventory, and sweep-requests removes the retired request", () => {
+  const root = fixture();
+  try {
+    const current = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "PF-53 current request\n" }, denials: denial, nowMs: Date.now() });
+    assert.equal(typeof current.requestSha256, "string", JSON.stringify(current));
+    const physical = realpathSync(root), base = join(physical, ".git", "agent-pipeline", "human-guard-overrides");
+    const digest = (value) => createHash("sha256").update(canonical(value)).digest("hex");
+    const write = (dir, name, value) => writeFileSync(join(base, dir, `${name}.json`), JSON.stringify(value), { mode: 0o600 });
+    const expiredAt = "2026-08-31T10:00:00.000Z";
+    const retiredRequest = (n) => ({ schema: "pipeline.human-guard-override-request.v2", root: physical, plugin: {}, repository: {}, toolName: "Bash",
+      toolInputSha256: "a".repeat(64), denials: [], policy: {}, preview: {}, eligiblePaths: [], commandClass: `retired-${n}`, mode: "standard",
+      authorSourceRoot: null, createdAt: "2026-08-31T09:00:00.000Z", expiresAt: expiredAt });
+    const swept = retiredRequest(1), held = retiredRequest(2);
+    write("requests", digest(swept), swept);
+    write("requests", digest(held), held);
+    write("plans", "b".repeat(64), { schema: "pipeline.human-guard-override-plan.v2", status: "planned", requestSha256: digest(swept), expiresAt: expiredAt });
+    write("capabilities", "c".repeat(64), { schema: "pipeline.human-guard-override-capability.v2", status: "armed", requestSha256: digest(held), expiresAt: expiredAt });
+    const port = createHumanGuardOverrideAuthorityProducerPort({ repository: inspectSignedDescriptorCustodyRepository(physical) });
+    assert.doesNotThrow(() => port.readBaseline(), "retired expired artifacts are inventory facts, never validated as current ones");
+    const result = sweepHumanGuardOverrideRequests({ rootDir: physical });
+    assert.equal(result.status, "swept", JSON.stringify(result));
+    assert.equal(existsSync(join(base, "requests", `${digest(swept)}.json`)), false, "an expired retired request is swept");
+    assert.equal(existsSync(join(base, "requests", `${digest(held)}.json`)), true, "a request a retired armed capability names stays");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

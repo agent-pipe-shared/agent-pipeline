@@ -59,6 +59,13 @@ const own = (stat, directory = false) => {
     || (!directory && stat.nlink !== 1)
     || (typeof process.getuid === "function" && stat.uid !== process.getuid())) fail("AGY-AUTHORITY-PRIVATE-PATH");
 };
+// `agent-pipeline/` and `agent-pipeline/run/` are shared with other components, which may have
+// created them 0755 (PF-53). An AGY root itself stays exactly 0700; a shared ancestor only has
+// to be an own, real directory that nobody else can write.
+const sharedAncestor = (stat) => {
+  if (stat.isSymbolicLink() || !stat.isDirectory() || (stat.mode & 0o022) !== 0
+    || (typeof process.getuid === "function" && stat.uid !== process.getuid())) fail("AGY-AUTHORITY-PRIVATE-PATH");
+};
 export function inspectAgyAuthorityRepository(repository) {
   if (!repository || Object.keys(repository).sort().join("\0") !== "candidate\0commonDir\0primaryRoot") fail("AGY-AUTHORITY-REPOSITORY");
   const actual = inspectSignedDescriptorCustodyRepository(repository.primaryRoot);
@@ -73,11 +80,14 @@ function authorityRoot(repository, namespaceId, create = false) {
   if (!common.isDirectory() || common.isSymbolicLink() || realpathSync(path) !== path) fail("AGY-AUTHORITY-PRIVATE-PATH");
   const ancestors = [{ path, stat: common }];
   let absent = false;
-  for (const part of suffix.split("/")) {
+  const parts = suffix.split("/");
+  for (const [index, part] of parts.entries()) {
     path = join(path, part);
     if (create) { try { mkdirSync(path, { mode: 0o700 }); } catch (error) { if (error?.code !== "EEXIST") throw error; } }
     if (absent || !existsSync(path)) { absent = true; continue; }
-    const stat = lstatSync(path); own(stat, true); ancestors.push({ path, stat });
+    const leaf = index === parts.length - 1, stat = lstatSync(path);
+    if (leaf) own(stat, true); else sharedAncestor(stat);
+    ancestors.push({ path, stat, leaf });
     if (realpathSync(path) !== path) fail("AGY-AUTHORITY-PRIVATE-PATH");
   }
   return { repo, suffix, path, absent, ancestors };
@@ -85,7 +95,7 @@ function authorityRoot(repository, namespaceId, create = false) {
 function verifyAuthorityParents(root) {
   for (let index = 0; index < root.ancestors.length; index++) {
     const entry = root.ancestors[index], stat = lstatSync(entry.path);
-    if (index > 0) own(stat, true);
+    if (index > 0) { if (entry.leaf) own(stat, true); else sharedAncestor(stat); }
     if (!stat.isDirectory() || stat.isSymbolicLink() || !sameSnapshot(entry.stat, stat) || realpathSync(entry.path) !== entry.path) fail("AGY-AUTHORITY-CAS");
   }
 }
