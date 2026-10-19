@@ -543,9 +543,9 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
   for(const entry of read.entries.filter(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256!==ownPendingSha256)) {
     const pending=effectiveNativePendingState(read,entry),operation=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256),member=members.get(operation.bindingSha256);
     if(!member||!pending.binding.itemDelivery||!pending.delivery||operation.association.state!=='bound')continue;
-    // D51 (2): an integrated or cancelled foreign slice is no longer in flight.
-    if(settled.has(pending.delivery.sliceId))continue;
-    if(scopesOverlap(pending.delivery.writeScope,allowedPaths))throw reservationFault('native-concurrent-scope-collision',pending.delivery.sliceId);
+    // D51 (2): an integrated or cancelled foreign slice no longer collides. Its paths and its commit stay
+    // known below, so a commit it already landed is still recognised as foreign (NGHS17).
+    if(!settled.has(pending.delivery.sliceId)&&scopesOverlap(pending.delivery.writeScope,allowedPaths))throw reservationFault('native-concurrent-scope-collision',pending.delivery.sliceId);
     // Literal, retained original item scopes are the only foreign dirty paths.
     if(member.phase!=='released')for(const path of pending.binding.allowedPaths)foreignPaths.add(path);
     const terminal=read.entries.find(row=>row.relativePath===`authority-terminal-${entry.sourceFact.sha256}.json`);
