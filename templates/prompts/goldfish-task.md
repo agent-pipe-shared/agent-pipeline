@@ -251,8 +251,9 @@ and attempt history.
 At an actual session start or runtime re-entry, invoke
 `pipeline-core:pipeline-start` and complete its required reading/preflight
 sequence before the first Edit, Write or NotebookEdit. A role without the Skill
-tool instead runs `node "<plugin-root>/scripts/pipeline-start-preflight.mjs"`
-once as a plain command (nothing appended); exit 2 with `hook-refresh-required`
+tool instead runs `node "<plugin-root>/scripts/pipeline-start-preflight.mjs" --role goldfish`
+once as a plain command (nothing else appended), so the readback withholds every
+Coordinator action from this role; exit 2 with `hook-refresh-required`
 is a soft host status, so continue. Use only the sanctioned
 preflight invocation and exact loaded plugin root returned by that entry; do
 not wait for a missing-receipt refusal and then retry as the normal sequence.
