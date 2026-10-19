@@ -95,7 +95,7 @@ export const START_MARKER = "<!-- GENERATED FROM roles/elephant.md -- do not han
 export const END_MARKER = "<!-- END GENERATED: role-prohibitions block -->";
 
 /** Print order and forced membership. See the module doc comment above for the reason each id is here. */
-export const INCLUDED_EL_IDS = Object.freeze(["EL-01", "EL-02", "EL-03", "EL-04", "EL-16", "EL-18", "EL-19", "EL-34", "EL-35"]);
+export const INCLUDED_EL_IDS = Object.freeze(["EL-01", "EL-02", "EL-03", "EL-04", "EL-16", "EL-18", "EL-19", "EL-34", "EL-35", "EL-36", "EL-37"]);
 
 const DISPATCH_PIPELINE_DUTY =
   "operational dispatch-pipeline duty (roles/elephant.md §4/5) -- describes HOW to run the pipeline, not a bootstrap-time prohibition boundary";
@@ -127,6 +127,7 @@ export const EXCLUDED_EL_IDS = Object.freeze({
   "EL-31": DISPATCH_PIPELINE_DUTY, // reused id, both occurrences (§5 AND §7 -- the §7 one is also caught via the "debugging-or-communication" heading match, same reason text applies)
   "EL-32": DISPATCH_PIPELINE_DUTY,
   "EL-33": DISPATCH_PIPELINE_DUTY,
+  "EL-38": DISPATCH_PIPELINE_DUTY, // (MUST) hold-po release duty, roles/elephant.md §5
   "EL-13": DEBUGGING_OR_COMMUNICATION_GUIDANCE,
   "EL-13a": DEBUGGING_OR_COMMUNICATION_GUIDANCE,
   "EL-13b": DEBUGGING_OR_COMMUNICATION_GUIDANCE,

@@ -19,7 +19,7 @@ a resumable checkpoint or tracked-finalization transition and can run many
 times over a feature's life; `close-feature` requests the one feature-completion
 transition. A checkpoint does not imply feature completion.
 
-Actor performing the close: `$ARGUMENTS` (name passed as `--by` below; required, non-blank).
+Actor performing the close: `$ARGUMENTS` (name passed as `--by` below; required, non-blank). `--by` is an actor attribution, not a substitute for approval.
 
 ## Step 1 — Append the current-session telemetry row (best-effort)
 

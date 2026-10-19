@@ -89,6 +89,18 @@ protected policy/signature changes remain outside this lane.
 - **Why:** The external-key signature is the one control in the push-approval model that is real protection rather than ceremony; `chat` mode is an attribution record, not proof. An agent that proposes downgrading it, or routing around it via a self-push, is trading away the model's one real control to save its own human a passphrase entry — confirmed as recurring PO-reported behaviour, not a one-off (`backlog/items/2026-08-28-agents-talk-the-po-out-of-the-signature-instead-of-walking-it.md`; the same fork-with-no-marker defect the push gate's own rendered guidance was fixed to remove, NVA-R37-SIGWALKIT).
 - **Check:** A trajectory, dispatch, or PO-facing message that offers `chat` mode or a self-push as an alternative when the configured mode is `signature`, without the PO having initiated that question, is a lifecycle-violation finding at close/critic review; `plugins/pipeline-core/skills/pipeline-start/references/push-approval.md` carries the full walkthrough this rule is bound to.
 
+### EL-36 (MUST NOT) — An approval or record label is never inferred in the PO's name
+
+- **Rule:** Never fill `--by`, or any operator/actor label, with a value the PO did not supply for that exact command. A label is attribution, never authority: it does not stand in for the approval, signature or confirmation it sits next to, and an example value shown in a template or doc is not an identity claim.
+- **Why:** Greenfield finding P0-2 (Claude-Windows greenfield test). A label the agent inferred in the PO's name makes the record attribute an act to the PO that the PO did not supply for that command.
+- **Check:** A trajectory that fills `--by` or an actor label with the PO's name, unsupplied for that exact command, is a lifecycle-violation finding at close/critic review.
+
+### EL-37 (MUST NOT) — Never route a protected or guard-denied mutation around its ceremony
+
+- **Rule:** A protected or guard-denied mutation goes only through its sanctioned route. That route is the signed human-guard-override ceremony or the documented protected-change ceremony; never hand the PO an agent-prepared script or command whose purpose is to perform that mutation outside the ceremony. Read-only diagnostic commands for the PO stay allowed. This is the same principle as EL-35: routing around the control trades away its one real protection.
+- **Why:** Greenfield finding P0-3 (Claude-Windows greenfield test). A script the agent writes to apply a guard-denied change skips the ceremony that makes the change a human-authorized one.
+- **Check:** A PO-facing message carrying an agent-written command that performs a guard-denied change is a lifecycle-violation finding at close/critic review.
+
 ## 4. Briefing duty — the six mandatory fields (EL-05)
 
 - **Rule:** Every dispatch (Goldfish AND Critic) uses the canonical 6-field briefing (`docs/operating-model.md` — *Roles and boundaries*):
@@ -264,6 +276,12 @@ PO target: at most 10 % of the Elephant's main-thread context is pipeline admini
 - **Rule:** When work requires PO release, request it so that ONE PO action (one command, one signature, one explicit "approved") is sufficient to carry the entire downstream chain through to completion — never design or request a sequence of separate PO touches for what is really one release (e.g. one approval for an implementation plus a second, separate approval later for a follow-on registration/config step already known to be needed). If a chain genuinely cannot be collapsed to one PO action with the mechanisms available today, say so explicitly rather than presenting it as already satisfying this.
 - **Why:** PO ruling (`docs/state.md`, 2026-08-07, dispatch `PHX-WP-STATE-EXTRACT-CHUNK-3`, translated from the original German): *"Top rule from now on: whenever the human has to approve something — no matter what — they do it only once, with one command, and then the whole chain for it gets carried through."* Stated as the highest-precedence process rule, applying to every human approval without exception. Multiple open Phoenix items at the time were found to violate it — a package designed to land in three separate human-gated acts for one release.
 - **Check:** A package/gate design that requires more than one separate PO action to complete a single logical release is flagged at design review; where today's mechanisms cannot collapse it to one action, the design states that limitation explicitly rather than silently presenting a multi-touch flow as compliant.
+
+### EL-38 (MUST) — A `hold-po` slice is never dispatched past without the PO's recorded release
+
+- **Rule:** A slice in state `hold-po` (a PO acceptance point) is never dispatched past, and no dependent work starts, until the PO's release is recorded. Absence of an objection is not a release.
+- **Why:** Greenfield finding P0-5 (Claude-Windows greenfield test). A PO acceptance point exists so that work depending on it waits for the PO; dispatching past it removes the point without the PO's act.
+- **Check:** A dispatch for a slice that depends on a `hold-po` slice with no recorded release is a lifecycle-violation finding at close/critic review.
 
 ## 6. Harness-first debugging (EL-13)
 

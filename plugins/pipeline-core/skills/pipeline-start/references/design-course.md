@@ -71,6 +71,7 @@ was needed; capability evidence is not an Advisor answer.
    state. For `epic`/`feature`, use `present-plan --by <presenter>
    --review-receipt <repo-relative-json-path>`, repeating `--review-receipt`
    once only when the current review chain includes the delta follow-up.
+   `--by` is an actor attribution, not a substitute for approval.
    Supply one or two distinct tracked receipts in chain order. The retired
    `--design-workflow-package` flag is rejected with `DWP-PRESENT-RETIRED`;
    it is not a recovery route.

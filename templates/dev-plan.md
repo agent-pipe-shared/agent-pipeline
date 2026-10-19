@@ -24,9 +24,12 @@ the feature is set: `node harness/scripts/pipeline-state.mjs set-feature --id <i
 > node harness/scripts/pipeline-state.mjs set-feature --id <feature-id> --plan-path .claude/plans/<date>-<feature>.md
 > node harness/scripts/pipeline-state.mjs approve-plan --by po-test
 > ```
+> `--by` is an actor attribution, not a substitute for approval. `po-test` is an example
+> value, not an identity claim.
 > Only after that does the Dev-Plan-Gate (guard-devplan.mjs) allow implementation edits
 > outside the standard exceptions (`docs/`, `specs/`, `.claude/`, `backlog/`, this plan
-> path itself). A revocation runs via `revoke-plan --by <name>`.
+> path itself). A revocation runs via `revoke-plan --by <name>`; there too `<name>` is a
+> label, not an identity claim or authority.
 
 ## Context
 <Task/assignment, occasion, boundary against parallel sessions/topics; one paragraph.>

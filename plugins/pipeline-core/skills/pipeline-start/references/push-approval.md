@@ -25,6 +25,9 @@ preparatory push layers up to the point of signature:
 node "${PIPELINE_PLUGIN_ROOT}/scripts/push-init.mjs" --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref> --candidate <ref> [--record-ref <ref>]]
 ```
 
+`--by` is an actor attribution, not a substitute for approval. Fill it only with
+a value the PO supplied for this exact command, never with a name you inferred.
+
 Use the absolute `pluginRoot` from the current ready start-preflight result for
 `PIPELINE_PLUGIN_ROOT`. Never substitute a project source-tree
 `plugins/pipeline-core` path: the lifecycle guard admits the loaded runtime

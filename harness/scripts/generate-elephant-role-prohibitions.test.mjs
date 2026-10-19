@@ -167,3 +167,36 @@ test("AC-7: the document carries no absolute or machine-specific path", () => {
   assert.doesNotMatch(generated, /C:\\Users/u);
   assert.doesNotMatch(generated, new RegExp(REPO_ROOT.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
 });
+
+test("AC-8 (G9 EL-36/EL-37/EL-38): the three greenfield rules are defined with the right tags and accounted for", () => {
+  const headings = parseElephantHeadings(readFileSync(ELEPHANT_ROLE_PATH, "utf8"));
+  const byId = new Map(headings.map((heading) => [heading.id, heading]));
+  assert.equal(byId.get("EL-36")?.tag, "MUST NOT", "EL-36 must be a (MUST NOT) rule");
+  assert.equal(byId.get("EL-37")?.tag, "MUST NOT", "EL-37 must be a (MUST NOT) rule");
+  assert.equal(byId.get("EL-38")?.tag, "MUST", "EL-38 must be a (MUST) rule");
+  assert.ok(INCLUDED_EL_IDS.includes("EL-36") && INCLUDED_EL_IDS.includes("EL-37"), "MUST NOT rules EL-36/EL-37 belong in the printed block");
+  assert.ok(!INCLUDED_EL_IDS.includes("EL-38"), "EL-38 is a dispatch-pipeline duty and stays out of the printed block");
+  assert.ok(Object.prototype.hasOwnProperty.call(EXCLUDED_EL_IDS, "EL-38"), "EL-38 must be excluded with a stated reason");
+  const generated = renderRoleProhibitions().replace(/\s+/gu, " ");
+  assert.match(generated, /EL-36 Never fill `--by`, or any operator\/actor label, with a value the PO did not supply for that exact command/u);
+  assert.match(generated, /EL-37 A protected or guard-denied mutation goes only through its sanctioned route/u);
+  assert.match(generated, /Role prohibitions loaded: [^ ]*EL-35\/EL-36\/EL-37 —/u);
+  assert.doesNotMatch(generated, /EL-38/u, "the excluded EL-38 must not be printed");
+});
+
+test("AC-9 (G9 P0-2): every reference that documents --by says it is a label, not authority", () => {
+  const sentence = /`--by` is an actor attribution, not a substitute for approval\./u;
+  const carriers = [
+    "plugins/pipeline-core/skills/close-feature/SKILL.md",
+    "plugins/pipeline-core/skills/pipeline-start/references/push-approval.md",
+    "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+    "plugins/pipeline-core/skills/pipeline-start/references/antigravity-feature-close.md",
+    "templates/dev-plan.md",
+  ];
+  for (const relativePath of carriers) {
+    const text = readFileSync(join(REPO_ROOT, relativePath), "utf8").replace(/^>\s?/gmu, "").replace(/\s+/gu, " ");
+    assert.match(text, sentence, `${relativePath} must say that --by is an actor attribution, not a substitute for approval`);
+  }
+  const devPlan = readFileSync(join(REPO_ROOT, "templates/dev-plan.md"), "utf8").replace(/^>\s?/gmu, "").replace(/\s+/gu, " ");
+  assert.match(devPlan, /`po-test` is an example value, not an identity claim/u);
+});
