@@ -39,7 +39,7 @@ copied from the source reports, and the source reports themselves stay local.
 | AGY F-02/04/05 exit 127, dispatch prepare, parallel writes | AC-108 | Uncovered clauses; native-host open |
 | AGY F-01 interpreter opacity clause | AC-115 | Clause open |
 | AGY F-03 signature UX | AC-264 | No single PO command |
-| AC-264 plan-readiness hand-off | D30 | Design spike done (ALF-B21-AC264SPIKE); lib, tests, then a ceremony on `scripts/pipeline-state.mjs` |
+| AC-264 plan-readiness hand-off | D30 | Lib, criterion-scan export and R1-R6 delivered in 7c2d7c6fc (Dispatch ALF-B27-D30B, RED first). The submit-plan/present-plan call sites are drafted as the D30 section of the C7 drop-in; a clone-based baseline-vs-patched proof is running. Open: the C7 ceremony, the Critic batch (flags: the check-path heuristic; a non-git governed root fails closed) and PO acceptance |
 | AC-147/209 catalog half | D29 | Codex-host session, then a ceremony on `lib/guard/read-scope.mjs` |
 | PF-21, PF-26, PF-27 | C2, C3, C1 | In source; effective once the ceremony runs |
 
