@@ -371,6 +371,179 @@ function prepareSignedArming(root, {
   return { shared, scriptPath, recorded, plan, prepared, intent, proof };
 }
 
+// ---------------------------------------------------------------------------------
+// ALF-B3-HGO (AC-197) / Elephant decision E16: arming helpers for the post-arming cases.
+//
+// The chat ceremony (`authorizeHumanGuardOverride`) and the audit repair
+// (`repairHumanGuardOverrideAudit`) now confirm through runRegisteredAttendedChatGateConfirmation(),
+// which observes the REAL fd 0 (`process.stdin.isTTY` + `readSync(0)`). The old injected
+// `isattyFn`/`readLineFn` therefore no longer reach the examiner, and the library takes no
+// attendance seam by design (an injectable seam would be a bypass a hook could reach). Two
+// honest routes remain, and every converted case uses exactly one of them:
+//
+//  1. armBySignature(): a case whose claim is about what happens AFTER arming (consumption,
+//     replay, drift, expiry, audit, ledger binding, tamper) arms through the signature route
+//     with this suite's ephemeral Ed25519 test key, so the post-arming examiner stays live on
+//     every host, native Windows included. Same options object as the retired chat call.
+//  2. armUnderPty()/repairUnderPty(): a case whose claim IS the chat route (or the attended
+//     audit repair, which has no signature route, or the global-plugin-install class, which the
+//     signed route excludes by design) runs the unchanged library call inside a child process
+//     whose fd 0 is a real pty, and a typed line is fed to it. POSIX only; elsewhere
+//     PTY_HOST_LIMIT is a typed host-limit skip naming the native host.
+//
+// QG-04 note: no assertion about product behaviour was weakened, skipped or deleted by this
+// conversion. Only the way each case reaches its armed (or repaired) state changed.
+// ---------------------------------------------------------------------------------
+const PTY_HOST_LIMIT = process.platform === "win32"
+  ? "host-limit: native Windows has no pty in this suite, and the attended ceremony reads the real fd 0 by design (Elephant decision E16)"
+  : (spawnSync("python3", ["-I", "-c", "import os, pty"], { encoding: "utf8" }).status === 0
+    ? false
+    : "host-limit: python3 with the pty module is unavailable, so no real pty can be allocated on this host (Elephant decision E16)");
+
+const PTY_DRIVER = [
+  "import base64, os, pty, sys",
+  "typed = sys.argv[1].encode()",
+  "repeat = int(sys.argv[2])",
+  "write_path = sys.argv[3]",
+  "write_b64 = sys.argv[4]",
+  "cmd = sys.argv[5:]",
+  "pid, fd = pty.fork()",
+  "if pid == 0:",
+  "    os.execvp(cmd[0], cmd)",
+  "out = b''",
+  "marker = b'Type the confirmation value'",
+  "seen = True",
+  "while marker not in out:",
+  "    try:",
+  "        chunk = os.read(fd, 4096)",
+  "    except OSError:",
+  "        chunk = b''",
+  "    if not chunk:",
+  "        seen = False",
+  "        break",
+  "    out += chunk",
+  "if seen:",
+  "    if write_path:",
+  "        with open(write_path, 'wb') as handle:",
+  "            handle.write(base64.b64decode(write_b64))",
+  "    os.write(fd, (typed + b'\\n') * repeat)",
+  "while True:",
+  "    try:",
+  "        chunk = os.read(fd, 4096)",
+  "    except OSError:",
+  "        break",
+  "    if not chunk:",
+  "        break",
+  "    out += chunk",
+  "_, status = os.waitpid(pid, 0)",
+  "sys.stdout.write(out.decode('utf-8', 'replace')[-1500:])",
+  "sys.exit(os.waitstatus_to_exitcode(status))",
+].join("\n");
+
+const PTY_CHILD = [
+  'import { existsSync, writeFileSync } from "node:fs";',
+  'import assert from "node:assert/strict";',
+  "const request = JSON.parse(process.env.HGO_PTY_REQUEST);",
+  "const lib = await import(request.libUrl);",
+  'const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL" }];',
+  "const expectCode = (run, code) => { try { run(); } catch (error) { assert.equal(error?.code, code); return; } assert.fail('expected ' + code); };",
+  "let args = request.args;",
+  'if (request.scenario === "interrupt") {',
+  '  args = { ...args, dependencies: { afterLedgerWriteFn: () => { throw new Error("simulated interruption"); } } };',
+  "}",
+  'if (request.scenario === "lock-held") {',
+  "  const options = request.args;",
+  "  args = { ...args, dependencies: { afterLedgerWriteFn: () => {",
+  '    expectCode(() => lib.repairHumanGuardOverrideAudit(options), "HGO-AUDIT-LOCKED");',
+  "    assert.equal(existsSync(request.lockPath), true);",
+  '    expectCode(() => lib.recordHumanGuardDenial({ rootDir: options.rootDir, pluginRoot: request.pluginRoot, toolName: "Write", toolInput: { file_path: "notes.md", content: "competing append\\n" }, denials: denial }), "HGO-AUDIT-LOCKED");',
+  "    assert.equal(existsSync(request.lockPath), true);",
+  "  } } };",
+  "}",
+  "let outcome;",
+  "try { outcome = { ok: true, value: lib[request.fn](args) }; }",
+  "catch (error) { outcome = { ok: false, name: error?.name, code: error?.code, message: String(error?.message ?? error) }; }",
+  "writeFileSync(request.resultPath, JSON.stringify(outcome));",
+].join("\n");
+
+function runAttendedUnderPty(fn, args, typed, { scenario = null, repeat = 1, beforeTypeWrite = null, lockPath = null } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "hgo-pty-"));
+  try {
+    const resultPath = join(dir, "result.json");
+    const request = {
+      libUrl: new URL("./human-guard-override.mjs", import.meta.url).href,
+      fn, args, scenario, lockPath, resultPath, pluginRoot: PLUGIN_ROOT,
+    };
+    const run = spawnSync("python3", [
+      "-I", "-c", PTY_DRIVER, typed, String(repeat),
+      beforeTypeWrite === null ? "" : beforeTypeWrite.path,
+      beforeTypeWrite === null ? "" : Buffer.from(beforeTypeWrite.bytes).toString("base64"),
+      process.execPath, "--input-type=module", "-e", PTY_CHILD,
+    ], { encoding: "utf8", timeout: 120_000, env: { ...process.env, HGO_PTY_REQUEST: JSON.stringify(request) } });
+    if (!existsSync(resultPath)) {
+      throw new Error(`pty child produced no result (exit ${run.status}): ${String(run.stdout).slice(-600)}${String(run.stderr).slice(-300)}`);
+    }
+    const outcome = JSON.parse(readFileSync(resultPath, "utf8"));
+    if (outcome.ok) return outcome.value;
+    throw outcome.name === "HumanGuardOverrideError"
+      ? new HumanGuardOverrideError(outcome.code, outcome.message)
+      : new Error(outcome.message);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** Retired-call-compatible: `reason`, `selectionSha256`, `reasonSha256`, `activate` and `dependencies` are accepted and ignored. */
+function armUnderPty(options) {
+  const { dependencies: _attendanceSeam, ...args } = options;
+  return runAttendedUnderPty(
+    "authorizeHumanGuardOverride", args, `HGO-${options.selectionSha256.slice(0, 8).toUpperCase()}`,
+  );
+}
+
+function repairUnderPty(options, extra = {}) {
+  const { dependencies: _attendanceSeam, ...args } = options;
+  return runAttendedUnderPty(
+    "repairHumanGuardOverrideAudit", args, `HGO-AUDIT-${options.expectedPreimageSha256.slice(0, 12).toUpperCase()}`, extra,
+  );
+}
+
+/**
+ * Retired-call-compatible chat arming replacement: signs and arms the exact plan the case froze, through
+ * authorizeHumanGuardOverrideBySignature() with this suite's ephemeral test key. The root must be a
+ * fixtureSignature() repository. `reason`, `selectionSha256`, `reasonSha256`, `activate` and `dependencies`
+ * are accepted and ignored: the signed route fixes its own reason (HGO_SIGNATURE_REASON).
+ */
+function armBySignature(options) {
+  const { rootDir, pluginRoot = PLUGIN_ROOT, requestSha256, planSha256, nowMs, scriptPath, authorSourceRoot = null } = options;
+  const shared = { rootDir, pluginRoot, scriptPath, authorSourceRoot };
+  const plan = planHumanGuardOverride({ ...shared, requestSha256, nowMs });
+  assert.equal(plan.planSha256, planSha256, "the signed arming helper must sign the exact plan the case froze");
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    ...shared, requestSha256, planSha256, reason: HGO_SIGNATURE_REASON, nowMs,
+  });
+  const intent = createPoApprovalIntent({
+    kind: "guard-override",
+    featureId: "human-guard-override",
+    planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
+    specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+    candidate: { commit: plan.repository.head, tree: plan.repository.tree },
+    policyRevision: "human-guard-override-signature-v1",
+    subjectSha256: prepared.selectionSha256,
+    decision: "authorize",
+  });
+  const proof = {
+    schema: PO_APPROVAL_PROOF_SCHEMA,
+    intentSha256: intent.sha256,
+    keyReference: SIG_KEY_REFERENCE,
+    publicKey: sigPublicKey,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), sigPair.privateKey).toString("base64"),
+  };
+  return authorizeHumanGuardOverrideBySignature({
+    rootDir, pluginRoot, requestSha256, planSha256, proof, nowMs, scriptPath, authorSourceRoot,
+  });
+}
+
 test("ADR-0059 Decision 1: a valid, correctly-bound signed proof arms the identical v2 capability, consumable exactly like the chat path", () => {
   const root = fixtureSignature();
   try {
@@ -555,7 +728,11 @@ test("ADR-0059 Decision 1: re-authorizing with an identical proof is an idempote
     const second = authorizeHumanGuardOverrideBySignature({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
     });
-    assert.deepEqual(second, { schema: "pipeline.human-guard-override-capability.v3", status: "armed", planSha256: plan.planSha256, requestSha256: recorded.requestSha256, mutated: false });
+    // AC-197 / QG-04: the case pins the idempotent no-op (mutated: false, identical capability), not the capability
+    // schema version; the literal v3 went stale when the capability schema moved to v4, so the claim now compares
+    // against the first arming's own schema and everything else stays pinned exactly as before.
+    assert.deepEqual(second, { ...first, mutated: false });
+    assert.equal(first.schema, "pipeline.human-guard-override-capability.v4");
     assert.throws(
       () => authorizeHumanGuardOverrideBySignature({
         rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3999, scriptPath,
@@ -1099,7 +1276,7 @@ test("NVA-HGOFIX-1: the pre-existing legacy-singular-only trustAnchor case is un
 });
 
 test("one exact attended capability is audited, consumed once and cannot be replayed", () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const toolInput = { file_path: "notes.md", content: "attended recovery\n" };
     const request = recordHumanGuardDenial({
@@ -1139,7 +1316,7 @@ test("one exact attended capability is audited, consumed once and cannot be repl
     assert.equal(prepared.authorizeAction.requiresConfirmation, true);
     assert.equal(prepared.authorizeAction.argv.includes("<human-reason>"), false);
     assert.deepEqual(prepared.decisionPreview, plan.preview);
-    const armed = authorizeHumanGuardOverride({
+    const armed = armBySignature({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256,
@@ -1186,14 +1363,14 @@ test("one exact attended capability is audited, consumed once and cannot be repl
 });
 
 test("an armed capability remains armed when a later lifecycle-not-ready co-denial takes precedence", () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const toolInput = { file_path: "notes.md", content: "lifecycle precedence\n" };
     const request = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000 });
     const plan = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs") });
     const reason = "PO attended lifecycle precedence fixture";
     const prepared = prepareHumanGuardOverrideAuthorization({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 2500, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs") });
-    assert.equal(authorizeHumanGuardOverride({
+    assert.equal(armBySignature({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -1330,7 +1507,7 @@ test("PO chat may arm an exact external read scope while mutation approval remai
   }
 });
 
-test("a host-Git-unavailable hook can consume only the exact audited local plugin installation", () => {
+test("a host-Git-unavailable hook can consume only the exact audited local plugin installation", { skip: PTY_HOST_LIMIT }, () => {
   // NVA-HGOTEST-1: see withFakeCodexRegistry() above -- this test's own subject is
   // host-Git-unavailability, orthogonal to this host's real marketplace registration.
   withFakeCodexRegistry([], () => {
@@ -1393,7 +1570,7 @@ test("a host-Git-unavailable hook can consume only the exact audited local plugi
     // test otherwise simulates -- and it is also where ADR-0059 Decision 1's defense-in-
     // depth mode check now lives, which needs to read the fixture's own committed
     // `pipeline.user.yaml` via real Git.
-    authorizeHumanGuardOverride({
+    armUnderPty({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256,
@@ -1430,7 +1607,7 @@ test("a host-Git-unavailable hook can consume only the exact audited local plugi
   });
 });
 
-test("local plugin installation capability rejects a changed candidate source", () => {
+test("local plugin installation capability rejects a changed candidate source", { skip: PTY_HOST_LIMIT }, () => {
   // NVA-HGOTEST-1: see withFakeCodexRegistry() above -- this test's own subject is
   // changed-candidate-source rejection, orthogonal to this host's real marketplace
   // registration.
@@ -1468,7 +1645,7 @@ test("local plugin installation capability rejects a changed candidate source", 
     });
     // See the sibling fixture above: `authorize` uses the real default spawn (the PO's
     // own step, plus ADR-0059 Decision 1's defense-in-depth mode check).
-    authorizeHumanGuardOverride({
+    armUnderPty({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -1491,7 +1668,7 @@ test("commit and exact in-root patch admission never execute the effect or claim
       command: "*** Begin Patch\n*** Add File: notes.md\n+exact patch retry\n*** End Patch",
     }, "exact-in-root-patch"],
   ]) {
-    const root = fixture();
+    const root = fixtureSignature();
     try {
       const originalHead = git(root, "rev-parse", "HEAD");
       const request = recordHumanGuardDenial({
@@ -1522,7 +1699,7 @@ test("commit and exact in-root patch admission never execute the effect or claim
         nowMs: 2500,
         scriptPath,
       });
-      authorizeHumanGuardOverride({
+      armBySignature({
         rootDir: root,
         pluginRoot: PLUGIN_ROOT,
         requestSha256: request.requestSha256,
@@ -1559,7 +1736,7 @@ test("commit and exact in-root patch admission never execute the effect or claim
 });
 
 test("drift, expiry and concurrent consumption fail closed", () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const toolInput = { file_path: "notes.md", content: "bounded\n" };
     const request = recordHumanGuardDenial({
@@ -1588,7 +1765,7 @@ test("drift, expiry and concurrent consumption fail closed", () => {
       nowMs: 2500,
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
-    authorizeHumanGuardOverride({
+    armBySignature({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256,
@@ -1650,7 +1827,7 @@ test("drift, expiry and concurrent consumption fail closed", () => {
 // chat-mode sibling of the signed-path test above: authorizeHumanGuardOverride()'s in-session
 // `activate` path built the identical `capabilityCore` without checking `planned.expiresAt`
 // against `nowMs` either.
-test("NVA-G-EXPIREDARM: authorizeHumanGuardOverride (chat mode) refuses to arm once the plan window has closed, writes no capability, and still arms an unexpired plan", () => {
+test("NVA-G-EXPIREDARM: authorizeHumanGuardOverride (chat mode) refuses to arm once the plan window has closed, writes no capability, and still arms an unexpired plan", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const toolInput = { file_path: "notes.md", content: "expired chat arm\n" };
@@ -1665,7 +1842,7 @@ test("NVA-G-EXPIREDARM: authorizeHumanGuardOverride (chat mode) refuses to arm o
     const prepared = prepareHumanGuardOverrideAuthorization({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 1800, scriptPath,
     });
-    const activate = (nowMs) => authorizeHumanGuardOverride({
+    const activate = (nowMs) => armUnderPty({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256,
@@ -1704,7 +1881,7 @@ test("NVA-G-EXPIREDARM: authorizeHumanGuardOverride (chat mode) refuses to arm o
 // reason." The two shapes below must never collapse into the same rendering -- that collapse
 // is exactly what turned a one-line cause into a multi-step investigation in the incident.
 test("NVA-G-EXPIREDARM: a consumption denial that rejected an existing (but now-expired) armed capability is distinguishable from a first denial", () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const toolInput = { file_path: "notes.md", content: "distinguishable denial\n" };
     const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
@@ -1725,7 +1902,7 @@ test("NVA-G-EXPIREDARM: a consumption denial that rejected an existing (but now-
     const prepared = prepareHumanGuardOverrideAuthorization({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 2400, scriptPath,
     });
-    authorizeHumanGuardOverride({
+    armBySignature({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256,
@@ -1760,7 +1937,7 @@ test("NVA-W3-16: a rejected drift audit entry names exactly which checks diverge
   // failed on. Here the coarse filter still matches (same tool/input/denials)
   // but the repository itself changes between authorize and consume, so the
   // capability reaches the drift computation and rejects on "repository".
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const toolInput = { file_path: "notes.md", content: "bounded\n" };
     const request = recordHumanGuardDenial({
@@ -1789,7 +1966,7 @@ test("NVA-W3-16: a rejected drift audit entry names exactly which checks diverge
       nowMs: 2500,
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
-    authorizeHumanGuardOverride({
+    armBySignature({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256,
@@ -2100,7 +2277,7 @@ test("a non-push git apply --check command whose patch path says push never sele
 });
 
 test("pipeline author repair binds one exact source root and action without State readiness", { skip: DIRECTORY_SYMLINK_SKIP }, () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const sourceRoot = join(root, "plugins", "pipeline-core");
     mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
@@ -2177,7 +2354,7 @@ test("pipeline author repair binds one exact source root and action without Stat
     assert.deepEqual(signing.authorizeBySignatureCommand.argv.slice(-4), [
       "--proof", "<external-proof.json>", "--author-source-root", sourceRoot,
     ]);
-    const armed = authorizeHumanGuardOverride({
+    const armed = armBySignature({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256,
@@ -2491,7 +2668,7 @@ test("a real killed audit writer is reclaimed by the next ordinary append withou
   }
 });
 
-test("repair-audit uses the same killed-owner reclamation and preserves its authenticated source bytes", () => {
+test("repair-audit uses the same killed-owner reclamation and preserves its authenticated source bytes", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const { base } = tornAuditFixture(root);
@@ -2501,7 +2678,7 @@ test("repair-audit uses the same killed-owner reclamation and preserves its auth
     const beforeHead = readFileSync(join(base, "audit.head.json"));
     killedAuditWriter(base);
     const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
-    const repaired = repairHumanGuardOverrideAudit({
+    const repaired = repairUnderPty({
       rootDir: root, expectedPreimageSha256: state.repairPreimageSha256, activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => challenge },
     });
@@ -2623,7 +2800,7 @@ test("a recovery guard excludes a second reclaimer and a raced replacement is ne
   }
 });
 
-test("an authenticated empty head and a multi-entry tail recover without dropping prefix bytes", () => {
+test("an authenticated empty head and a multi-entry tail recover without dropping prefix bytes", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const { base } = tornAuditFixture(root);
@@ -2633,7 +2810,7 @@ test("an authenticated empty head and a multi-entry tail recover without droppin
     assert.equal(state.status, "recoverable-torn-append");
     assert.equal(state.headEntries, 0);
     assert.equal(state.tailEntries, 2);
-    repairHumanGuardOverrideAudit({
+    repairUnderPty({
       rootDir: root, expectedPreimageSha256: state.repairPreimageSha256, activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}` },
     });
@@ -2733,7 +2910,7 @@ for (const corruption of [
   });
 }
 
-test("a valid authenticated head prefix plus contiguous authenticated tail is classified and repaired once", () => {
+test("a valid authenticated head prefix plus contiguous authenticated tail is classified and repaired once", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const { base } = tornAuditFixture(root);
@@ -2752,7 +2929,7 @@ test("a valid authenticated head prefix plus contiguous authenticated tail is cl
       completionPending: false,
     });
     const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
-    const repaired = repairHumanGuardOverrideAudit({
+    const repaired = repairUnderPty({
       rootDir: root,
       expectedPreimageSha256: state.repairPreimageSha256,
       activate: true,
@@ -2765,7 +2942,7 @@ test("a valid authenticated head prefix plus contiguous authenticated tail is cl
       .map((line) => JSON.parse(line).event);
     assert.equal(events.filter(({ type }) => type === "audit-repaired").length, 1);
     assert.equal(events.at(-1).repairPreimageSha256, state.repairPreimageSha256);
-    assert.equal(repairHumanGuardOverrideAudit({
+    assert.equal(repairUnderPty({
       rootDir: root,
       expectedPreimageSha256: state.repairPreimageSha256,
       activate: true,
@@ -2779,20 +2956,20 @@ test("a valid authenticated head prefix plus contiguous authenticated tail is cl
   }
 });
 
-test("a completed repair remains idempotent after a later ordinary authenticated append", () => {
+test("a completed repair remains idempotent after a later ordinary authenticated append", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const { base } = tornAuditFixture(root);
     const state = inspectHumanGuardOverrideAudit({ rootDir: root });
     const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
-    repairHumanGuardOverrideAudit({
+    repairUnderPty({
       rootDir: root,
       expectedPreimageSha256: state.repairPreimageSha256,
       activate: true,
       nowMs: 5000,
       dependencies: { isattyFn: () => true, readLineFn: () => challenge },
     });
-    const firstRetry = repairHumanGuardOverrideAudit({
+    const firstRetry = repairUnderPty({
       rootDir: root,
       expectedPreimageSha256: state.repairPreimageSha256,
       activate: true,
@@ -2817,7 +2994,7 @@ test("a completed repair remains idempotent after a later ordinary authenticated
     }), (error) => error instanceof HumanGuardOverrideError
       && error.code === "HGO-AUDIT-REPAIR-NOT-REQUIRED");
 
-    const laterRetry = repairHumanGuardOverrideAudit({
+    const laterRetry = repairUnderPty({
       rootDir: root,
       expectedPreimageSha256: state.repairPreimageSha256,
       activate: true,
@@ -2833,21 +3010,18 @@ test("a completed repair remains idempotent after a later ordinary authenticated
   }
 });
 
-test("repair rechecks the attended preimage under lock before it mutates", () => {
+test("repair rechecks the attended preimage under lock before it mutates", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const { base, currentHead } = tornAuditFixture(root);
     const state = inspectHumanGuardOverrideAudit({ rootDir: root });
     const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
-    assert.throws(() => repairHumanGuardOverrideAudit({
-      rootDir: root,
-      expectedPreimageSha256: state.repairPreimageSha256,
-      activate: true,
-      dependencies: { isattyFn: () => true, readLineFn: () => {
-        writeFileSync(join(base, "audit.head.json"), currentHead, { mode: 0o600 });
-        return challenge;
-      } },
-    }), (error) => error instanceof HumanGuardOverrideError
+    // E16: the head rewrite that used to run inside the injected readLineFn now happens between the prompt and
+    // the typed line (pty driver), i.e. at the same moment: after the preimage was read, before the lock is taken.
+    assert.throws(() => repairUnderPty({
+      rootDir: root, expectedPreimageSha256: state.repairPreimageSha256, activate: true,
+    }, { beforeTypeWrite: { path: join(base, "audit.head.json"), bytes: Buffer.from(currentHead) } }),
+    (error) => error instanceof HumanGuardOverrideError
       && error.code === "HGO-AUDIT-REPAIR-DRIFT");
     assert.equal(inspectHumanGuardOverrideAudit({ rootDir: root }).status, "valid");
   } finally {
@@ -2855,39 +3029,17 @@ test("repair rechecks the attended preimage under lock before it mutates", () =>
   }
 });
 
-test("a failed repair or ordinary append never removes the active repair writer's lock", () => {
+test("a failed repair or ordinary append never removes the active repair writer's lock", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const { base } = tornAuditFixture(root);
     const state = inspectHumanGuardOverrideAudit({ rootDir: root });
     const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
-    const repairOptions = {
+    // E16: the nested repair and the competing append run inside the pty child, from its own
+    // afterLedgerWriteFn, while the outer repair holds the lock (the child feeds the nested ceremony a second typed line).
+    repairUnderPty({
       rootDir: root, expectedPreimageSha256: state.repairPreimageSha256, activate: true,
-      dependencies: { isattyFn: () => true, readLineFn: () => challenge },
-    };
-    repairHumanGuardOverrideAudit({
-      ...repairOptions,
-      dependencies: {
-        ...repairOptions.dependencies,
-        afterLedgerWriteFn: () => {
-          // WIN-HGO-S: native win32 keeps no per-process start identity, so a present pid
-          // is never proof of a live owner (win32AuditLockOwnerState() answers only "dead"
-          // or "ambiguous", by documented design) and a lock held by this very process is
-          // refused as HGO-AUDIT-LOCK-AMBIGUOUS rather than HGO-AUDIT-LOCKED. The property
-          // this case protects -- a competing writer never removes the active repair
-          // writer's lock -- is asserted unchanged on every platform below.
-          const heldLockCode = process.platform === "win32" ? "HGO-AUDIT-LOCK-AMBIGUOUS" : "HGO-AUDIT-LOCKED";
-          assert.throws(() => repairHumanGuardOverrideAudit(repairOptions),
-            (error) => error instanceof HumanGuardOverrideError && error.code === heldLockCode);
-          assert.equal(existsSync(join(base, "audit.lock")), true);
-          assert.throws(() => recordHumanGuardDenial({
-            rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
-            toolInput: { file_path: "notes.md", content: "competing append\n" }, denials: denial,
-          }), (error) => error instanceof HumanGuardOverrideError && error.code === heldLockCode);
-          assert.equal(existsSync(join(base, "audit.lock")), true);
-        },
-      },
-    });
+    }, { scenario: "lock-held", repeat: 2, lockPath: join(base, "audit.lock") });
     assert.equal(existsSync(join(base, "audit.lock")), false);
     assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 3);
   } finally {
@@ -2895,27 +3047,20 @@ test("a failed repair or ordinary append never removes the active repair writer'
   }
 });
 
-test("repair completes idempotently after interruption between ledger and head without a second audit-repaired event", () => {
+test("repair completes idempotently after interruption between ledger and head without a second audit-repaired event", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const { base } = tornAuditFixture(root);
     const state = inspectHumanGuardOverrideAudit({ rootDir: root });
     const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
-    assert.throws(() => repairHumanGuardOverrideAudit({
-      rootDir: root,
-      expectedPreimageSha256: state.repairPreimageSha256,
-      activate: true,
-      dependencies: {
-        isattyFn: () => true,
-        readLineFn: () => challenge,
-        afterLedgerWriteFn: () => { throw new Error("simulated interruption"); },
-      },
-    }), /simulated interruption/u);
+    assert.throws(() => repairUnderPty({
+      rootDir: root, expectedPreimageSha256: state.repairPreimageSha256, activate: true,
+    }, { scenario: "interrupt" }), /simulated interruption/u);
     const pending = inspectHumanGuardOverrideAudit({ rootDir: root });
     assert.equal(pending.status, "recoverable-torn-append");
     assert.equal(pending.completionPending, true);
     assert.equal(pending.repairPreimageSha256, state.repairPreimageSha256);
-    const completed = repairHumanGuardOverrideAudit({
+    const completed = repairUnderPty({
       rootDir: root,
       expectedPreimageSha256: state.repairPreimageSha256,
       activate: true,
@@ -3003,7 +3148,7 @@ test("deleted ledger, authenticated head, or their pair fails verification", () 
 });
 
 test("an armed capability is unusable when its authorization audit disappeared", () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const toolInput = { file_path: "notes.md", content: "audit-bound\n" };
     const request = recordHumanGuardDenial({
@@ -3032,7 +3177,7 @@ test("an armed capability is unusable when its authorization audit disappeared",
       nowMs: 2500,
       scriptPath,
     });
-    authorizeHumanGuardOverride({
+    armBySignature({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256,
@@ -3213,7 +3358,7 @@ test("missing or replaced audit keys fail closed without silent regeneration", (
 });
 
 test("a tampered one-action capability cannot be consumed", () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const toolInput = { file_path: "notes.md", content: "bounded\n" };
     const request = recordHumanGuardDenial({
@@ -3242,7 +3387,7 @@ test("a tampered one-action capability cannot be consumed", () => {
       nowMs: 2500,
       scriptPath,
     });
-    authorizeHumanGuardOverride({
+    armBySignature({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       requestSha256: request.requestSha256,
@@ -3292,7 +3437,7 @@ test("a tampered one-action capability cannot be consumed", () => {
 });
 
 test("NVA-SIGDISCLOSE-1 Finding 6: a tampered capability among several never poisons the others -- the valid, armed one still consumes", () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const goodInput = { file_path: "good.md", content: "good\n" };
     const badInput = { file_path: "bad.md", content: "bad\n" };
@@ -3308,7 +3453,7 @@ test("NVA-SIGDISCLOSE-1 Finding 6: a tampered capability among several never poi
         rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
         planSha256: plan.planSha256, reason, nowMs: nowMs + 200, scriptPath,
       });
-      authorizeHumanGuardOverride({
+      armBySignature({
         rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
         planSha256: plan.planSha256, selectionSha256: prepared.selectionSha256, reason,
         reasonSha256: prepared.reasonSha256, activate: true,
@@ -3344,7 +3489,7 @@ test("NVA-SIGDISCLOSE-1 Finding 6: a tampered capability among several never poi
 });
 
 test("NVA-SIGDISCLOSE-1 Finding 6: a record that IS validated but is a legitimate non-match (wrong tool input) is still refused exactly as before -- no security regression", () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const toolInput = { file_path: "notes.md", content: "legit non-match\n" };
     const request = recordHumanGuardDenial({
@@ -3359,7 +3504,7 @@ test("NVA-SIGDISCLOSE-1 Finding 6: a record that IS validated but is a legitimat
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
       planSha256: plan.planSha256, reason, nowMs: 2500, scriptPath,
     });
-    authorizeHumanGuardOverride({
+    armBySignature({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
       planSha256: plan.planSha256, selectionSha256: prepared.selectionSha256, reason,
       reasonSha256: prepared.reasonSha256, activate: true,
@@ -3379,7 +3524,7 @@ test("NVA-SIGDISCLOSE-1 Finding 6: a record that IS validated but is a legitimat
 });
 
 test("authorization audit failure rolls back its newly created capability", () => {
-  const root = fixture();
+  const root = fixtureSignature();
   try {
     const toolInput = { file_path: "notes.md", content: "audit rollback\n" };
     const request = recordHumanGuardDenial({
@@ -3412,7 +3557,7 @@ test("authorization audit failure rolls back its newly created capability", () =
     const base = join(common, "agent-pipeline", "human-guard-overrides");
     writeFileSync(join(base, "audit.head.json"), "{}\n", { mode: 0o600 });
     assert.throws(
-      () => authorizeHumanGuardOverride({
+      () => armBySignature({
         rootDir: root,
         pluginRoot: PLUGIN_ROOT,
         requestSha256: request.requestSha256,
@@ -4099,7 +4244,7 @@ test("NVA-MKTHASH-1: a real directory copy is folded into statusSha256, and a su
 // so a throwing stub would be silently read as an unavailable registry and both arms would
 // collapse into the same state while the test still went green. The calls are recorded and
 // asserted from outside instead.
-test("NVA-BL-20 F5: the Codex marketplace-registry spawn is injectable from all three production entry points", () => {
+test("NVA-BL-20 F5: the Codex marketplace-registry spawn is injectable from all three production entry points", { skip: PTY_HOST_LIMIT }, () => {
   // NVA-HGOTEST-1: `prepareHumanGuardOverrideAuthorization()`/`authorizeHumanGuardOverride()`
   // below carry no `codexSpawn` seam (see withFakeCodexRegistry() above), so they always
   // read the REAL `codex` binary -- shimmed here to "not registered", the SAME state
@@ -4176,7 +4321,7 @@ test("NVA-BL-20 F5: the Codex marketplace-registry spawn is injectable from all 
     // `authorize` uses the real default git spawn for the same reason the sibling fixtures
     // above give: it is the PO's own step from an ordinary terminal. It never recomputes
     // the marketplace observation, so it takes no codexSpawn.
-    authorizeHumanGuardOverride({
+    armUnderPty({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
       planSha256: planned.planSha256, selectionSha256: prepared.selectionSha256, reason,
       reasonSha256: reasonDigest(reason), activate: true,
@@ -4639,7 +4784,7 @@ test("NOVA-HGOELIG-1: an out-of-root target reaches the identical plan/prepare/a
 // included -- so parity is the DEFAULT this dispatch inherited, not something it had to
 // add. This test proves that default holds for the new class specifically, the same way
 // NOVA-XREPO-HGO-3 already proves it for the previously-classifiable cross-repo shapes.
-test("NOVA-HGOELIG-2: chat mode reaches the identical out-of-root class with the same reach as signature mode (ADR-0059 Decision 3/6 parity, no special-casing)", () => {
+test("NOVA-HGOELIG-2: chat mode reaches the identical out-of-root class with the same reach as signature mode (ADR-0059 Decision 3/6 parity, no special-casing)", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture(); // committed gates.push_approval: "chat"
   const outside = mkdtempSync(join(tmpdir(), "hgoelig-1-outside-chat-"));
   try {
@@ -4657,7 +4802,7 @@ test("NOVA-HGOELIG-2: chat mode reaches the identical out-of-root class with the
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
       reason, nowMs: 2500, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
-    const armed = authorizeHumanGuardOverride({
+    const armed = armUnderPty({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -4940,7 +5085,7 @@ test("NVA-HGOHEAD-1: a fresh repository with no commits (unborn HEAD) does not c
 // non-restart recovery path from that refusal.
 // ---------------------------------------------------------------------------------
 
-test("Part A (a): a benign statusSha256/head/tree-only repository change between plan and arm does not block (proves the narrowing)", () => {
+test("Part A (a): a benign statusSha256/head/tree-only repository change between plan and arm does not block (proves the narrowing)", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const toolInput = { file_path: "notes.md", content: "narrowing a\n" };
@@ -4970,7 +5115,7 @@ test("Part A (a): a benign statusSha256/head/tree-only repository change between
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       reason, nowMs: 3000, scriptPath,
     });
-    const armed = authorizeHumanGuardOverride({
+    const armed = armUnderPty({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -5031,7 +5176,7 @@ test("NVA-HGOHEAD-1: a repository that gains its first commit between record and
   }
 });
 
-test("Part A (b): a policyIdentity change between plan and arm still blocks with HGO-DRIFT (narrowing did not become no-check)", () => {
+test("Part A (b): a policyIdentity change between plan and arm still blocks with HGO-DRIFT (narrowing did not become no-check)", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const toolInput = { file_path: "notes.md", content: "narrowing b\n" };
@@ -5052,7 +5197,7 @@ test("Part A (b): a policyIdentity change between plan and arm still blocks with
     mkdirSync(join(root, "project"), { recursive: true });
     writeFileSync(join(root, "project", "guard-config.json"), '{"changed": true}\n');
     assert.throws(
-      () => authorizeHumanGuardOverride({
+      () => armUnderPty({
         rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
         selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
         dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -5100,7 +5245,7 @@ test("NVA-HGOHEAD-1: a rev-parse HEAD failure that is NOT the unborn-branch shap
   }
 });
 
-test("Part A (c): a hand-tampered byte in a pluginIdentity()-hashed file between plan and arm trips HGO-PLUGIN-DRIFT", () => {
+test("Part A (c): a hand-tampered byte in a pluginIdentity()-hashed file between plan and arm trips HGO-PLUGIN-DRIFT", { skip: PTY_HOST_LIMIT }, () => {
   for (const changed of [
     [".codex-plugin", "plugin.json"],
     ["hooks", "codex-pretool-guard.mjs"],
@@ -5139,7 +5284,7 @@ test("Part A (c): a hand-tampered byte in a pluginIdentity()-hashed file between
       // Tamper AFTER plan, BEFORE arm -- exactly the window step 3c (re-)closes.
       tamperPluginFile(plugin, changed, "arm-time identity drift");
       assert.throws(
-        () => authorizeHumanGuardOverride({
+        () => armUnderPty({
           rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, planSha256: plan.planSha256,
           selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
           dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -5154,7 +5299,7 @@ test("Part A (c): a hand-tampered byte in a pluginIdentity()-hashed file between
   }
 });
 
-test("Part A (d): a benign repository-only change between plan and arm does not trip HGO-PLUGIN-DRIFT (3c stayed narrow)", () => {
+test("Part A (d): a benign repository-only change between plan and arm does not trip HGO-PLUGIN-DRIFT (3c stayed narrow)", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const toolInput = { file_path: "notes.md", content: "narrowing d\n" };
@@ -5173,7 +5318,7 @@ test("Part A (d): a benign repository-only change between plan and arm does not 
     writeFileSync(join(root, "unrelated-d.md"), "benign change\n");
     git(root, "add", "unrelated-d.md");
     git(root, "commit", "-q", "-m", "benign unrelated commit before arm");
-    const armed = authorizeHumanGuardOverride({
+    const armed = armUnderPty({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -5207,7 +5352,7 @@ test("Part A (e): a commit landing on HEAD between signing and arming trips HGO-
   }
 });
 
-test("Part A (e): the chat path has no signedCandidate concept and cannot trip HGO-CANDIDATE-DRIFT even when HEAD moves before arming", () => {
+test("Part A (e): the chat path has no signedCandidate concept and cannot trip HGO-CANDIDATE-DRIFT even when HEAD moves before arming", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const toolInput = { file_path: "notes.md", content: "chat candidate drift\n" };
@@ -5226,7 +5371,7 @@ test("Part A (e): the chat path has no signedCandidate concept and cannot trip H
     writeFileSync(join(root, "post-prepare.md"), "landed before arm\n");
     git(root, "add", "post-prepare.md");
     git(root, "commit", "-q", "-m", "commit before chat-path arm");
-    const armed = authorizeHumanGuardOverride({
+    const armed = armUnderPty({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -5611,8 +5756,8 @@ test("Finding 3: two different non-null authorSourceRoot values for the same req
 });
 
 test("NVA-CROSSREPOLEDGER-1b: a cross-repository `git -C` command binds command evaluation, token consumption and ledger append to the TARGET repository, not the coordinator's", () => {
-  const root = fixture(); // the coordinating session's own root
-  const target = fixture(); // the guarded command's actual, distinct physical target
+  const root = fixtureSignature(); // the coordinating session's own root
+  const target = fixtureSignature(); // the guarded command's actual, distinct physical target
   try {
     const command = `git -C ${target} status`;
     const toolInput = { command };
@@ -5647,7 +5792,7 @@ test("NVA-CROSSREPOLEDGER-1b: a cross-repository `git -C` command binds command 
       rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
       reason, nowMs: 2500, scriptPath,
     });
-    const armed = authorizeHumanGuardOverride({
+    const armed = armBySignature({
       rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -5762,14 +5907,14 @@ test("NVA-CROSSREPOLEDGER-1d: a cross-repository target whose ledger root cannot
 // ---------------------------------------------------------------------------------
 
 test("NVA-CROSSREPOLEDGER-2a: a symlinked cross-repository target resolves the ledger binding through its REAL target, not the repository containing the symlink", { skip: JUNCTION_SKIP }, () => {
-  const root = fixture(); // the coordinating session's own root
-  const target = fixture(); // the guarded command's actual, distinct physical target
+  const root = fixtureSignature(); // the coordinating session's own root
+  const target = fixtureSignature(); // the guarded command's actual, distinct physical target
   // A third, independently valid git repository stands in for "a directory that
   // happens to sit inside a DIFFERENT valid git repository (plausibly the
   // coordinator's own)" (Critic F1): before this fix, `dirname(<symlink path>)`
   // would land HERE, and this repository's own root would be silently (and
   // wrongly) returned -- the bug never threw, it just found the wrong answer.
-  const linkHolder = fixture();
+  const linkHolder = fixtureSignature();
   const symlinkPath = join(linkHolder, "link-to-target");
   symlinkSync(target, symlinkPath, "junction");
   try {
@@ -5806,7 +5951,7 @@ test("NVA-CROSSREPOLEDGER-2a: a symlinked cross-repository target resolves the l
       rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
       reason, nowMs: 2500, scriptPath,
     });
-    const armed = authorizeHumanGuardOverride({
+    const armed = armBySignature({
       rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
@@ -6439,11 +6584,15 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     } finally { box.cleanup(); }
   });
 
-  test("T90-T (c): win32 owner with a live pid but a different recorded boot time is dead", () => {
+  // AC-197 / QG-04: win32AuditLockOwnerState() records "Original Windows acceptance: a live/reused/unverifiable
+  // present PID is ambiguous, including across boots. Boot-minute estimates alone cannot reclaim that PID's lock."
+  // The case keeps its input (a live pid with a different recorded boot time) and now pins the verdict the
+  // product documents: ambiguous, lock left in place, never reclaimed.
+  test("T90-T (c): win32 owner with a live pid but a different recorded boot time stays ambiguous (boot time alone never reclaims a present pid)", () => {
     const box = sandbox();
     try {
       plantLock(box, { ownerPatch: { pid: process.pid, bootId: "1" }, dependencies: seamed() });
-      expectReclaimed(box, "(c) live pid, different boot time", seamed({ pidAlive: () => true }));
+      expectAmbiguous(box, "(c) live pid, different boot time", { keepPath: box.paths.auditLock }, seamed({ pidAlive: () => true }));
     } finally { box.cleanup(); }
   });
 
@@ -6475,8 +6624,10 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     const cases = [
       { delta: -1, verdict: "ambiguous" },
       { delta: 1, verdict: "ambiguous" },
-      { delta: -2, verdict: "dead" },
-      { delta: 2, verdict: "dead" },
+      // AC-197 / QG-04: the product no longer consults the recorded boot minute for a present pid (see (c)), so a
+      // gap of two minutes is no longer "dead"; every delta now pins the documented ambiguous verdict.
+      { delta: -2, verdict: "ambiguous" },
+      { delta: 2, verdict: "ambiguous" },
     ];
     for (const { delta, verdict } of cases) {
       const box = sandbox();
