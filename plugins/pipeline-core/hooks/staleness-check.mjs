@@ -22,6 +22,7 @@ import { inspectPipelineUpdateAvailability } from "../scripts/ruleset-freshness.
 // Static import, matching NVA-STALENESSTLA-1's discipline above: this call is synchronous
 // end to end (spawnSync throughout), so no dynamic import is needed here either.
 import { runBootstrapScratchLifecycle } from "../scripts/pipeline-start-preflight.mjs";
+import { resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
@@ -293,7 +294,8 @@ export function runScratchLifecycleForSessionStart(deps = {}) {
   const parsedInput = deps.stdinPayload ?? null;
   const sessionId = resolveSessionIdFromInput(parsedInput);
   const lifecycle = deps.scratchLifecycleFn ?? runBootstrapScratchLifecycle;
-  const pidFn = deps.pidFn ?? (() => process.ppid);
+  // D54: when the hook runs under a one-shot shell, that shell is the parent and dies first.
+  const pidFn = deps.pidFn ?? (() => resolveRunnerHostPid({ startPid: process.ppid }));
   try {
     return lifecycle({
       rootDir,

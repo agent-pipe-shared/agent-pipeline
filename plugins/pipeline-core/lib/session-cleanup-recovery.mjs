@@ -43,6 +43,7 @@ import {
   hardenWindowsPrivateDirectory,
 } from "./windows-private-state.mjs";
 import { hasExpectedSpawnStatus } from "./successful-spawn.mjs";
+import { parseLinuxProcessStat } from "./native-platform-process-observer.mjs";
 
 import { fsyncSync as sdcFsync } from "node:fs";
 import { canonical as sdcCanonical, createPoApprovalIntent as sdcCreateIntent, verifyPoApprovalProof as sdcVerifyProof } from "./po-approval-proof.mjs";
@@ -537,6 +538,36 @@ function defaultProcessIdentity(pid) {
   } catch {
     return null;
   }
+}
+
+const TRANSIENT_SHELLS = new Set(["sh", "bash", "dash", "zsh", "ksh", "mksh", "fish", "busybox"]);
+
+/**
+ * The long-lived runner host a scratch binding is anchored to (D54, E37 (b)). A Claude hook or
+ * a Bash tool call runs under a shell started for that one call, below the runner host
+ * (measured: node -> bash -> claude), so that shell is gone seconds after the bind and the next
+ * sweep would retire a live session's binding. On Linux this walks up from `startPid` past
+ * shell processes; elsewhere, or when `/proc` cannot be read, it keeps `startPid` as before.
+ */
+export function resolveRunnerHostPid({
+  startPid = process.ppid,
+  platform = process.platform,
+  readStat = (pid) => readFileSync(`/proc/${pid}/stat`, "utf8"),
+} = {}) {
+  if (platform !== "linux" || !Number.isSafeInteger(startPid) || startPid < 2) return startPid;
+  let pid = startPid;
+  for (let depth = 0; depth < 8 && pid > 1; depth += 1) {
+    let stat;
+    try {
+      const text = readStat(pid);
+      stat = { ...parseLinuxProcessStat(text), comm: text.slice(text.indexOf("(") + 1, text.lastIndexOf(")")) };
+    } catch {
+      return startPid;
+    }
+    if (!TRANSIENT_SHELLS.has(stat.comm)) return pid;
+    pid = stat.parentPid;
+  }
+  return startPid;
 }
 
 function acquireCompositeLock(paths, plan, security, deps) {
@@ -1950,20 +1981,27 @@ export function bindScratchDescriptor({ rootDir, sessionId, deps = {} } = {}) {
   const scratchRoot = physicalScratchRoot(root);
   const { directory: descriptorDirectory, security } = scratchDescriptorDirectory(root, deps);
   const descriptorPath = scratchDescriptorPath(descriptorDirectory, sessionId);
+  const now = (deps.now ?? (() => new Date()))();
+  const pid = (deps.pidFn ?? (() => process.pid))();
+  const processIdentity = (deps.processIdentityFn ?? defaultProcessIdentity)(pid);
   if (existsSync(descriptorPath)) {
     safePrivateFile(descriptorPath, security);
     const existing = validateScratchDescriptor(JSON.parse(readFileSync(descriptorPath, "utf8")), sessionId);
     const existingAbsolute = join(scratchRoot, existing.scratchRelativePath.slice("scratch/".length));
-    if (existsSync(existingAbsolute)
-      && lstatSync(existingAbsolute).isDirectory()
-      && !lstatSync(existingAbsolute).isSymbolicLink()) {
-      return { status: "reused", scratchRelativePath: existing.scratchRelativePath, descriptorPath };
+    if (existsSync(existingAbsolute)) {
+      const info = lstatSync(existingAbsolute);
+      if (!info.isDirectory() || info.isSymbolicLink()) fail("WT-SCRATCH-DESCRIPTOR", "bound scratch directory is unsafe");
+      if (scratchAnchorAlive(existing, deps) !== false) {
+        return { status: "reused", scratchRelativePath: existing.scratchRelativePath, descriptorPath };
+      }
+      // D54: the session is binding, so it is alive; only its recorded anchor has gone. Re-anchor in place.
+      const reanchored = validateScratchDescriptor({ ...existing, pid, processIdentity }, sessionId);
+      writeAtomicPrivate(descriptorPath, Buffer.from(`${JSON.stringify(reanchored)}\n`, "utf8"), security);
+      return { status: "reanchored", scratchRelativePath: existing.scratchRelativePath, descriptorPath };
     }
-    fail("WT-SCRATCH-DESCRIPTOR", "bound scratch directory is missing or unsafe");
+    // D54: an earlier sweep retired the claimed directory; a fresh bind below replaces the descriptor.
+    unlinkSync(descriptorPath);
   }
-  const now = (deps.now ?? (() => new Date()))();
-  const pid = (deps.pidFn ?? (() => process.pid))();
-  const processIdentity = (deps.processIdentityFn ?? defaultProcessIdentity)(pid);
   const randomHex = deps.randomHexFn ?? (() => randomBytes(4).toString("hex"));
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const dirName = `${sessionId}-${randomHex()}`;
@@ -1987,6 +2025,29 @@ export function bindScratchDescriptor({ rootDir, sessionId, deps = {} } = {}) {
     return { status: "bound", scratchRelativePath: descriptor.scratchRelativePath, descriptorPath };
   }
   fail("WT-SCRATCH-DESCRIPTOR", "scratch directory name could not be allocated");
+}
+
+/**
+ * One session's scratch binding for the repair CLI (D54): `bound`, `dead-anchor` (a bind
+ * re-anchors it), `directory-missing` (a bind replaces it), `unbound`, or `invalid`. It changes
+ * no descriptor and no scratch directory.
+ */
+export function inspectScratchBinding({ rootDir, sessionId, deps = {} } = {}) {
+  if (typeof sessionId !== "string" || !SAFE_SCRATCH_SESSION_ID.test(sessionId)) return { status: "invalid", scratchRelativePath: null };
+  const root = realpathSync(resolve(rootDir));
+  const { directory, security } = scratchDescriptorDirectory(root, deps);
+  const descriptorPath = scratchDescriptorPath(directory, sessionId);
+  if (!existsSync(descriptorPath)) return { status: "unbound", scratchRelativePath: null };
+  let descriptor;
+  try {
+    safePrivateFile(descriptorPath, security);
+    descriptor = validateScratchDescriptor(JSON.parse(readFileSync(descriptorPath, "utf8")), sessionId);
+  } catch {
+    return { status: "invalid", scratchRelativePath: null };
+  }
+  const scratchRelativePath = descriptor.scratchRelativePath;
+  if (!existsSync(resolve(root, scratchRelativePath))) return { status: "directory-missing", scratchRelativePath };
+  return { status: scratchAnchorAlive(descriptor, deps) === false ? "dead-anchor" : "bound", scratchRelativePath };
 }
 
 /**
@@ -2017,7 +2078,19 @@ export function releaseScratchDescriptor({ rootDir, sessionId, deps = {} } = {})
  * crashed one (PID reuse defeats a bare `process.kill(pid, 0)` check; the
  * recorded boot_id+start-ticks identity does not).
  */
-export function planOrphanScratchRetirement({ rootDir, deps = {} } = {}) {
+function scratchAnchorAlive(descriptor, deps) {
+  const processIdentity = (deps.processIdentityFn ?? defaultProcessIdentity)(descriptor.pid);
+  const reusedPid = descriptor.processIdentity !== null
+    && processIdentity !== null
+    && processIdentity !== descriptor.processIdentity;
+  return reusedPid ? false : (deps.isProcessAliveFn ?? defaultProcessAlive)(descriptor.pid);
+}
+
+/**
+ * `currentSessionId` names the session running this plan. Its own descriptor is reported
+ * `current` and never `orphan`: the session is alive whatever its recorded anchor says (D54).
+ */
+export function planOrphanScratchRetirement({ rootDir, deps = {}, currentSessionId = null } = {}) {
   const root = realpathSync(resolve(rootDir));
   const { directory: descriptorDirectory, security } = scratchDescriptorDirectory(root, deps);
   const names = existsSync(descriptorDirectory)
@@ -2036,16 +2109,11 @@ export function planOrphanScratchRetirement({ rootDir, deps = {} } = {}) {
       entries.push({ sessionId, descriptorPath, status: "invalid" });
       continue;
     }
-    const processIdentity = (deps.processIdentityFn ?? defaultProcessIdentity)(descriptor.pid);
-    const reusedPid = descriptor.processIdentity !== null
-      && processIdentity !== null
-      && processIdentity !== descriptor.processIdentity;
-    const alive = reusedPid ? false : (deps.isProcessAliveFn ?? defaultProcessAlive)(descriptor.pid);
     entries.push({
       sessionId,
       descriptorPath,
       scratchRelativePath: descriptor.scratchRelativePath,
-      status: alive === false ? "orphan" : "active",
+      status: sessionId === currentSessionId ? "current" : scratchAnchorAlive(descriptor, deps) === false ? "orphan" : "active",
     });
   }
   return entries;
@@ -2060,11 +2128,11 @@ export function planOrphanScratchRetirement({ rootDir, deps = {} } = {}) {
  * the same session ID); a descriptor that no longer matches is retained
  * rather than forced.
  */
-export function retireOrphanScratchDescriptors({ rootDir, deps = {} } = {}) {
+export function retireOrphanScratchDescriptors({ rootDir, deps = {}, currentSessionId = null } = {}) {
   const root = realpathSync(resolve(rootDir));
   const scratchRoot = physicalScratchRoot(root);
   const { security } = scratchDescriptorDirectory(root, deps);
-  const plan = planOrphanScratchRetirement({ rootDir, deps });
+  const plan = planOrphanScratchRetirement({ rootDir, deps, currentSessionId });
   let retired = 0;
   const retained = [];
   for (const entry of plan) {

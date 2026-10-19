@@ -26,7 +26,7 @@ import {
   SCRATCH_LIFECYCLE_SCHEMA,
   WORKTREE_SWEEP_SCHEMA,
 } from "./pipeline-start-preflight.mjs";
-import { bindScratchDescriptor } from "../lib/session-cleanup-recovery.mjs";
+import { bindScratchDescriptor, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
 
 /** A descriptor directory lives under the git common dir, so a fixture needs a real repo. */
 function freshRepo() {
@@ -145,6 +145,89 @@ test("a bootstrap still sweeps and binds as before when scratch/ already exists"
   assert.equal(existsSync(previousDirectory), false, "the previous session's claimed directory survives the sweep");
   assert.equal(result.binding.status, "bound");
   assert.equal(existsSync(join(root, result.binding.scratchRelativePath)), true);
+});
+
+// D54 (backlog: 2026-10-19-session-scratch-binding-stays-unbound.md): the preflight runs in the
+// session's own shell, which carries CLAUDE_CODE_SESSION_ID but no PIPELINE_SCRATCH_SESSION_ID,
+// and both binders anchored to a process that is gone seconds later.
+
+const descriptorFile = (root, sessionId) => join(root, ".git", "agent-pipeline", "scratch-descriptors", `${sessionId}.json`);
+
+test("D54: the session's own CLAUDE_CODE_SESSION_ID binds when PIPELINE_SCRATCH_SESSION_ID is absent", () => {
+  const root = freshRepo();
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  const sessionId = "bbbbbbbb-1111-2222-3333-444444444444";
+  const result = runBootstrapScratchLifecycle({
+    rootDir: root,
+    env: { CLAUDE_CODE_SESSION_ID: sessionId },
+    deps: { ...ANONYMOUS_OWNER, pidFn: () => 4242, isProcessAliveFn: () => true },
+  });
+  assert.deepEqual(result.faults, []);
+  assert.equal(result.binding.status, "bound");
+  assert.match(result.binding.scratchRelativePath, new RegExp(`^scratch/${sessionId}-`, "u"));
+});
+
+test("D54: the sweep keeps the current session's own descriptor even when its anchor is dead, and the bind re-anchors it in place", () => {
+  const root = freshRepo();
+  const own = bindScratchDescriptor({ rootDir: root, sessionId: "current-session", deps: { ...ANONYMOUS_OWNER, pidFn: () => 4242 } });
+  const ownDirectory = join(root, own.scratchRelativePath);
+  writeFileSync(join(ownDirectory, "kept.txt"), "kept\n");
+  const result = runBootstrapScratchLifecycle({
+    rootDir: root,
+    env: { PIPELINE_SCRATCH_SESSION_ID: "current-session" },
+    deps: { ...ANONYMOUS_OWNER, pidFn: () => 4343, isProcessAliveFn: () => false },
+  });
+  assert.deepEqual(result.faults, []);
+  assert.equal(result.sweep.retiredCount, 0, "the sweep retired the session that is running it");
+  assert.equal(result.binding.status, "reanchored");
+  assert.equal(result.binding.scratchRelativePath, own.scratchRelativePath);
+  assert.equal(readFileSync(join(ownDirectory, "kept.txt"), "utf8"), "kept\n");
+  assert.equal(JSON.parse(readFileSync(descriptorFile(root, "current-session"), "utf8")).pid, 4343);
+});
+
+test("D54: a descriptor whose directory an earlier sweep removed is replaced by a fresh bind", () => {
+  const root = freshRepo();
+  const own = bindScratchDescriptor({ rootDir: root, sessionId: "current-session", deps: ANONYMOUS_OWNER });
+  rmSync(join(root, own.scratchRelativePath), { recursive: true, force: true });
+  const result = runBootstrapScratchLifecycle({
+    rootDir: root,
+    env: { PIPELINE_SCRATCH_SESSION_ID: "current-session" },
+    deps: { ...ANONYMOUS_OWNER, isProcessAliveFn: () => true },
+  });
+  assert.deepEqual(result.faults, []);
+  assert.equal(result.binding.status, "bound");
+  assert.ok(existsSync(join(root, result.binding.scratchRelativePath)));
+});
+
+test("D54: without an injected anchor the bootstrap records the runner host, never its own one-shot pid", () => {
+  const root = freshRepo();
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  runBootstrapScratchLifecycle({
+    rootDir: root,
+    env: { PIPELINE_SCRATCH_SESSION_ID: "anchor-default" },
+    deps: ANONYMOUS_OWNER,
+  });
+  const descriptor = JSON.parse(readFileSync(descriptorFile(root, "anchor-default"), "utf8"));
+  assert.notEqual(descriptor.pid, process.pid);
+  assert.equal(descriptor.pid, resolveRunnerHostPid());
+});
+
+test("D54: the runner host anchor skips one-shot shells, and keeps the start pid off Linux or when /proc cannot be read", () => {
+  // The fields after comm, as /proc/<pid>/stat has them: state, ppid, pgrp, session, fifteen more, starttime.
+  const stat = (pid, comm, ppid) => `${pid} (${comm}) S ${ppid} ${pid} ${pid} ${"0 ".repeat(15)}777 0 0`;
+  const tree = {
+    300: stat(300, "bash", 200),
+    200: stat(200, "claude", 100),
+    100: stat(100, "Relay(100)", 1),
+    410: stat(410, "sh", 400),
+    400: stat(400, "bash", 1),
+  };
+  const readStat = (pid) => { if (!tree[pid]) throw Object.assign(new Error("absent"), { code: "ENOENT" }); return tree[pid]; };
+  assert.equal(resolveRunnerHostPid({ startPid: 300, platform: "linux", readStat }), 200, "the walk stops at the first process that is not a shell");
+  assert.equal(resolveRunnerHostPid({ startPid: 200, platform: "linux", readStat }), 200, "a runner host as the parent is kept");
+  assert.equal(resolveRunnerHostPid({ startPid: 410, platform: "linux", readStat }), 410, "shells all the way up keep the start pid");
+  assert.equal(resolveRunnerHostPid({ startPid: 999, platform: "linux", readStat }), 999, "an unreadable /proc keeps the start pid");
+  assert.equal(resolveRunnerHostPid({ startPid: 300, platform: "win32", readStat }), 300, "off Linux the start pid is kept");
 });
 
 test("the lifecycle is fail-open: an unusable root is a typed fault, never a throw", () => {

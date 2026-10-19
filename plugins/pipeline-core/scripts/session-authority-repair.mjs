@@ -10,9 +10,11 @@
 //               baseline, whether its records read at all, and how many bound members are in flight. Per
 //               native item reservation: its slice, queue state and whether it still blocks. Ends with the
 //               exact next command for every finding (`next`), or none when nothing blocks.
-//   heal        Enters the registry boundary once. That heals every drifted producer with no armed or running
-//               bound member and migrates a catalogue another plugin version wrote (D51 (1), PF-52), then
-//               inspects again.
+//               Also reports the scratch binding of the session it runs in (D54): the session id is
+//               PIPELINE_SCRATCH_SESSION_ID, else the session's own CLAUDE_CODE_SESSION_ID; a terminal has none.
+//   heal        Binds or re-anchors that scratch binding (D54), then enters the registry boundary once. That
+//               heals every drifted producer with no armed or running bound member and migrates a catalogue
+//               another plugin version wrote (D51 (1), PF-52), then inspects again.
 //   move-aside  Last resort, when a producer's records no longer read or a namespace changed under an in-flight
 //               member whose Goldfish no longer runs: the whole registry moves to session-authority-abandoned
 //               (retained, never deleted) and the next governed dispatch initializes it fresh (D44). Requires
@@ -29,6 +31,7 @@ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecy
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
 import { readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
+import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
 
 const SCHEMA = "pipeline.session-authority-repair.v1";
 const SELF = fileURLToPath(import.meta.url);
@@ -114,11 +117,34 @@ function reservationReport(repository, root) {
   return rows;
 }
 
+const scratchSessionId = (env) => [env.PIPELINE_SCRATCH_SESSION_ID, env.CLAUDE_CODE_SESSION_ID]
+  .find((value) => typeof value === "string" && value !== "") ?? null;
+const SCRATCH_REPAIRABLE = new Set(["unbound", "dead-anchor", "directory-missing"]);
+
+// D54: the same binding the bootstrap makes. Without scratch/ there is nothing to bind, and creating it could
+// dirty a consumer tree whose .gitignore does not cover it, so both verbs skip, as the bootstrap does.
+function scratchReport(root, scratch) {
+  const sessionId = scratchSessionId(scratch.env);
+  if (sessionId === null) return { status: "no-session-identity" };
+  if (!existsSync(join(root, "scratch"))) return { status: "skipped-no-scratch-directory" };
+  try { return inspectScratchBinding({ rootDir: root, sessionId, deps: scratch.deps }); }
+  catch (error) { return { status: "unavailable", code: error?.code ?? null }; }
+}
+
+function bindScratch(root, scratch) {
+  const sessionId = scratchSessionId(scratch.env);
+  if (sessionId === null) return "no-session-identity";
+  if (!existsSync(join(root, "scratch"))) return "skipped-no-scratch-directory";
+  try { return bindScratchDescriptor({ rootDir: root, sessionId, deps: { pidFn: () => resolveRunnerHostPid(), ...scratch.deps } }).status; }
+  catch (error) { return `unavailable:${error?.code ?? "unknown"}`; }
+}
+
 // `afterHeal`: heal just ran, so whatever it did not clear needs the next narrower command, not heal again.
-function inspect(repository, root, { afterHeal = false } = {}) {
+function inspect(repository, root, { afterHeal = false, scratch } = {}) {
   // The strict read is what every boundary operation performs; the per-producer report explains it.
   const registry = { ...producerReport(repository), read: inspectSessionAuthorityRegistryRead({ repository }) };
   const reservations = reservationReport(repository, root);
+  const scratchBinding = scratchReport(root, scratch);
   const next = [];
   const open = reservations.filter((row) => row.sliceId && row.settled === null);
   const cancelCommand = (sliceId) => `node ${SLICE_QUEUE} cancel ${sliceId} --started --reason "<why>"`;
@@ -130,6 +156,7 @@ function inspect(repository, root, { afterHeal = false } = {}) {
   const healReasons = [
     ...(!afterHeal && drifted.some((row) => row.inFlight === 0) ? [`drifted with nothing in flight: ${drifted.filter((row) => row.inFlight === 0).map((row) => `${row.producerId} (${row.drifted.join(", ")})`).join("; ")}`] : []),
     ...(migrates ? ["the catalogue was written by another plugin version and is migrated on heal"] : []),
+    ...(!afterHeal && SCRATCH_REPAIRABLE.has(scratchBinding.status) ? [`this session's scratch binding is ${scratchBinding.status}`] : []),
   ];
   if (healReasons.length) next.push({ why: healReasons.join("; "), command: sessionAuthorityRepairCommand(root, "heal") });
   const stuck = [...drifted.filter((row) => afterHeal || row.inFlight > 0), ...broken];
@@ -137,7 +164,7 @@ function inspect(repository, root, { afterHeal = false } = {}) {
   const healable = (reason) => !afterHeal && (reason === "catalogue-source-closure" || drifted.some((row) => row.inFlight === 0 && reason === `${row.producerId}:namespace-drift`));
   const unexplained = registry.read.status === "refused" && !healable(registry.read.reason);
   if (registry.status === "unreadable" || stuck.length || unexplained) next.push({ why: `${[...stuck.map((row) => `${row.producerId} ${row.status}${row.drifted?.length ? ` (${row.drifted.join(", ")})` : ""}${row.reason ? `: ${row.reason}` : ""}`), ...(unexplained ? [`the registry read refuses: ${registry.read.code} ${registry.read.reason}`] : [])].join("; ") || `the registry does not read: ${registry.reason}`}. Last resort once no Goldfish runs: the registry is retained aside and starts fresh`, command: `${sessionAuthorityRepairCommand(root, "move-aside")} --no-goldfish-running --reason "<why>"` });
-  return { registry, reservations, next };
+  return { registry, reservations, scratchBinding, next };
 }
 
 function markers(repository) {
@@ -145,23 +172,27 @@ function markers(repository) {
   return existsSync(dir) ? readdirSync(dir).sort() : [];
 }
 
-export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.write(text)) {
+// `env` carries the session identity for the scratch binding; only the command line passes the process's own.
+export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.write(text), { env = {}, scratchDeps = {} } = {}) {
   const emit = (value, code) => { out(`${JSON.stringify({ schema: SCHEMA, ...value })}\n`); return code; };
+  const scratch = { env, deps: scratchDeps };
   const parsed = parse(argv);
   if (parsed.error) return emit({ status: "refused", code: "SAR-ARGS", reason: parsed.error }, 2);
   let root, repository;
   try { root = realpathSync(resolve(parsed.flags.root)); if (!statSync(root).isDirectory()) throw new Error("not a directory"); repository = inspectSignedDescriptorCustodyRepository(root); }
   catch (error) { return emit({ status: "refused", code: "SAR-ROOT", reason: `--root is not a Pipeline repository: ${short(error)}` }, 2); }
-  if (parsed.verb === "inspect") return emit({ status: "inspected", ...inspect(repository, root) }, 0);
+  if (parsed.verb === "inspect") return emit({ status: "inspected", ...inspect(repository, root, { scratch }) }, 0);
   const before = new Set(markers(repository));
+  // Independent of the registry, so a registry refusal below never leaves it unrepaired.
+  const scratchBound = parsed.verb === "heal" ? bindScratch(root, scratch) : null;
   try {
     if (parsed.verb === "heal") retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, () => { entered.value = true; return null; }));
     else retryWhileSessionAuthorityLockHeld((entered) => { const moved = moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }); return moved; });
   } catch (error) {
-    return emit({ status: "refused", code: error?.code === "SDC-LOCK-HELD" ? "SAR-LOCK-HELD" : "SAR-UNAVAILABLE", reason: error?.code === "SDC-LOCK-HELD" ? "another Pipeline operation holds the registry lock; retry once it finished" : short(error) }, 2);
+    return emit({ status: "refused", code: error?.code === "SDC-LOCK-HELD" ? "SAR-LOCK-HELD" : "SAR-UNAVAILABLE", reason: error?.code === "SDC-LOCK-HELD" ? "another Pipeline operation holds the registry lock; retry once it finished" : short(error), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
   }
   const retained = markers(repository).filter((name) => !before.has(name));
-  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...inspect(repository, root, { afterHeal: parsed.verb === "heal" }) }, 0);
+  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
 }
 
-if (isDirectInvocation(import.meta.url)) process.exitCode = runSessionAuthorityRepair(process.argv.slice(2));
+if (isDirectInvocation(import.meta.url)) process.exitCode = runSessionAuthorityRepair(process.argv.slice(2), undefined, { env: process.env });

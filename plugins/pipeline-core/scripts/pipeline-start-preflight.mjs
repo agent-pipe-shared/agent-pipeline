@@ -42,6 +42,7 @@ import {
 } from "../lib/self-application-attestation-gate.mjs";
 import {
   bindScratchDescriptor,
+  resolveRunnerHostPid,
   retireOrphanScratchDescriptors,
   retireOrphanWorktreeDirectories,
   retireRegisteredWorktrees,
@@ -2082,11 +2083,14 @@ export const SCRATCH_LIFECYCLE_SCHEMA = "pipeline.bootstrap-scratch-lifecycle.v1
  *
  * SESSION IDENTITY: binding needs a stable per-session id and the preflight has no session
  * identity of its own (it reads no hook stdin, where `session_id` is delivered). A caller
- * that knows its own id supplies it via `PIPELINE_SCRATCH_SESSION_ID`; without one this
+ * that knows its own id supplies it via `PIPELINE_SCRATCH_SESSION_ID`; otherwise the session's
+ * own `CLAUDE_CODE_SESSION_ID`, which a Claude session's shell carries, is used (D54, E37 (a):
+ * observed, not authenticated, the identity late binding already uses). Without either this
  * reports `unbound-no-session-identity` and performs the sweep only. Inventing an id per
  * invocation is deliberately NOT done — it would mint a fresh descriptor on every bootstrap
  * that no later sweep could ever match to a dead process, which is the unbounded growth this
- * whole mechanism exists to stop.
+ * whole mechanism exists to stop. The sweep keeps this session's own descriptor, and the bind
+ * anchors it to the runner host rather than this one-shot process (`resolveRunnerHostPid`).
  *
  * NO PRE-EXISTING scratch/, NO SWEEP. Both `retireOrphanScratchDescriptors` and
  * `bindScratchDescriptor` resolve their scratch root via `physicalScratchRoot`, which
@@ -2113,20 +2117,19 @@ export function runBootstrapScratchLifecycle({
   }
   const faults = [];
   const faultCode = (error) => String(error?.code ?? "unknown");
+  const sessionId = [env.PIPELINE_SCRATCH_SESSION_ID, env.CLAUDE_CODE_SESSION_ID]
+    .find((value) => typeof value === "string" && value !== "") ?? null;
   let sweep = null;
   try {
-    const retired = retireOrphanScratchDescriptors({ rootDir, deps });
+    const retired = retireOrphanScratchDescriptors({ rootDir, deps, currentSessionId: sessionId });
     sweep = { retiredCount: retired.retiredCount, retainedCount: retired.retained.length };
   } catch (error) {
     faults.push(`sweep:${faultCode(error)}`);
   }
-  const sessionId = typeof env.PIPELINE_SCRATCH_SESSION_ID === "string" && env.PIPELINE_SCRATCH_SESSION_ID !== ""
-    ? env.PIPELINE_SCRATCH_SESSION_ID
-    : null;
   let binding = { status: "unbound-no-session-identity" };
   if (sessionId !== null) {
     try {
-      const bound = bindScratchDescriptor({ rootDir, sessionId, deps });
+      const bound = bindScratchDescriptor({ rootDir, sessionId, deps: { pidFn: () => resolveRunnerHostPid(), ...deps } });
       binding = { status: bound.status, scratchRelativePath: bound.scratchRelativePath };
     } catch (error) {
       binding = { status: "unavailable" };

@@ -151,6 +151,52 @@ const cases = [
     assert.match(refused.text, /State authority route unavailable \(SDC-AUTHORITY-UNAVAILABLE: state-producer-unreadable\)/u, refused.text);
     assert.match(refused.text, /Repair: node \S+session-authority-repair\.mjs inspect --root /u, refused.text);
   }) },
+  { id: "SAR07", name: "a session's unbound, dead-anchored or directory-less scratch binding is named with heal, and heal binds or re-anchors it; outside a session nothing changes (D54)", run: () => fixture(({ root }) => {
+    course(root);
+    mkdirSync(join(root, "scratch"), { recursive: true });
+    const sessionId = "aaaaaaaa-1111-2222-3333-444444444444";
+    const env = { CLAUDE_CODE_SESSION_ID: sessionId };
+    const owner = (pid, alive) => ({ pidFn: () => pid, processIdentityFn: () => null, isProcessAliveFn: () => alive });
+    const run = (options, ...argv) => {
+      let text = "";
+      const code = runSessionAuthorityRepair(argv, (chunk) => { text += chunk; }, options);
+      return { code, result: JSON.parse(text) };
+    };
+    const healNamed = (result) => result.next.some((row) => / heal --root /u.test(row.command) && /scratch binding/u.test(row.why));
+    const descriptorPath = join(root, ".git/agent-pipeline/scratch-descriptors", `${sessionId}.json`);
+
+    const outside = run({}, "inspect", "--root", root).result;
+    assert.equal(outside.scratchBinding.status, "no-session-identity");
+    assert.equal(healNamed(outside), false, JSON.stringify(outside.next));
+    assert.equal(run({}, "heal", "--root", root).result.scratchBound, "no-session-identity");
+    assert.equal(existsSync(descriptorPath), false, "a heal without a session id bound something");
+
+    const unbound = run({ env, scratchDeps: owner(4242, true) }, "inspect", "--root", root).result;
+    assert.equal(unbound.scratchBinding.status, "unbound");
+    assert.ok(healNamed(unbound), JSON.stringify(unbound.next));
+    const bound = run({ env, scratchDeps: owner(4242, true) }, "heal", "--root", root);
+    assert.equal(bound.code, 0, JSON.stringify(bound.result));
+    assert.equal(bound.result.scratchBound, "bound");
+    assert.equal(bound.result.scratchBinding.status, "bound");
+    const directory = join(root, bound.result.scratchBinding.scratchRelativePath);
+    assert.ok(existsSync(directory));
+
+    const dead = run({ env, scratchDeps: owner(4343, false) }, "inspect", "--root", root).result;
+    assert.equal(dead.scratchBinding.status, "dead-anchor");
+    assert.ok(healNamed(dead), JSON.stringify(dead.next));
+    writeFileSync(join(directory, "kept.txt"), "kept\n");
+    const reanchored = run({ env, scratchDeps: owner(4343, false) }, "heal", "--root", root).result;
+    assert.equal(reanchored.scratchBound, "reanchored");
+    assert.equal(JSON.parse(readFileSync(descriptorPath, "utf8")).pid, 4343);
+    assert.equal(readFileSync(join(directory, "kept.txt"), "utf8"), "kept\n", "re-anchoring lost the session's scratch files");
+
+    rmSync(directory, { recursive: true, force: true });
+    const missing = run({ env, scratchDeps: owner(4343, true) }, "inspect", "--root", root).result;
+    assert.equal(missing.scratchBinding.status, "directory-missing");
+    const rebound = run({ env, scratchDeps: owner(4343, true) }, "heal", "--root", root).result;
+    assert.equal(rebound.scratchBound, "bound");
+    assert.ok(existsSync(join(root, rebound.scratchBinding.scratchRelativePath)));
+  }) },
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
