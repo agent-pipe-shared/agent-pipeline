@@ -23,7 +23,8 @@ import { nativeContractFixtureParent, prepareSessionAuthorityRegistryFixture } f
 import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
 import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "./model-family-discovery.mjs";
 import { createAntigravityFamilyAdapter } from "./model-family-antigravity-adapter.mjs";
-import { startSessionDescriptor } from "./worktree-lifecycle.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { createControlledMethodRuntimeFixture, inspectSourceOwnedRequesterInvocation } from "./session-requester-bridge.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const session = { id: "agy-session-1", source: "runtime", observed: true };
@@ -44,8 +45,15 @@ function familyFixture(nativeRole, { adapterContractSha256 = hash("adapter"), sc
   execFileSync("git", ["-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.invalid", "add", "input.txt"], { cwd: root });
   execFileSync("git", ["-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.invalid", "commit", "-qm", "synthetic fixture"], { cwd: root });
   const now = Date.parse("2026-10-02T12:00:00.000Z"), expires = now + 60000;
-  const started = startSessionDescriptor(root, { sessionId: session.id }), repository = { primaryRoot: started.repo.primaryRoot, commonDir: started.repo.commonDir }, boundSession = { id: session.id, descriptorSha256: started.descriptorSha256 };
-  mkdirSync(join(repository.commonDir, "agent-pipeline"), { mode: 0o700, recursive: true });
+  // AC-212 (ALF-B10-AGY, E29 (1)): the dispatch lifetime and the consent admission require a source-owned requester carrier
+  // (session-requester-bridge.mjs), which this fixture never supplied (a stale fixture, E29 (1) classification (b)). The session
+  // descriptor therefore comes from createControlledMethodRuntimeFixture (assurance controlled-unit-method), the same session id,
+  // written BEFORE the registry initializes (see ORDER MATTERS below); the consent subject keeps its two-key repository object.
+  const custody = inspectSignedDescriptorCustodyRepository(root);
+  mkdirSync(join(custody.commonDir, "agent-pipeline"), { mode: 0o700, recursive: true });
+  const runtime = createControlledMethodRuntimeFixture({ repository: custody, fixtureRoot: join(custody.commonDir, "agent-pipeline/controlled-method-fixtures/agy-dispatch-owner"), sessionId: session.id });
+  const carried = inspectSourceOwnedRequesterInvocation({ repository: custody, currentInvocationHandle: runtime.currentInvocationHandle, runtimePort: runtime.runtimePort });
+  const repository = { primaryRoot: custody.primaryRoot, commonDir: custody.commonDir }, boundSession = { id: session.id, descriptorSha256: carried.currentRequester.descriptorSha256 };
   const mechanic = nativeRole.endsWith("mechanic"), taskRoute = mechanic ? "duty.mechanic" : "duty.implement", role = mechanic ? "efficient" : "worker";
   const slot = { runner: "antigravity", taskRoute, role, effort: "high", familyId: "gemini" }, selector = { kind: "model-id", value: "synthetic-gemini-1" };
   const { publicKey, privateKey } = generateKeyPairSync("ed25519"), publicPem = publicKey.export({ type: "spki", format: "pem" });
@@ -75,17 +83,22 @@ function familyFixture(nativeRole, { adapterContractSha256 = hash("adapter"), sc
   // the lifecycle, as in model-family-host-store.test.mjs. ORDER MATTERS: the session descriptor above is written BEFORE
   // the registry initializes (descriptors written afterwards drift the namespace, SDC-AUTHORITY-CAS; see d92874a11).
   // excludeFromStatus keeps the fixture checkout reporting a clean `git status` (the two helper inputs are never tracked).
+  // AC-212 (ALF-B11-AGY): the stored consent file is an unadopted legacy member that the registry must see at initialization
+  // (agy-session-authority.mjs consentLegacy); written after the registry initialized it is an unregistered authority fact and the
+  // reconcile refuses with AGY-AUTHORITY-UNREGISTERED, so the consent record is built and written BEFORE the registry below.
+  const consentSubject ={ schema: "pipeline.agy-session-consent-subject.v2", repository, session: boundSession, runner: "antigravity", provider: "google", familyAuthoritySha256: verified.value.authoritySha256, assignments: verified.value.assignments.map(familyConsentAssignment), roles: [nativeRole], allowedPaths: ["input.txt"], scope, fallbackPolicy: "none", expiresAtMs: expires, decisionNonce: "synthetic-dispatch-consent" };
+  const intent = buildSignatureIntent({ featureId: "fixture", planSha256: hash("plan"), specSha256: hash("spec"), candidate, subjectSha256: canonicalDigest(consentSubject), policyRevision: "agy-session-family-v2" });
+  let stored = { schema: "pipeline.agy-session-consent.v2", status: "approved", decisionId: consentSubject.decisionNonce, mode: "signature", session: boundSession, runner: "antigravity", provider: "google", familyAuthoritySha256: consentSubject.familyAuthoritySha256, assignments: consentSubject.assignments, roles: consentSubject.roles, allowedPaths: consentSubject.allowedPaths, subject: consentSubject, subjectSha256: canonicalDigest(consentSubject), intent, proof: proofFor(intent), attribution: null, approvedAtMs: now, expiresAtMs: expires };
+  mkdirSync(join(repository.commonDir, "agent-pipeline/run/agy-session-consent"), { recursive: true, mode: 0o700 });
+  // AC-212 (ALF-B11-AGY): the authority store refuses any stored consent file that is not exactly 0o600 (agy-host-observed-store.mjs
+  // own(): AGY-AUTHORITY-PRIVATE-PATH), so the fixture writes it with the same private mode the production writer uses.
+  writeFileSync(join(repository.commonDir, "agent-pipeline/run/agy-session-consent", session.id + ".json"), JSON.stringify(stored), { mode: 0o600 });
   const registry = prepareSessionAuthorityRegistryFixture({ root, excludeFromStatus: true });
   const authorityLifecycle = createModelFamilyHostAuthorityLifecycle({ repository: registry.repository });
   const controller = createModelFamilyHostController({ rootDir: join(repository.commonDir, "agent-pipeline"), clock: () => now, trustedSources: sources, authorityLifecycle });
   const activated = controller.activate(); assert.equal(activated.ok, true, activated.code);
-  const consentSubject = { schema: "pipeline.agy-session-consent-subject.v2", repository, session: boundSession, runner: "antigravity", provider: "google", familyAuthoritySha256: verified.value.authoritySha256, assignments: verified.value.assignments.map(familyConsentAssignment), roles: [nativeRole], allowedPaths: ["input.txt"], scope, fallbackPolicy: "none", expiresAtMs: expires, decisionNonce: "synthetic-dispatch-consent" };
-  const intent = buildSignatureIntent({ featureId: "fixture", planSha256: hash("plan"), specSha256: hash("spec"), candidate, subjectSha256: canonicalDigest(consentSubject), policyRevision: "agy-session-family-v2" });
-  let stored = { schema: "pipeline.agy-session-consent.v2", status: "approved", decisionId: consentSubject.decisionNonce, mode: "signature", session: boundSession, runner: "antigravity", provider: "google", familyAuthoritySha256: consentSubject.familyAuthoritySha256, assignments: consentSubject.assignments, roles: consentSubject.roles, allowedPaths: consentSubject.allowedPaths, subject: consentSubject, subjectSha256: canonicalDigest(consentSubject), intent, proof: proofFor(intent), attribution: null, approvedAtMs: now, expiresAtMs: expires };
-  mkdirSync(join(repository.commonDir, "agent-pipeline/run/agy-session-consent"), { recursive: true, mode: 0o700 });
-  writeFileSync(join(repository.commonDir, "agent-pipeline/run/agy-session-consent", session.id + ".json"), JSON.stringify(stored));
-  const host = createAgyFamilyConsentAuthority({ readFamilyAuthority: () => inputs, readInvocation: ({ invocationId }) => { const held = readHeldModelFamilyInvocation({ rootDir: join(repository.commonDir, "agent-pipeline"), key: key(invocationId) }); return held.ok ? { invocation: held.value, bindings, provenanceSha256: canonicalDigest(held.value) } : held; }, readLive: () => live ? { ok: true, session: boundSession, descriptor: { repo: repository } } : { ok: false, code: "AGY-SESSION-OWNER-UNAVAILABLE" }, readStored: () => ({ record: stored, revoked }), readMode: () => ({ mode: "signature" }), readPolicy: () => ({ ok: true, trustAnchors }) });
-  return { root, now, expires, host, consentSubject, nativeRole, key, controller, sources, routeSource, slot, candidate, boundSession, repository, bindings, prepare(n) { version = n; const r = controller.prepare({ key: key("invocation-" + n), assignment: slot }); assert.equal(r.ok, true, r.code); return r; }, mutate(fn) { stored = fn(stored); }, revoke(value = true) { revoked = value; }, loseOwner() { live = false; }, launched: () => launched };
+  const host =createAgyFamilyConsentAuthority({ readFamilyAuthority: () => inputs, readInvocation: ({ invocationId }) => { const held = readHeldModelFamilyInvocation({ rootDir: join(repository.commonDir, "agent-pipeline"), key: key(invocationId) }); return held.ok ? { invocation: held.value, bindings, provenanceSha256: canonicalDigest(held.value) } : held; }, readLive: () => live ? { ok: true, session: boundSession, descriptor: { repo: repository } } : { ok: false, code: "AGY-SESSION-OWNER-UNAVAILABLE" }, readStored: () => ({ record: stored, revoked }), readMode: () => ({ mode: "signature" }), readPolicy: () => ({ ok: true, trustAnchors }) });
+  return { root, runtime, now, expires, host, consentSubject, nativeRole, key, controller, sources, routeSource, slot, candidate, boundSession, repository, bindings, prepare(n) { version = n; const r = controller.prepare({ key: key("invocation-" + n), assignment: slot }); assert.equal(r.ok, true, r.code); return r; }, mutate(fn) { stored = fn(stored); }, revoke(value = true) { revoked = value; }, loseOwner() { live = false; }, launched: () => launched };
 }
 
 function syntheticAgyContract() {
@@ -157,8 +170,18 @@ test("actual Agy S2 S4 S5 native callers launch each signed successor once and r
         const p = packet({ role: nativeRole, candidate: f.candidate, dispatchId });
         return { packet: p, input: { root: f.root, packet: p, sessionId: session.id, descriptorSha256: f.boundSession.descriptorSha256,
           resultPath: "results/" + dispatchId + ".json", consentAuthority: f.host, runtimeHost, routeSource: f.routeSource,
+          currentInvocationHandle: f.runtime.currentInvocationHandle, runtimePort: f.runtime.runtimePort,
           scope: "implementation", fallbackPolicy: "none", nowEpochMs: f.now } };
       };
+      // QG-04 (ALF-B10-AGY, E6/E29 (1)): Antigravity provides no authenticated per-call carrier of its own, so the same call WITHOUT
+      // a current-invocation handle and runtime port is still refused with the explicit carrier code, and authorization is never
+      // inferred. The positive route below then runs under the controlled-unit-method carrier (f.runtime) instead of ending here;
+      // ending the case at the refusal would make every positive-route examiner below unreachable (E29 (1), rejected alternative).
+      const { currentInvocationHandle: noHandle, runtimePort: noPort, ...withoutCarrier } = makePreparation("no-carrier").input;
+      assert.equal(noHandle !== undefined && noPort !== undefined, true, "the fixture does hold a carrier that this call deliberately withholds");
+      const uncarried = await prepareAgyFamilyNativeDispatch(withoutCarrier);
+      assert.equal(uncarried.ok, false); assert.equal(uncarried.code, "AGY-SESSION-NATIVE-CARRIER-UNAVAILABLE", JSON.stringify(uncarried));
+      assert.equal(launches.length, 0); assert.equal(admissions.length, 0);
       for (const port of ["resolveCurrentInvocationIdentity", "resolveInvocationContext"]) {
         const missing = { ...trustedSources }; delete missing[port];
         const host = createModelFamilyRuntimeHost({ cwd: f.root, clock: () => f.now, trustedSources: missing });
@@ -175,8 +198,8 @@ test("actual Agy S2 S4 S5 native callers launch each signed successor once and r
         version = n; const p = packet({ role: nativeRole, candidate: f.candidate, dispatchId: "native-" + n }), requestPath = join(f.root, "request-" + n + ".json"); writeFileSync(requestPath, JSON.stringify(p));
         const args = { root: f.root, dispatchRequestPath: requestPath, resultPath: "results/native-" + n + ".json", sessionId: session.id, descriptorSha256: f.boundSession.descriptorSha256 };
         const dependencies = { familyConsentAuthority: f.host, familyRuntimeHost: runtime, familyRouteSource: f.routeSource, nowEpochMs: f.now, routeAuthority: () => { throw Error("no V3 fallback"); }, runLiveHost: () => { throw Error("no alternate native lane"); } };
-        const result = await dispatchElephantAgyImplementation(args, dependencies); if (admissionError) throw admissionError; assert.equal(result.code, "AGY-SESSION-FAMILY-RETURN-CONTRACT-UNQUALIFIED", JSON.stringify(result)); assert.equal(result.status, "recovery-required"); assert.equal(result.launcherCalls, 1); assert.equal(result.modelCalls, 1); assert.equal(result.observed.identityEvidence, "unknown"); assert.equal(result.record, null); assert.equal(launches.length, n); assert.equal(admissions.length, n); assert.equal(launches[n - 1].requestedModel, "synthetic-gemini-" + n);
-        const replay = await dispatchElephantAgyImplementation(args, dependencies); assert.equal(replay.code, "MODEL-FAMILY-NATIVE-CAPABILITY-CONSUMED"); assert.equal(launches.length, n);
+        const result = await f.runtime.run(() => dispatchElephantAgyImplementation(args, dependencies)); if (admissionError) throw admissionError; assert.equal(result.code, "AGY-SESSION-FAMILY-RETURN-CONTRACT-UNQUALIFIED", JSON.stringify(result)); assert.equal(result.status, "recovery-required"); assert.equal(result.launcherCalls, 1); assert.equal(result.modelCalls, 1); assert.equal(result.observed.identityEvidence, "unknown"); assert.equal(result.record, null); assert.equal(launches.length, n); assert.equal(admissions.length, n); assert.equal(launches[n - 1].requestedModel, "synthetic-gemini-" + n);
+        const replay = await f.runtime.run(() => dispatchElephantAgyImplementation(args, dependencies)); assert.equal(replay.code, "MODEL-FAMILY-NATIVE-CAPABILITY-CONSUMED"); assert.equal(launches.length, n);
       }
       const mutation = makePreparation("mutation-concurrent"), prepared = await prepareAgyFamilyNativeDispatch(mutation.input); assert.equal(prepared.ok, true, prepared.code);
       // The original caller packet is changed after selection. S4 admits and
@@ -286,7 +309,12 @@ test("v2 lightweight dispatch rechecks actual signed consent and S4 successor in
   for (const nativeRole of ["pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"]) {
     const f = familyFixture(nativeRole);
     try {
-      const admitted = await f.host.admit({ root: f.root, sessionId: session.id, descriptorSha256: f.boundSession.descriptorSha256, nowEpochMs: f.now }); assert.equal(admitted.ok, true, admitted.code);
+      // QG-04 (ALF-B10-AGY, E6/E29 (1)): without a current-invocation handle and runtime port the consent admission has no requester
+      // carrier and is refused (the host's catch-all code); authorization is never inferred. The positive route then admits under
+      // the controlled-unit-method carrier (f.runtime), so every examiner below stays reachable instead of ending at the refusal.
+      const admission = { root: f.root, sessionId: session.id, descriptorSha256: f.boundSession.descriptorSha256, nowEpochMs: f.now };
+      const uncarried = await f.host.admit(admission); assert.equal(uncarried.ok, false); assert.equal(uncarried.code, "AGY-CONSENT-ADMISSION-UNAVAILABLE", JSON.stringify(uncarried));
+      const admitted = await f.host.admit({ ...admission, currentInvocationHandle: f.runtime.currentInvocationHandle, runtimePort: f.runtime.runtimePort }); assert.equal(admitted.ok, true, admitted.code);
       for (const n of [1, 2]) {
         f.prepare(n);
         const request = { invocationId: "invocation-" + n, requestedModel: "synthetic-gemini-" + n, requestedEffort: "high", role: nativeRole, scope: f.consentSubject.scope, requiredPaths: ["input.txt"], fallbackPolicy: "none", nowEpochMs: f.now };
