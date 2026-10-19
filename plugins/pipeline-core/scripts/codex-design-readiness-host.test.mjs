@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import test from 'node:test';
 import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,rmSync,lstatSync,realpathSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {fileURLToPath} from 'node:url';
 import {join,isAbsolute,resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {advisoryEvidenceBundleSha256,buildAdvisoryEvidenceBundle} from '../lib/advisory-lifecycle-v2.mjs';
@@ -19,9 +19,19 @@ import {createModelFamilyDiscoveryHost,RULE_FIELDS,pass,fail,digest as discovery
 import {createCodexFamilyAdapter} from '../lib/model-family-codex-adapter.mjs';
 import {createModelFamilyExecutionHost} from '../lib/model-family-execution.mjs';
 import {buildCodexToolFreeReadinessRequest} from '../lib/codex-tool-free-design-readiness.mjs';
+import {prepareSessionAuthorityRegistryFixture} from '../lib/test-item-approved-course-fixture.mjs';
 function fixture(t){
-  const root=mkdtempSync(join(tmpdir(),'readiness-activation-fixture-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
-  const common=join(root,'.git');mkdirSync(common);const processes=join(root,'processes');mkdirSync(processes,{mode:0o700});
+  // QG-04 justification (AC-151, E12; live route, not an ADR-0085 retirement): runCodexDesignReadinessHost is live and its
+  // siblings are green. Only 'active readiness carries immutable prompt through real signed S4/S2/S5' failed, with
+  // WT-GIT-FAILED, because the model-family runtime host store resolves its authority repository through git, and this
+  // fixture handed it an empty .git directory (fixture blindness: the real contract is a physical git repository).
+  // The fixture now creates a real repository at the physical root; no assertion, route or expectation was changed.
+  // Second cause of the same case: the session-authority ancestor walker refuses a world-writable ancestor (the OS temp
+  // directory is mode 1777), so the fixture root lives under the checkout's gitignored scratch/ directory instead.
+  const scratchParent=join(realpathSync(fileURLToPath(new URL('../../../',import.meta.url))),'scratch');mkdirSync(scratchParent,{recursive:true});
+  const root=realpathSync(mkdtempSync(join(scratchParent,'readiness-activation-fixture-')));t.after(()=>rmSync(root,{recursive:true,force:true}));
+  execFileSync('git',['init','-q',root]);
+  const common=join(root,'.git');const processes=join(root,'processes');mkdirSync(processes,{mode:0o700});
   writeFileSync(join(root,'pipeline.user.yaml'),readFileSync(new URL('../../../pipeline.user.yaml',import.meta.url)));
   const names=['input','prd','spec','design','traceability'];for(const name of names)writeFileSync(join(root,name+'.md'),'# '+name+'\nFixture.\n');
   const bundle=buildAdvisoryEvidenceBundle(root,names.map(name=>name+'.md').sort());
@@ -150,6 +160,8 @@ async function signedFamilyPorts(fx){
           `codex-host-${nativeRequest.managedProcess.receiptId}`),finalizedReadiness:{sha256:hash('synthetic-finalized')}};
       return {ok:true,value:{rawHostResult,report,observed}};
     }};
+  // AC-212: the host's lifetimes reserve their members in the session-authority registry; the fixture root is already a physical checkout under scratch/.
+  prepareSessionAuthorityRegistryFixture({root:fx.root});
   const runtimeHost=createModelFamilyRuntimeHost({cwd:fx.root,resolveCommonDir:()=>common,trustedSources,
     clock:()=>Date.parse('2026-10-01T12:00:30.000Z')});
   const activated=runtimeHost.store().activate();assert.equal(activated.ok,true,JSON.stringify(activated));

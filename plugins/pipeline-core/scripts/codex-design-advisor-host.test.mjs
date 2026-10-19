@@ -7,6 +7,7 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {advisorHostFixture} from '../lib/codex-advisor-host.fixture.mjs';
+import {prepareSessionAuthorityRegistryFixture} from '../lib/test-item-approved-course-fixture.mjs';
 import {createInitialAdvisorContext} from '../lib/design-advisor-course.mjs';
 import {hostDigest} from '../lib/codex-host-process-journal.mjs';
 import {createPoApprovalIntent,canonical} from '../lib/po-approval-proof.mjs';
@@ -60,6 +61,8 @@ test('active Advisor keeps its signed S4/S2 selection through metadata rechecks 
  writeFileSync(join(fx.root,'pipeline.user.yaml'),'advisor_export:\n  consent: approved\n');git(['add','pipeline.user.yaml']);git(['commit','--quiet','-m','Add synthetic Advisor consent']);
  const candidate={commit:git(['rev-parse','HEAD']).toString().trim(),tree:git(['rev-parse','HEAD^{tree}']).toString().trim()};
  const common=join(fx.root,'.git');mkdirSync(join(common,'agent-pipeline'),{recursive:true,mode:0o700});
+ // AC-212: the host's lifetimes reserve their members in the session-authority registry (added after the candidate is fixed, so the commit is unchanged).
+ prepareSessionAuthorityRegistryFixture({root:fx.root});
  const appServerPath=join(fx.root,'app-server'),answerPath=join(fx.root,'.native-advisor-answer.json');
  let appServer=readFileSync(fx.script,'utf8');
  appServer=appServer.replace("proposals:[{proposalId:'proposal-1',text:'Synthetic actual managed output suggestion',evidenceReferences:[refs[0]]}]};",

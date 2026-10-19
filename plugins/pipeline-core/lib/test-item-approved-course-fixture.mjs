@@ -1,10 +1,14 @@
 // Test-only synthetic original chat event; no real human proof is claimed.
 // Production original-approval producer/observer and physical hashes are used.
-import {mkdirSync,mkdtempSync,writeFileSync,readFileSync,chmodSync,realpathSync,lstatSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import {mkdirSync,mkdtempSync,writeFileSync,readFileSync,chmodSync,realpathSync,lstatSync,existsSync} from 'node:fs';
 import {join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {nativeManagedDigest} from './native-managed-authority-support.mjs';
+import {inspectSignedDescriptorCustodyRepository} from './worktree-lifecycle.mjs';
+import {createSessionAuthorityParticipantPorts} from './session-authority-observers.mjs';
+import {initializeSessionAuthorityRegistry} from './session-authority-registry.mjs';
 import {publishPoGateProfileReceipt} from './po-gate-profile-publisher.mjs';
 import {run,observeCurrentPlanApprovalForCalibration} from '../scripts/pipeline-state.mjs';
 // Resolve this test module's genuine outer Git root, independent of cwd/layout/OS.
@@ -20,6 +24,32 @@ export function nativeContractFixtureParent() {
  const physical=lstatSync(parent);
  if(!physical.isDirectory()||physical.isSymbolicLink()||realpathSync(parent)!==parent)throw Error('native fixture parent unsafe');
  return parent;
+}
+// AC-212 (ALF-B5-MFF): production-shaped session-authority registry for model-family suites. The model-family host store
+// reserves every lifetime's member in the session-authority registry, which initializes only over a Git checkout that carries
+// a manifest and a pipeline State with a continuity object; a fixture without it fails the first reservation with ENOENT on
+// session-authority/catalogue.json (fixture blindness: the real contract is an initialized registry). Without `root` this
+// creates a fresh Git checkout beneath nativeContractFixtureParent() (the authority walk refuses a group/world-writable
+// ancestor such as the OS temp directory); with `root` it initializes over that existing checkout and only adds the two
+// authority inputs when absent. Returns {repoDir,repository,root} where root is <commonDir>/agent-pipeline (mode 0700).
+export function prepareSessionAuthorityRegistryFixture({root=null,prefix='session-authority-fixture-'}={}) {
+ const repoDir=root??mkdtempSync(join(nativeContractFixtureParent(),prefix));
+ if(root===null){const init=spawnSync('git',['-C',repoDir,'init','-q'],{encoding:'utf8'});if(init.status!==0)throw Error('session-authority fixture checkout unavailable');}
+ mkdirSync(join(repoDir,'.claude'),{recursive:true,mode:0o700});
+ const manifest=join(repoDir,'.claude/pipeline.yaml'),state=join(repoDir,'.claude/pipeline-state.json');
+ if(!existsSync(manifest))writeFileSync(manifest,'schema: pipeline.manifest.v0\n');
+ if(!existsSync(state)){
+  const ref=path=>({path,sha256:'a'.repeat(64)});
+  const continuity={schema:'pipeline.continuity.v0',featureId:'unit',revision:0,runtime:{humanFacingLanguage:'en',activeDuty:'Coordinator',sessionCleanup:null},authority:{prd:ref('specs/unit/prd.md'),spec:ref('specs/unit/spec.md'),result:null},queueHead:{packageId:'unit-package',actionId:'session-authority-fixture',nextAction:'dispatch',productRetryCount:0,environmentRerouteCount:0,dispatch:null},blocker:null,acknowledgedFinal:null,resume:{mode:'immediate',sourceRevision:0,reasonCode:'active-turn'},recovery:null,decisionTxn:null,closeTransition:null,capacity:{concurrencyLimit:3,reservedCriticSlots:1,reservedRecoverySlots:1,fallbackPolicy:'defer'}};
+  writeFileSync(state,JSON.stringify({schema:'pipeline.state.v0',activeFeature:{id:'unit',planPath:'specs/unit/prd.md',phase:'design'},planApproved:false,continuity}),{mode:0o600});
+ }
+ const repository=inspectSignedDescriptorCustodyRepository(repoDir);
+ const authorityRoot=join(repository.commonDir,'agent-pipeline');mkdirSync(authorityRoot,{recursive:true,mode:0o700});
+ const ports=createSessionAuthorityParticipantPorts({repository});
+ for(const row of ports)assert.doesNotThrow(()=>row.port.readBaseline(),row.producerId);
+ const initialized=initializeSessionAuthorityRegistry({repository},ports);
+ assert.equal(initialized.status,'initialized',JSON.stringify(initialized));
+ return {repoDir,repository,root:authorityRoot};
 }
 export function prepareApprovedItemCourseFixture({root,additionalCriteria=[],pipelineUserSource=null}={}) {
 const write=(path,bytes)=>{const target=join(root,path);mkdirSync(join(target,'..'),{recursive:true});writeFileSync(target,bytes);};

@@ -9,6 +9,7 @@ import { spawnSync, execFileSync } from "node:child_process";
 import { canonical, createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation.mjs";
 import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
+import { prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
 import { registeredModelFamilyTaskRoutes } from "../lib/model-family-route-source.mjs";
 import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "../lib/model-family-discovery.mjs";
 import { createCodexFamilyAdapter } from "../lib/model-family-codex-adapter.mjs";
@@ -3029,6 +3030,8 @@ async function signedPreparedCriticFixture(dutyId, root, childRoot) {
   const route = routeSource.taskRoutes.find(value => value.runner === runner && value.taskRoute === taskRoute);
   const commonDir = join(root, ".git");
   mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
+  // AC-212: the host's lifetimes reserve their members in the session-authority registry, so the checkout carries an initialized one.
+  prepareSessionAuthorityRegistryFixture({ root });
   const candidateCommit = run("git", ["rev-parse", "HEAD"], root);
   const candidateTree = run("git", ["rev-parse", "HEAD^{tree}"], root);
   const keyFor = invocationId => ({ runner, installationBindingSha256: sha("installation"), accountBindingSha256: sha("account"), sessionId: "critic-session", invocationId });
