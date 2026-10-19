@@ -50,7 +50,7 @@ import {
 } from "./project-onboarding-v3.mjs";
 import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
 import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
-import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+import { confirmTrustAnchorKey, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-migration-v3.mjs";
 import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
@@ -96,8 +96,7 @@ import { isDirectInvocation } from "./entrypoint.mjs";
 import { requireProjectOnboardingReady } from "./project-onboarding-ready-gate.mjs";
 import { materializeArchitectureDesignFixture } from "./architecture-design-test-fixture.mjs";
 import { inspectArchitectureEntryReadiness } from "./architecture-entry-readiness.mjs";
-import { designWorkflowAdvisorQuestionSha256 } from "./design-workflow-package.mjs";
-import { designReadinessReportSha256 } from "./design-readiness-host-evidence.mjs";
+import { createDesignReviewReceipt } from "./design-review-receipt.mjs";
 import { createTestCaseCompletionRecorder } from "./test-case-completion.mjs";
 
 // B8 producer-to-guard property: exercise the real guard against every direct
@@ -528,110 +527,99 @@ export const fakeDeps = {
   },
 };
 
-// The plan-handoff regressions below exercise lifecycle semantics, not live
-// Advisor/Readiness providers. They still use a real, physically validated
-// feature package so the production presentation and single-approval contract
-// remains in force. Candidate/model observations are deterministic test
-// evidence and are never written into the product source tree.
-const DESIGN_WORKFLOW_FIXTURE_CANDIDATE = { commit: "a".repeat(40), tree: "b".repeat(40) };
-function materializeDesignWorkflowPackageFixture({ rootDir, featureId, planPath, specPath, runner = "codex" }) {
-  const parent = dirname(planPath);
-  const sourceFiles = {
-    input: { path: `${parent}/input.md`, bytes: Buffer.from(`Original request for ${featureId}.\n`) },
-    prd: { path: planPath, bytes: readFileSync(join(rootDir, planPath)) },
-    spec: { path: specPath, bytes: readFileSync(join(rootDir, specPath)) },
-    design: { path: `${parent}/design.md`, bytes: Buffer.from(`Revised design for ${featureId}.\n`) },
-    traceability: { path: `${parent}/traceability.md`, bytes: Buffer.from(`Every requirement for ${featureId} is mapped.\n`) },
-  };
-  const sources = Object.fromEntries(Object.entries(sourceFiles).map(([name, entry]) => [name, {
-    path: entry.path, sha256: sha256(entry.bytes),
-  }]));
-  for (const entry of Object.values(sourceFiles)) {
-    const target = join(rootDir, entry.path);
+// QG-04 written justification for the four lifecycle examiners that use the
+// helpers below (the seeded dev-plan gate, the per-runner public onboarding
+// handover, and NVA-R40-PROJDRIFT). They used to reach plan approval through
+// the design-workflow-package route, which ADR-0085 retired (d02409a8a, Elephant
+// decision E12). pipeline-state.mjs now refuses that route with three typed
+// codes, and a route-compliant setup has to avoid all three:
+//   - DWP-PRESENT-RETIRED: `present-plan --design-workflow-package`;
+//   - DWP-APPROVAL-REQUEST-RETIRED: `approve-plan --design-workflow-approval-request`;
+//   - DWP2-INFLIGHT-PRESENTATION-RETIRED: a pipeline.plan-presentation.v2
+//     presentation already recorded in State.
+// The replacement is `present-plan --review-receipt <tracked receipt>` followed by
+// `approve-plan --design-approval-request <the presentation's own request path>`
+// (DAB-REQUEST-PATH refuses any other path). Each case keeps the claim it always
+// made; only its setup moved to the live route. Nothing is deleted or weakened:
+// the receipt is a REAL, committed, clean review of the final sources (the PRD,
+// the spec, two companions and the report), the candidate is the repository's
+// real HEAD, and approval is the one cryptographic ceremony the route requires,
+// signed here in process with a disposable Ed25519 key whose public anchor is
+// committed to project/critical-human-proof.json, exactly as the route's own
+// end-to-end test does. The chat mode also exists on this route, but the
+// accepted-contract verifier admits it only when the committed
+// pipeline.user.yaml selects global chat, which would change the very projection
+// source NVA-R40-PROJDRIFT examines, so signature mode is the faithful choice.
+const DESIGN_REVIEW_FIXTURE_SIGNERS = new Map();
+function materializeDesignReviewReceiptFixture({ rootDir, featureId, planPath, specPath, round = 1 }) {
+  const parent = dirname(specPath);
+  const companionPaths = [`${parent}/design.md`, `${parent}/traceability.md`];
+  const reportPath = `${parent}/review/design-review-${round}.md`;
+  const receiptPath = `${parent}/review/design-review-receipt-${round}.json`;
+  const put = (path, text) => {
+    const target = join(rootDir, path);
     mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, entry.bytes);
-  }
-  const providerAndModel = {
-    claude: { provider: "anthropic", modelId: "claude-opus", selector: { kind: "alias", value: "opus" } },
-    codex: { provider: "openai", modelId: "gpt-6-sol", selector: { kind: "model-id", value: "gpt-6-sol" } },
-    antigravity: { provider: "google", modelId: "gemini-pro", selector: { kind: "model-id", value: "gemini-pro" } },
-  }[runner];
-  const advisorDispatchId = `advisor-${featureId}`;
-  const advisorReceipt = {
-    schema: "pipeline.advisory-receipt.v1", receiptId: `receipt-${advisorDispatchId}`,
-    dispatch: { dispatchId: advisorDispatchId, queueRevision: 0,
-      candidateCommit: DESIGN_WORKFLOW_FIXTURE_CANDIDATE.commit,
-      candidateTree: DESIGN_WORKFLOW_FIXTURE_CANDIDATE.tree },
-    duty: "advisory", profile: "feature",
-    configuredRoute: { runner, selector: providerAndModel.selector, effort: "high" },
-    adapter: "consult",
-    observed: { status: "answered", identity: { provider: providerAndModel.provider,
-      modelId: providerAndModel.modelId, effort: "high" } },
-    questionSha256: designWorkflowAdvisorQuestionSha256(sources), answerSha256: "c".repeat(64),
-    fallback: { reason: "none", redactedErrorClass: null }, emittedAtMs: 1,
+    writeFileSync(target, text);
   };
-  const evidenceDir = `${parent}/evidence`;
-  const advisorPath = `${evidenceDir}/advisor.json`;
-  const readinessPath = `${evidenceDir}/readiness.json`;
-  const advisorBytes = Buffer.from(`${JSON.stringify(advisorReceipt)}\n`);
-  const readinessReport = {
-    schema: "pipeline.design-readiness-receipt.v1", dispatchId: `readiness-${featureId}`,
-    runner, candidate: DESIGN_WORKFLOW_FIXTURE_CANDIDATE, sources,
-    outcome: "ready-for-po-review",
-    findings: [{ code: "TRACE-OK", severity: "non-blocking", summary: "All requirements are mapped." }],
-    unresolvedChoices: [], summary: `The complete design package for ${featureId} is ready for PO review.`,
-  };
-  const readinessReceipt = {
-    ...readinessReport,
-    hostExecution: {
-      schema: "pipeline.design-readiness-host-execution.v1", runner,
-      repoFingerprint: "f".repeat(64), selectionId: `css_${"a".repeat(25)}e`,
-      selectionSha256: "b".repeat(64), executionReceiptSha256: "c".repeat(64),
-      dutyReceiptSha256: designReadinessReportSha256(readinessReport),
-      route: { model: providerAndModel.modelId, effort: "high", sourceSha256: "8".repeat(64),
-        candidateCommit: DESIGN_WORKFLOW_FIXTURE_CANDIDATE.commit },
-    },
-  };
-  const readinessBytes = Buffer.from(`${JSON.stringify(readinessReceipt)}\n`);
-  const workflowPackage = {
-    schema: "pipeline.design-workflow-package.v1", featureId,
-    authoringDispatchId: `authoring-${featureId}`, candidate: DESIGN_WORKFLOW_FIXTURE_CANDIDATE,
-    sources,
-    advisor: { status: "answered", runner, nativeAvailable: false,
-      receipt: { path: advisorPath, sha256: sha256(advisorBytes) }, attemptTrail: null,
-      disposition: { decision: "accept", rationale: "The advice is reflected in the design." }, exception: null },
-    readiness: { path: readinessPath, sha256: sha256(readinessBytes), dispatchId: readinessReceipt.dispatchId },
-    createdAt: "2026-09-27T12:00:00.000Z",
-  };
-  const packagePath = `${evidenceDir}/design-workflow-package.json`;
-  for (const [relativePath, bytes] of [[advisorPath, advisorBytes], [readinessPath, readinessBytes],
-    [packagePath, Buffer.from(`${JSON.stringify(workflowPackage)}\n`)]]) {
-    const target = join(rootDir, relativePath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, bytes);
-  }
-  return packagePath;
+  put(companionPaths[0], `# Design for ${featureId}\n`);
+  put(companionPaths[1], "| ID | Evidence |\n| --- | --- |\n");
+  put(reportPath, `# Design review ${round}\nVerdict: pass.\n`);
+  const sourceFor = (path) => ({ path, sha256: sha256(readFileSync(join(rootDir, path))) });
+  const created = createDesignReviewReceipt({
+    featureId,
+    previous: null,
+    sources: { prd: sourceFor(planPath), spec: sourceFor(specPath), companions: companionPaths.map(sourceFor) },
+    reviewer: { runner: "claude", model: "claude-opus-4" },
+    report: sourceFor(reportPath),
+    openFindingIds: [],
+    reviewedAt: new Date(Date.UTC(2026, 9, 9, 9, 0, round)).toISOString(),
+  });
+  assert.equal(created.ok, true, `fixture review receipt refused: ${created.code}`);
+  put(receiptPath, Buffer.from(created.bytes).toString("utf8"));
+
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
+  const keyReference = `design-review-fixture-${featureId}-${round}`;
+  // The anchor is ADDED to the project's trust-anchor set through the policy's
+  // own confirmation function, never assigned over it. The architecture design
+  // fixture that ran before this one has already anchored the key that signed
+  // the adoption disposition; a v1/v2 policy holds one `trustAnchor`, so
+  // overwriting it here invalidated that disposition (PO-APPROVAL-PROOF-INVALID,
+  // surfaced as ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED at set-phase
+  // implementation). confirmTrustAnchorKey lifts the document to v3, keeps the
+  // earlier anchor and appends this one.
+  const anchored = confirmTrustAnchorKey(rootDir, { keyReference, publicKey: publicKeyPem });
+  assert.equal(anchored.ok, true, `fixture trust anchor refused: ${anchored.code}`);
+  DESIGN_REVIEW_FIXTURE_SIGNERS.set(rootDir, { keyReference, publicKeyPem, privateKey });
+
+  // Tracked and clean is the route's own precondition (ADR-0085): commit the
+  // final sources, the report, the receipt and the anchored proof policy so the
+  // candidate HEAD carries exactly the bytes the receipt and the policy binding
+  // name. The trailer block satisfies the commit-msg hook onboarding installed.
+  hostGit(rootDir, ["add", "--", planPath, specPath, ...companionPaths, reportPath, receiptPath, "project/critical-human-proof.json"]);
+  hostGit(rootDir, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit",
+    "-m", `design review fixture ${featureId} ${round}`, "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]);
+  return receiptPath;
 }
 
-function designWorkflowApprovalArgv(rootDir, by = "po") {
+// The approval half of the live route. The request path is read from the
+// presentation (DAB-REQUEST-PATH), the canonical intent is signed in process, and
+// the proof lands next to the request, which is where the route reads it.
+function designApprovalRequestArgv(rootDir, by = "po") {
   const current = JSON.parse(readFileSync(join(rootDir, "project", "pipeline-state.json"), "utf8"));
-  return ["approve-plan", "--by", by, "--design-workflow-approval-request",
-    current.planPresentation.designWorkflowApprovalRequestPath];
-}
-
-function designWorkflowLifecycleDeps(rootDir) {
-  return {
-    gitCandidate: () => ({ ok: true, ...DESIGN_WORKFLOW_FIXTURE_CANDIDATE }),
-    verifyDesignReadinessHostExecution: ({ hostExecution, readinessReceipt }) =>
-      hostExecution?.dutyReceiptSha256 === designReadinessReportSha256(readinessReceipt)
-        ? { ok: true } : { ok: false, code: "DWP-TEST-HOST-BINDING" },
-    isattyFn: () => true,
-    readLineFn: () => {
-      const current = JSON.parse(readFileSync(join(rootDir, "project", "pipeline-state.json"), "utf8"));
-      const packageSha256 = current.planPresentation?.designWorkflowPackageSha256;
-      return typeof packageSha256 === "string" ? `approve-${packageSha256.slice(0, 12)}` : "";
-    },
+  const requestPath = current.planPresentation.designApprovalRequestPath;
+  const request = JSON.parse(readFileSync(join(rootDir, requestPath), "utf8"));
+  const signer = DESIGN_REVIEW_FIXTURE_SIGNERS.get(rootDir);
+  assert.ok(signer, "a review receipt fixture must precede the approval request");
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: request.approvalIntent.sha256,
+    keyReference: signer.keyReference,
+    publicKey: signer.publicKeyPem,
+    signatureBase64: sign(null, Buffer.from(String(request.approvalIntent.sha256)), signer.privateKey).toString("base64"),
   };
+  writeFileSync(join(rootDir, requestPath.replace("request-", "proof-")), `${JSON.stringify(proof, null, 2)}\n`);
+  return ["approve-plan", "--by", by, "--design-approval-request", requestPath];
 }
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
@@ -4826,6 +4814,9 @@ test("promoting a PRD whose language differs from kickoff's own answer reaches a
   const path = root();
   try {
     hostGit(path, ["init", "--initial-branch=main"]);
+    // Existing project source is committed before onboarding installs the
+    // commit-msg hook, as the other lifecycle examiners in this file do.
+    commitExistingProjectSource(path);
     const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
     const barrier = initializeRestartRequiredRoot(path, localDeps);
     clearRuntimeBarrier(path, barrier);
@@ -4852,6 +4843,7 @@ test("promoting a PRD whose language differs from kickoff's own answer reaches a
       rootDir: path, profile: "feature", featureId: "promo-lang-work", planPath: prdPath,
       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
     };
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROMO-LANG-DESIGN" });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({
       runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true,
@@ -5084,6 +5076,10 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
   const path = root();
   try {
     hostGit(path, ["init", "--initial-branch=main"]);
+    // Existing project source is committed before onboarding installs the
+    // commit-msg hook (the gate refuses source in a draft phase), exactly as
+    // the per-runner handover and NVA-R40-PROJDRIFT examiners already do.
+    commitExistingProjectSource(path);
     const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
     const barrier = initializeRestartRequiredRoot(path, localDeps);
     clearRuntimeBarrier(path, barrier);
@@ -5112,9 +5108,6 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
     };
     materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-GATED-DESIGN" });
-    const workflowPackagePath = materializeDesignWorkflowPackageFixture({
-      rootDir: path, featureId: "gated-work", planPath: prdPath, specPath,
-    });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true });
     assert.equal(promoted.status, "ready");
@@ -5144,21 +5137,26 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
         now: () => "2026-08-01T12:00:00.000Z",
         writeError: (value) => stderr.push(String(value)),
         // This dev-plan regression exercises the phase gate, not the shared
-        // acknowledgement ceremony. Its historical authority fixture is
-        // deliberately legacy-scoped; global signature/chat receipt behavior
-        // is covered by the dedicated acknowledgement tests below.
-        ...designWorkflowLifecycleDeps(path),
-        readHumanApprovalMode: () => ({ mode: "chat", source: "test", key: "human_approval", scope: "legacy" }),
+        // acknowledgement ceremony; the approval below runs on the live
+        // review-receipt / design-approval-request route with the repository's
+        // real approval mode and real HEAD candidate (see the QG-04 note above
+        // materializeDesignReviewReceiptFixture).
         designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
       });
       return { code, stderr: stderr.join("") };
     };
+    // The reviewed sources are committed while the design is still a draft: once
+    // the plan is submitted the gate treats the submitted PRD/spec as immutable
+    // (GUARD-DEVPLAN-LIFECYCLE on the staged path), so the review commit cannot
+    // follow submission without reopening the design. The route only needs the
+    // receipt tracked and clean by present-plan, which still runs after submit.
+    const reviewReceiptPath = materializeDesignReviewReceiptFixture({ rootDir: path, featureId: "gated-work", planPath: prdPath, specPath });
     const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
     assert.equal(submitted.code, 0, submitted.stderr);
     assert.equal(attemptWrite("src/index.html").status, 2, "a submitted but unapproved plan still refuses implementation");
-    const presented = state(["present-plan", "--by", "po", "--design-workflow-package", workflowPackagePath]);
+    const presented = state(["present-plan", "--by", "po", "--review-receipt", reviewReceiptPath]);
     assert.equal(presented.code, 0, presented.stderr);
-    const approved = state(designWorkflowApprovalArgv(path));
+    const approved = state(designApprovalRequestArgv(path));
     assert.equal(approved.code, 0, approved.stderr);
     const phased = state(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`]);
     assert.equal(phased.code, 0, phased.stderr);
@@ -5225,8 +5223,12 @@ for (const runner of ["claude", "codex", "antigravity"]) {
       assert.equal(promoted.status, "ready");
       const architectureReadiness = inspectArchitectureEntryReadiness({ rootDir: path });
       assert.equal(architectureReadiness.status, "ready", `${runner}: design materialization must satisfy the real entry gate: ${JSON.stringify(architectureReadiness)}`);
-      const workflowPackagePath = materializeDesignWorkflowPackageFixture({
-        rootDir: path, featureId: `handover-${runner}`, planPath: prdPath, specPath, runner,
+      // Every presentation gets its own tracked, clean review receipt: a design
+      // that was reopened and re-submitted is genuinely re-reviewed, and a fresh
+      // receipt keeps each request path distinct (the request embeds HEAD).
+      let reviewRound = 0;
+      const reviewReceipt = () => materializeDesignReviewReceiptFixture({
+        rootDir: path, featureId: `handover-${runner}`, planPath: prdPath, specPath, round: ++reviewRound,
       });
 
       let tick = 0;
@@ -5239,8 +5241,6 @@ for (const runner of ["claude", "codex", "antigravity"]) {
           writeError: (value) => stderr.push(String(value)),
           // Keep this handover test's concern to public lifecycle handoff.
           // The signature/global receipt contract has its own all-runner test.
-          ...designWorkflowLifecycleDeps(path),
-          readHumanApprovalMode: () => ({ mode: "chat", source: "test", key: "human_approval", scope: "legacy" }),
           designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
         });
         return { code, stderr: stderr.join("") };
@@ -5250,9 +5250,9 @@ for (const runner of ["claude", "codex", "antigravity"]) {
           const result = state(argv);
           assert.equal(result.code, 0, `${runner}: ${argv[0]}: ${result.stderr}`);
         }
-        const presented = state(["present-plan", "--by", "po", "--design-workflow-package", workflowPackagePath]);
+        const presented = state(["present-plan", "--by", "po", "--review-receipt", reviewReceipt()]);
         assert.equal(presented.code, 0, `${runner}: present-plan: ${presented.stderr}`);
-        const approved = state(designWorkflowApprovalArgv(path));
+        const approved = state(designApprovalRequestArgv(path));
         assert.equal(approved.code, 0, `${runner}: approve-plan: ${approved.stderr}`);
       };
       const publicInspect = () => {
@@ -5301,14 +5301,19 @@ for (const runner of ["claude", "codex", "antigravity"]) {
         requiresConfirmation: false,
         expected: { schema: "pipeline.inspect.v1", statuses: ["draft", "awaiting-approval"] },
       });
+      // The first review commit happens while the design is still a draft: after
+      // submit-plan the gate treats the submitted PRD/spec as immutable, so the
+      // staged spec could not be committed then (GUARD-DEVPLAN-LIFECYCLE). Later
+      // rounds only add new review files and an unchanged tracked PRD/spec.
+      const firstReviewReceipt = reviewReceipt();
       const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
       assert.equal(submitted.code, 0, `${runner}: submit-plan: ${submitted.stderr}`);
       const awaitingEntry = publicInspect();
       assert.deepEqual(awaitingEntry.nextAction, draftEntry.nextAction,
         `${runner}: awaiting approval remains owned by the same public inspect driver`);
-      const presented = state(["present-plan", "--by", "po", "--design-workflow-package", workflowPackagePath]);
+      const presented = state(["present-plan", "--by", "po", "--review-receipt", firstReviewReceipt]);
       assert.equal(presented.code, 0, `${runner}: present-plan: ${presented.stderr}`);
-      const approved = state(designWorkflowApprovalArgv(path));
+      const approved = state(designApprovalRequestArgv(path));
       assert.equal(approved.code, 0, `${runner}: approve-plan: ${approved.stderr}`);
 
       // Fresh calibration uses the shipped baseline and needs no PO input.
@@ -5418,9 +5423,6 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
       prdPath, specPath, designInputPath, runner, deps: localDeps,
     };
     materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROJDRIFT-DESIGN" });
-    const workflowPackagePath = materializeDesignWorkflowPackageFixture({
-      rootDir: path, featureId: "projdrift-work", planPath: prdPath, specPath, runner,
-    });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner, ...promotion, planSha256: planned.planSha256, activate: true });
     assert.equal(promoted.status, "ready");
@@ -5432,17 +5434,22 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
         now: () => "2026-08-01T12:00:00.000Z",
         writeError: (v) => stderr.push(String(v)),
         // Projection drift is independent from the global acknowledgement
-        // policy; retain the legacy fixture instead of reviving --by in the
-        // production global policy.
-        ...designWorkflowLifecycleDeps(path),
-        readHumanApprovalMode: () => ({ mode: "chat", source: "test", key: "human_approval", scope: "legacy" }),
+        // policy; the plan is approved on the live review-receipt route with the
+        // repository's real approval mode (see the QG-04 note above
+        // materializeDesignReviewReceiptFixture), so pipeline.user.yaml stays
+        // untouched until the edit this case exists to examine.
         designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
       });
       return { code, stderr: stderr.join("") };
     };
+    // Review commit while still a draft (see the dev-plan case above): the
+    // submitted PRD/spec are immutable to the staged lifecycle policy.
+    const reviewReceiptPath = materializeDesignReviewReceiptFixture({ rootDir: path, featureId: "projdrift-work", planPath: prdPath, specPath });
     assert.equal(state(["submit-plan", "--by", "po", "--profile", "feature"]).code, 0);
-    assert.equal(state(["present-plan", "--by", "po", "--design-workflow-package", workflowPackagePath]).code, 0);
-    assert.equal(state(designWorkflowApprovalArgv(path)).code, 0);
+    const presentedProjdrift = state(["present-plan", "--by", "po", "--review-receipt", reviewReceiptPath]);
+    assert.equal(presentedProjdrift.code, 0, presentedProjdrift.stderr);
+    const approvedProjdrift = state(designApprovalRequestArgv(path));
+    assert.equal(approvedProjdrift.code, 0, approvedProjdrift.stderr);
 
     const inspect = () => inspectProjectOnboardingV3({ runner, rootDir: path, intent: "bootstrap", deps: localDeps });
 
