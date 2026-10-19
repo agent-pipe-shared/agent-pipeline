@@ -37,6 +37,9 @@ import { nativeManagedCurrentOwner } from "../lib/native-managed-authority-suppo
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
+import { sessionAuthorityRepairCommand } from "./session-authority-repair.mjs";
 import { appendEvent, FANOUT_FINISH_HOWS, FanoutLedgerError, liveSlices, readEvents } from "../lib/fanout-ledger.mjs";
 import { COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_SCHEMA, SLICE_TIERS, validateSliceQueue } from "../lib/slice-queue.mjs";
 
@@ -71,7 +74,8 @@ const VERBS = {
   defer: { positional: 1, flags: [...COMMON, ...LEDGER, "reason"], repeatable: [] },
   hold: { positional: 1, flags: [...COMMON, ...LEDGER, "po-question", "external-reason"], repeatable: [] },
   depend: { positional: 2, flags: [...COMMON], repeatable: [] },
-  cancel: { positional: 1, flags: [...COMMON, "reason"], repeatable: [] },
+  // D51 (3): --started cancels a started slice whose Goldfish no longer runs; the caller asserts that.
+  cancel: { positional: 1, flags: [...COMMON, "reason", "started"], repeatable: [], booleans: ["started"] },
   pause: { positional: 0, flags: [...COMMON, ...LEDGER, "by", "reason", "until"], repeatable: [] },
   reap: { positional: 1, flags: [...COMMON, ...LEDGER, "reason"], repeatable: [] },
   finish: { positional: 1, flags: [...COMMON, ...LEDGER, "how"], repeatable: [] },
@@ -98,6 +102,12 @@ export function parseArguments(argv) {
       name = name.slice(0, eq);
     }
     if (!spec.flags.includes(name)) throw usage(`${verb}: unknown flag --${name.slice(0, 40)}`);
+    if ((spec.booleans ?? []).includes(name)) {
+      if (value !== undefined) throw usage(`${verb}: --${name} takes no value`);
+      if (Object.hasOwn(flags, name)) throw usage(`${verb}: --${name} given twice`);
+      flags[name] = true;
+      continue;
+    }
     if (value === undefined) {
       value = rest[index + 1];
       if (value === undefined || value.startsWith("--")) throw usage(`${verb}: --${name} needs a value`);
@@ -372,9 +382,9 @@ function verbCancel({ positional, flags }) {
   if (loaded.raw.schema === "pipeline.slice-queue.v2") {
     const governed = resolveGovernedItemQueue({ root: process.cwd() });
     if (governed.status !== "required" || resolve(process.cwd(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
-    const result = cancelUnstartedGovernedItemSlice({ root: process.cwd(), sliceId: positional[0], reason });
-    if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0] });
-    return { sliceId: result.sliceId, state: "cancelled", released: result.released };
+    const result = cancelUnstartedGovernedItemSlice({ root: process.cwd(), sliceId: positional[0], reason, started: flags.started === true });
+    if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
+    return { sliceId: result.sliceId, state: "cancelled", released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
   }
   const raw = structuredClone(loaded.raw);
   const entry = findSlice(raw, positional[0]);
@@ -475,12 +485,25 @@ export function runCli(argv) {
     verb = parsed.verb;
     return { exit: EXIT.OK, output: { schema: CLI_SCHEMA, verb, ok: true, ...HANDLERS[verb](parsed) } };
   } catch (error) {
-    if (error instanceof CliError) return { exit: error.exit, output: { schema: CLI_SCHEMA, verb, ok: false, code: error.code, message: error.message, ...error.extra } };
+    // D52 (2): a session-authority refusal names its typed code and the general repair, never only SQ-IO.
+    const authority = typeof error?.code === "string" && error.code.startsWith("SDC-");
+    const repair = authority && !(error instanceof CliError && error.extra?.repair) ? { repair: `${sessionAuthorityRepairCommand(process.cwd())} names the cause and the command that clears it` } : {};
+    if (error instanceof CliError) return { exit: error.exit, output: { schema: CLI_SCHEMA, verb, ok: false, code: error.code, message: error.message, ...error.extra, ...repair } };
+    if (authority) return { exit: EXIT.INVALID, output: { schema: CLI_SCHEMA, verb, ok: false, code: error.code, message: String(error.reason ?? error.message).slice(0, 240), ...repair } };
     return { exit: EXIT.IO, output: { schema: CLI_SCHEMA, verb, ok: false, code: "SQ-IO", message: `unexpected failure (${error?.code ?? error?.name ?? "error"})` } };
   }
 }
 
+/** D52 (1): the agent session's own shell carries its Claude session id. It enters the same hook-observed
+ * owner the session's hooks enter (the same descriptor, so the same association), so a governed queue write
+ * from a running session needs no new session start. A terminal without that id stays unbound. */
+export function enterSessionOwnerFromEnvironment(env = process.env, root = process.cwd()) {
+  const identity = resolveModelRoleHostSessionIdentity({ runner: "claude", env });
+  return identity.ok ? enterClaudeHookSessionOwner({ root, input: { session_id: identity.sessionId } }) : false;
+}
+
 if (isDirectInvocation(import.meta.url)) {
+  enterSessionOwnerFromEnvironment();
   const { exit, output } = runCli(process.argv.slice(2));
   process.stdout.write(`${JSON.stringify(output)}\n`);
   process.exitCode = exit;

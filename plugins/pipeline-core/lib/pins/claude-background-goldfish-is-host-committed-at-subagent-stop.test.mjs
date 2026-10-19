@@ -399,3 +399,21 @@ test("(iv) a keyless launch with the SubagentStop route unregistered keeps today
   assert.equal(hostCommits(fx).length, 0);
   assert.equal(fx.gitOk("rev-parse", "HEAD"), fx.candidate);
 });
+
+test("(vi) a launch the hook refuses after it prepared the queue row leaves the queue and the registry as they were, and names the dirty path (PF-55)", () => {
+  const fx = buildConsumer("refused-after-prepare");
+  const queueBefore = existsSync(join(fx.root, QUEUE)) ? fx.read(QUEUE).toString("base64") : null;
+  const members = join(fx.root, ".git", "agent-pipeline", "session-authority", "members");
+  const memberFiles = () => { const out = []; const walk = (dir) => { for (const entry of readdirSync(dir, { withFileTypes: true })) { const path = join(dir, entry.name); if (entry.isDirectory()) walk(path); else out.push(`${path}:${sha256(readFileSync(path))}`); } }; if (existsSync(members)) walk(members); return out.sort(); };
+  const membersBefore = memberFiles();
+  fx.write("README.md", "Synthetic subagent-stop fixture\nA local edit nobody committed.\n");
+  const pre = preToolUse(fx, "toolu_pf55_dirty", {});
+  assert.equal(pre.status, 2, `the dirty launch is refused -- ${pre.stderr.slice(0, 600)}`);
+  assert.match(pre.stderr, /AGY-HOST-BASELINE-DIRTY/u, pre.stderr.slice(0, 600));
+  assert.match(pre.stderr, /Repair: commit or restore these tracked paths before dispatching: README\.md/u, pre.stderr.slice(0, 600));
+  assert.equal(existsSync(join(fx.root, QUEUE)) ? fx.read(QUEUE).toString("base64") : null, queueBefore, "no phantom queue row is left behind");
+  assert.deepEqual(pendingFiles(fx), [], "no pending state is left behind");
+  assert.deepEqual(memberFiles(), membersBefore, "no reserved registry member is left behind");
+  fx.gitOk("checkout", "-q", "--", "README.md");
+  launchedPending(fx, "toolu_pf55_clean", {});
+});

@@ -81,12 +81,19 @@ import { recordDispatchBriefingRoute } from "../lib/dispatch-briefing-route-reco
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
 import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
-import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+
+const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
+// D52 (2): a session-authority refusal without a repair of its own names the general repair, which reports
+// the cause and the exact command that clears it.
+const sessionAuthorityRepair = (code, root) => typeof code === "string" && code.startsWith("SDC-")
+  ? `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} inspect --root ${root} names the cause and the command that clears it`
+  : null;
 // Repository admission precedes hook input hardening and all governed effects.
 if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
 
@@ -743,6 +750,8 @@ if (isDirectInvocation(import.meta.url)) {
   }
   const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
   let itemGovernanceRequired = false;
+  // Once a native pending state names the queue row, a later refusal keeps the row with it.
+  let nativePendingPrepared = false;
   if (productive.length > 0) {
     const courseRoot=input.cwd??process.env.CLAUDE_PROJECT_DIR??process.cwd();
     let governed=resolveGovernedItemQueue({root:courseRoot});
@@ -750,6 +759,16 @@ if (isDirectInvocation(import.meta.url)) {
       const parsed=parseNativeGoldfishBriefing(productive[0].dispatch.prompt);
       if(parsed.ok&&parsed.binding.itemDelivery)governed=prepareGovernedItemQueue({root:courseRoot,itemDelivery:parsed.binding.itemDelivery,
         candidate:{commit:parsed.binding.candidateCommit,tree:parsed.binding.candidateTree},writeScope:parsed.binding.allowedPaths});
+      // PF-55: a dispatch refused by any later check leaves the queue as it was, never a phantom row.
+      if(governed.written){
+        const written=governed.written,sliceId=parsed.binding.itemDelivery.sliceId;
+        process.once("exit",(code)=>{
+          if(code===0)return;
+          // A refusal after the native pending state was written keeps row and state together; both are released by one cancel.
+          const rolled=nativePendingPrepared?{status:"refused",code:"native-pending-prepared"}:rollbackGovernedItemQueue(written);
+          if(rolled.status==="refused")process.stderr.write(`WARNING (guard-dispatch): the queue row this refused dispatch prepared for ${sliceId} is kept (${rolled.code}); if it is not dispatched again, release it with: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>".\n`);
+        });
+      }
     }
     itemGovernanceRequired=governed.status==='required';
     const unsupported = governed.status === "required" && productive.some(({ dispatch }) =>
@@ -759,9 +778,10 @@ if (isDirectInvocation(import.meta.url)) {
       // PF-47: a queue-preparation refusal carries its own reason (and, where one exists, an exact repair);
       // the generic transport text applies only to the unsupported-transport case.
       const clean = (text) => String(text).replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 600);
+      const repair = governed.repair ?? sessionAuthorityRepair(governed.code, courseRoot);
       const detail = unsupported
         ? "Use the authenticated native item admission; this transport has no qualified item reservation adapter."
-        : [governed.reason ? `Reason: ${clean(governed.reason)}.` : "", governed.repair ? `Repair: ${clean(governed.repair)}` : ""].filter(Boolean).join(" ")
+        : [governed.reason ? `Reason: ${clean(governed.reason)}.` : "", repair ? `Repair: ${clean(repair)}` : ""].filter(Boolean).join(" ")
           // Critic F1: a refused queue never evaluated the transport, so it is never blamed for it.
           || `Reason: the governed item queue refused the preparation (${governed.code}); no further cause was reported.`;
       process.stderr.write(`BLOCKED (guard-dispatch): ${unsupported ? "SQ-NATIVE-ITEM-ADMISSION-REQUIRED" : governed.code}: ${detail}\n`);
@@ -859,6 +879,7 @@ if (isDirectInvocation(import.meta.url)) {
           root: rootDir, runner: nativeRunner, input,
           subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
         });
+        if (prepared.ok) nativePendingPrepared = true;
         if (!prepared.ok) {
           // Claude runtimes without a run_in_background parameter cannot launch in the foreground;
           // item admission and the budget binding already ran, so fall back to an uncommitted child.
@@ -879,9 +900,8 @@ if (isDirectInvocation(import.meta.url)) {
             const reasonText = typeof prepared.reason === "string" && prepared.reason.trim() !== ""
               ? ` Reason: ${prepared.reason.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 240)}`
               : "";
-            const repairText = typeof prepared.repair === "string" && prepared.repair.trim() !== ""
-              ? ` Repair: ${prepared.repair.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 360)}`
-              : "";
+            const repair = typeof prepared.repair === "string" && prepared.repair.trim() !== "" ? prepared.repair : sessionAuthorityRepair(prepared.code, rootDir);
+            const repairText = repair ? ` Repair: ${repair.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 800)}` : "";
             process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}${repairText}\n`);
             process.exit(2);
           }

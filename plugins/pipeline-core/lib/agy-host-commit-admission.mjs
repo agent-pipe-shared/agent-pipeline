@@ -81,7 +81,11 @@ function captureHostCommitBaseline({ root, candidateCommit, resultPath } = {}, c
   const tracked = paths(git(physical, ["diff", "--no-renames", "--name-only", "-z", "HEAD"]));
   const untracked = paths(git(physical, ["ls-files", "--others", "--exclude-standard", "-z"]));
   if (head === null || topLevel === null || conflicts === null || staged === null || tracked === null || untracked === null) return fail("AGY-HOST-BASELINE-GIT");
-  if (!sameTopLevel(topLevel, physical) || head.trim() !== candidateCommit || conflicts.length !== 0 || staged.length !== 0 || tracked.some(path=>!concurrent?.foreignPaths.includes(path))) return fail("AGY-HOST-BASELINE-DIRTY");
+  if (!sameTopLevel(topLevel, physical) || head.trim() !== candidateCommit || conflicts.length !== 0 || staged.length !== 0 || tracked.some(path=>!concurrent?.foreignPaths.includes(path))) {
+    // D52 (2): name what is dirty, so the refusal carries its repair instead of only a code.
+    const dirtyPaths = [...new Set([...staged, ...tracked.filter(path=>!concurrent?.foreignPaths.includes(path))])].sort().slice(0, 20);
+    return { ...fail("AGY-HOST-BASELINE-DIRTY"), headMatches: head.trim() === candidateCommit, dirtyPaths };
+  }
   if (resultExists(physical, resultPath)) return fail("AGY-HOST-BASELINE-RESULT-COLLISION");
   const files = untrackedDigests(physical, untracked.filter(path=>!concurrent?.foreignPaths.includes(path)));
   if (files === null) return fail("AGY-HOST-BASELINE-UNSAFE");

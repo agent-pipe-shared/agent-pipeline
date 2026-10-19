@@ -151,6 +151,31 @@ function moveRegistryAside(repo,aside){
   for(const name of readdirSync(safePath(repo,ROOT)).sort())if(name!=='registry.lock')renameSync(safePath(repo,`${ROOT}/${name}`),safePath(repo,`${aside}/${name}`));
   syncDirectory(safePath(repo,ROOT));
 }
+/** D52 (2): the strict read every boundary operation performs, done read-only and without the boundary.
+ * Returns the typed refusal instead of throwing, for the repair's diagnosis. */
+export function inspectSessionAuthorityRegistryRead({repository:input}={}){
+  try{
+    const repo=repository(input);
+    if(!existsSync(safePath(repo,cataloguePath)))return freeze({status:'absent'});
+    stateRead(repo,portsFor(repo,definitions.map(def=>({producerId:def[0],port:def[1][`create${def[2]}AuthorityProducerPort`]({repository:repo})}))));
+    return freeze({status:'readable'});
+  }catch(error){return freeze({status:'refused',code:error?.code??null,reason:String(error?.reason??error?.message??'').slice(0,240)});}
+}
+/** D52 (2), last resort: the whole registry is retained under session-authority-abandoned on the caller's word
+ * that no Goldfish or other authority operation runs; nothing is deleted. The next governed dispatch
+ * initializes it fresh (D44). `onEntered` runs once the boundary is held, for a lock-retry caller. */
+export function moveSessionAuthorityRegistryAside({repository:input,reason,onEntered}={}){
+  if(typeof reason!=='string'||!reason.trim()||reason.length>500||/[\u0000-\u001f\u007f]/u.test(reason))fail('SDC-AUTHORITY-UNAVAILABLE','move-aside-reason');
+  return withSessionAuthorityBoundary({repository:input},token=>{
+    if(typeof onEntered==='function')onEntered();
+    const repo=boundary(token);
+    if(readdirSync(safePath(repo,ROOT)).every(name=>name==='registry.lock'))return freeze({status:'absent',aside:null});
+    const aside=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-repair-move-aside`;
+    moveRegistryAside(repo,aside);
+    try{writeFileSync(safePath(repo,`${aside}/repair.json`),canonical({schema:'pipeline.session-authority-repair-move-aside.v1',reason:reason.trim(),movedAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});}catch{}
+    return freeze({status:'moved-aside',aside});
+  });
+}
 function rebindSourceUpdatedRegistry(repo,catalogue,aside,expected){
   const prior=catalogue.participants;
   if(!Array.isArray(prior)||prior.length!==expected.length||!Array.isArray(catalogue.producers)||catalogue.producers.length!==expected.length

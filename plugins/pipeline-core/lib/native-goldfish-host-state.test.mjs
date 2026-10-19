@@ -971,6 +971,48 @@ const cases = [
     assert.equal(heals().every(name=>!JSON.parse(readFileSync(join(abandoned,name,'heal.json'),'utf8')).healed.some(row=>row.producerId==='native-goldfish')),true);
   })},
 
+  { id: "NGHS37", name: "a refused dispatch leaves no member and no queue row and names its dirty paths; a slice integrated by its Dispatch commit or cancelled with --started stops holding its item; cancel needs no bound session (PF-55, D51)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    const git=(...args)=>{const r=spawnSync('git',['-C',root,...args],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+    const dispatch=(sliceId,dispatchId,toolUseId,candidate)=>{const binding={...makeBinding({dispatchId,commit:candidate.commit,tree:candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery:delivery(sliceId)};
+      const input=toolInput('claude',{root,session:'native-session-one',toolUseId,binding});
+      input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+`\nSlice: ${sliceId}\nWrite scope: src/change.mjs\n`;
+      return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));};
+    assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized');
+    const registry=join(repository.commonDir,'agent-pipeline/session-authority'),queuePath=join(root,'specs/unit/slice-queue.json');
+    const members=()=>{const out={};const walk=dir=>{for(const name of readdirSync(dir,{withFileTypes:true})){const path=join(dir,name.name);if(name.isDirectory())walk(path);else out[path.slice(registry.length)]=readFileSync(path,'utf8');}};if(existsSync(join(registry,'members')))walk(join(registry,'members'));return out;};
+    const row=sliceId=>JSON.parse(readFileSync(queuePath,'utf8')).slices.find(entry=>entry.id===sliceId);
+    // A dirty tracked path refuses before any member is reserved, names the path, and the queue row it prepared is removed again.
+    const membersBefore=members();
+    writeFileSync(join(root,'.gitignore'),`${readFileSync(join(root,'.gitignore'),'utf8')}# local edit\n`);
+    const dirty=dispatch('ITEM-AC-1','DELIVER-AC-1','native-tool-one',original.candidate);
+    assert.equal(dirty.reason,'AGY-HOST-BASELINE-DIRTY',JSON.stringify(dirty));assert.match(dirty.repair,/commit or restore these tracked paths before dispatching: \.gitignore/u);
+    assert.deepEqual(members(),membersBefore,'a refused dispatch leaves no reserved member behind');
+    assert.equal(existsSync(queuePath),false,'a refused dispatch leaves no phantom queue row');
+    git('checkout','-q','--','.gitignore');
+    // A never-started slice is cancelled from an unbound shell (D51 (3)).
+    assert.equal(runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-0'),candidate:original.candidate,writeScope:['src/change.mjs']})).status,'required');
+    const unbound=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-0',reason:'not needed'});
+    assert.equal(unbound.status,'cancelled',JSON.stringify(unbound));
+    assert.equal(dispatch('ITEM-AC-1','DELIVER-AC-1','native-tool-one',original.candidate).ok,true);
+    // The Goldfish delivered and the orchestrator committed it by hand: the commit evidence releases the item (D40, D51 (2)).
+    writeFileSync(join(root,'src/change.mjs'),'delivered by ITEM-AC-1\n');git('add','src/change.mjs');git('commit','-q','-m','fixture delivery','-m','AI-Assisted: true\nDispatch: ITEM-AC-1 (goldfish)\nCommit-Act: orchestrator');
+    const candidate={commit:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}')};
+    const second=dispatch('ITEM-AC-2','DELIVER-AC-2','native-tool-two',candidate);
+    assert.equal(second.ok,true,JSON.stringify(second));
+    assert.equal(runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-1',reason:'delivered'})).code,'SQ-ITEM-CANCEL-INTEGRATED');
+    // A started slice whose Goldfish no longer runs is cancelled from an unbound shell on the caller's word.
+    const started=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped'});
+    assert.equal(started.code,'SQ-ITEM-CANCEL-STARTED',JSON.stringify(started));assert.match(started.repair,/slice-queue\.mjs cancel ITEM-AC-2 --started --reason/u);
+    const cancelled=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped',started:true});
+    assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));assert.equal(cancelled.started,true);assert.equal(row('ITEM-AC-2').state,'cancelled');
+    const third=dispatch('ITEM-AC-3','DELIVER-AC-3','native-tool-three',candidate);
+    assert.equal(third.ok,true,JSON.stringify(third));assert.deepEqual(row('ITEM-AC-3').dependsOn,['ITEM-AC-1']);
+  })},
+
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

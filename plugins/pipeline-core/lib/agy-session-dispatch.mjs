@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 
-import { resolveGovernedItemQueue, prepareGovernedItemQueue, executeGovernedItemDeliveryChecks, readNativeReservedItemScopes, observeGovernedItemIntegrationReadiness } from "./native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, prepareGovernedItemQueue, executeGovernedItemDeliveryChecks, readNativeReservedItemScopes, observeGovernedItemIntegrationReadiness, readSettledItemSliceIds } from "./native-goldfish-host-state.mjs";
 import { bindAgyItemDeliveryChecks, inspectAgyItemMainIntegration, inspectAgyItemMainIntegrationValue } from "./agy-item-delivery.mjs";
 import { parseDispatchSlice } from "./dispatch-policy.mjs";
 import { scopesOverlap } from "./slice-queue.mjs";
@@ -114,7 +114,9 @@ function beginDispatchLifetime({ root, sessionId, descriptorSha256, packet, purp
         const latest=new Map();for(const row of agy.entries.filter(entry=>entry.value?.basis?.itemDelivery)){const prior=latest.get(row.value.operationId);if(!prior||(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);}
         const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort});
         const released=new Set(producer.record.members.map(member=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort,memberRef:member.memberRef}).record).filter(member=>member.phase==='released').map(member=>member.bindingSha256));
-        for(const row of [...latest.values()].filter(entry=>!released.has(entry.value.bindingSha256))) {
+        // D51 (2): the same settled definition as the native route; an integrated or cancelled slice no longer collides.
+        const settled=readSettledItemSliceIds({repository,boundary,governed});
+        for(const row of [...latest.values()].filter(entry=>!released.has(entry.value.bindingSha256)&&!settled.has(entry.value.basis.itemDelivery.sliceId))) {
           const previous=row.value.basis.itemDelivery;
           if(row.value.basis.itemBriefing?.criterionLocator&&familyDigest(row.value.basis.itemBriefing.criterionLocator)===criterionSha256)authorityFailure('AGY-ITEM-CRITERION-OWNER-COLLISION');
           if(previous.itemId===itemDelivery.itemId)authorityFailure('AGY-ITEM-OWNER-COLLISION');

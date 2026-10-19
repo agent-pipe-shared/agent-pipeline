@@ -166,7 +166,14 @@ export const NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE = "subagent-stop";
 // `subagentStopCompletionRegistered` is the caller's explicit fact that the Claude `SubagentStop` completion route is
 // registered in the running plugin's hooks. Only the strict boolean `true` is that fact: absent, `false` and every
 // non-boolean value leave an explicit background launch refused exactly as before.
-export function prepareNativeGoldfishHostState({ root, runner, input, subagentStopCompletionRegistered } = {}, dependencies = {}) {
+/** PF-55: a preparation that refuses after it wrote the queue row restores the queue as it was. */
+export function prepareNativeGoldfishHostState(args = {}, dependencies = {}) {
+  const written = [];
+  const result = prepareNativeGoldfishHostStateOnce(args, dependencies, written);
+  if (result?.ok !== true) for (const row of written.reverse()) rollbackGovernedItemQueue(row);
+  return result;
+}
+function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopCompletionRegistered } = {}, dependencies = {}, written = []) {
   if (!safeRunner(runner)) return fail("NGHS-RUNNER");
   const fields = toolFields(runner, input);
   if (!fields || !safeCorrelation(fields.correlation) || !ID.test(fields.sessionId ?? "")) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
@@ -189,6 +196,7 @@ export function prepareNativeGoldfishHostState({ root, runner, input, subagentSt
     ? prepareGovernedItemQueue({root:root??input.cwd??process.cwd(),itemDelivery:binding.itemDelivery,
       candidate:{commit:binding.candidateCommit,tree:binding.candidateTree},writeScope:binding.allowedPaths})
     : resolveGovernedItemQueue({ root: root ?? input.cwd ?? process.cwd() });
+  if (deliveryQueue.written) written.push(deliveryQueue.written);
   if (deliveryQueue.status === "refused") return { ...fail(deliveryQueue.code), ...(deliveryQueue.reason ? { reason: deliveryQueue.reason } : {}), ...(deliveryQueue.repair ? { repair: deliveryQueue.repair } : {}) };
   let delivery;
   if (deliveryQueue.status === "required") {
@@ -233,7 +241,7 @@ export function prepareNativeGoldfishHostState({ root, runner, input, subagentSt
   };
   let stored;
   try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state); }
-  catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??null}; }
+  catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
 }
 
@@ -514,12 +522,13 @@ export function readNativeReservedItemScopes({repository,boundary}={}) {
   const owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
   const released=new Set(producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}).record).filter(row=>row.phase==='released').map(row=>row.bindingSha256));
-  const read=nativeAuthorityScan(owner),reservations=[];
+  const read=nativeAuthorityScan(owner),reservations=[],settled=readSettledItemSliceIds({repository,boundary});
   for(const entry of read.entries.filter(row=>row.relativePath.startsWith('pending-'))) {
     const operation=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256);
     if(released.has(operation.bindingSha256))continue;
     const state=effectiveNativePendingState(read,entry);
-    reservations.push({pendingSha256:entry.sourceFact.sha256,itemId:state.delivery?.itemId??null,criterionSha256:state.binding.itemDelivery?nativeManagedDigest(state.binding.itemDelivery.criterionLocator):null,writeScope:state.delivery?.writeScope??state.binding.allowedPaths});
+    if(settled.has(state.delivery?.sliceId))continue;
+    reservations.push({pendingSha256:entry.sourceFact.sha256,sliceId:state.delivery?.sliceId??null,itemId:state.delivery?.itemId??null,criterionSha256:state.binding.itemDelivery?nativeManagedDigest(state.binding.itemDelivery.criterionLocator):null,writeScope:state.delivery?.writeScope??state.binding.allowedPaths});
   }
   return {reservations};
 }
@@ -530,11 +539,13 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
   if(current.association.state!=='bound')throw nativeManagedFault('native-concurrent-owner-unbound');
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
   const members=new Map(producer.record.members.map(row=>{const record=inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}).record;return [record.bindingSha256,record];}));
-  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),foreignCommits=[];
+  const read=nativeAuthorityScan(owner),foreignPaths=new Set(),foreignCommits=[],settled=readSettledItemSliceIds({repository,boundary});
   for(const entry of read.entries.filter(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256!==ownPendingSha256)) {
     const pending=effectiveNativePendingState(read,entry),operation=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256),member=members.get(operation.bindingSha256);
     if(!member||!pending.binding.itemDelivery||!pending.delivery||operation.association.state!=='bound')continue;
-    if(scopesOverlap(pending.delivery.writeScope,allowedPaths))throw nativeManagedFault('native-concurrent-scope-collision');
+    // D51 (2): an integrated or cancelled foreign slice is no longer in flight.
+    if(settled.has(pending.delivery.sliceId))continue;
+    if(scopesOverlap(pending.delivery.writeScope,allowedPaths))throw reservationFault('native-concurrent-scope-collision',pending.delivery.sliceId);
     // Literal, retained original item scopes are the only foreign dirty paths.
     if(member.phase!=='released')for(const path of pending.binding.allowedPaths)foreignPaths.add(path);
     const terminal=read.entries.find(row=>row.relativePath===`authority-terminal-${entry.sourceFact.sha256}.json`);
@@ -722,34 +733,39 @@ function publishNativeAuthorityState(commonDir,name,state){
         const prior=latest.get(row.value.operationId);
         if(!prior||(rank[row.value.phase]??0)>(rank[prior.value.phase]??0)||row.value.phase===prior.value.phase&&(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);
       }
-      for(const entry of [...latest.values()].filter(row=>!agyReleased.has(row.value.bindingSha256))) {
+      // D51 (2): a reservation whose slice is integrated (native record or D40/D40b commit evidence) or cancelled no longer collides.
+      const settled=settledItemSlices(integratedIds,governed);
+      for(const entry of [...latest.values()].filter(row=>!agyReleased.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId))) {
         const pending=entry.value.basis.itemDelivery;
-        if(pending.itemId===state.delivery.itemId)throw nativeManagedFault('item-delivery-owner-collision');
-        if(state.binding.itemDelivery&&entry.value.basis?.itemBriefing?.criterionLocator&&nativeManagedDigest(entry.value.basis.itemBriefing.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw nativeManagedFault('item-delivery-criterion-owner-collision');
-        if(scopesOverlap(pending.writeScope,state.delivery.writeScope))throw nativeManagedFault('item-delivery-scope-collision');
+        if(pending.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.sliceId);
+        if(state.binding.itemDelivery&&entry.value.basis?.itemBriefing?.criterionLocator&&nativeManagedDigest(entry.value.basis.itemBriefing.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw reservationFault('item-delivery-criterion-owner-collision',pending.sliceId);
+        if(scopesOverlap(pending.writeScope,state.delivery.writeScope))throw reservationFault('item-delivery-scope-collision',pending.sliceId);
       }
       const inventory=nativeAuthorityScan(owner);
       for(const entry of inventory.entries.filter(row=>row.relativePath.startsWith('pending-'))){
         const pending=effectiveNativePendingState(inventory,entry);
         if(integration.releasedPendingHashes.includes(entry.sourceFact.sha256))continue;
-        // No terminal report frees an item reservation. Explicit Main
-        // integration/cancellation recovery is a separate, still-required port.
-        if(pending.delivery?.itemId===state.delivery.itemId)throw nativeManagedFault('item-delivery-owner-collision');
-        if(state.binding.itemDelivery&&pending.binding?.itemDelivery&&nativeManagedDigest(pending.binding.itemDelivery.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw nativeManagedFault('item-delivery-criterion-owner-collision');
-        if(scopesOverlap(pending.delivery?.writeScope??pending.binding?.allowedPaths??[],state.delivery.writeScope))throw nativeManagedFault('item-delivery-scope-collision');
+        // A terminal report alone frees no item reservation; a native release, the slice's
+        // integration by commit evidence, or its cancellation does (D51 (2)).
+        if(settled.has(pending.delivery?.sliceId))continue;
+        if(pending.delivery?.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.delivery?.sliceId);
+        if(state.binding.itemDelivery&&pending.binding?.itemDelivery&&nativeManagedDigest(pending.binding.itemDelivery.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw reservationFault('item-delivery-criterion-owner-collision',pending.delivery?.sliceId);
+        if(scopesOverlap(pending.delivery?.writeScope??pending.binding?.allowedPaths??[],state.delivery.writeScope))throw reservationFault('item-delivery-scope-collision',pending.delivery?.sliceId);
       }
     }
-    nativeAuthorityOperations.set(handle,{owner,operation});owner.operations.set(name,operation);
-    const reserved=reserveSessionAuthorityMember({boundary,producerPort:port,association:operation.association,operationHandle:handle});
-    operation.memberHandle=reserved.memberHandle;operation.memberRef=reserved.memberRef;
+    // PF-55: every check that can still refuse runs before the registry member is reserved, so a
+    // refused dispatch leaves no orphaned reserved member behind.
     if(state.binding.itemDelivery){
       const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:state.binding.allowedPaths,baseCommit:state.binding.candidateCommit,ownPendingSha256:null});
-      try {const captured=captureSourceOwnedNativeHostCommitBaseline({root:state.root,candidateCommit:state.binding.candidateCommit,resultPath:state.resultPath,authority});if(!captured.ok)throw nativeManagedFault(captured.code);state.baseline=captured.baseline;}
+      try {const captured=captureSourceOwnedNativeHostCommitBaseline({root:state.root,candidateCommit:state.binding.candidateCommit,resultPath:state.resultPath,authority});if(!captured.ok)throw baselineFault(captured);state.baseline=captured.baseline;}
       finally{nativeConcurrentAuthorities.delete(authority);}
     }
     // Productive native delivery publishes its bounded Source-owned receipts here.
     // Prepare the empty directory before launch/authoring; no product bytes or baseline waiver.
     if(state.delivery){const evidencePath=join(repository.primaryRoot,"evidence");let present;try{present=lstatSync(evidencePath);}catch(error){if(error.code!=="ENOENT")throw error;mkdirSync(evidencePath,{mode:0o700});present=lstatSync(evidencePath);}if(!present.isDirectory()||present.isSymbolicLink()||realpathSync(evidencePath)!==evidencePath)throw nativeManagedFault("native-evidence-parent-unsafe");}
+    nativeAuthorityOperations.set(handle,{owner,operation});owner.operations.set(name,operation);
+    const reserved=reserveSessionAuthorityMember({boundary,producerPort:port,association:operation.association,operationHandle:handle});
+    operation.memberHandle=reserved.memberHandle;operation.memberRef=reserved.memberRef;
     const stored=writeExclusive(commonDir,name,state);operation.pendingSha256=stored.sha256;operation.phase='armed';
     writeExclusive(commonDir,`authority-owner-${stored.sha256}.json`,{schema:'pipeline.native-goldfish-authority-owner.v1',pendingSha256:stored.sha256,association:operation.association,bindingSha256:operation.bindingSha256});
     const advanced=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:handle});operation.memberRef=advanced.memberRef;
@@ -1062,9 +1078,32 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       if(after.status!=='eligible'||after.approvalSha256!==approval.approvalSha256||after.stateSha256!==approval.stateSha256
         ||nativeManagedDigest(nativeManagedCurrentOwner(repository).association)!==nativeManagedDigest(current.association))throw nativeManagedFault('item-course-approval-cas');
       writeGovernedQueue(path,preimage,raw);
-      return resolveGovernedItemQueue({root:physical});
+      // PF-55: what a later refusal of the same dispatch needs to restore the queue exactly (rollbackGovernedItemQueue).
+      return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,preimage:preimage?preimage.toString('base64'):null,postimageSha256:digest(readFileSync(path))}};
     }));
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
+}
+
+/** PF-55: a dispatch refused after its queue was prepared leaves the queue as it was. The prepared
+ * bytes are restored only while nothing else has changed the queue since (compare and swap on them). */
+export function rollbackGovernedItemQueue(written) {
+  try {
+    if(!written||typeof written.root!=='string'||typeof written.path!=='string'||!SHA.test(written.postimageSha256??'')||!(written.preimage===null||typeof written.preimage==='string'))
+      return {status:'refused',code:'SQ-ROLLBACK-INPUT'};
+    const repository=inspectSignedDescriptorCustodyRepository(realpathSync(written.root));
+    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
+      entered.value=true;
+      let current;
+      try{current=readFileSync(written.path);}catch(error){if(error.code==='ENOENT')return {status:'unchanged',code:'SQ-ROLLBACK-ABSENT'};throw error;}
+      if(digest(current)!==written.postimageSha256)return {status:'unchanged',code:'SQ-ROLLBACK-CHANGED'};
+      if(written.preimage===null){unlinkSync(written.path);return {status:'restored',code:'SQ-ROLLBACK-REMOVED'};}
+      const bytes=Buffer.from(written.preimage,'base64'),temp=join(dirname(written.path),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);
+      let fd;
+      try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const count=writeSync(fd,bytes,offset,bytes.length-offset);if(count<=0)throw nativeManagedFault('item-course-queue-rollback-write');offset+=count;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,written.path);}
+      finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
+      return {status:'restored',code:'SQ-ROLLBACK-RESTORED'};
+    }));
+  }catch(error){return {status:'refused',code:error.code??'SQ-ROLLBACK-UNAVAILABLE',reason:error.reason??error.message};}
 }
 
 /** Publishes a governed item queue as a fresh inode by rename, after the preimage compare-and-swap. */
@@ -1082,7 +1121,7 @@ function writeGovernedQueue(path,preimage,raw) {
  * Never started means no native dispatch state names the slice and no "Dispatch: <slice> (goldfish)" commit
  * after its base touches its write scope. Its id is removed from every dependsOn: nothing of it will be
  * delivered, so nothing may wait on it. The shared critic and an already cancelled slice are refused. */
-export function cancelUnstartedGovernedItemSlice({root,sliceId,reason}={}) {
+export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=false}={}) {
   try {
     if(typeof sliceId!=='string'||!ID.test(sliceId))return {status:'refused',code:'SQ-ITEM-CANCEL-INPUT',reason:'the slice id is not a queue slice id'};
     if(typeof reason!=='string'||!reason.trim()||reason.length>500||/[\u0000-\u001f\u007f]/u.test(reason))return {status:'refused',code:'SQ-ITEM-CANCEL-INPUT',reason:'--reason needs one line of at most 500 characters'};
@@ -1092,7 +1131,8 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason}={}) {
     const repository=inspectSignedDescriptorCustodyRepository(physical),path=resolve(physical,governed.path);
     return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
       entered.value=true;
-      if(nativeManagedCurrentOwner(repository).association.state!=='bound')throw nativeManagedFault('item-course-requester-unavailable');
+      // D51 (3): no bound session is required. Cancelling only releases (nothing of the slice is
+      // delivered), and neither the agent's shell nor the PO's terminal ever carries a session binding.
       const preimage=readFileSync(path),raw=parseStrictJson(preimage);
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-queue-invalid');
       const row=raw.slices.find(entry=>entry.id===sliceId);
@@ -1101,18 +1141,21 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason}={}) {
       if(row.tier==='critic')return {status:'refused',code:'SQ-ITEM-CANCEL-CRITIC',reason:`slice ${sliceId} is the shared critic slice; it is not cancelled with this verb`};
       let native=[];
       try{native=readNativeManagedInventory(repository,'native-goldfish')[0].entries;}catch(error){if(error?.code!=='ENOENT'&&!sessionAuthorityRegistryAbsent(error))throw error;}
-      if(native.some(entry=>entry.relativePath.startsWith('pending-')&&entry.value?.delivery?.sliceId===sliceId))
-        return {status:'refused',code:'SQ-ITEM-CANCEL-STARTED',reason:`slice ${sliceId} has a native dispatch state; it was started and is finished through its own delivery`};
       if(readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:[row]}).includes(sliceId))
-        return {status:'refused',code:'SQ-ITEM-CANCEL-STARTED',reason:`slice ${sliceId} already has a "Dispatch: ${sliceId} (goldfish)" commit; it counts as integrated and needs no cancel`};
+        return {status:'refused',code:'SQ-ITEM-CANCEL-INTEGRATED',reason:`slice ${sliceId} already has a "Dispatch: ${sliceId} (goldfish)" commit; it counts as integrated, its reservation no longer blocks, and it needs no cancel`};
+      const hasNativeState=native.some(entry=>entry.relativePath.startsWith('pending-')&&entry.value?.delivery?.sliceId===sliceId);
+      if(hasNativeState&&started!==true)
+        return {status:'refused',code:'SQ-ITEM-CANCEL-STARTED',reason:`slice ${sliceId} has a native dispatch state, so it was started`,
+          repair:`if its Goldfish still runs, let it finish through its own delivery. If it no longer runs: node <plugin-root>/scripts/slice-queue.mjs cancel ${sliceId} --started --reason "<why>". With --started you assert that no Goldfish runs for it; its reservation then stops blocking and its write scope is no longer protected`};
       row.state='cancelled';row.holdReason=reason.trim();
       const released=[];
       for(const other of raw.slices)if((other.dependsOn??[]).includes(sliceId)){other.dependsOn=other.dependsOn.filter(id=>id!==sliceId);released.push(other.id);}
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-cancelled-queue-invalid');
       writeGovernedQueue(path,preimage,raw);
-      return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,released,queuePath:governed.path};
+      return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,released,queuePath:governed.path,
+        ...(hasNativeState?{started:true,note:'a started slice was cancelled on the caller\'s word that no Goldfish runs for it; its reservation no longer blocks and its write scope is no longer protected'}:{})};
     }));
-  }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-CANCEL-UNAVAILABLE',reason:error.reason??error.message};}
+  }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-CANCEL-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
 
 const governedCheckHandles=new WeakMap();
@@ -1197,12 +1240,15 @@ export function amendNativeGoldfishItemWriteScope(input={}) {
       const raw=structuredClone(governed.queue),rawItem=raw.slices.find(row=>row.id===original.sliceId);
       if(!unchanged&&nativeManagedDigest(item.writeScope)!==nativeManagedDigest(effective.delivery.writeScope))throw nativeManagedFault('native-item-scope-queue-recovery-required');
       const {reservations}=readNativeReservedItemScopes({repository,boundary});
-      if(reservations.some(row=>row.pendingSha256!==pendingSha256&&scopesOverlap(row.writeScope,writeScope)))throw nativeManagedFault('item-delivery-scope-collision');
+      const blocking=reservations.find(row=>row.pendingSha256!==pendingSha256&&scopesOverlap(row.writeScope,writeScope));
+      if(blocking)throw reservationFault('item-delivery-scope-collision',blocking.sliceId);
       const agyPort=createAgyFamilyDispatchAuthorityProducerPort({repository}),agyProducer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:agyPort});
       const released=new Set(agyProducer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:agyPort,memberRef:row.memberRef}).record).filter(row=>row.phase==='released').map(row=>row.bindingSha256));
       const agy=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']}),rank={reserved:0,armed:1,running:2,'terminal-observed':3},latestAgy=new Map();
       for(const row of agy.entries.filter(row=>row.value?.basis?.itemDelivery)){const prior=latestAgy.get(row.value.operationId);if(!prior||(rank[row.value.phase]??0)>(rank[prior.value.phase]??0)||row.value.phase===prior.value.phase&&(row.value.revision??0)>(prior.value.revision??0))latestAgy.set(row.value.operationId,row);}
-      if([...latestAgy.values()].some(row=>!released.has(row.value.bindingSha256)&&scopesOverlap(row.value.basis.itemDelivery.writeScope,writeScope)))throw nativeManagedFault('item-delivery-scope-collision');
+      const settled=readSettledItemSliceIds({repository,boundary,governed});
+      const agyBlocking=[...latestAgy.values()].find(row=>!released.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId)&&scopesOverlap(row.value.basis.itemDelivery.writeScope,writeScope));
+      if(agyBlocking)throw reservationFault('item-delivery-scope-collision',agyBlocking.value.basis.itemDelivery.sliceId);
       const queuePath=resolve(repository.primaryRoot,governed.path),queueBytes=readFileSync(queuePath);
       if(digest(queueBytes)!==governed.sha256)throw nativeManagedFault('native-item-scope-queue-cas');
       rawItem.writeScope=writeScope;
@@ -1377,11 +1423,16 @@ export function observeGovernedItemIntegrationReadiness({root}={}) {
  * scope. D40b: the commit may be the orchestrator's (`Commit-Act: orchestrator`) or the Goldfish's
  * own. D40a: a stopped attempt is superseded when a same-item
  * slice that depends on it is integrated by that evidence. A git fault releases nothing. */
+// PF-55: the result is a pure function of the candidate's immutable history and the slice rows, so a process
+// reads it once per (root, candidate, rows) instead of once per collision check.
+const commitIntegrationMemo=new Map();
 export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,slices}) {
   const run=args=>spawnSync('git',['-C',root,...args],{env:agyHostGitEnvironment(),shell:false,timeout:30000,maxBuffer:64*1024*1024,encoding:'utf8'});
   const live=(slices??[]).filter(row=>row&&row.state!=='cancelled'&&row.tier!=='critic'&&Array.isArray(row.writeScope)&&row.writeScope.length>0
     &&row.writeScope.every(path=>typeof path==='string')&&typeof row.delivery?.baseCommit==='string'&&/^[0-9a-f]{40}$/u.test(row.delivery.baseCommit));
   if(!live.length||typeof candidateCommit!=='string'||!/^[0-9a-f]{40}$/u.test(candidateCommit))return [];
+  const memoKey=`${root}\0${candidateCommit}\0${nativeManagedDigest(live)}`;
+  if(commitIntegrationMemo.has(memoKey))return [...commitIntegrationMemo.get(memoKey)];
   const log=run(['log','--no-merges','--fixed-strings','--grep=(goldfish)','--name-only',
     '--format=%x1e%H%x00%(trailers:key=Dispatch,valueonly,separator=%x1f)%x00',candidateCommit,'--']);
   if(log.status!==0)return [];
@@ -1399,7 +1450,10 @@ export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,sli
   // Only a `ready` predecessor can be a stopped attempt; held, deferred or blocked slices keep their hold.
   const superseded=live.filter(row=>!direct.has(row.id)&&row.state==='ready'&&live.some(next=>next.id!==row.id&&direct.has(next.id)&&(next.dependsOn??[]).includes(row.id)
     &&typeof row.delivery.itemId==='string'&&next.delivery.itemId===row.delivery.itemId)).map(row=>row.id);
-  return [...direct,...superseded];
+  const result=[...direct,...superseded];
+  if(commitIntegrationMemo.size>=64)commitIntegrationMemo.delete(commitIntegrationMemo.keys().next().value);
+  commitIntegrationMemo.set(memoKey,result);
+  return [...result];
 }
 /** Only the never-created registry catalogue counts as absent; a missing member or any other fault does not. */
 export function sessionAuthorityRegistryAbsent(error) {
@@ -1440,6 +1494,33 @@ function readNativeIntegratedSlices({governed,repository,boundary}) {
       }
   const agy=readAgyIntegratedItemDelivery({repository,boundary,governed});
   return {integrated:[...new Set([...integrated,...agy.integratedSliceIds])],releasedPendingHashes};
+}
+
+/** D51 (2): the slices whose item reservations no longer block an owner, criterion or write-scope check:
+ * integrated by a native record or by D40/D40b commit evidence, or cancelled in the governed queue.
+ * Every native and AGY collision check reads this one definition. */
+function settledItemSlices(integratedIds,governed){
+  return new Set([...integratedIds,...(governed?.status==='required'?governed.normalized.slices.filter(row=>row.state==='cancelled').map(row=>row.id):[])]);
+}
+export function readSettledItemSliceIds({repository,boundary,governed=resolveGovernedItemQueue({root:repository.primaryRoot})}={}) {
+  if(governed?.status!=='required')return new Set();
+  const {integrated}=readNativeIntegratedSlices({governed,repository,boundary});
+  return settledItemSlices([...integrated,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})],governed);
+}
+/** The repair a reservation collision names: the slice that still holds it and the commands that release it. */
+export function itemReservationRepair(sliceId) {
+  return typeof sliceId==='string'
+    ?`slice ${sliceId} still holds this reservation. If it delivered, its "Dispatch: ${sliceId} (goldfish)" commit releases it. If its Goldfish no longer runs: node <plugin-root>/scripts/slice-queue.mjs cancel ${sliceId} --started --reason "<why>"`
+    :'a reservation that names no slice holds this item; report it to the PO with the refusal';
+}
+function reservationFault(reason,sliceId){return Object.assign(nativeManagedFault(reason),{repair:itemReservationRepair(sliceId)});}
+/** D52 (2): a dirty host baseline names its paths and the repair, not only its code. */
+function baselineFault(captured) {
+  const fault=nativeManagedFault(captured.code);
+  if(captured.code!=='AGY-HOST-BASELINE-DIRTY')return fault;
+  if(captured.headMatches===false)return Object.assign(fault,{repair:'HEAD is no longer the binding\'s candidate: regenerate the binding at the current HEAD (dispatch-briefing.mjs binding) and dispatch again'});
+  const paths=captured.dirtyPaths??[],state=paths.filter(path=>/(^|\/)pipeline-state\.json$/u.test(path));
+  return Object.assign(fault,{repair:`commit or restore these tracked paths before dispatching: ${paths.join(', ')||'(none named)'}${state.length?`; the push-approval record approve-push leaves in ${state.join(', ')} is committed once its approved push has landed: write the subject "chore(pipeline-state): fold pending push-approval record" to a message file, then git commit -F <message file> -- ${state.join(' ')}`:''}`});
 }
 
 function validItemCheckpoint(value) {

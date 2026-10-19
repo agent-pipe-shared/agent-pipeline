@@ -280,7 +280,22 @@ check("usage: an unknown verb, a missing --queue and an unknown flag exit 2 with
   }
 });
 
-assert.equal(cases.length, 15, "the complete CLI corpus must be registered before execution begins");
+check("cancel: --started is a flag without a value, given at most once (D51)", () => {
+  const dir = sandbox();
+  const path = writeQueue(dir, [slice("A", ["a.mjs"])]);
+  const before = readFileSync(path);
+  for (const args of [["cancel", "A", "--queue", REL, "--reason", "x", "--started=yes"], ["cancel", "A", "--queue", REL, "--reason", "x", "--started", "--started"]]) {
+    const result = cli(dir, args);
+    assert.equal(result.status, 2, JSON.stringify(args));
+    assert.equal(result.json.code, "SQ-USAGE");
+    assert.ok(readFileSync(path).equals(before));
+  }
+  const cancelled = cli(dir, ["cancel", "A", "--started", "--queue", REL, "--reason", "no longer runs"]);
+  assert.equal(cancelled.status, 0, cancelled.stdout + cancelled.stderr);
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).slices[0].state, "cancelled");
+});
+
+assert.equal(cases.length, 16, "the complete CLI corpus must be registered before execution begins");
 process.on("exit", () => {
   for (const dir of sandboxes) rmSync(dir, { recursive: true, force: true });
 });
