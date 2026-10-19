@@ -50,6 +50,8 @@ import { resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import { run as runPipelineState } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
+import { classifyDirtyTree } from "../lib/pipeline-owned-files.mjs";
+import { commitPipelineOwned } from "./commit-pipeline-owned.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -1034,7 +1036,8 @@ test("pushPrepareReport: HEAD unresolved + gates.security blocking -> security-e
 
 const CHECKPOINT_ARGV = ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/feat/x"];
 const slimOptions = { profile: "feature-checkpoint", sourceRef: "refs/heads/feat/x" };
-const blockingSecurity = () => ({ gates: { security: { mode: "blocking" } } });
+const checkpointPolicy = { schema: "pipeline.push-destination-policy.v1", checkpointNamespace: "refs/heads/feat/" };
+const blockingSecurity = () => ({ gates: { security: { mode: "blocking" } }, pushDestinationPolicy: checkpointPolicy });
 
 test("PUSHSIG-S4c: slim profile omits both evidence ids and keeps every other check id", () => {
   const deps = readyDeps({ loadManifestSafe: blockingSecurity });
@@ -1046,7 +1049,7 @@ test("PUSHSIG-S4c: slim profile omits both evidence ids and keeps every other ch
   assert.equal(slim.report.ready, true);
   assert.equal(slimIds.includes("verify-evidence"), false);
   assert.equal(slimIds.includes("security-evidence"), false);
-  assert.deepEqual(slimIds, fullIds.filter((id) => id !== "verify-evidence" && id !== "security-evidence"));
+  assert.deepEqual(slimIds.filter((id) => id !== "checkpoint-destination"), fullIds.filter((id) => id !== "verify-evidence" && id !== "security-evidence"));
   assert.ok(slimIds.includes("working-tree-clean") && slimIds.includes("push-threat-model") && slimIds.includes("critical-human-proof-policy"));
   // Value-less --checkpoint on argv selects the same profile.
   const viaFlag = pushPrepareReport([...CHECKPOINT_ARGV, "--checkpoint"], deps);
@@ -1067,8 +1070,23 @@ test("PUSHSIG-S4c regression: default profile still has both evidence checks and
   assert.equal(stale.report.ready, false);
 });
 
+test("PF-32: --checkpoint without a checkpoint policy, or to a destination the guard would not classify as one, is refused before any signing command", () => {
+  for (const [manifest, sourceRef, remedy] of [
+    [{ gates: { security: { mode: "blocking" } } }, "refs/heads/feat/x", /opt in once: add "pushDestinationPolicy: .*then approve the plan again/u],
+    [blockingSecurity(), "refs/heads/feat/other", /same name under the checkpoint namespace/u],
+  ]) {
+    const result = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ loadManifestSafe: () => manifest }), { ...slimOptions, sourceRef });
+    assert.equal(result.report.ready, false);
+    assert.equal(result.lines, null, "no signing command is printed for a push the guard would not admit as a checkpoint");
+    const check = result.report.checks.find((row) => row.id === "checkpoint-destination");
+    assert.equal(check.ok, false); assert.match(check.message, /protected publication/u); assert.match(check.remedy, remedy);
+  }
+  const admitted = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ loadManifestSafe: blockingSecurity }), slimOptions);
+  assert.equal(admitted.report.checks.find((row) => row.id === "checkpoint-destination").ok, true);
+});
+
 test("PUSHSIG-S4c: profile note and sourceRef push line appear only in the slim profile", () => {
-  const deps = readyDeps();
+  const deps = readyDeps({ loadManifestSafe: blockingSecurity });
   const slim = pushPrepareReport(CHECKPOINT_ARGV, deps, slimOptions);
   const full = pushPrepareReport(CHECKPOINT_ARGV, deps);
   assert.match(slim.lines.profileNote, /feature checkpoint: no Verify\/security\/Critic evidence/u);
@@ -1388,4 +1406,42 @@ test("foldPendingPushApprovalWrite: non-zero or status-less git write remains fa
     const outcome = foldPendingPushApprovalWrite(FIXTURE_DIR, { spawn: () => result });
     assert.equal(outcome.reason, "status-unavailable");
   }
+});
+
+// ---------------------------------------------------------------------------
+// PF-31/PF-36/PF-40 (D56 (2)): the Pipeline's own dirty files are named with the one command that commits them
+// ---------------------------------------------------------------------------
+
+test("PF-31: a tree dirty only with the slice queue or the override log names commit-pipeline-owned; any other change keeps the plain remedy", () => {
+  const owned = checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => "?? specs/unit/slice-queue.json\n M project/guard-override.log.jsonl" });
+  assert.equal(owned.ok, false);
+  assert.match(owned.remedy, /commit-pipeline-owned\.mjs --root /u);
+  assert.match(owned.remedy, /specs\/unit\/slice-queue\.json, project\/guard-override\.log\.jsonl/u);
+  const mixed = checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => "?? specs/unit/slice-queue.json\n M src/app.mjs" });
+  assert.match(mixed.remedy, /commit or stash/u);
+  assert.equal(classifyDirtyTree("M project/pipeline-state.json").others[0], "project/pipeline-state.json", "a trimmed first line still yields the full path");
+});
+
+test("PF-36: commit-pipeline-owned commits exactly the Pipeline's own files and refuses when anything else is dirty", () => {
+  const root = mkdtempSync(join(tmpdir(), "commit-pipeline-owned-"));
+  const config = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"];
+  try {
+    const git = (...args) => spawnSync("git", ["-C", root, ...config, ...args], { encoding: "utf8" });
+    assert.equal(spawnSync("git", ["init", "-q", root]).status, 0);
+    assert.equal(git("commit", "--allow-empty", "-q", "-m", "base").status, 0);
+    mkdirSync(join(root, "specs/unit"), { recursive: true });
+    writeFileSync(join(root, "specs/unit/slice-queue.json"), "{}\n");
+    writeFileSync(join(root, "other.txt"), "x\n");
+    const run = (...argv) => commitPipelineOwned(argv, { spawn: (command, args, options) => spawnSync(command, [args[0], args[1], ...config, ...args.slice(2)], options) });
+    const refused = run("--root", root);
+    assert.equal(refused.code, "CPO-FOREIGN-CHANGES"); assert.deepEqual(refused.others, ["other.txt"]);
+    rmSync(join(root, "other.txt"));
+    assert.equal(run("--root", root, "--dry-run").status, "dry-run");
+    const committed = run("--root", root);
+    assert.equal(committed.status, "committed", JSON.stringify(committed)); assert.deepEqual(committed.owned, ["specs/unit/slice-queue.json"]);
+    assert.equal(git("status", "--porcelain").stdout, "");
+    assert.match(git("log", "-1", "--format=%B").stdout, /AI-Assisted: true\nDispatch: stage-0 \(elephant\)/u);
+    assert.equal(run("--root", root).status, "nothing-to-commit");
+    assert.equal(run().code, "CPO-ARGS");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

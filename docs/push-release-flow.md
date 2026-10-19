@@ -110,6 +110,22 @@ require fresh Verify/security evidence, marketplace synchronization, or a
 release signature; it never permits force, deletion, implicit destinations, a
 source/destination mismatch, or a dirty tree.
 
+**The lane is an opt-in.** The guard classifies a push as a checkpoint only when
+the project manifest carries `pushDestinationPolicy: { schema:
+pipeline.push-destination-policy.v1, checkpointNamespace: refs/heads/feat/ }`;
+without it every push is a protected publication that needs Verify and security
+evidence. Both `push-init --checkpoint` and `push-prepare --checkpoint` check this
+before any signing command is printed (`checkpoint-destination`), so no signature
+is spent on a push the guard would refuse (PF-32). Adding the policy changes the
+manifest, which the plan approval binds: approve the plan again afterwards (PF-33).
+
+**A tree dirty only with the Pipeline's own files** (the governed
+`specs/<feature>/slice-queue.json` a dispatch binding writes, the guard-override
+audit log a signed push writes) is named by every clean-tree refusal together with
+`node "${PIPELINE_PLUGIN_ROOT}/scripts/commit-pipeline-owned.mjs" --root <repo>`,
+which commits exactly those files and refuses if anything else is dirty
+(PF-31/PF-36/PF-40). The clean-tree checks themselves stay strict.
+
 **In `signature` mode a checkpoint also needs a commit-bound push signature**
 (PUSHSIG, `lib/checkpoint-push-approval.mjs`): the git pre-push hook refuses it
 with `CHECKPOINT-APPROVAL-STALE` until an approval for this exact commit, remote

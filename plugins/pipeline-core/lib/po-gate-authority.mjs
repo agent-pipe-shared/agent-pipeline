@@ -30,6 +30,7 @@ import {
   resolve,
   sep,
 } from "node:path";
+import { fileURLToPath } from "node:url";
 import { TextDecoder } from "node:util";
 
 import { parseYaml } from "./yaml-lite.mjs";
@@ -100,8 +101,10 @@ const RECEIPT_KEYS = [
 // leaves to them. Both act on the project's own primary checkout -- the receipt
 // is shared through the Git common directory and is validated against the
 // primary's bytes, so a linked worktree must not be able to publish it.
+// PF-33: the consumer route names the absolute script, so it runs as printed.
+const PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROFILE_REPAIR = "Run node setup.mjs --publish-po-profile from the canonical primary checkout, then retry."
-  + " In a consumer project, run the pipeline-core script po-gate-profile-repair.mjs (plan, then apply --activate)"
+  + ` In a consumer project, run node ${PROFILE_REPAIR_SCRIPT} plan --root <primary checkout>, then apply --activate`
   + " against that project's own primary checkout; add --human-facing <de|en> to set or correct the operator-facing language.";
 const PRD_REPAIR = "Repair activeFeature.planPath and the active feature directory; do not create child PRDs.";
 // PO-GATE-PRD-SPEC-MISMATCH is a document-binding defect: the PRD's technical

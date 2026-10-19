@@ -1,0 +1,62 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+//
+// commit-pipeline-owned.mjs --root <root> [--dry-run]
+//
+// PF-31, PF-36, PF-40 (D56 (2)): commits exactly the Pipeline's own dirty state files (the governed slice
+// queue, the guard-override audit log) so the clean-tree checks of push-prepare, push-init and the PO
+// approval pass again. It refuses when anything else is dirty, naming those paths: it never commits, stashes
+// or discards a file the Pipeline does not own. Runs from the agent's shell and from the PO's terminal.
+//
+// Prints one JSON result. Exit 0: committed | nothing-to-commit | dry-run. Exit 2: refused.
+import { spawnSync } from "node:child_process";
+import { realpathSync, statSync } from "node:fs";
+import { resolve } from "node:path";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { classifyDirtyTree } from "../lib/pipeline-owned-files.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+
+const SCHEMA = "pipeline.commit-pipeline-owned.v1";
+const MESSAGE = "chore(pipeline): commit the Pipeline's own state files\n\n"
+  + "Committed by commit-pipeline-owned.mjs (PF-31/PF-36/PF-40): the governed slice queue\n"
+  + "and the guard-override audit log are written by the Pipeline itself and would\n"
+  + "otherwise keep the tree a push needs clean dirty.\n\n"
+  + "AI-Assisted: true\n"
+  + "Dispatch: stage-0 (elephant)\n";
+
+function parse(argv) {
+  const flags = { dryRun: false };
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === "--dry-run" && !flags.dryRun) { flags.dryRun = true; continue; }
+    if (argv[index] === "--root" && flags.root === undefined && typeof argv[index + 1] === "string" && !argv[index + 1].startsWith("--")) { flags.root = argv[index + 1]; index += 1; continue; }
+    return { error: "usage: commit-pipeline-owned.mjs --root <root> [--dry-run]" };
+  }
+  return flags.root === undefined ? { error: "--root <root> is required" } : flags;
+}
+
+export function commitPipelineOwned(argv, { spawn = spawnSync } = {}) {
+  const parsed = parse(argv);
+  if (parsed.error) return { status: "refused", code: "CPO-ARGS", reason: parsed.error };
+  let root;
+  try { root = realpathSync(resolve(parsed.root)); if (!statSync(root).isDirectory()) throw new Error("not a directory"); }
+  catch (error) { return { status: "refused", code: "CPO-ROOT", reason: `--root is not a directory: ${String(error?.message ?? error).slice(0, 200)}` }; }
+  const git = (args) => spawn("git", ["-C", root, ...args], { encoding: "utf8" });
+  const status = git(["status", "--porcelain=v1", "--untracked-files=all"]);
+  if (!isSuccessfulSpawn(status) || typeof status.stdout !== "string") return { status: "refused", code: "CPO-GIT", reason: "git status failed" };
+  const { owned, others } = classifyDirtyTree(status.stdout);
+  if (others.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: "other files are uncommitted; this command commits only the Pipeline's own state files", others, owned };
+  if (!owned.length) return { status: "nothing-to-commit", owned: [] };
+  if (parsed.dryRun) return { status: "dry-run", owned };
+  const add = git(["add", "--", ...owned]);
+  if (!isSuccessfulSpawn(add)) return { status: "refused", code: "CPO-GIT", reason: "git add failed", owned };
+  const commit = git(["commit", "-m", MESSAGE, "--", ...owned]);
+  if (!isSuccessfulSpawn(commit)) return { status: "refused", code: "CPO-GIT", reason: `git commit failed: ${String(commit.stderr ?? "").trim().slice(0, 300)}`, owned };
+  const head = git(["rev-parse", "HEAD"]);
+  return { status: "committed", owned, commit: isSuccessfulSpawn(head) ? head.stdout.trim() : null };
+}
+
+if (isDirectInvocation(import.meta.url)) {
+  const result = commitPipelineOwned(process.argv.slice(2));
+  process.stdout.write(`${JSON.stringify({ schema: SCHEMA, ...result })}\n`);
+  process.exitCode = result.status === "refused" ? 2 : 0;
+}

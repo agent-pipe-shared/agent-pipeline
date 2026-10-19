@@ -1015,7 +1015,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       if(current.association.state!=='bound')throw nativeManagedFault('item-course-requester-unavailable');
       const approval=observeCurrentPlanApprovalForCalibration({rootDir:physical});
       if(approval.status!=='eligible')return {status:'refused',code:approval.code,reason:`the current plan approval is ${approval.status} (${approval.code})`,
-        repair:approval.repair??'the item course needs an eligible PO plan approval of the current PRD and spec; read pipeline-state.mjs inspect'};
+        repair:approval.repair??staleApprovalRepair(approval.code)};
       const paths=resolveProjectAuthorityPaths({rootDir:physical});
       if(paths.status!=='ready')throw nativeManagedFault('item-course-authority-unavailable');
       const stateBytes=readFileSync(join(physical,paths.state)),state=parseStrictJson(stateBytes);
@@ -1119,6 +1119,15 @@ function writeGovernedQueue(path,preimage,raw) {
   let fd;
   try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const written=writeSync(fd,bytes,offset,bytes.length-offset);if(written<=0)throw nativeManagedFault('item-course-queue-write');offset+=written;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,path);}
   finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
+}
+
+/** PF-33 (D56 (3)): the plan approval binds the PO-gate authority (manifest, PRD) and the PO profile, so a later
+ * change to either, such as the checkpoint policy opt-in, makes it stale. The repair names the route that exists. */
+const STATE_SCRIPT=fileURLToPath(new URL('../scripts/pipeline-state.mjs',import.meta.url));
+export function staleApprovalRepair(code) {
+  if(code==='CVCT-AUTHORITY-STALE'||code==='CVCT-PROFILE-STALE')
+    return `the ${code==='CVCT-PROFILE-STALE'?'PO profile':'project manifest or PRD'} changed after the plan approval, which binds it; submit the plan again (node ${STATE_SCRIPT} submit-plan --by <PO name> --profile <profile>) and have the PO approve it again, then retry`;
+  return `the item course needs an eligible PO plan approval of the current PRD and spec; read node ${STATE_SCRIPT} inspect`;
 }
 
 /** Critic F2: an AGY reservation that names the slice and is not released marks it started, as a native

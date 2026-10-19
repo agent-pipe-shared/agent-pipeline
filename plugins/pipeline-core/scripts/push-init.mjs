@@ -114,6 +114,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { gateConfig, loadManifest } from "../lib/manifest.mjs";
 import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
+import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
 import { pushPrepareReport as realPushPrepareReport } from "./push-prepare.mjs";
@@ -204,7 +205,8 @@ export function driveCheckpointPushInit({ rootDir, by, remote, destination, run 
   });
   checks.push({ id: "checkpoint-destination", ok: classification.lane === "feature-checkpoint", message: classification.reason ?? "configured feature checkpoint destination." });
   const status = gitText(root, ["status", "--porcelain"], run);
-  checks.push({ id: "working-tree-clean", ok: status === "", message: status === "" ? "working tree is clean." : "working tree is not clean or cannot be read." });
+  const ownedRemedy = status ? pipelineOwnedRemedy(status, root) : null;
+  checks.push({ id: "working-tree-clean", ok: status === "", message: status === "" ? "working tree is clean." : "working tree is not clean or cannot be read.", ...(ownedRemedy ? { remedy: ownedRemedy } : {}) });
   const intent = gitText(root, ["show", "-s", "--format=%(trailers:key=Checkpoint-Intent,valueonly)", "HEAD"], run);
   const intents = intent === null ? [] : intent.split("\n").map((value) => value.trim()).filter(Boolean);
   checks.push({ id: "checkpoint-intent", ok: intents.length === 1 && validCheckpointIntent(intents[0]), message: intents.length === 1 && validCheckpointIntent(intents[0]) ? "committed Checkpoint-Intent is present." : "HEAD needs exactly one bounded Checkpoint-Intent commit trailer." });

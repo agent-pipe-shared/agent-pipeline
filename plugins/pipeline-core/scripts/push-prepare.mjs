@@ -45,6 +45,8 @@ import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { criticalProofWaiverFor, readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+import { CHECKPOINT_LANE, PUSH_DESTINATION_POLICY_SCHEMA, classifyPushDestination } from "../lib/push-destination-policy.mjs";
+import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
@@ -110,7 +112,7 @@ export function checkWorkingTreeClean(dir, deps = {}) {
     return { id: "working-tree-clean", ok: false, message: "could not determine working-tree status (git status --porcelain failed).", remedy: "git status" };
   }
   if (status !== "") {
-    return { id: "working-tree-clean", ok: false, message: "the working tree is not clean.", remedy: "git status  # then commit or stash the listed changes" };
+    return { id: "working-tree-clean", ok: false, message: "the working tree is not clean.", remedy: pipelineOwnedRemedy(status, dir) ?? "git status  # then commit or stash the listed changes" };
   }
   return { id: "working-tree-clean", ok: true, message: "working tree is clean." };
 }
@@ -243,6 +245,28 @@ export function isSecurityGateActive(dir, deps = {}) {
   const manifest = loadManifest(dir);
   const securityGate = readGateConfig(manifest, "security");
   return Boolean(securityGate) && securityGate.mode !== "off";
+}
+
+/**
+ * PF-32 (D56 (3)): `--checkpoint` is only a checkpoint if guard-push will classify the exact refspec as one.
+ * Without a valid `pushDestinationPolicy` the guard treats the push as a protected publication and demands
+ * Verify and security evidence, so a signature collected here would be spent for nothing. Checked before
+ * any signing command is printed, with the same classifier the guard uses.
+ */
+export function checkCheckpointDestination(dir, { remote, destination, sourceRef }, deps = {}) {
+  const loadManifest = deps.loadManifestSafe ?? loadManifestSafe;
+  const manifest = loadManifest(dir);
+  const classification = classifyPushDestination({ manifestStatus: manifest ? "ok" : "invalid", policy: manifest?.pushDestinationPolicy, binding: { ok: true, remote, sourceRef, destination } });
+  if (classification.lane === CHECKPOINT_LANE) return { id: "checkpoint-destination", ok: true, message: "guard-push classifies this refspec as a feature checkpoint." };
+  const optIn = !classification.policy?.ok;
+  return {
+    id: "checkpoint-destination",
+    ok: false,
+    message: `guard-push would treat this push as a protected publication, not a checkpoint: ${classification.reason}.`,
+    remedy: optIn
+      ? `opt in once: add "pushDestinationPolicy: { schema: ${PUSH_DESTINATION_POLICY_SCHEMA}, checkpointNamespace: refs/heads/feat/ }" to the project manifest through its sanctioned route, then approve the plan again (the approval binds the manifest)`
+      : "push the checked-out feature branch to the same name under the checkpoint namespace (source and destination must be equal)",
+  };
 }
 
 export function checkPushThreatModel(dir, deps = {}) {
@@ -645,12 +669,16 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   if (options.foldPendingApprovalWrite !== false) foldPending(dir, deps);
 
   const headCommit = resolveHeadCommit(dir, deps);
+  // The slim profile pushes the exact checked-out branch; resolved once, for the PF-32 check and the push line.
+  let slimSourceRef;
+  const checkpointSourceRef = () => slimSourceRef ??= options.sourceRef ?? gitOutput(dir, ["symbolic-ref", "-q", "HEAD"], deps) ?? "HEAD";
   const checks = [];
   checks.push(checkWorkingTreeClean(dir, deps));
   const securityGateActive = isSecurityGateActive(dir, deps);
   const evidenceDir = resolveEvidenceProjectDir(dir, deps);
   if (slim) {
-    // feature-checkpoint profile: no Verify/security evidence is demanded.
+    // feature-checkpoint profile: no Verify/security evidence is demanded, but only if guard-push agrees it is one.
+    checks.push(checkCheckpointDestination(dir, { remote, destination, sourceRef: checkpointSourceRef() }, deps));
     if (!headCommit) {
       checks.push({ id: "head-commit", ok: false, message: "HEAD commit could not be determined (git rev-parse HEAD failed).", remedy: "git rev-parse HEAD" });
     }
@@ -684,9 +712,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   };
   if (slim) report.profile = "feature-checkpoint";
   // Slim profile pushes the exact checked-out branch; the default profile keeps HEAD.
-  const sourceRef = slim
-    ? (options.sourceRef ?? gitOutput(dir, ["symbolic-ref", "-q", "HEAD"], deps) ?? "HEAD")
-    : "HEAD";
+  const sourceRef = slim ? checkpointSourceRef() : "HEAD";
   const profileNote = slim
     ? "feature checkpoint: no Verify/security/Critic evidence is demanded or implied by this approval"
     : null;
