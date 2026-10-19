@@ -580,6 +580,7 @@
 | pipeline.outside-root-read-label-skips-option-value-file-tokens | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.outside-root-read-scope-denies-ls-and-rg-o-on-po-named-folders | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
+| pipeline.owned-gitignore-without-evidence-breaks-every-item-governed-host-commit | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.p-ac-11-four-dimensions-declared-but-inert | closed | defect | pipeline | — | 2026-08-16 | 2026-09-15 | — |
 | pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry | closed | defect | pipeline | — | 2026-08-17 | 2026-09-15 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -920,7 +921,7 @@
 
 ## Counts
 
-- open: 234
+- open: 235
 - in_progress: 0
 - closed: 664
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "197fa57516c3b5e70eafce77455486de1097a85249c1ffc4314d1c8876fe03d5"
+    "transitionHead": "a1c3d246e130dbf5d008f441894c52b8ca45484b24db49a590e9c0940903f7a0"
   },
   "counts": {
-    "open": 234,
+    "open": 235,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -7378,6 +7378,16 @@
       "closureRepository": "self",
       "closureCommit": "f9d52fe33b7797c7c86eea1bd93c35b0458d26a0",
       "closureEvidence": "backlog/evidence/2026-08-09-closure-evidence-trackedness.md"
+    },
+    {
+      "id": "pipeline.owned-gitignore-without-evidence-breaks-every-item-governed-host-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "PF-26C diagnosis (2026-10-19): the second PF-26 cause in the end-to-end pin fixture",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.p-ac-11-four-dimensions-declared-but-inert",
