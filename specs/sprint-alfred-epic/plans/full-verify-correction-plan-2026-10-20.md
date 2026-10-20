@@ -283,3 +283,57 @@ Interim entry.
 - **Next:** D71 product fix (test isolation of the address root, repair verb for the bound); D70 (c)
   RF2A owner option; D70 (b) legacy historic bytes (7 binding + 1 recovery case); the remaining binding
   reds; K1f, K1g; then the K1 closure.
+
+### K1 measurement 7 (2026-10-20, dispatches ALF-K1R, ALF-K1-RF2A-ARCHIVE-RELEASE and -RELEASE2)
+
+Interim entry. Changes the direction of RF2A.
+
+- **K1R delivered (implementation complete; D65 security read in the Critic batch and PO acceptance
+  pending):** `33fcdf82d`. `session-power-address-repair.mjs plan | apply --plan-sha256 <digest>` moves
+  slots of absent repositories aside to `<home>/.apsp-aside/<stamp>/`, deletes nothing, reads back; the
+  plan digest binds only the root identity and the candidate set. The `SP-ADDRESS` refusal names the verb.
+  Counted: new suite 17/17, power 2/2, consumer-safe paths 9/9, architecture check only the two known
+  entries. Live: plan and apply against the real address root moved 139 of 477 slots, readback ok.
+  The scratch runners (`scratch/run-quiet.mjs`, `run-detail.mjs`, `run-causes.mjs`) run the repair after
+  each suite. The new test file needs C16 registration.
+- **Deviation from D72 (Elephant):** Verify runs the repair once before and once after its whole suite
+  run, not after every suite: suites run concurrently and `prepareAddressRoot` compares two directory
+  listings (`session-power.mjs` 369), so a move during a running suite fails it spuriously. The change
+  sits in `harness/scripts/verify.mjs` (TP-3) as a C15 drop-in, `scratch/c15/verify.mjs`
+  (sha256 `02258f8174d948ea1ede13edb3bbc4892be58137b7e4858d990fa3c3c2a7c412`, +4 lines).
+- **Queue:** `ALF-C-WIN-ANCESTOR2` (AC-270 follow-up for the five other Windows ancestor walkers, never
+  started) held `verify-journal.mjs` and `session-requester-bridge.mjs`; cancelled through the guard's
+  repair verb, which released ten dependent slices. The walker follow-up is to be re-queued for the
+  native Windows session. The first RF2A slice was cancelled `--started` after a budget stop.
+- **RF2A finding 1:** a descriptor whose owner process exited reads `not-live`; `archive-orphan` admits
+  only `unavailable` and `unobserved` by design (`ORPHAN_ARCHIVE_OWNER_STATUSES`, `worktree-lifecycle.mjs`
+  ~1026), because `not-live` has the ordinary retirement route.
+- **RF2A finding 2 (invalidates the basis of D70 (c)):** a Source-owned bind refuses a descriptor whose
+  owner is not observable: with `ownerPid: -1` the bound start fails at `prepareOperation`
+  (`onboarding-continuity.mjs` 9423-9445, 'continuity owner preparation refused'; the catch maps every
+  cause to `SDC-AUTHORITY-UNAVAILABLE`), measured in both the recovery RF2A case and the new lost-binding
+  cases, whose only difference from the green bound start is `ownerPid: -1`. So an owner option cannot
+  produce the RF2A state 'bound + unavailable owner'; under the current contract that state exists only
+  as a historic binding, which is D70 (b)'s technique. The RF2A bound case moves onto D70 (b)'s historic
+  binding artifact; the bridge `ownerPid` option is dropped (a dead optional key in an authority file at
+  its line bound).
+- **RF2A2 draft (not committed, not green):** `releaseArchivedOrphanBinding` with typed
+  `WT-ORPHAN-RELEASE-*` refusals and the boundary block shared with `releaseLostSessionCleanupBinding`,
+  the `applyOrphanDescriptorArchive` wiring (net -4 lines), `sessionCleanupInFreshProcess` in the
+  fixture module, two new lost-binding cases (RED 4/6 for the fixture reason above). Saved to
+  `scratch/k1rf/rf2a2/` (`node scratch/k1rf/rf2a2-save.mjs restore`); the tree was restored. With the
+  draft applied nothing regressed: recovery 37/39, binding 49/66, repair 10/10.
+- **Binding-suite causes (clean run, `scratch/run-causes.mjs`, no other dispatch running):** 17 reds.
+  7 × 'continuity owning bind failed after reservation' (`SDC-AUTHORITY-CAS`): the legacy-layout group
+  (legacy post-close recovery x2, the four apply-recovery event cases, start does not replace a provable
+  post-close binding); 3 × 'continuity owning release failed' (start binds once ..., release-binding
+  completes an interrupted ..., sanctioned neutral start/reuse/release); 4 × composite recovery
+  `ERR_ASSERTION` (lost binding plus orphan set, post-release crash x2, State and orphan-set drift);
+  1 × 'continuity owner preparation refused' (neutral coordinator-close release); 1 × plain-context bind
+  (a single unbound descriptor requires an activated digest-bound rebind); 1 ×
+  `onboarding-continuity:namespace-drift` (ordinary orphan release). An earlier 36-red reading was taken
+  while a dispatch edited `session-power.mjs` and is invalid.
+- **Next:** K1fg (four fixture suites, packaged); then package A (deep): the D70 (b) historic-binding
+  fixture helper plus the 7 legacy binding cases and the recovery `release-closed-feature` case; then
+  package B (deep): restore the RF2A2 draft, rewire the RF2A bound case and the lost-binding cases onto
+  A's helper, drop the bridge option; then the remaining binding reds; then the K1 closure.
