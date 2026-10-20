@@ -17,7 +17,7 @@
 // one step that atomically creates AND binds a descriptor.
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   existsSync,
   lstatSync,
@@ -48,17 +48,22 @@ import {
 } from "./session-cleanup-recovery.mjs";
 import {
   applyOnboardingKickoff,
+  bindOnboardingSessionCleanup,
+  observeSessionCleanupState,
   planOnboardingKickoff,
   readOnboardingSessionCleanupBinding,
 } from "./onboarding-continuity.mjs";
 import {
   cleanupSession,
   createDetachedWorktree,
+  inspectSignedDescriptorCustodyRepository,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
   retireSessionDescriptor,
   startSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
+import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
+import { prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
 import { main as sessionCleanupMain } from "../scripts/session-cleanup.mjs";
 import {
@@ -101,11 +106,80 @@ function neutralFixture(name) {
   return root;
 }
 
+// K1c3 (AC-203): `bindOnboardingSessionCleanup` refuses outside a Source-owned bound requester context, and
+// binds only the requester's own {sessionId, descriptorSha256}; the same design as
+// `scripts/session-cleanup-binding.test.mjs` (commit 9bf8a8619). Production (session-power-controller.mjs
+// `direct`) creates the session descriptor first, binds a requester to exactly that descriptor, and runs the
+// work inside `withSourceOwnedAuthorityContext`. The `start` verb creates its descriptor and binds in one call,
+// and `bind-orphan` binds a descriptor that already exists, so the fixtures rebuild the production order through
+// the bridge's own fixture builder at the seams this file already drives: descriptor creation returns the
+// descriptor the builder created and bound a requester to, and the REAL `bindOnboardingSessionCleanup` runs
+// inside that requester's own context. Nothing is stubbed into a `bound` result.
+const boundRequesterRuntimes = new Map();
+const registryPreparedRoots = new Set();
+const legacyLayoutRoots = new Set();
+let boundRequesterSequence = 0;
+function boundRequesterKey(repository, sessionId) { return `${repository.primaryRoot}\n${sessionId}`; }
+
+// The existing authority-migration builders, exactly as `neutralFixture` applies them.
+function migrateToNeutral(root) {
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const plan = planProjectAuthorityMigration({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(applyProjectAuthorityMigration(plan, { rootDir: root, activate: true }).status, "applied");
+}
+
+function startDescriptorWithBoundRequester(repoPath, options = {}) {
+  const repository = inspectSignedDescriptorCustodyRepository(repoPath);
+  // A Source-owned bound bind is admitted only for a neutral project (`continuityJoinActualBoundCleanupOwner`
+  // requires `observed.neutral`), so the first bound start migrates a legacy-layout fixture through the existing
+  // builders, unless the case pins the legacy layout (that case then stays refused and is named as such).
+  if (!legacyLayoutRoots.has(repository.primaryRoot) && !observeSessionCleanupState(repository.primaryRoot).neutral) {
+    migrateToNeutral(repository.primaryRoot);
+  }
+  // A cleanup binding reserves its member in the session-authority registry: initialize the real, empty registry
+  // (no stub) once per root, on the first bound start.
+  if (!registryPreparedRoots.has(repository.primaryRoot)) {
+    prepareSessionAuthorityRegistryFixture({ root: repository.primaryRoot, excludeFromStatus: true });
+    registryPreparedRoots.add(repository.primaryRoot);
+  }
+  const sessionId = options.sessionId ?? `session-${randomBytes(12).toString("hex")}`;
+  boundRequesterSequence += 1;
+  const runtime = createControlledMethodRuntimeFixture({
+    repository,
+    fixtureRoot: join(repository.commonDir, "agent-pipeline", "controlled-method-fixtures", `${sessionId}-${boundRequesterSequence}`),
+    sessionId,
+  });
+  boundRequesterRuntimes.set(boundRequesterKey(repository, sessionId), runtime);
+  const loaded = loadSessionDescriptor(repoPath, sessionId);
+  return {
+    repo: loaded.repo,
+    path: loaded.path,
+    sessionId: loaded.sessionId,
+    ownerNonce: loaded.ownerNonce,
+    descriptorSha256: loaded.descriptorSha256,
+  };
+}
+
+function bindInsideRequesterContext(request) {
+  const repository = inspectSignedDescriptorCustodyRepository(request.rootDir);
+  const runtime = boundRequesterRuntimes.get(boundRequesterKey(repository, request.sessionCleanup?.sessionId));
+  // No requester bound to this descriptor: run the real function in the caller's plain context (it refuses).
+  if (runtime === undefined) return bindOnboardingSessionCleanup(request);
+  return runtime.run(() => bindOnboardingSessionCleanup(request));
+}
+
+const BOUND_REQUESTER_DEPENDENCIES = Object.freeze({
+  startSessionDescriptorFn: startDescriptorWithBoundRequester,
+  bindOnboardingSessionCleanupFn: bindInsideRequesterContext,
+});
+
 function invoke(argv, dependencies = {}) {
   let output = "";
   const code = sessionCleanupMain(argv, {}, {
     requireProjectOnboardingReadyFn() { return { status: "ready" }; },
     writeFn(value) { output += value; },
+    ...BOUND_REQUESTER_DEPENDENCIES,
     ...dependencies,
   });
   return { code, output: output === "" ? null : JSON.parse(output) };
@@ -194,6 +268,9 @@ function rewriteAsLegacyDescriptor(root, sessionId) {
 // State/Git-authenticated cleanup binding.
 function legacyClosedCleanupFixture(name) {
   const root = fixture(name);
+  // This fixture pins the LEGACY layout (State in `.claude/pipeline-state.json`); a Source-owned bound bind is
+  // admitted only for a neutral project, so the bound start below is not migrated and stays refused (named K1c3 finding).
+  legacyLayoutRoots.add(root);
   const started = invoke(["start", "--repo", root, "--session", `session-${name}`]);
   assert.equal(started.code, 0);
   const statePath = join(root, ".claude", "pipeline-state.json");
@@ -260,7 +337,9 @@ function legacyClosedCleanupFixture(name) {
 test("bind-orphan auto-executes without confirmation, backs up onboarding private state first, and rebinds the exact active descriptor", () => {
   const root = fixture("bind-orphan");
   try {
-    const orphan = startSessionDescriptor(root, { sessionId: "session-recovery-bind-orphan" });
+    // K1c3: the orphan is created through the bridge's fixture builder, which binds a requester to exactly this
+    // descriptor; the recovery's own bind runs inside that requester's context (library seam, recovery.mjs).
+    const orphan = startDescriptorWithBoundRequester(root, { sessionId: "session-recovery-bind-orphan" });
     const plan = planSessionCleanupRecovery({ rootDir: root });
     assert.equal(plan.status, "ready");
     assert.equal(plan.recovery, "bind-orphan");
@@ -268,6 +347,7 @@ test("bind-orphan auto-executes without confirmation, backs up onboarding privat
     const preOnboarding = snapshotOnboardingPrivate(root);
     const applied = applySessionCleanupRecovery({
       rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+      deps: { bindOnboardingSessionCleanupFn: bindInsideRequesterContext },
     });
     assert.equal(applied.status, "rebound");
     assertOnboardingBackups(root, preOnboarding);
