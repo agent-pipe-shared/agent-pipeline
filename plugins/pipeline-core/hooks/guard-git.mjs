@@ -65,8 +65,9 @@
  *   "<RULE-ID>|<token>|<authority-reference.json>|<reason>". A local token alone is
  *   never authority there; see the Phoenix block below.
  *
- *   One-time semantics, BOUND rather than counted: a consumption ledger
- *   `.claude/guard-override.log.jsonl` bound to the physical command target records one
+ *   One-time semantics, BOUND rather than counted: a consumption ledger under the target
+ *   repository's common Git directory (`agent-pipeline/guard-override.log.jsonl`, D56 (2);
+ *   lib/guard-override-ledger.mjs) bound to the physical command target records one
  *   JSON line per successful override `{ts, rule, token, reason, command, commandSha256,
  *   candidateCommit, status, expiresAt, targetSha256}`. A `rule|token` pair already in the
  *   ledger is consumed — re-presenting it blocks — with exactly one exception: the SAME
@@ -285,6 +286,7 @@ import {
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { appendGuardOverrideLedgerEntry, guardOverrideLedger, readGuardOverrideLedgerEntries } from "../lib/guard-override-ledger.mjs";
 import { UNION_BLOCKERS, RAW_BLOCKERS, PRENORM_BLOCKERS, dangerousGitFindings } from "./git-dangerous-policy.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 
@@ -528,38 +530,26 @@ function overrideTarget() {
   if (roots.size !== 1 || !roots.has(coordinator)) return { ok: false };
   return { ok: true, root: coordinator, sha256: sha256(coordinator) };
 }
-function ledgerPath(target) {
-  return join(target.root, guardAuditRelPath);
+// D56 (2): the ledger lives under the target repository's common Git directory and leaves the tracked
+// tree. A tree ledger an older build left is read first, so its consumed tokens stay consumed; a root
+// without Git keeps the tree path resolved above. Resolved once per root and hook run.
+const ledgers = new Map();
+function ledgerFor(target) {
+  if (!ledgers.has(target.root)) ledgers.set(target.root, guardOverrideLedger(target.root, { treeFallback: guardAuditRelPath }));
+  return ledgers.get(target.root);
+}
+function ledgerLabel() {
+  try { return ledgerFor({ root: realpathSync(projectDir) }).label; } catch { return guardAuditRelPath; }
 }
 function readLedgerEntries(target) {
-  let raw;
-  try {
-    raw = readFileSync(ledgerPath(target), "utf8");
-  } catch {
-    return []; // absent/unreadable ledger -> nothing consumed yet
-  }
-  const entries = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      entries.push(JSON.parse(trimmed));
-    } catch {
-      // corrupt line — ignore it (read side stays fail-open); appends are unaffected.
-    }
-  }
-  return entries;
+  // absent/unreadable ledger -> nothing consumed yet; a corrupt line is ignored (read side stays fail-open).
+  return readGuardOverrideLedgerEntries(ledgerFor(target));
 }
 function findConsumption(rule, token, target) {
   return readLedgerEntries(target).find((e) => e && e.rule === rule && e.token === token && (!e.targetSha256 || e.targetSha256 === target.sha256)) ?? null;
 }
 function appendLedger(entry, target) {
-  try {
-    appendFileSync(ledgerPath(target), JSON.stringify(entry) + "\n");
-    return true;
-  } catch {
-    return false; // fail-closed: caller must NOT apply the override
-  }
+  return appendGuardOverrideLedgerEntry(ledgerFor(target), entry); // false: fail-closed, caller must NOT apply the override
 }
 
 // ---- override mechanism: what an arming is bound to, and how long it lives -------------
@@ -741,7 +731,7 @@ async function admitSignedPush() {
     if (!appended) {
       return {
         admitted: false,
-        note: `Signed-approval route: NOT applied — the audit ledger (${guardAuditRelPath}) could not be written, so the `
+        note: `Signed-approval route: NOT applied — the audit ledger (${ledgerLabel()}) could not be written, so the `
           + "verified chat approval is not acted on (fail-closed, exactly like an override without an audit record).",
       };
     }
@@ -780,7 +770,7 @@ async function admitSignedPush() {
   if (!appended) {
     return {
       admitted: false,
-      note: `Signed-approval route: NOT applied — the audit ledger (${guardAuditRelPath}) could not be written, so the ` +
+      note: `Signed-approval route: NOT applied — the audit ledger (${ledgerLabel()}) could not be written, so the ` +
         "verified approval is not acted on (fail-closed, exactly like an override without an audit record).",
     };
   }
@@ -946,7 +936,7 @@ function blockOverrideConsumed(rule, priorEntry) {
 function blockLedgerFailure(rule) {
   const lines = [
     formatBlockHeader(rule),
-    `Override NOT applied: the audit ledger (${guardAuditRelPath}) could not be written — ` +
+    `Override NOT applied: the audit ledger (${ledgerLabel()}) could not be written — ` +
       `fail-closed, an override without an audit record is never applied.`,
     overrideProcedureText(rule),
     ...notices,
@@ -967,7 +957,7 @@ function allowWithOverride(status, expiresAt) {
       ? `[git-guard] OVERRIDE APPLIED (retry of the same arming — identical command, same candidate, valid until ${expiresAt}): rule ${arming.rule}, token ${arming.token}.`
       : `[git-guard] OVERRIDE APPLIED (one-time, this arming is valid until ${expiresAt} for this exact command and candidate): rule ${arming.rule}, token ${arming.token}.`,
     `Reason: ${arming.reason}`,
-    `Ledger: ${guardAuditRelPath} (appended).`,
+    `Ledger: ${ledgerLabel()} (appended).`,
     ...notices,
   ];
   emit(1, lines);
@@ -1430,7 +1420,7 @@ if (matched.length > 0) {
   if (signed?.admitted) {
     emit(0, [
       `[git-guard] GG-03 lifted by a verified push approval (key ${signed.keyReference}) for candidate ${signed.forCommit} -> ${signed.destination}.`,
-      `Audit: ${guardAuditRelPath} (appended). No override token was armed or consumed.`,
+      `Audit: ${ledgerLabel()} (appended). No override token was armed or consumed.`,
       ...notices,
     ]);
   }

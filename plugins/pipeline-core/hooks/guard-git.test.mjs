@@ -41,6 +41,10 @@ import { fileURLToPath } from "node:url";
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+import { guardOverrideLedger } from "../lib/guard-override-ledger.mjs";
+
+// D56 (2): every fixture is a Git repository, so the guard's override ledger is the common-directory one.
+const ledgerFile = (projectDir) => guardOverrideLedger(realpathSync(projectDir)).path;
 
 const enrolledFixtureRoots = new Set();
 function enrollFixtureGovernance(root) {
@@ -111,7 +115,7 @@ function checkLedger(id, projectDir, predicate) {
   let entry = null;
   let problem = null;
   try {
-    const lines = readFileSync(join(projectDir, ".claude", "guard-override.log.jsonl"), "utf8").trim().split("\n");
+    const lines = readFileSync(ledgerFile(projectDir), "utf8").trim().split("\n");
     entry = JSON.parse(lines.at(-1));
     if (!predicate(entry)) problem = "ledger entry did not satisfy its target-binding contract";
   } catch {
@@ -128,7 +132,7 @@ function checkLedger(id, projectDir, predicate) {
 function checkNoLedgerToken(id, projectDir, rule, token) {
   let problem = null;
   try {
-    const entries = readFileSync(join(projectDir, ".claude", "guard-override.log.jsonl"), "utf8")
+    const entries = readFileSync(ledgerFile(projectDir), "utf8")
       .split("\n")
       .filter((line) => line.trim() !== "")
       .map((line) => JSON.parse(line));
@@ -305,13 +309,15 @@ check("CFG allow  missing config is silent (no warning)", "git status", ALLOW, {
 check("CFG block  union active without any config", "git add secrets.yaml", BLOCK, { projectDir: NO_CONFIG_DIR });
 
 // ---- P4-01: guard override mechanism (double-confirmation, one-time) --------------------------
-// Ledger-bearing dir: .claude/ pre-created so appendFileSync into guard-override.log.jsonl succeeds.
+// Override fixture: the ledger is written under the fixture repository's common Git directory (D56 (2)).
 const OV_DIR = mkdtempSync(join(tmpdir(), "guard-test-override-"));
 mkdirSync(join(OV_DIR, ".claude"), { recursive: true });
 mkdirSync(join(OV_DIR, "nested-target"), { recursive: true });
 const OV_ABSOLUTE_TARGET = mkdtempSync(join(tmpdir(), "guard-test-override-absolute-target-"));
-// Deliberately WITHOUT .claude/ — simulates an unwritable/missing ledger directory (AC-5).
+// AC-5: an unwritable ledger. A directory sits where the ledger file belongs, so every append fails.
 const OV_NOLEDGER_DIR = mkdtempSync(join(tmpdir(), "guard-test-override-noledger-"));
+enrollFixtureGovernance(OV_NOLEDGER_DIR);
+mkdirSync(ledgerFile(OV_NOLEDGER_DIR), { recursive: true });
 
 // AC-1: valid override (inline prefix) for the matching rule -> allow via the guard's existing
 // "exit 1 = allow + loud non-blocking notice" semantics (spec AC-1: "exit 1"), ledgered.
@@ -904,7 +910,7 @@ function checkThat(id, predicate) {
 }
 function ledgerEntries(projectDir) {
   try {
-    return readFileSync(join(projectDir, ".claude", "guard-override.log.jsonl"), "utf8")
+    return readFileSync(ledgerFile(projectDir), "utf8")
       .split("\n")
       .filter((line) => line.trim() !== "")
       .map((line) => JSON.parse(line));
@@ -1006,7 +1012,9 @@ function signedPushFixture({
   const root = gitRepoFixture("guard-test-signed-push-");
   mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, "specs", "demo"), { recursive: true });
+  // ledgerDir: false makes the ledger unwritable: a directory sits where the ledger file belongs (D56 (2)).
   if (ledgerDir) mkdirSync(join(root, ".claude"), { recursive: true });
+  else mkdirSync(ledgerFile(root), { recursive: true });
   const threatBody = "# threat model\n";
   writeFileSync(join(root, THREAT_MODEL_REL_PATH), threatBody);
   const threatModel = { path: THREAT_MODEL_REL_PATH, sha256: createHash("sha256").update(threatBody).digest("hex") };
@@ -1292,7 +1300,8 @@ check(
 );
 
 // RTY-8: a ledger written before this change carries no `commandSha256`, so it can never
-// satisfy the retry test. A pre-existing ledger does not become re-usable.
+// satisfy the retry test. A pre-existing ledger does not become re-usable. It is also a tree
+// ledger written before D56 (2): its entry still counts as consumed after the move.
 const OLD_DIR = gitRepoFixture("guard-test-retry-oldshape-");
 mkdirSync(join(OLD_DIR, ".claude"), { recursive: true });
 commitFile(OLD_DIR, "seed.txt", "seed\n");
