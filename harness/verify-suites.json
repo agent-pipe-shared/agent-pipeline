@@ -3556,6 +3556,24 @@
       "file": "plugins/pipeline-core/hooks/guard-gate-strength-review-receipt.test.mjs",
       "invariantPinned": "The gate-strength guard refuses a Write or Edit whose resulting content is a design review receipt, names the producer, plans no override, and lets ordinary JSON and source files through",
       "nonOverlapNote": "Unique hook-level suite (ALF-G4C) spawning guard-gate-strength.mjs; guard-gate-strength.test.mjs keeps the path-rule coverage"
+    },
+    {
+      "name": "session-authority-repair-tests",
+      "file": "plugins/pipeline-core/scripts/session-authority-repair.test.mjs",
+      "invariantPinned": "The session-authority repair CLI diagnoses a broken registry or lock, names a repair that actually runs, and leaves no state behind on a refused operation",
+      "nonOverlapNote": "Unique CLI suite for session-authority-repair.mjs (PF-55, D52)"
+    },
+    {
+      "name": "pin-claude-background-goldfish-is-host-committed-at-subagent-stop-tests",
+      "file": "plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs"
+    },
+    {
+      "name": "architecture-boundary-check-tests",
+      "file": "plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs",
+      "invariantPinned": "Map ownership, forbidden dependencies and the line bound are checked against the architecture map and its boundary policy, with ratchet exceptions and typed exit codes",
+      "nonOverlapNote": "Unique test suite for architecture-boundary-check.mjs (FB3-PF-54 first stage)"
     }
   ]
 }
