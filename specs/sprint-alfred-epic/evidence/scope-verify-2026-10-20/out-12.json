@@ -1,0 +1,65 @@
+[
+ {"itemId":"pipeline.guard-suite-fails-60-tests-on-native-windows","ac":"AC-197","read":true,
+  "clauses":[
+   {"clause":"Classify the red cases of guard-lifecycle-ready.test.mjs (stale fixture, platform difference, real defect).","status":"done","evidence":"3bca6bab2 adds specs/sprint-alfred-epic/evidence/counted-runs-2026-10-19/guard-lifecycle-ready-red-classification.md (26 red on WSL: 7 fixture, 19 intent-to-settle). Classification covers WSL, not the 60 native-Windows cases.","work":"","protected":[]},
+   {"clause":"Bring the fixtures in line with the current activation model.","status":"evidence","evidence":"07a946996, 146d23641, be7c027c3 edit plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs (orchestrator runs: 388/392, then 389 pass 3 skipped, WSL). Elephant should re-run and count that file once.","work":"","protected":["plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs (guard-lifecycle-ready* family)"]},
+   {"clause":"Keep a recorded baseline count so a later change can be attributed.","status":"content","evidence":"Counts exist only in commit messages and the classification doc; no standalone baseline record with the final count.","work":"Doc-only: add one baseline line (final pass/skip/fail count, host, sha) to specs/sprint-alfred-epic/evidence/counted-runs-2026-10-19/guard-lifecycle-ready-red-classification.md. Size S.","protected":[]},
+   {"clause":"Show the suite is green on native Windows (item Description is a native Windows measurement, 273 tests, 60 fail).","status":"native-host","evidence":"All counted runs are WSL.","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"Mostly accurate; the repair and WSL counts exist, but only the Windows run and a recorded baseline line remain.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.handover-doc-committed-without-governance-classification","ac":"AC-198","read":true,
+  "clauses":[
+   {"clause":"A new handover/docs/*.md cannot be committed unclassified: the pre-commit hook runs the observation-governance check and refuses with OG-DOC-UNCLASSIFIED.","status":"evidence","evidence":"4fa3b2d5e extends plugins/pipeline-core/lib/pins/handover-doc-committed-without-governance-classification.test.mjs (+58 lines): drives the real installed pre-commit hook on a governance-enrolled fixture; refusal, HEAD unchanged, refusal gone once classified. No counted GREEN stated; Elephant should run and count that file.","work":"","protected":[]},
+   {"clause":"A clone without hooks is recorded as a known residual (only a later validator run reports it).","status":"done","evidence":"Second case of the same test file, added in 4fa3b2d5e.","work":"","protected":[]}
+  ],
+  "remeasureWrong":"Stale: the remeasure says no commit touches the OG-DOC-UNCLASSIFIED pin, but 4fa3b2d5e (test(pipeline-core): pin handover classification through the installed hook) does. Only a counted run is missing.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier","ac":"AC-199","read":true,
+  "clauses":[
+   {"clause":"commandIsGitPush routes heredocs fed to command runners (xargs, at, batch, ed, ex, sqlite3, php, lua, awk -f -) to guard-push.","status":"evidence","evidence":"Code: HEREDOC_RUNNER_NAMES and hasRunnerHeredocReceiver in plugins/pipeline-core/lib/git-cmd.mjs (e694f8509, 8fafb1e99, 35a1369f8). Pins: e8568588c adds 84 lines to plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs; also git-cmd.test.mjs. No counted GREEN stated.","work":"","protected":[]},
+   {"clause":"Non-pushing runner uses (git commit -F -, cat to file, xargs echo, plain SQL, grep heredocs) stay data.","status":"evidence","evidence":"Same pin file (e8568588c) plus 7e23d06ff.","work":"","protected":[]},
+   {"clause":"The unlisted-receiver boundary is documented and pinned.","status":"done","evidence":"git-cmd.mjs header comment at about line 837; boundary pinned in e8568588c.","work":"","protected":[]}
+  ],
+  "remeasureWrong":"Stale: the remeasure says no commit changes the receiver list and the receiver handling is missing. It exists (HEREDOC_RUNNER_NAMES, hasRunnerHeredocReceiver, e694f8509 and later) with pins in e8568588c. Only a counted run is open.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows","ac":"AC-200","read":true,
+  "clauses":[
+   {"clause":"On win32, owner liveness comes from a native pid plus start-time query; fail closed only if the query fails or identity mismatches.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows.test.mjs: 'AC-200 P1/P2: win32 owner whose native identity query says absent', 'P1: lock a win32 writer publishes records the pid start identity', 'P1: failed query records no fabricated identity'. HGO suite counted 173/174 (71b692e81) is not item-specific; run this pin file and count it.","work":"","protected":[]},
+   {"clause":"Dead owner recoverable; live owner, reused pid and unverifiable owner stay ambiguous.","status":"evidence","evidence":"Same file: 'P2 win32 dead owner', 'P3 live owner', 'P3 pid reused', 'P3 unverifiable owner for every failure shape', 'owner state function'.","work":"","protected":[]},
+   {"clause":"Linux control unchanged.","status":"evidence","evidence":"Same file: 'P4: Linux control' (carries a LINUX_CONTROL_SKIP; confirm in the run whether it executes on WSL).","work":"","protected":[]},
+   {"clause":"The ambiguous refusal names the attended recovery file and command.","status":"evidence","evidence":"Same file: 'P5: an ambiguous refusal names the attended recovery file and command', 'P5 foreign-host owner'.","work":"","protected":[]},
+   {"clause":"Real native win32 query classifies a gone pid dead and a live process ambiguous.","status":"native-host","evidence":"Case 'AC-200 real host' is a typed skip off win32 (owner Coordinator, due 2026-10-19).","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.hgo-patch-preflight-before-signature","ac":"AC-201","read":true,
+  "clauses":[
+   {"clause":"A malformed hunk is rejected by a read-only applicability check before a human signature is requested.","status":"content","evidence":"plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs has 'AC-201 point 1 (PREFLIGHT_PENDING)' and several 'P07D_PENDING' cases (stored patch, typed refusal, converter, preflight). Names carry PENDING markers; I did not read whether they are skip/todo or live, and did not find the production preflight verb. Goldfish must first read the pin file and the writer in plugins/pipeline-core/lib/human-guard-override.mjs.","work":"Implement the preflight check and un-pend the point-1 test; size M, test file as named above.","protected":[]},
+   {"clause":"A corrected patch signs once and applies against the same frozen preimage; a changed preimage needs a fresh signature; a failed attempt arms nothing.","status":"evidence","evidence":"Same pin file: 'AC-201 point 2', 'point 3', 'point 4'. Elephant to run and count, and check for pending/skip status.","work":"","protected":[]},
+   {"clause":"The native EOF marker grammar (Update/rename termination admitted; orphan, duplicate, Add/Delete, nonterminal markers and unknown headers still refused) is admitted by guard-apply-patch.mjs.","status":"content","evidence":"Item says source guard-apply-patch.mjs has the catch-all unknown-header refusal; the AC-201 pins show a closed-grammar converter test but no EOF-marker case by name.","work":"Add EOF-marker admission and refusal cases to guard-apply-patch.mjs and a test next to it. Size M.","protected":["plugins/pipeline-core/hooks/guard-apply-patch.mjs or lib/guard/*.mjs if it lives there","its guard test files if matching the protected patterns"]},
+   {"clause":"A validation-only git apply --check --reverse is recognised as read-only without admitting mutation.","status":"content","evidence":"No named test for validation-only flags in the AC-201 pin file.","work":"Add a classifier case and test. Size S.","protected":["plugins/pipeline-core/hooks/guard-git.mjs","guard-git*.test.mjs"]},
+   {"clause":"The pre-signature checker validates hunk order with the real native apply_patch engine and compares every postimage digest.","status":"native-host","evidence":"Item 2026-09-29 evidence requires a rehearsal with the real native engine; in-memory replay is stated insufficient.","host":"codex-wsl","protected":[]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.hgo-stale-capability-shadows-current-authorization","ac":"AC-202","read":true,
+  "clauses":[
+   {"clause":"Consume enumeration audits and refuses each drifted authenticated match and keeps searching for a current exact match.","status":"evidence","evidence":"Fix 26fef9e7d in plugins/pipeline-core/lib/human-guard-override.mjs (backlog Triage 2026-10-09). Pins: lib/human-guard-override-capability-scan.test.mjs and lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs 'AC1: stale authenticated match sorted first does not shadow the current one; stale rejected+audited, locks closed'. No counted GREEN stated.","work":"","protected":[]},
+   {"clause":"Stale-only keeps HGO-DRIFT, expired-only keeps HGO-EXPIRED, mixed precedence explicit, drifted never consumed.","status":"evidence","evidence":"Pin file: 'AC3', 'AC4', 'AC5'.","work":"","protected":[]},
+   {"clause":"Corrupt audit stays a global HGO-AUDIT failure even with a later current record.","status":"evidence","evidence":"Pin file: 'AC6'.","work":"","protected":[]},
+   {"clause":"Invalid capability files still skipped; tool-input binding enforced per candidate; selection by currency not order.","status":"evidence","evidence":"Pin file: 'AC7', 'AC8', 'AC2'.","work":"","protected":[]}
+  ],
+  "remeasureWrong":"Stale: the remeasure says the search-continues fix is not integrated. It is in source (26fef9e7d), and the stale-only, corrupt-audit and two-record regressions are pinned. Only a counted run of the two test files is open.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear","ac":"AC-203","read":true,
+  "clauses":[
+   {"clause":"A typed archive verb clears a zero-authority unavailable-owner descriptor (byte-exact, audited, idempotent).","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs: 'AC-203 point 1' plus RED proof 'point 1'. Code in plugins/pipeline-core/scripts/session-cleanup.mjs. No counted GREEN stated.","work":"","protected":[]},
+   {"clause":"A resource-bearing orphan is refused by the zero-authority archive with a typed code naming the signed route, losing nothing; plan-human-recovery offers the signed custody route, not only retain-and-observe.","status":"evidence","evidence":"Same file: 'AC-203 point 2', 'AC-203 point 3'.","work":"","protected":[]},
+   {"clause":"A foreign unavailable-owner descriptor leaves readiness ready with a typed warning (real readiness evaluation too).","status":"evidence","evidence":"Same file: 'AC-203 point 4' and 'point 4 (real readiness)', plus RED proof 'point 4'.","work":"","protected":[]},
+   {"clause":"Kill Verify mid-run and confirm readiness stays ready (live crash simulation).","status":"content","evidence":"Pins build a descriptor by fixture; I found no test that kills a running Verify. Likely acceptable as the fixture equivalent; the Elephant must decide whether a real kill is required.","work":"Optional S: a test that kills a spawned verify stand-in and checks readiness, in the same pin file.","protected":["harness/scripts/verify.mjs only if the producer must change"]},
+   {"clause":"The Windows verify-producer change behaves on a native host.","status":"native-host","evidence":"Baseline change recorded as UNVERIFIED on Windows.","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"Stale: the remeasure says no commit addresses the recovery verb or a crash simulation. The typed archive verb, the signed-route plan and the foreign-descriptor warning are implemented and pinned in the AC-203 pin file with RED proofs. Only a counted run, an optional live-kill test and the Windows run are open.",
+  "closableAfterTest":"no"}
+]

@@ -1,0 +1,155 @@
+{
+ "part": "02",
+ "rows": [
+  {
+   "n": 13,
+   "itemId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+   "ac": "AC-113",
+   "file": "backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 fits this item; 70e2e724c and a1cd742de retarget or share fixtures of the retired design route without stating counts for this clause.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the ignored-directory package behaviour with a counted GREEN."
+    },
+    {
+     "owner": "native-host",
+     "what": "Run the design-workflow-package-v2 case skipped on win32 on native Windows."
+    },
+    {
+     "owner": "po-decision",
+     "what": "Decide whether the retired design route (ADR-0085) makes this item moot."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 14,
+   "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+   "ac": "AC-114",
+   "file": "backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches HEAD-versus-candidate binding.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement and pin approval verification against the candidate commit instead of HEAD."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    },
+    {
+     "owner": "po-signature",
+     "what": "A signature-bound push approval is needed to exercise the candidate-bound route."
+    }
+   ]
+  },
+  {
+   "n": 15,
+   "itemId": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+   "ac": "AC-115",
+   "file": "backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md",
+   "stage": "75",
+   "remeasureReason": "Baseline 384e73527 stands for the original acceptance; 9dda09720 admits the resume-hint read in state approved (pin 4/4), a distinct verb that does not change this item.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Close the perl-opaque clause that is still a todo and count the devplan-lane pin."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 17,
+   "itemId": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+   "ac": "AC-117",
+   "file": "backlog/items/2026-10-05-bootstrap-should-refresh-hooks-when-the-plugin-updated.md",
+   "stage": "50",
+   "remeasureReason": "4d5bd1af1 makes the mandatory-hook preflight case hermetic (preflight 77/79, 0 fail, 2 todo; AC-117 pin 18/18 reported by the goldfish) but changes no assertion; the non-ready preflight, the confirmation refusal and the model-role readback are still uncovered.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Cover the non-ready preflight, the confirmation refusal and the model-role readback, and the 2 todo injection seam."
+    },
+    {
+     "owner": "native-host",
+     "what": "Run the real refresh route on an installed host (it is skip-covered)."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 18,
+   "itemId": "pipeline.bounded-reader-terminal-binding",
+   "ac": "AC-118",
+   "file": "backlog/items/2026-09-27-bounded-reader-terminal-binding.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item; the fixture clause GREEN 11/11 stands, the real-course binding clause is uncovered.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the real-course terminal binding clause with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 19,
+   "itemId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+   "ac": "AC-119",
+   "file": "backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 states brownfield or deferred-adoption counts; baseline a6641cce4 stands.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State counted brownfield and deferred-adoption pins for the entry."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 22,
+   "itemId": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+   "ac": "AC-122",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Qualify the Windows npm launch on native Windows."
+    },
+    {
+     "owner": "agent",
+     "what": "Map the original acceptance to a counted pin."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,56 @@
+[
+ {"itemId":"pipeline.feature-branch-push-admitted-without-signature-approval","ac":"AC-172","read":true,
+  "clauses":[
+   {"clause":"In signature mode a feature-checkpoint push without a current commit-bound approval is refused by guard-push.","status":"evidence","evidence":"code: commit 29629211c (guard-push.mjs checkpointEligibility, lib/checkpoint-push-approval.mjs); tests: plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs (commit message says 36 green) and guard-push.test.mjs case 'PG-CHECKPOINT block configured clean signature-mode checkpoint without an approval record' (line ~2305, patch already landed via 7f37cc916). No counted GREEN of the current tree found.","work":"","protected":[]},
+   {"clause":"The git pre-push hook mirrors the lane and refuses a checkpoint without an approval (CHECKPOINT-APPROVAL-*), using the shared checkCheckpointPushApproval.","status":"evidence","evidence":"code: scripts/pre-push-hook-install.mjs checkpointFailure (lines ~373-414); tests exist in plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs and lib/checkpoint-push-approval.test.mjs; the CHECKPOINT-APPROVAL string count was not confirmed (grep refused), so the exact pre-push case was not named.","work":"","protected":[]},
+   {"clause":"docs/push-release-flow.md describes the signed checkpoint requirement.","status":"done","evidence":"docs/push-release-flow.md lines ~133-148 ('In signature mode a checkpoint also needs a commit-bound push signature').","work":"","protected":[]},
+   {"clause":"Non-release pushes need only the approval (no Verify/security/Critic chain).","status":"evidence","evidence":"checkpointFailure keeps the slim set (clean tree, HEAD, one Checkpoint-Intent trailer, approval); no test named for 'no Verify chain'; covered by guard-push-checkpoint-approval.test.mjs if it has an allow case with a valid approval.","work":"","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says no commit changes the approval lane; commits 29629211c and 016417c9a implement it and 36 cases exist, so only a counted GREEN run is missing, not new clauses.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.foreign-worktree-closes-the-implementation-gate","ac":"AC-174","read":false,
+  "clauses":[
+   {"clause":"Reader (design-workflow-package-v2.mjs) keeps the underlying error code instead of a catch-all collapse.","status":"content","evidence":"item file read; code and the two-worktree pin NOT inspected (tool budget). Remeasure says one RED case remains until a protected patch lands.","work":"unverified: inspect design-workflow-package-v2.mjs ~line 142 and the RED pin; a patch in a protected path (guard-devplan / lib/guard) per remeasure; size unknown, assume M","protected":["plugins/pipeline-core/lib/guard/*.mjs (probable)"]},
+   {"clause":"A foreign registered worktree is a typed environment condition; reopen-design is offered only for verified content drift; the named diagnosis is admitted while the gate is closed.","status":"po-signature","evidence":"per remeasure the protected patch needs a PO-signed override; not independently verified.","work":"","protected":["guard-devplan.mjs or lib/guard/*.mjs (probable)"]}
+  ],
+  "remeasureWrong":"Not checked.","closableAfterTest":"no"},
+ {"itemId":"pipeline.forensics-and-audit-evidence-not-reconstructable","ac":"AC-175","read":true,
+  "clauses":[
+   {"clause":"Project-bound transcript export merging segments, child sessions, turn boundaries and usage for all three runners.","status":"po-decision","evidence":"Triage in the item: deferred past 0.7.0 by PO decision 2026-10-16; AC-175 not counted against the candidate. Groundwork 17067dca4 (Claude and Codex export; Antigravity typed unavailable).","work":"Remaining: child sessions, turn boundaries, Antigravity, size L; admitting the export to governed agents needs a held guard patch.","protected":["plugins/pipeline-core/lib/guard/*.mjs or hooks guard (held patch)"]},
+   {"clause":"Bootstrap and dispatch compare continuity source digests with the checkout and surface drift as recovery.","status":"po-decision","evidence":"Deferred item; not checked in code.","work":"size M, not for 0.7.0","protected":[]},
+   {"clause":"Design course fixes an executable Verify contract activated with the first implementation dispatch.","status":"po-decision","evidence":"Deferred; touches verify contract.","work":"size L","protected":["harness/scripts/verify.mjs","harness/verify-suites.json (probable)"]},
+   {"clause":"Generated per-change audit index with explicitly missing steps.","status":"po-decision","evidence":"Deferred.","work":"size L","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure treats this as work to implement now; the item Triage (2026-10-17) records a PO deferral past 0.7.0, so no Goldfish should be dispatched.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.git-for-windows-2-56-rejects-git-config-global-nul","ac":"AC-177","read":true,
+  "clauses":[
+   {"clause":"One shared null-device constant ('/dev/null') for git spawns replaces every win32 'NUL' site, with a ratchet scan.","status":"evidence","evidence":"Triage: fixed in source by commits 12ac0a7af, 2532a96fe; code and test files not inspected by this reader (budget), so the test file and count are unknown.","work":"","protected":[]},
+   {"clause":"A regression test spawns real git with the constant.","status":"native-host","evidence":"Real Git for Windows 2.56 behaviour can only be shown on a native Windows host.","work":"","host":"claude-windows","protected":[]},
+   {"clause":"Acceptance line of the Node-v24 NUL item is updated.","status":"evidence","evidence":"not checked; backlog/items/2026-10-05-node-v24-on-windows-creates-a-real-nul-file.md","work":"S if still unchanged","protected":[]}
+  ],
+  "remeasureWrong":"Remeasure is consistent with the item's own Triage (fixed in source, host checklist open); no new code is needed beyond the unchecked doc line.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog","ac":"AC-178","read":true,
+  "clauses":[
+   {"clause":"Installed runtime snapshot contains the exact protected-baseline catalog and its digest; copied loader resolves it.","status":"evidence","evidence":"Item intake status and Triage: fixed in source, commit 26fef9e7d, hook suite 55/55; later 9738cf3bd git-hook-runtime-snapshot 8/8 per remeasure. Test files not named by this reader.","work":"","protected":[]},
+   {"clause":"Missing, changed or aliased catalog stays refused under existing integrity controls.","status":"evidence","evidence":"git-hook-runtime-snapshot suite 8/8 per remeasure (9738cf3bd).","work":"","protected":[]},
+   {"clause":"Original onboarding handover commit succeeds; full original184 onboarding suite green with a counted result.","status":"native-host","evidence":"Item states the full original184 suite and final candidate qualification are pending.","work":"","host":"claude-wsl","protected":[]},
+   {"clause":"Source dependency/registration closure and candidate-bound checks include the snapshot producer and its test.","status":"evidence","evidence":"Needs Full Verify on WSL.","work":"","host":"claude-wsl","protected":[]}
+  ],
+  "remeasureWrong":"","closableAfterTest":"yes"},
+ {"itemId":"pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes","ac":"AC-179","read":false,
+  "clauses":[
+   {"clause":"Snapshot bound to installed plugin identity with typed HOOK-SNAPSHOT-STALE diagnostic in preflight and commit refusal, plus refresh in the install flow.","status":"content","evidence":"item file read; code, tests and commits NOT inspected (tool budget). Remeasure says the behavioural pin is held behind a protected patch.","work":"unverified; installer scripts commit-msg-hook-install.mjs / pre-commit-hook-install.mjs, size M","protected":["plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs (cp-source clause)"]},
+   {"clause":"cp/install classify only the destination as write target; mv sources count as written.","status":"po-signature","evidence":"Not verified; guard-lifecycle-ready.mjs is a protected path, remeasure says the patch needs a PO-signed override.","work":"size S-M","protected":["plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"]}
+  ],
+  "remeasureWrong":"Not checked.","closableAfterTest":"no"},
+ {"itemId":"pipeline.git-push-classifier-misses-env-s-and-editor-bang","ac":"AC-180","read":true,
+  "clauses":[
+   {"clause":"commandIsGitPush classifies env -S 'git push ...' (quoted, attached, --split-string=) as a push.","status":"evidence","evidence":"code: 9bc217fe9 and d256c7e81 (lib/git-cmd.mjs recursion into the -S string); test: plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs 'env -S is a push' x4 (commit 5b3602b72), file listed in harness/verify-suites.json. No counted GREEN stated.","work":"","protected":[]},
+   {"clause":"commandIsGitPush classifies vim/vi/nvim -c '!git push' and +'!...' as a push.","status":"evidence","evidence":"code: 9bc217fe9; test: same pin file, 'editor bang is a push' x4.","work":"","protected":[]},
+   {"clause":"Non-push wrapper uses stay non-push (no over-blocking).","status":"evidence","evidence":"same pin file, 'non-push wrapper stays non-push' x3 and the RED naive mirror.","work":"","protected":[]}
+  ],
+  "remeasureWrong":"Remeasure says no commit qualifies env -S or editor bang; false: fix 9bc217fe9 plus d256c7e81 and the pin 5b3602b72 are committed. Only a counted run is missing.",
+  "closableAfterTest":"no"}
+]

@@ -1,0 +1,179 @@
+{
+ "part": "15",
+ "rows": [
+  {
+   "n": 119,
+   "itemId": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+   "ac": "AC-219",
+   "file": "backlog/items/2026-09-28-onboarding-home-override-does-not-bind-machine-plane.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject (onboarding test commits bf8c28986, a1cd742de, 79732b923 concern approval route and staging cases). Explicit override retention is still not shown.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin explicit home-override retention for the machine plane with a counted result."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 120,
+   "itemId": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+   "ac": "AC-220",
+   "file": "backlog/items/2026-09-29-onboarding-init-greenfield-matrix-is-serial-and-slow.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 changes the matrix wall-time clause; the onboarding commits (bf8c28986, a1cd742de, 79732b923) retarget cases and fixtures, not matrix parallelism. The wall-time skip remains.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement and pin the matrix wall-time clause that is still a skip."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "Measure the matrix wall time on the WSL Full Verify."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 121,
+   "itemId": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+   "ac": "AC-221",
+   "file": "backlog/items/2026-09-29-onboarding-test-runner-reports-async-pass-before-settlement.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches the onboarding test runner's settlement; E23 and E24 concern the model-family async lifetime, a different subject. Criteria 1-3 pinned, criterion 4 deferred.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement and pin the deferred criterion 4 with a counted result."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 122,
+   "itemId": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+   "ac": "AC-222",
+   "file": "backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 states a counted green result for the model-tier acceptance. Triage still lists open points.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Close the open triage points and pin the Opus-tier batching acceptance with a counted result."
+    },
+    {
+     "owner": "po-decision",
+     "what": "Decide any open scope point in the item's triage."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 124,
+   "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+   "ac": "AC-224",
+   "file": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 implements the open scope or states a counted result. Restart-liveness is not implemented.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement restart-liveness and the AGY serial-packages scope, then pin with a counted result."
+    },
+    {
+     "owner": "native-host",
+     "what": "Verify the AGY serial-packages behaviour on a real Antigravity run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 125,
+   "itemId": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+   "ac": "AC-225",
+   "file": "backlog/items/2026-10-04-passive-read-policy-admits-uncovered-credential-files-and-rg-follow.md",
+   "stage": "50",
+   "remeasureReason": "32829a645 (passive-read-policy 4/4, credential-follow 36/36) closes only the skill-tree alias read, not this item's credential-list or rg -L clauses. The /etc/shadow clause remains a typed skip.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the shared credential-root constant refusals and the rg -L decision with counted results."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "Run the /etc/shadow clause on Linux, where it is a typed skip elsewhere."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 126,
+   "itemId": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+   "ac": "AC-226",
+   "file": "backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches opt-in hook behaviour (ee3148bc3 concerns GIT_CEILING_DIRECTORIES in Git discovery). Real hook entrypoints are pinned for git fixtures, non-git skipped.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the non-git hook entrypoint clauses that are skipped."
+    },
+    {
+     "owner": "native-host",
+     "what": "Confirm hooks stay inert in a never-opted-in repository on an installed host."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

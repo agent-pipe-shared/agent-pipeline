@@ -1,0 +1,171 @@
+{
+ "part": "10",
+ "rows": [
+  {
+   "n": 81,
+   "itemId": "pipeline.git-stash-list-classified-as-working-tree-write",
+   "ac": "AC-181",
+   "file": "backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the pin covers the Proposal but no counts or integration evidence exist.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN and integration evidence for the stash-list pin."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 82,
+   "itemId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+   "ac": "AC-182",
+   "file": "backlog/items/2026-10-05-gitleaks-content-suppression-does-not-match-on-windows.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the pin is committed but no counts or native evidence exist.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run the suppression match on native Windows."
+    },
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the pin."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 83,
+   "itemId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+   "ac": "AC-183",
+   "file": "backlog/items/2026-10-06-gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the real-scanner and batch clauses remain open and no counts are stated.",
+   "remeasureOpen": [
+    {
+     "owner": "verify-wsl",
+     "what": "Run the real-scanner clause on a Linux run."
+    },
+    {
+     "owner": "agent",
+     "what": "Pin the batch clause with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 84,
+   "itemId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+   "ac": "AC-184",
+   "file": "backlog/items/2026-10-05-gitleaks-repair-ignore-cli-is-a-no-op-on-windows.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the CLI child-process pin is committed but no counts or native Windows run are evidenced.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run the repair ignore CLI on native Windows."
+    },
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the child-process pin."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 85,
+   "itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+   "ac": "AC-185",
+   "file": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+   "stage": "50",
+   "remeasureReason": "The fix and RED-to-GREEN producer case are committed but no count is stated for them; 10819d460 (Critic budget next-step text, E20) concerns the Critic budget, not the Goldfish closing ceremony.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the closing-ceremony budget producer case."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 86,
+   "itemId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+   "ac": "AC-186",
+   "file": "backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the applied postimage has a GREEN pin without counts and the review and sync clauses are unverified.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN and verify the sync clause."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 87,
+   "itemId": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+   "ac": "AC-187",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the template pin passes 7 but AC-187 is labelled partial and consumer coverage is open.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Cover the remaining AC-187 clauses and consumer coverage with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

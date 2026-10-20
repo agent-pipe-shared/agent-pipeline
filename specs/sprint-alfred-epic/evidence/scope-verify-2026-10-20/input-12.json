@@ -1,0 +1,159 @@
+{
+ "part": "12",
+ "rows": [
+  {
+   "n": 97,
+   "itemId": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+   "ac": "AC-197",
+   "file": "backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md",
+   "stage": "50",
+   "remeasureReason": "The lifecycle-guard suite was classified (AC-197 groups, E16) and repaired: 146d23641 moves it 370/391 to 388/392 and be7c027c3 reports 389 pass, 3 skipped. These are orchestrator runs, not stated as native Windows, so the item's Windows acceptance is not covered.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run guard-lifecycle-ready.test.mjs on native Windows and record the count as the baseline."
+    },
+    {
+     "owner": "agent",
+     "what": "Record the classified baseline count the Proposal asks for."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    }
+   ]
+  },
+  {
+   "n": 98,
+   "itemId": "pipeline.handover-doc-committed-without-governance-classification",
+   "ac": "AC-198",
+   "file": "backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches the OG-DOC-UNCLASSIFIED pin or hook, and no pass count is stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the classification hook with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 99,
+   "itemId": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+   "ac": "AC-199",
+   "file": "backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base changes the heredoc receiver list and no counts are stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Add the receiver handling and a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 100,
+   "itemId": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+   "ac": "AC-200",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "The T90-T pins (dead, live and reused-pid owners on an injected win32 host, plus the recovery line) sit in the HGO suite, now counted 173/174 with one skip in 71b692e81 (also 713106862, 6e6ec10fb). The count is not item-specific, and the native win32 real-host case is a typed skip, which does not qualify.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run the native win32 real-host T90-T2 case, which is skipped elsewhere."
+    },
+    {
+     "owner": "agent",
+     "what": "State an item-specific pass count for the T90 pins."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    }
+   ]
+  },
+  {
+   "n": 101,
+   "itemId": "pipeline.hgo-patch-preflight-before-signature",
+   "ac": "AC-201",
+   "file": "backlog/items/2026-09-27-hgo-patch-preflight-before-signature.md",
+   "stage": "50",
+   "remeasureReason": "71b692e81 pins one cross-repository apply_patch preflight (HGO suite 173/174, 1 skip) but not the acceptance of rejecting a malformed hunk before signing, the native EOF grammar, or a real native-engine rehearsal.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Add a malformed-hunk-rejected-before-signature test and the EOF-marker grammar admission."
+    },
+    {
+     "owner": "native-host",
+     "what": "Rehearse the patch with the real native apply_patch engine on the installed guard."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent security-class Critic review is pending."
+    }
+   ]
+  },
+  {
+   "n": 102,
+   "itemId": "pipeline.hgo-stale-capability-shadows-current-authorization",
+   "ac": "AC-202",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since base changes the consume enumeration; 6e6ec10fb and 8981ea9b9 change binding and classification, not continued search after a drifted capability.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Integrate the search-continues fix and its stale-only, corrupt-audit and two-record regressions."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent security-class Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 103,
+   "itemId": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+   "ac": "AC-203",
+   "file": "backlog/items/2026-10-05-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base addresses crash simulation or the recovery route; the baseline Windows verify-producer change was UNVERIFIED.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement the recovery verb and a crash-simulation test."
+    },
+    {
+     "owner": "native-host",
+     "what": "The Windows verify-producer change needs a native run."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    }
+   ]
+  }
+ ]
+}

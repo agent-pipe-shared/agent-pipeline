@@ -1,0 +1,131 @@
+{
+ "part": "21",
+ "rows": [
+  {
+   "n": 169,
+   "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+   "ac": "AC-269",
+   "file": "backlog/items/2026-09-29-windows-greenfield-scratch-write-denied.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches this item; guard fix and pins map the acceptance but no counts are stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Record counted GREEN results for the guard fix pins."
+    },
+    {
+     "owner": "native-host",
+     "what": "Confirm the scratch write on a real native Windows greenfield run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 170,
+   "itemId": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+   "ac": "AC-270",
+   "file": "backlog/items/2026-10-05-windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base changes the temp-root DACL picture; c972bc580 (fixtures ignore scratch/) addresses a different fixture cause.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run the suites on native Windows to confirm the temp-root DACL result."
+    },
+    {
+     "owner": "agent",
+     "what": "Move remaining fixtures off os.tmpdir or handle the DACL case, with a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 171,
+   "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+   "ac": "AC-271",
+   "file": "backlog/items/2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches this item; the driver, onboarding and installed-observation clauses are still held.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement the held driver and onboarding clauses with counted tests."
+    },
+    {
+     "owner": "native-host",
+     "what": "Run the installed-observation clause on native Windows."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 172,
+   "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+   "ac": "AC-272",
+   "file": "backlog/items/2026-09-29-windows-pre-push-installer-fsync-and-relative-action.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches this item; 04bc678d1 states no pass count and the skip and smoke runs remain.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run the skipped fsync and relative-action smoke on native Windows."
+    },
+    {
+     "owner": "agent",
+     "what": "Record a counted GREEN for the installer pin."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 174,
+   "itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+   "ac": "AC-274",
+   "file": "backlog/items/2026-09-29-worktrees-share-onboarding-private-state-with-root-bound-intake.md",
+   "stage": "50",
+   "remeasureReason": "Onboarding fixture commits since base (bf8c28986, 79732b923, a1cd742de) repair other onboarding suites; a1cd742de leaves cases idx 6, 46, 198, 199 open, and 128d7bd36 states no pass count.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Record a counted GREEN covering each clause of the worktree onboarding private-state pin."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  }
+ ]
+}

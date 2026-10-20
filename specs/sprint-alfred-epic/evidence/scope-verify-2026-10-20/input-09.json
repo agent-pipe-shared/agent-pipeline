@@ -1,0 +1,183 @@
+{
+ "part": "09",
+ "rows": [
+  {
+   "n": 72,
+   "itemId": "pipeline.feature-branch-push-admitted-without-signature-approval",
+   "ac": "AC-172",
+   "file": "backlog/items/2026-10-03-feature-branch-push-admitted-without-signature-approval.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes the approval lane; the broader clauses remain beyond the four uncounted cases.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the remaining approval-lane clauses with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-signature",
+     "what": "Any guard patch or push for this change needs a PO signature."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 74,
+   "itemId": "pipeline.foreign-worktree-closes-the-implementation-gate",
+   "ac": "AC-174",
+   "file": "backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; its one RED case stays red until a protected patch is applied and no count is stated.",
+   "remeasureOpen": [
+    {
+     "owner": "po-signature",
+     "what": "The protected patch that turns the RED case green needs a PO-signed override."
+    },
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the two-worktree pin once the patch lands."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 75,
+   "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+   "ac": "AC-175",
+   "file": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+   "stage": "25",
+   "remeasureReason": "No commit since the baseline changes this item; the ledger-outside-tree commits (74a77e0e8, 7a7ccceae) do not address forensic export, and admitting the export to governed agents needs a held guard patch.",
+   "remeasureOpen": [
+    {
+     "owner": "po-signature",
+     "what": "The held guard patch admitting the export to governed agents needs a PO signature."
+    },
+    {
+     "owner": "agent",
+     "what": "Implement the reconstructable evidence export and pin it with a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 77,
+   "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+   "ac": "AC-177",
+   "file": "backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline states a count for the real-git run or the shared null-device routing; ee3148bc3 (GIT_CEILING_DIRECTORIES) concerns Git discovery, not this clause.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run against Git for Windows 2.56 on a native Windows host."
+    },
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the real-git run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 78,
+   "itemId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+   "ac": "AC-178",
+   "file": "backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md",
+   "stage": "50",
+   "remeasureReason": "9738cf3bd removes the typed skip on the aliased-catalog clause (git-hook-runtime-snapshot 8/8, no skip on WSL), but the original onboarding handover commit and the full original184 onboarding suite are not shown green; stay at 50.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Show the onboarding handover commit and full original184 onboarding suite green with counts."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "Run the candidate-bound closure checks and Full Verify on WSL."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 79,
+   "itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+   "ac": "AC-179",
+   "file": "backlog/items/2026-10-04-git-hook-runtime-snapshots-go-stale-after-plugin-changes.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the behavioural pin held behind a protected patch and the stale-admission clause remain unqualified.",
+   "remeasureOpen": [
+    {
+     "owner": "po-signature",
+     "what": "The protected patch holding the behavioural pin needs a PO-signed override."
+    },
+    {
+     "owner": "agent",
+     "what": "Pin the stale-admission clause with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 80,
+   "itemId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+   "ac": "AC-180",
+   "file": "backlog/items/2026-10-08-git-push-classifier-misses-env-s-and-editor-bang.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline qualifies this item for env -S or editor bang.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin env -S and editor-bang classification with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

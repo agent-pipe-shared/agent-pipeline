@@ -1,0 +1,175 @@
+{
+ "part": "17",
+ "rows": [
+  {
+   "n": 137,
+   "itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+   "ac": "AC-237",
+   "file": "backlog/items/2026-10-05-push-classifier-misreads-backslash-escaped-quotes.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject. Shapes pinned without counts.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State counted GREEN results for the pinned backslash-quote shapes."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 138,
+   "itemId": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+   "ac": "AC-238",
+   "file": "backlog/items/2026-10-06-push-classifier-misses-nested-quotes-and-redirect-before-push.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject. No count for the item.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State counted GREEN results for the nested-quote and redirect clauses."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 139,
+   "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+   "ac": "AC-239",
+   "file": "backlog/items/2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject (32829a645 and be7c027c3 concern alias reads and outside git -C). Most original clauses still held.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement and pin the held read-block and denial-text clauses with counted results."
+    },
+    {
+     "owner": "native-host",
+     "what": "Confirm denial texts on real Claude, Codex and Antigravity runs."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 140,
+   "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+   "ac": "AC-240",
+   "file": "backlog/items/2026-09-30-read-only-guard-admits-execution-and-output-options.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject (be7c027c3 is a git -C classification test, 389 pass, 3 skipped, a different clause). Skips and lanes remain.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Close the remaining skipped lanes and pin them with counted results."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "Run the skipped lanes on Linux."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 141,
+   "itemId": "pipeline.readiness-input-omits-current-advisor-observation",
+   "ac": "AC-241",
+   "file": "backlog/items/2026-09-28-readiness-input-omits-current-advisor-observation.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches the readiness advisor-observation input (afa446b8b pins the retired advisor answered route, not this input). 6 green, 3 clauses are typed skips.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Replace the three typed skips with counted GREEN cases."
+    },
+    {
+     "owner": "native-host",
+     "what": "Run a real native independent Readiness turn with the supplied Advisor observations."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 143,
+   "itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+   "ac": "AC-243",
+   "file": "backlog/items/2026-09-29-retirement-reader-masks-typed-unsafe-layout-inspection.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 closes more than the typed-unsafe clause (eb750b36d pins the 23-callback policy of the sibling item). Only the typed-unsafe clause is pinned.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Qualify the complete original onboarding controller and the admitted-root history clauses with counted results."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing; the item stays open until combined candidate acceptance."
+    }
+   ]
+  },
+  {
+   "n": 144,
+   "itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+   "ac": "AC-244",
+   "file": "backlog/items/2026-10-04-revised-native-design-cannot-reach-a-new-advisor-course.md",
+   "stage": "50",
+   "remeasureReason": "The route is retired (ADR-0085); afa446b8b pins the retired advisor route 19/19 but does not add an acceptance for this item. Surviving observer 5 green, 2 skips.",
+   "remeasureOpen": [
+    {
+     "owner": "po-decision",
+     "what": "Decide how the item's original acceptance is disposed given the retired design course."
+    },
+    {
+     "owner": "agent",
+     "what": "Replace the two skips on the surviving observer with counted cases."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

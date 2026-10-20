@@ -1,0 +1,171 @@
+{
+ "part": "06",
+ "rows": [
+  {
+   "n": 45,
+   "itemId": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+   "ac": "AC-145",
+   "file": "backlog/items/2026-09-29-cross-runner-chat-intake-reference-needs-host-capture.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches the expiry clause or host capture; a37132a91 replays the AC-189 chat-to-signature transition, a neighbouring subject. The befb0eea3 baseline (10 pass, 11 skipped) stands.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Host capture of the chat intake reference needs real Codex, Claude and Antigravity runs."
+    },
+    {
+     "owner": "agent",
+     "what": "Cover the expiry clause and replace the typed skips."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 47,
+   "itemId": "pipeline.declared-system-skill-read-requires-human-override",
+   "ac": "AC-147",
+   "file": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+   "stage": "50",
+   "remeasureReason": "32829a645 refuses a passive read that reaches the skill tree through an alias; AC-147/209 pins A2c and P3c are green but the run is only 5/10 and 7/14 with the rest typed holds, and the catalog-bound clauses need a protected read-scope seam. Item deferred past 0.7.0 by the PO.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Build the protected read-scope seam and the catalog-bound clauses, replacing the typed holds."
+    },
+    {
+     "owner": "native-host",
+     "what": "Installed Codex host readback proving the actual route is required."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 48,
+   "itemId": "pipeline.denial-names-a-diagnosis-it-refuses",
+   "ac": "AC-148",
+   "file": "backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item and 6c3fa2d6c still states no pass count; 1c3b2b096 adds repair names to dispatch refusals, a different subject. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN result for the denial-diagnosis fix."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 50,
+   "itemId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+   "ac": "AC-150",
+   "file": "backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+   "stage": "25",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item; the enforcement clause is only recorded. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement and pin the enforcement clause."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 51,
+   "itemId": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+   "ac": "AC-151",
+   "file": "backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md",
+   "stage": "50",
+   "remeasureReason": "No commit fixes the --run-v2 output collision, resume or revision-path gaps; 70e2e724c retargets the design-course session suite (9/9) to the ADR-0085 retirement, which leaves the item's acceptance unqualified and probably moot. Two skips still hold it at 50.",
+   "remeasureOpen": [
+    {
+     "owner": "po-decision",
+     "what": "Decide whether the item is superseded by the ADR-0085 retirement of the design-course v2 run, or is still to be fixed."
+    },
+    {
+     "owner": "native-host",
+     "what": "The Advisor host fixture on native Windows (K3-16) needs a Windows run."
+    },
+    {
+     "owner": "agent",
+     "what": "If kept, fix the output collision, resume and revision-path gaps and replace the skips."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    }
+   ]
+  },
+  {
+   "n": 52,
+   "itemId": "pipeline.design-generator-repeats-large-source-material",
+   "ac": "AC-152",
+   "file": "backlog/items/2026-09-27-design-generator-repeats-large-source-material.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 changes the picture; 38e1758a4 (AC-152 pin 8/8) removes the verbatim-copy half only. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Measure before and after, the host output budget and reviewer understanding, and fix the hand-edit header contradiction."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 54,
+   "itemId": "pipeline.design-package-parent-metadata-false-drift",
+   "ac": "AC-154",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item; skips and the corpus link stay open. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Replace the typed skips and link the corpus case with counted GREEN tests."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

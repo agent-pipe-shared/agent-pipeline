@@ -1,0 +1,88 @@
+[
+ {"itemId": "pipeline.cross-runner-chat-intake-reference-needs-host-capture", "ac": "AC-145", "read": true,
+  "clauses": [
+   {"clause": "Host-provided turn reference with message identity, exact UTF-8 bytes, scope, consent (A1 identity/bytes/scope/consent).", "status": "evidence",
+    "evidence": "plugins/pipeline-core/lib/pins/cross-runner-chat-intake-reference-needs-host-capture.test.mjs cases 'A1 identity+bytes+scope', 'A1 scope', 'A1 consent'. The first two are skipped on native Windows (PB-WINDOWS-ASSURANCE) and need a Linux/WSL run to be counted.", "work": "", "host": "", "protected": []},
+   {"clause": "Reference carries an explicit expiry that the resolver enforces (A1 expiry).", "status": "evidence",
+    "evidence": "Implemented by befb0eea3 (24 h lifetime; INTAKE-CAPTURE-EXPIRED / -EXPIRY-MISSING / -REFERENCE-MALFORMED). Store-free cases 'A1 lifetime: ...' (5 cases, library, reader and CLI) run on every host; 'A1 lifetime writer' needs the private store. Leftover: the case titled 'A1 KNOWN-GAP expiry' (line 126) is a stale name; it now passes by the writer's expiresAt key and is store-backed (skipped on Windows). Run on WSL to count.", "work": "", "host": "", "protected": []},
+   {"clause": "Adapters only where the host exposes a reliable capture API, otherwise typed unavailable (Codex, Antigravity).", "status": "evidence",
+    "evidence": "Same test file: 'A2 typed unavailable for hosts without a reliable capture API' and 'A2 host event validation' (store-free, run on Windows).", "work": "", "host": "", "protected": []},
+   {"clause": "Captured bytes and reference digest bound into the intake checkpoint, with replay/drift checks and size limit.", "status": "evidence",
+    "evidence": "Same test file: 'A3 size limit', 'A3 replay/drift', 'A3 tamper', 'A3 checkpoint binds the captured bytes', 'A3 KNOWN-GAP reference digest' (stale title; test body at line 291 may still assert only the gap, check it passes), 'A3 consent-fixture binding'. Store-backed, skipped on native Windows.", "work": "If the A3 reference-digest case still asserts a gap, rename and fix it: S, same test file, lib/onboarding-continuity.mjs.", "host": "", "protected": []},
+   {"clause": "Chat-only greenfield path avoids agent re-emission and captures byte-exact multiline content on a real host.", "status": "native-host",
+    "evidence": "Fixture-level proof: 'A4 end to end: hook reference -> CLI intake-capture-apply' (store-backed). A real chat-turn run is still required.", "work": "", "host": "claude-wsl (also claude-windows for the PB-WINDOWS-ASSURANCE store limit)", "protected": []}
+  ],
+  "remeasureWrong": "The remeasure says the expiry clause is uncovered and the typed skips need replacing; the expiry clause is implemented and tested (befb0eea3), and the skips are host limitations on native Windows that a Linux/WSL run turns into counted results, not missing work.",
+  "closableAfterTest": "yes"},
+
+ {"itemId": "pipeline.declared-system-skill-read-requires-human-override", "ac": "AC-147", "read": true,
+  "clauses": [
+   {"clause": "A fresh Codex session reads its declared skill-creator SKILL.md through a normal read action without a human override.", "status": "evidence",
+    "evidence": "plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs 'A1 ...' (admitted today by the generic host-visible rule, not by a catalog).", "work": "", "host": "", "protected": []},
+   {"clause": "Credentials, transcript directory, skill tree directory and symlink aliases stay refused.", "status": "evidence",
+    "evidence": "Same test file: 'A2a credentials...' and 'A2c symlink alias' (fix 32829a645, green, A2c skipped on native Windows for directory symlinks); passive-read-policy.test.mjs 4/4.", "work": "", "host": "", "protected": []},
+   {"clause": "Unlisted sibling skill files, lookalike paths, transcript files and traversal/tilde spellings are refused (catalog binding).", "status": "content",
+    "evidence": "Same test file: 'A2a-unlisted', 'A2a-transcript', 'A2b' are skipped as NATIVE_HOLD; today any host-visible non-credential file is admitted.", "work": "Catalog-bound read authority in sessionReadScopeRoots / passive-read-policy plus a catalog producer; target test = the same pin file (unskip). Size L. Deferred past 0.7.0 by PO decision 2026-10-16 (see item Triage 2026-10-17); not counted against the candidate.", "host": "", "protected": ["plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs", "plugins/pipeline-core/lib/guard/*.mjs"]},
+   {"clause": "Replaced or drifting catalog/file identities invalidate the read authority (A3).", "status": "content",
+    "evidence": "Pin 'A3' skipped: no catalog-bound seam exists in sessionReadScopeRoots.", "work": "Identity digest check in the new read-scope seam; same pin file; size M, part of the L work above.", "host": "", "protected": ["plugins/pipeline-core/lib/guard/*.mjs"]},
+   {"clause": "Installed host readback proves the actual route; not a static allowlist (A4).", "status": "native-host",
+    "evidence": "Pin 'A4' skipped; needs the authenticated host catalog producer (Codex-held).", "work": "", "host": "codex-wsl", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+
+ {"itemId": "pipeline.denial-names-a-diagnosis-it-refuses", "ac": "AC-148", "read": true,
+  "clauses": [
+   {"clause": "The inspect command a DAA/DWP denial names is refused by the lane and so must not be named.", "status": "evidence",
+    "evidence": "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs 'headline case' (6c3fa2d6c made the skipped case real; no pass count was ever stated).", "work": "", "host": "", "protected": []},
+   {"clause": "Every recovery verb named by a denial code is admitted in the producing state, pinned per denial code.", "status": "evidence",
+    "evidence": "Same file: 'all denial codes' (parses DAA-/DWP- codes from the emitter source) and 'exact rendered recovery text'; 'DLR035 receipt'. Emitter needed no change.", "work": "", "host": "", "protected": []},
+   {"clause": "An approved feature whose approval cannot be re-verified degrades to advisory instead of locking all execution (PO decision BI).", "status": "content",
+    "evidence": "No case in the pin file or a commit read mentions degrade/advisory fallback; not verified further (tool budget).", "work": "Either record this clause as out of AC scope (PO decision) or add a degrade path in guard-devplan / lib/guard devplan-shell-lane and a case in the pin file. Size M.", "host": "", "protected": ["plugins/pipeline-core/hooks/guard-devplan.mjs", "plugins/pipeline-core/lib/guard/*.mjs"]}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+
+ {"itemId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract", "ac": "AC-150", "read": true,
+  "clauses": [
+   {"clause": "A fresh verify:null project gets a design-stage readiness result distinct from a passing Verify.", "status": "evidence",
+    "evidence": "plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs 'A1: verify null / blank / placeholder classify as typed baseline-only' and 'A1: the release-contract check reports baseline-only distinctly'.", "work": "", "host": "", "protected": []},
+   {"clause": "Implementation authority and release Verify reject the deferred state.", "status": "evidence",
+    "evidence": "Same file: 'A2: a placeholder, blank or whitespace --verify-command is refused...', 'A2: a missing calibration is refused', 'A2-literal (measured policy)': the transition ADMITS baseline-only and release is the blocked side. Release rejection is pinned by the A1 release-contract case; implementation-transition rejection of the deferred state is explicitly not enforced (recorded policy), which is the remeasure's 'enforcement clause only recorded'.", "work": "If the PO wants the implementation transition to reject verify:null, change the transition in scripts/pipeline-state.mjs and flip the 'A2-literal' case. Size S to M. Otherwise record a PO decision that the measured policy stands.", "host": "", "protected": ["scripts/pipeline-state.mjs"]},
+   {"clause": "A real command is supplied once and read back exactly without repeating onboarding questions.", "status": "evidence",
+    "evidence": "Same file: 'A3: a real command is supplied once, written to both calibration twins, and replays without it' and 'A1/A3: ... not rewritten into a command'.", "work": "", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "The remeasure says the enforcement clause is only recorded and nothing is pinned; the pin file has 7 cases covering A1-A3 (no commit sha confirmed, run count not stated). Only the transition-time rejection is a policy choice, not missing tests.",
+  "closableAfterTest": "no"},
+
+ {"itemId": "pipeline.design-course-run-v2-refuses-its-own-documented-routes", "ac": "AC-151", "read": true,
+  "clauses": [
+   {"clause": "Every course step including a revision runs from emitted, guard-admitted commands with zero overrides; failed stage resumes idempotently; course evidence outputs writable by the agent (K5-8, K5-9, K5-11, revision path).", "status": "po-decision",
+    "evidence": "Per the remeasure, 70e2e724c retargets the design-course session suite to the ADR-0085 retirement of the v2 run; I did not verify this in the ADR text. Decision needed: mark the item superseded by ADR-0085 (then status superseded, cite ADR-0085) or keep it and fix output collision (design-course-session.mjs), resume, and revision path.", "work": "If kept: fix in plugins/pipeline-core/scripts/design-course-session.mjs, plan-spec-state-v2.mjs, guard catalogue; tests in plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs (two skips). Size L.", "host": "", "protected": ["plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"]},
+   {"clause": "The Advisor host fixture runs on native Windows (R4-8, K3-16).", "status": "native-host",
+    "evidence": "Item Description K3-16: CRHS-INPUT on native Windows.", "work": "", "host": "other (native Windows Antigravity/Codex host; claude-windows for the fixture itself)", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+
+ {"itemId": "pipeline.design-generator-repeats-large-source-material", "ac": "AC-152", "read": true,
+  "clauses": [
+   {"clause": "A measured before/after run reports emitted bytes, tokens where available, truncation and duplication, with identical requirement coverage.", "status": "evidence",
+    "evidence": "Item 2026-09-28 Controlled Codex CLI measurement (47,815 B full vs 2,153 B summary, artifacts byte-identical) in scratch/generator-output-measurement-report.md; commit 38e1758a4 made design-input.md a provenance record; pin plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs (8/8 per remeasure). Token counts remain unknown; the measurement predates 38e1758a4, so a re-measure on the final code is not recorded.", "work": "", "host": "", "protected": []},
+   {"clause": "A fresh reviewer can understand PRD and Spec from bounded references and explicit source; no requirement disappears.", "status": "po-decision",
+    "evidence": "Needs an independent reader review (pipeline-core:reader-review) of the generated PRD/Spec; not a code test.", "work": "", "host": "", "protected": []},
+   {"clause": "The host response stays below its output budget for the same large input.", "status": "native-host",
+    "evidence": "Item: host output budget unknown.", "work": "", "host": "codex-wsl (also claude-wsl)", "protected": []},
+   {"clause": "Routine inspect/pendingAsks responses compact after an ask was shown, full ask retrievable (Proposal, stored duplication).", "status": "content",
+    "evidence": "Item 2026-09-28 triage: 'Stored duplication and routine pendingAsks compaction remain open'. I did not locate the code.", "work": "Compact inspect envelope in the design intake script plus a case in the pin file. Size M.", "host": "", "protected": []},
+   {"clause": "Generated PRD/spec drafts must not say 'do not hand-edit' while the reference requires elaboration before binding (Observed PF-06).", "status": "content",
+    "evidence": "Item 'Observed 2026-10-18': header contradiction remains open.", "work": "Change the draft header text in the generator (design intake script) and add a case asserting the header in the pin file; size S.", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+
+ {"itemId": "pipeline.design-package-parent-metadata-false-drift", "ac": "AC-154", "read": false,
+  "clauses": [],
+  "remeasureWrong": "unread: tool budget exhausted before reading specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json and plugins/pipeline-core/lib/pins/design-package-parent-metadata-false-drift.test.mjs (the pin file exists). Remeasure hint only: replace typed skips and link the corpus case.",
+  "closableAfterTest": "no"}
+]

@@ -1,0 +1,167 @@
+{
+ "part": "18",
+ "rows": [
+  {
+   "n": 145,
+   "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+   "ac": "AC-245",
+   "file": "backlog/items/2026-10-03-role-route-preflight-with-self-dispatch-fallback.md",
+   "stage": "50",
+   "remeasureReason": "b59e44303 (AC-245) states preflight 85 pass / 2 todo, pin 15/15, role-route-preflight 18/18, but states the end-to-end course clause stays HELD and the recovery-state verb, live Codex sandbox check and template change were open. 203a53687 later passes --role goldfish in the template (E34c) as docs only.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement the held point 2b and the recovery-state verb (C7) and pin them with counted results."
+    },
+    {
+     "owner": "native-host",
+     "what": "Run the live Codex sandbox check of the role-scoped preflight."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 146,
+   "itemId": "pipeline.scratch-has-no-retention-and-no-durability-check",
+   "ac": "AC-246",
+   "file": "backlog/items/2026-10-05-scratch-has-no-retention-and-no-durability-check.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 implements the sanctioned sweep or the durability check; keep-baseline rule.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement the sanctioned scratch sweep and the durability check from the Proposal with a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 147,
+   "itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+   "ac": "AC-247",
+   "file": "backlog/items/2026-09-27-scratch-must-remain-writable-across-lifecycle-states.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base changes the picture; 9dda09720 (C2) admits only the bootstrap resume-hint read, not scratch writes, and no pass count covers the item.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Add a counted GREEN pin for scratch writes in every lifecycle state without typed skips."
+    },
+    {
+     "owner": "native-host",
+     "what": "Native-host sweeps that are typed skips still need a real run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 148,
+   "itemId": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+   "ac": "AC-248",
+   "file": "backlog/items/2026-10-05-script-mediated-writes-bypass-protected-test-paths.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches script-mediated writes; keep-baseline rule.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Add a counted result for the codemod-shape acceptance beyond the baseline redirect pins."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 149,
+   "itemId": "pipeline.security-scanner-failure-provenance",
+   "ac": "AC-249",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches this item; keep-baseline rule.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Finish implementation and a counted test for scanner failure provenance."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 150,
+   "itemId": "pipeline.semgrep-console-coverage-note-has-no-test",
+   "ac": "AC-250",
+   "file": "backlog/items/2026-10-07-semgrep-console-coverage-note-has-no-test.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches this item; the pin maps the proposal but states no counted GREEN.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Record a counted GREEN run of the console-coverage-note pin."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 151,
+   "itemId": "pipeline.semgrep-offline-default-version-check",
+   "ac": "AC-251",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches this item; keep-baseline rule.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Finish the offline default version check and a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  }
+ ]
+}

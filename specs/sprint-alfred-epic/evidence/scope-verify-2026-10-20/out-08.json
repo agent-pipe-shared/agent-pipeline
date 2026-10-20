@@ -1,0 +1,62 @@
+[
+{"itemId":"pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries","ac":"AC-163","read":true,
+ "clauses":[
+  {"clause":"A dispatch record can be started from a generated, valid skeleton with digests pre-filled; the agent fills judgment fields only.","status":"content","evidence":"git grep for init-dispatch-record / init-design-review in plugins, harness, scripts returns nothing; no scaffolder exists.","work":"New scaffolder script (e.g. plugins/pipeline-core/scripts/init-dispatch-record.mjs) emitting a schema-valid skeleton (bundleSha256, criteria[], outcomeClassification, criticRequired.appliedRow pre-filled where derivable) plus its test, validated against the existing dispatch-record validator; wire into templates/prompts/goldfish-task.md field 6. Size M.","protected":["new test file needs a protected registration in harness/verify-suites.json"]},
+  {"clause":"A design review can be started from a generated, valid skeleton with digests pre-filled.","status":"content","evidence":"No init-design-review exists anywhere in plugins/harness/scripts.","work":"New scaffolder script for the design review with the same pattern and its own test file; update the design-review course docs. Size M.","protected":["new test file needs a protected registration in harness/verify-suites.json"]},
+  {"clause":"Proposal: a terminal record with an empty log is mechanically rejected at dispatch close.","status":"evidence","evidence":"Per the remeasure, b4ab07ce5 and AC-163 require a terminal v3 record to carry a log entry; I did not read the validator or its test, so run and count the dispatch-record validator suite that b4ab07ce5 touched.","work":"","protected":[]},
+  {"clause":"Proposal: measure why entries are skipped and fold log appends into existing writes.","status":"content","evidence":"Item Triage is empty; no measurement artifact found by name.","work":"Measurement note plus a template/role wording change (templates/prompts/goldfish-task.md, roles/goldfish.md section 6). Size S.","protected":[]}
+ ],
+ "remeasureWrong":"Remeasure under-states the gap: the Added acceptance (generated skeleton for dispatch record and design review) is wholly unimplemented, not just a measurement/fold-in part.",
+ "closableAfterTest":"no"},
+{"itemId":"pipeline.dispatch-record-ownership-binds-an-attempted-creation","ac":"AC-164","read":true,
+ "clauses":[
+  {"clause":"Ownership binds to a landed creation, not an attempted one.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs (tracked): OWN-4, OWN-5 (v2 claim bound to physical record), OWN-6 (no ownership for a creation that did not land); OWN-5/OWN-6 carry skip: HOST_LIMIT. Lib change in plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs. No counted GREEN stated.","work":"","protected":[]},
+  {"clause":"Two linked worktrees share one claim registry and RC-1/RC-2 still hold.","status":"evidence","evidence":"Same pin file: OWN-1 (one registry across linked worktrees), OWN-2 (RC-1), OWN-3 (RC-2), OWN-7 (production reader).","work":"","protected":[]}
+ ],
+ "remeasureWrong":"Remeasure says only that the pin file must be confirmed tracked: it is tracked and covers both acceptance points; only a counted run (and the HOST_LIMIT skips) remain.",
+ "closableAfterTest":"no"},
+{"itemId":"pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight","ac":"AC-167","read":true,
+ "clauses":[
+  {"clause":"The preflight command is admitted in draft phase by closed argv identity.","status":"evidence","evidence":"lib/guard/command-catalogue.mjs line 150 (START_PREFLIGHT_SCRIPT, args.length===0); scripts/pipeline-start-preflight.path-spelling.test.mjs covers backslash and forward-slash spellings; hooks/guard-lifecycle-ready.test.mjs. Not confirmed that a draft-phase fixture drives it.","work":"","protected":[]},
+  {"clause":"The clone-hook-readiness --apply, refresh-mandatory-hooks, observation-governance-bootstrap and resume-hint inspect reads are admitted in every lifecycle phase.","status":"done","evidence":"command-catalogue.mjs lines 152-160 (ALF-C-P8-02B / AC-167, AC-123); commit 9dda09720 pin resume-hint-inspect-is-admitted-in-every-lifecycle-state 4/4, guard-lifecycle-ready 389/389.","work":"","protected":[]},
+  {"clause":"project-onboarding-v3.mjs inspect and pipeline-state.mjs inspect are admitted in draft by closed argv.","status":"evidence","evidence":"sanctionedPipelineStateArgs exists (command-catalogue.mjs line 184); onboarding-v3 inspect admission not seen in my reads; run guard-lifecycle-ready.test.mjs to check a draft-phase case for each.","work":"","protected":[]},
+  {"clause":"The skill's literal ${PIPELINE_PLUGIN_ROOT} spelling is admitted (or the skill prescribes an admitted spelling).","status":"content","evidence":"No test or catalogue line seen for an unexpanded variable.","work":"Either resolve/admit the variable spelling in the guard or change plugins/pipeline-core/skills/pipeline-start/SKILL.md to an admitted spelling; pin in guard-lifecycle-ready.test.mjs or a new pin under lib/pins. Size S to M.","protected":["plugins/pipeline-core/lib/guard/command-catalogue.mjs","plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs","new pin test needs harness/verify-suites.json registration"]},
+  {"clause":"SKILL.md documents handling of the hook-provisioning-required preflight status.","status":"content","evidence":"Not checked against SKILL.md in this pass; the item says it is undocumented.","work":"One paragraph in plugins/pipeline-core/skills/pipeline-start/SKILL.md. Size S.","protected":[]},
+  {"clause":"A draft-phase fixture runs the bootstrap sequence to a ready confirmation without an override.","status":"content","evidence":"No such end-to-end fixture found; only per-command pins.","work":"One regression test in hooks/guard-lifecycle-ready.test.mjs (or a new pin) running preflight, onboarding inspect, governance bootstrap, state inspect in draft. Size M.","protected":["plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs (if the test exposes a gap)"]},
+  {"clause":"Forward-slash and variable spellings behave correctly on a real Windows host.","status":"native-host","evidence":"Item observed on Windows; path-spelling test is in-process only.","work":"","host":"claude-windows","protected":[]}
+ ],
+ "remeasureWrong":"Partly stale: clone-hook-readiness --apply, refresh-mandatory-hooks and observation-governance-bootstrap are already admitted in the catalogue; the preflight itself is admitted (line 150) with a path-spelling test. Open work is the ${PIPELINE_PLUGIN_ROOT} spelling, onboarding inspect, SKILL.md status text and the end-to-end draft fixture.",
+ "closableAfterTest":"no"},
+{"itemId":"pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads","ac":"AC-168","read":true,
+ "clauses":[
+  {"clause":"A repeatable measurement tool exists in the repository (C1 telemetry).","status":"evidence","evidence":"plugins/pipeline-core/scripts/elephant-context-measure.mjs with elephant-context-measure.test.mjs; findings in specs/sprint-alfred-epic/evidence/elephant-load-findings-2026-10-05.md. No counted GREEN stated.","work":"","protected":[]},
+  {"clause":"One enforcement-layer measure per cause (wake-up replies, inline reads, Explore/Plan refusal, guard false positives, hand-written briefings).","status":"content","evidence":"No per-cause measure located; item Triage empty.","work":"Up to five separate measures across hooks/templates, each with a test; scope needs a PO/Elephant split by cause. Size L in total.","protected":["likely hooks/hooks.json and guard files for wake-up and false-positive causes"]},
+  {"clause":"Each measure has a before/after measurement against a real session.","status":"native-host","evidence":"Needs real session transcripts from an installed host.","work":"","host":"claude-windows","protected":[]}
+ ],
+ "remeasureWrong":"",
+ "closableAfterTest":"no"},
+{"itemId":"pipeline.every-dispatch-pays-a-bootstrap-receipt-detour","ac":"AC-169","read":true,
+ "clauses":[
+  {"clause":"The receipt is recorded without agent cost (SubagentStart hook) or template step 0 runs the preflight.","status":"evidence","evidence":"plugins/pipeline-core/hooks/hooks.json line 234 registers SubagentStart (ALF-C-AC169-B, PO decision 2026-10-17) with hooks/subagent-start-receipt.mjs; step 0 fallback retained. No counted GREEN stated.","work":"","protected":["hooks/hooks.json (already registered)"]},
+  {"clause":"A regression test shows the first Write of a freshly started dispatch is admitted.","status":"evidence","evidence":"hooks/subagent-start-receipt.test.mjs: S1 (refused before event, admitted after), S2/A2 (first write of every write tool admitted), S8 (host-style stdin run).","work":"","protected":[]}
+ ],
+ "remeasureWrong":"Yes: the remeasure says the receipt hook registration is a held signature-bound patch, but hooks.json in the tree already carries the SubagentStart entry and the hook plus its test exist. Open: a counted run, Critic and PO acceptance only.",
+ "closableAfterTest":"no"},
+{"itemId":"pipeline.evidence-artifacts-carry-no-commit-identity","ac":"AC-170","read":true,
+ "clauses":[
+  {"clause":"The evidence header records HEAD, tree and a dirty flag.","status":"evidence","evidence":"capture-evidence.mjs lines 197-210 write head/tree/dirty; capture-evidence.test.mjs EVID-T cases (head, tree, dirty true/false, unavailable fallback). No counted GREEN stated.","work":"","protected":[]},
+  {"clause":"A test pins the header (order and fields on one artifact).","status":"evidence","evidence":"capture-evidence.test.mjs line 674 'EVID-T / T60 characterisation pin: one artifact header carries head, tree and dirty together, in order'.","work":"","protected":[]}
+ ],
+ "remeasureWrong":"",
+ "closableAfterTest":"no"},
+{"itemId":"pipeline.existing-signing-key-reuse-deadlocks-onboarding","ac":"AC-171","read":true,
+ "clauses":[
+  {"clause":"An existing canonical po-private.pem is recognised and never copied or replaced; public fingerprint bound to the key.","status":"done","evidence":"scripts/onboarding-init.test.mjs line 1230 'signature anchor reuses a key already at the canonical directory path without importing or replacing it'; commit 13ff0433b, suite 55/55.","work":"","protected":[]},
+  {"clause":"Narrow attended external-terminal recovery for a driver failure before trust-anchor setup, same first-anchor transaction, typed digest confirmation.","status":"done","evidence":"onboarding-init.test.mjs line 90 'a failed first-anchor action returns an attended digest-bound recovery command' and line 1402 first-anchor transaction restores preimages; in the 55/55 suite.","work":"","protected":[]},
+  {"clause":"Audit record explicitly labelled unattended-by-signature; no general guard or lifecycle bypass.","status":"evidence","evidence":"onboarding-init.test.mjs lines 1132-1179 (unattended setup --existing-key, TR-S1-T3g); I did not read the assertions for the label text.","work":"","protected":[]},
+  {"clause":"Tests for replay, path aliases and wrong-key refusal.","status":"content","evidence":"git grep in onboarding-init.test.mjs found no wrong-key or path-alias case by those words (could be named differently).","work":"Add replay, path-alias and wrong-key refusal cases to scripts/onboarding-init.test.mjs. Size M.","protected":[]},
+  {"clause":"Windows spelling of the recovery and consumer onboarding on a real Windows host.","status":"native-host","evidence":"In-process tests only.","work":"","host":"claude-windows","protected":[]}
+ ],
+ "remeasureWrong":"",
+ "closableAfterTest":"no"}
+]

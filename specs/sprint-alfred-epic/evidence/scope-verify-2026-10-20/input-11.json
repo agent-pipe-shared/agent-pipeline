@@ -1,0 +1,163 @@
+{
+ "part": "11",
+ "rows": [
+  {
+   "n": 90,
+   "itemId": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+   "ac": "AC-190",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "25",
+   "remeasureReason": "Only 1f0efdc24 and 6bee0e8c1 touch it, and both just file it as a post-0.7.0 item; no implementation exists.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Turn the reconstructed acceptance draft into an implementation and a counted test."
+    },
+    {
+     "owner": "po-decision",
+     "what": "Confirm the post-0.7.0 scope and the acceptance content."
+    },
+    {
+     "owner": "critic",
+     "what": "No independent Critic review exists."
+    }
+   ]
+  },
+  {
+   "n": 91,
+   "itemId": "pipeline.greenfield-design-course-cost-and-proportionality",
+   "ac": "AC-191",
+   "file": "backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md",
+   "stage": "25",
+   "remeasureReason": "1f0efdc24 only records the telemetry clause as a post-0.7.0 item; no commit implements cost or proportionality, so analysis only.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement the cost and proportionality limits and pin them with a counted test."
+    },
+    {
+     "owner": "po-decision",
+     "what": "Decide the telemetry clause, which stays a typed skip and is moved after 0.7.0."
+    },
+    {
+     "owner": "critic",
+     "what": "No independent Critic review exists."
+    }
+   ]
+  },
+  {
+   "n": 92,
+   "itemId": "pipeline.greenfield-machine-output-and-skill-budget",
+   "ac": "AC-192",
+   "file": "backlog/items/2026-09-29-greenfield-machine-output-and-skill-budget.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches the machine-output or skill-budget pin; the baseline 14/14 pin stands and the help-action clause is still not shown as covered.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Cover the help-action clause with a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 93,
+   "itemId": "pipeline.guard-override-request-digest-drifts-after-arming",
+   "ac": "AC-193",
+   "file": "backlog/items/2026-10-03-guard-override-request-digest-drifts-after-arming.md",
+   "stage": "50",
+   "remeasureReason": "6e6ec10fb (HGO 172/173, 1 skip) and 8981ea9b9 (160/172) fix the cross-repository consume drift, and 71b692e81 reaches 173/174, but none pins the seed-sign-arm-identical-retry sequence, excludes the cosmetic description field, or names the differing digest inputs.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Exclude runner-cosmetic fields such as description from the digest and add the arm-then-identical-retry regression with a named-input mismatch message."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "A Linux run of the sequence is needed."
+    },
+    {
+     "owner": "native-host",
+     "what": "A native Windows run of the sequence is needed."
+    },
+    {
+     "owner": "critic",
+     "what": "The security-class Critic review is pending."
+    }
+   ]
+  },
+  {
+   "n": 94,
+   "itemId": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+   "ac": "AC-194",
+   "file": "backlog/items/2026-10-05-guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches the git grep --no-index shape; the baseline pin set still has no --no-index case.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Isolate the exact refused shape and pin it with a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 95,
+   "itemId": "pipeline.guard-push-refuses-read-only-git-without-push",
+   "ac": "AC-195",
+   "file": "backlog/items/2026-10-09-guard-push-refuses-read-only-git-without-push.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base changes the nested-shell clause, which is still pinned as a refusal (T85d); the baseline 251/251 does not meet the proposal's second clause.",
+   "remeasureOpen": [
+    {
+     "owner": "po-decision",
+     "what": "Decide whether the nested-shell false positive (T85d) is accepted or must be fixed."
+    },
+    {
+     "owner": "agent",
+     "what": "Implement the second clause if the PO asks for it."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    }
+   ]
+  },
+  {
+   "n": 96,
+   "itemId": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+   "ac": "AC-196",
+   "file": "backlog/items/2026-10-05-guard-push-treats-gitleaks-as-a-git-command.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base concerns the gitleaks prefix match; no counted result for the gitleaks admit case exists.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Add a test for the gitleaks admit case and a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

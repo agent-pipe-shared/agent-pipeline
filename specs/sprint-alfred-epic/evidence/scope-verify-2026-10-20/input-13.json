@@ -1,0 +1,163 @@
+{
+ "part": "13",
+ "rows": [
+  {
+   "n": 104,
+   "itemId": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+   "ac": "AC-204",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "25",
+   "remeasureReason": "No commit since base concerns dispatchless implementation; 00ef3108d only declares a recorded EL-01 exception in the trailer and waives no gate.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement the review-coverage check for dispatchless commits and test it."
+    },
+    {
+     "owner": "po-decision",
+     "what": "Decide the scope of the review-coverage rule against the D55 EL-01 exception."
+    },
+    {
+     "owner": "critic",
+     "what": "No independent Critic review exists."
+    }
+   ]
+  },
+  {
+   "n": 105,
+   "itemId": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+   "ac": "AC-205",
+   "file": "backlog/items/2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base changes the design (elephant) trailer admission; 00ef3108d adds a different trailer form and 9a15050e3 and ad638524a concern commit-pipeline-owned.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted pass for the 8e7dce0f4 trailer admission."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 106,
+   "itemId": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+   "ac": "AC-206",
+   "file": "backlog/items/2026-10-05-kernel-closure-check-masks-violations-after-the-first.md",
+   "stage": "50",
+   "remeasureReason": "73bc8f117 closes the never-liftable list over the receipt write guard and reports guard-maintenance-window-kernel-closure 11/11 (was 10/11), which repairs the red ratchet but does not show the all-violations-per-run clause or the stamp block.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Make the check report all violations per run and pin it; make a red ratchet block the candidate stamp."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent security-class Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 107,
+   "itemId": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+   "ac": "AC-207",
+   "file": "backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md",
+   "stage": "50",
+   "remeasureReason": "9dda09720 admits only the bootstrap's resume-hint inspect read in every lifecycle state (pin 4/4, guard-lifecycle-ready 389/389), a narrow slice; the other lanes, scratch scripts, scaffold commits and the Windows design-course test remain open.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Admit the remaining coordination lanes (continuity-cas, integrate-final, cancel-submitted-plan, scratch read-only scripts) and cover them with counted tests."
+    },
+    {
+     "owner": "native-host",
+     "what": "A Windows Git Bash design-course end-to-end test must reach present-plan with zero overrides."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    }
+   ]
+  },
+  {
+   "n": 108,
+   "itemId": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+   "ac": "AC-208",
+   "file": "backlog/items/2026-09-28-lifecycle-inspect-omits-current-plan-spec-digests.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches lifecycle inspect or its digest observation; the 07a946996 and 146d23641 suite repairs do not cover the digest-drift acceptance.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Integrate the prepared inspect source-digest correction with its regressions into Source."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 109,
+   "itemId": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+   "ac": "AC-209",
+   "file": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+   "stage": "50",
+   "remeasureReason": "32829a645 only adds a negative alias refusal (AC-147/209 pins A2c and P3c green, 5/10 and 7/14, rest typed holds); the declared-skill admission is deferred past 0.7.0 and not implemented.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement the narrow declared-skill admission and the catalog-bound clauses that need a protected read-scope seam."
+    },
+    {
+     "owner": "native-host",
+     "what": "Verify the admission at the real installed Codex lifecycle boundary."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent security Critic review is missing."
+    },
+    {
+     "owner": "po-decision",
+     "what": "Confirm the deferral past the 0.7.0 candidate (recorded 2026-10-17)."
+    }
+   ]
+  },
+  {
+   "n": 110,
+   "itemId": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+   "ac": "AC-210",
+   "file": "backlog/items/2026-10-06-mandatory-hook-readiness-returned-refusal-skips-rollback.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base changes the readiness rollback; the baseline triage points to ddabe0ae3 with no pass count.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the readiness rollback."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

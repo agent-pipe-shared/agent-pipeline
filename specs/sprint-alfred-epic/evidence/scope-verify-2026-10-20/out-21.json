@@ -1,0 +1,42 @@
+[
+{"itemId":"pipeline.windows-greenfield-scratch-write-denied","ac":"AC-269","read":true,
+ "clauses":[
+  {"clause":"Native absolute/relative paths, drive-letter spelling and root aliases normalize before containment.","status":"evidence","evidence":"fix 0eaa8d0b3 (physical-scratch-boundary.mjs); pin plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs cases W1 (relative/absolute, native Windows spellings, root alias)","protected":[]},
+  {"clause":"Symlink, hardlink and active-plugin exclusions are kept.","status":"evidence","evidence":"same pin, W2 cases (alias dir, alias scratch root, hardlink nlink>1, active plugin root)","protected":[]},
+  {"clause":"Actual guard admits Claude Write and PowerShell New-Item/Set-Content for scratch and rejects escapes.","status":"evidence","evidence":"same pin, W3 cases (PowerShell admit, escapes rejected, Claude Write/Edit predicate, live-guard control); commit 743f2ea6a","protected":[]},
+  {"clause":"Same tests run on macOS and Linux.","status":"evidence","evidence":"pin has non-win32 case 'native-Windows spellings refused'; registered in harness/verify-suites.json; run on WSL/Linux and count","protected":[]},
+  {"clause":"A fresh Windows intake completes.","status":"native-host","host":"claude-windows","evidence":"item done_when: manual; the native-spelling W1 case runs only on win32","protected":[]}],
+ "remeasureWrong":"","closableAfterTest":"yes"},
+{"itemId":"pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures","ac":"AC-270","read":true,
+ "clauses":[
+  {"clause":"Tests create a hardened private temp root (owner-only, non-inheriting DACL) and place fixtures under it, no security change.","status":"evidence","evidence":"pin plugins/pipeline-core/lib/pins/windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.test.mjs: P2 cases (win32 and simulated observation), P4 consumer mapping (an existing fixture suite adopts the helper), POSIX 0700 branch","protected":[]},
+  {"clause":"Assurance is not loosened for system principals.","status":"evidence","evidence":"same pin, P3 cases (SYSTEM/Administrators insecure, RED mirror)","protected":[]},
+  {"clause":"State-authority fixtures reach the authority via the production creator.","status":"evidence","evidence":"same pin, P5 cases (win32)","protected":[]},
+  {"clause":"v3 suite failure count on native Windows drops.","status":"native-host","host":"claude-windows","evidence":"P1/P2/P5/P6 cases are skipped off win32","protected":[]},
+  {"clause":"Remaining fixtures moved off os.tmpdir.","status":"content","work":"Pin P4 only shows that one existing suite adopts the helper; whether the other v3 onboarding fixtures still use os.tmpdir() was not enumerated. Only needed if the native Windows run still shows DACL failures. Files: fixture helpers in the failing suites. Size M, test carried by the same pin file P4.","protected":[]}],
+ "remeasureWrong":"Remeasure says nothing addresses the DACL picture; a helper (privateTempRoot/privateMkdtemp), pin and verify-suites registration already exist. The open piece is the native Windows run and possibly extra fixture adoption.","closableAfterTest":"yes"},
+{"itemId":"pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error","ac":"AC-271","read":true,
+ "clauses":[
+  {"clause":"Git worktree paths compare correctly irrespective of slash style and drive-letter case; no GS-WORKTREE.","status":"evidence","evidence":"pin plugins/pipeline-core/lib/pins/windows-portable-seed-rolls-back-with-hidden-worktree-error.test.mjs A1 cases (4, incl. governance scope no GS-WORKTREE; drive-case win32 only)","protected":[]},
+  {"clause":"A failed portable seed apply exposes rollback and diagnostic with a non-success result.","status":"evidence","evidence":"same pin, A2 'rolled-back with a diagnostic and leaves no Git control'","protected":[]},
+  {"clause":"Unexpected status outside nextAction.expected.statuses stops the guided driver with observed status and bounded repair action.","status":"evidence","evidence":"same pin, A3 cases; onboarding-init.mjs has a comment at ~1447 on stopping after an unexpected status","protected":[]},
+  {"clause":"Synthetic path fixtures and a fresh non-Git onboarding cover failure and progression to runtime initialization.","status":"evidence","evidence":"same pin, A4 cases","protected":[]},
+  {"clause":"Corrected installed Claude candidate observed in a fresh Windows session.","status":"native-host","host":"claude-windows","evidence":"pin A5 is a skipped manual case","protected":[]}],
+ "remeasureWrong":"Remeasure says the driver and onboarding clauses are still held for implementation; a pin with A1-A4 cases exists and is registered in harness/verify-suites.json. I read the pin and found no commit message proving the production code landed, so run the pin to confirm; if A3 or A4 are RED, content work remains in onboarding-init.mjs, size S to M.","closableAfterTest":"yes"},
+{"itemId":"pipeline.windows-pre-push-installer-fsync-and-relative-action","ac":"AC-272","read":true,
+ "clauses":[
+  {"clause":"Windows-compatible durable file-sync descriptor and a typed refusal when durability is unavailable.","status":"evidence","evidence":"pin plugins/pipeline-core/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs A1-A3, B1, B2; scripts/pre-push-hook-install.mjs, test pre-push-hook-install.test.mjs","protected":[]},
+  {"clause":"Installer action returns absolute executable and script path with explicit consumer cwd.","status":"evidence","evidence":"commit 04bc678d1 (prePushHookInstallCommand emits process.execPath); pin C1, C2","protected":[]},
+  {"clause":"Install, marker/readback, blocking push and removal proven.","status":"evidence","evidence":"pin D1-D4 (real git push blocked/allowed, removal)","protected":[]},
+  {"clause":"macOS/Linux smoke kept and foreign hooks untouched.","status":"evidence","evidence":"pin E1, E2, F1 (POSIX modes)","protected":[]},
+  {"clause":"Install, marker, blocking push and removal on native Windows.","status":"native-host","host":"claude-windows","evidence":"item requires native Windows proof; A1 and D cases need that host","protected":[]}],
+ "remeasureWrong":"","closableAfterTest":"yes"},
+{"itemId":"pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake","ac":"AC-274","read":true,
+ "clauses":[
+  {"clause":"Private-state ownership binds selected physical root and Git common scope; re-enrollment retires only that root's intake and consent.","status":"evidence","evidence":"commit 128d7bd36 (pin, no production change needed); pin plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs 'repeated enrollment is idempotent per root...'","protected":[]},
+  {"clause":"Foreign-worktree bytes and active legacy authority preserved; root-bound legacy migration via exact CAS.","status":"evidence","evidence":"same pin: 'legacy root-only state migrates under exact CAS...' and 'foreign sibling history ... preserved, malformed slot refuses'","protected":[]},
+  {"clause":"Declined barrier before migration; exact bounded history archived; crash recovery and stale CAS recoverable.","status":"evidence","evidence":"same pin: 'declined barrier...', 'archived history stays bound...', 'interrupted generation is detected in its own root'","protected":[]},
+  {"clause":"First enrollment follows repository-capability route; unverifiable history gets a supported route.","status":"evidence","evidence":"same pin: 'first enrollment follows the repository-capability route...'","protected":[]},
+  {"clause":"Disposable tests cover two worktrees; prior onboarding and uninstall behavior preserved.","status":"evidence","evidence":"same pin (7 cases; 'archived history' case marked SLOW); run onboarding/uninstall suites and count","protected":[]}],
+ "remeasureWrong":"Remeasure lists onboarding cases idx 6, 46, 198, 199 as open from a1cd742de; these belong to other onboarding suites, not to this pin. The pin and production behavior are already in tree; only a counted run remains.","closableAfterTest":"yes"}
+]

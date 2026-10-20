@@ -1,0 +1,85 @@
+[
+ {"itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes", "ac": "AC-237", "read": true,
+  "clauses": [
+   {"clause": "A command with a backslash-escaped quote outside single quotes and a git word at an executable boundary is classified a push (fail closed).", "status": "evidence",
+    "evidence": "Code: commit 6b0413700 (git-cmd.mjs) plus a2857ac3a (flip pins, decision S). Tests: plugins/pipeline-core/lib/git-cmd.test.mjs GPGL-3 tables (about lines 410-460, 547-570) and decision-S rows; no counted GREEN stated in the item.", "work": "", "host": "", "protected": []},
+   {"clause": "Pin GL-B13 (escaped-quote fake span around a real push) and the plain echo-wrapped shape as refused.", "status": "evidence",
+    "evidence": "plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs case GL-B13 (line 200), GL-B17 (line 220); git-cmd.test.mjs line 421 echo-wrapped shape. Elephant must run and count.", "work": "", "host": "", "protected": []},
+   {"clause": "Pin the quoted-executable shape (\"git\" followed by an unknown option before push) as refused.", "status": "evidence",
+    "evidence": "git-cmd.test.mjs F1 rows at lines 552-553 (quoted git executable with split push word); GPGL-5 commit chain. Elephant must run and count.", "work": "", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "yes"},
+ {"itemId": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push", "ac": "AC-238", "read": true,
+  "clauses": [
+   {"clause": "Quotes nested inside a double-quoted command substitution holding a git push are classified a push.", "status": "evidence",
+    "evidence": "Code: commits 7b0bb402a (fail closed on expansion, check #6 on double-quoted span with substitution plus git word) and 49d6f928d (Q12 F1-F4). Tests: git-cmd.test.mjs GPGL-9 / Q12 tables (lines 721-1100). A case with the exact inner-double-quote shape was not located by name; Elephant should confirm one exists when running.", "work": "", "host": "", "protected": []},
+   {"clause": "A redirect between git and push (git 2>&1 push origin main) is classified a push.", "status": "content",
+    "evidence": "Code exists: git-cmd.mjs lines 1407-1462 (redirectionRe, redirectFreeRegion, redirectedPush). No test found: rg for redirect, 2>&1, &1, 'git 2>' in git-cmd.test.mjs finds only unrelated rows (lines 783, 1364).",
+    "work": "Add a table in plugins/pipeline-core/lib/git-cmd.test.mjs pinning git 2>&1 push, git >out push, git <in push, git 2>&1 --config-env=x push as pushes. Size S. Test file is not in the protected list (git-cmd.test.mjs is not named there); check it is registered in harness/verify-suites.json.", "host": "", "protected": []},
+   {"clause": "The two accepted false positives (git diff with a substituted merge-base; heredoc commit message in a quoted substitution containing a boundary git word) are pinned as documented accepted behaviour.", "status": "content",
+    "evidence": "Not located in git-cmd.test.mjs by redirect/substitution searches; I could not confirm absence beyond that.",
+    "work": "Add two rows (expected push-candidate true, comment 'accepted false positive') to the same git-cmd.test.mjs table. Size S.", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners", "ac": "AC-239", "read": true,
+  "clauses": [
+   {"clause": "Native Read of a WSL UNC path outside the repo is admitted (credential roots denied).", "status": "unread", "evidence": "Budget exhausted. Test host file to check: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs (readScopeRun fixtures from line 7061); a UNC / wsl.localhost search found no hit.", "work": "", "host": "", "protected": []},
+   {"clause": "Native Grep with a glob or type filter inside the repo is admitted.", "status": "unread", "evidence": "Budget exhausted; check readToolScopeVerdict and readScopeRun tests (guard-lifecycle-ready.test.mjs from line 7026).", "work": "", "host": "", "protected": []},
+   {"clause": "Native Grep on an in-repo directory and Glob with a * pattern are admitted.", "status": "unread", "evidence": "Budget exhausted.", "work": "", "host": "", "protected": []},
+   {"clause": "Every guard denial says blocked by guard <code> and never implies absence (audit of 'not found' / 'not present' wording).", "status": "unread", "evidence": "Budget exhausted.", "work": "", "host": "", "protected": []},
+   {"clause": "One cross-runner test matrix covers the read shapes; denial texts confirmed on real Claude, Codex, Antigravity runs.", "status": "native-host", "evidence": "Remeasure names native-host runs; the item itself has no host clause. Unverified whether the matrix exists.", "work": "", "host": "claude-wsl", "protected": []}
+  ],
+  "remeasureWrong": "Not checked; the item has an empty Triage and I could not verify the remeasure's claim that most clauses are held.",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.read-only-guard-admits-execution-and-output-options", "ac": "AC-240", "read": true,
+  "clauses": [
+   {"clause": "rg execution and output options (--pre, --output) are refused by single-command and piped lanes.", "status": "evidence",
+    "evidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs lines 1776-1778 (rg --pre in pipelines), 1836 (rg --pre sh, rg --output), 7254 (native read scope run). No counted GREEN stated.", "work": "", "host": "", "protected": []},
+   {"clause": "Closed grammars for node --test reporter destinations, git diff/log/show --output, abbreviated git long options, git fetch --upload-pack, git -C containment, git config screening.", "status": "unread",
+    "evidence": "Budget exhausted; the 2026-10-04 evidence section assigns these to R2 work package W1-5. Check guard-lifecycle-ready.mjs and guard-command-grammar.mjs plus guard-lifecycle-ready.test.mjs.", "work": "", "host": "", "protected": ["plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"]},
+   {"clause": "Credential roots and PO signing keys denied through every read lane (symlinks, .., ~, drive spelling, directory scans).", "status": "evidence",
+    "evidence": "guard-lifecycle-ready.test.mjs QP4 block around lines 11538-11700 (credential reads refused in absolute, traversal and tilde spellings; link escapes). Junction/symlink cases skip when links are not permitted (lines 11095, 11348).", "work": "", "host": "", "protected": []},
+   {"clause": "Skipped lanes (symlink/junction creation) run on real hosts.", "status": "native-host", "evidence": "t.skip at guard-lifecycle-ready.test.mjs lines 11095 and 11348 when junction creation is not permitted.", "host": "claude-windows", "work": "", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.readiness-input-omits-current-advisor-observation", "ac": "AC-241", "read": true,
+  "clauses": [
+   {"clause": "Supplement v2 Advisor observation is supplied with the five sources, verified before transmission, bound in the request and reconstructed by the fresh verifier.", "status": "evidence",
+    "evidence": "Item Progress section states Codex package 1/1, native request custody 5/5, host reader 3/3 and a forgery case 1/1 on synthetic fixtures; test file names not located in budget (owner evidence scratch/0.7-quality-readiness-pretransmission-provenance-20260929/pre-post.md).", "work": "", "host": "", "protected": []},
+   {"clause": "Replace the three typed skips with counted GREEN cases (substituted receipt, wrong candidate/question, drift, oversized, alias, missing context).", "status": "content",
+    "evidence": "Remeasure says 6 green and 3 typed skips; the test file was not located in budget.",
+    "work": "Locate the readiness advisor-observation test file (search git ls-files for readiness-advisor / supplemental) and replace the three skips with real cases. Size S-M. Check whether the file is in harness/verify-suites.json.", "host": "", "protected": []},
+   {"clause": "A real native independent Readiness turn with the supplied observations; old not-ready reports stay historical.", "status": "native-host", "evidence": "Item states current evidence is synthetic host fixtures, not real provider acceptance.", "host": "codex-wsl", "work": "", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection", "ac": "AC-243", "read": true,
+  "clauses": [
+   {"clause": "Public inspection returns typed unsafe results for rejected roots and descendants (root_symlink_rejected, unavailable repository diagnostics).", "status": "done",
+    "evidence": "Fix 26fef9e7d; pin commit 43419638c 'test(pipeline-core): pin typed unsafe layout before the retirement reader'. Item states the original callback passes 1/1; counted.", "work": "", "host": "", "protected": []},
+   {"clause": "No enrollment reader runs against a V4-rejected physical layout.", "status": "done",
+    "evidence": "Same commits 26fef9e7d and 43419638c.", "work": "", "host": "", "protected": []},
+   {"clause": "Admitted roots keep canonical selected-root retirement and history validation; corrupt owned history is not silently accepted.", "status": "unread",
+    "evidence": "Budget exhausted; remeasure says this clause is unqualified. Check 43419638c stat for an admitted-root case.", "work": "", "host": "", "protected": []},
+   {"clause": "Qualify the complete original onboarding controller and the fixed candidate's broader gates.", "status": "native-host",
+    "evidence": "Item Triage 2026-10-08: named test exceeded 600 s, needs host run.", "host": "claude-wsl", "work": "", "protected": []}
+  ],
+  "remeasureWrong": "Remeasure's \"only the typed-unsafe clause is pinned\" is incomplete: the no-enrollment-reader clause is covered by the same fix and pin.",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course", "ac": "AC-244", "read": true,
+  "clauses": [
+   {"clause": "One design revision after an Advisor or readiness finding is one emitted step with zero PO interactions and no loop (spec 21.5 R5-6/R5-8).", "status": "unread",
+    "evidence": "ADR-0085 (docs/adr/0085-one-review-one-signature-design-approval.md lines 92-95) says R5-6 stays valid under it; R5-8 not checked. ADR is marked Decision (proposed).", "work": "", "host": "", "protected": []},
+   {"clause": "A native-runner revision opens a child course bound to the registered authoring dispatch; reusing a decision reference is refused.", "status": "superseded",
+    "evidence": "ADR-0085 lines 68-76 remove authoring-dispatch registration and the private Advisor course store with parent/child courses. Caveat: the ADR text says 'Decision (proposed)'; confirm PO acceptance in docs/state.md.", "work": "", "host": "", "protected": []},
+   {"clause": "An interrupted export re-run yields byte-identical artifacts; a second re-run is a no-op (R4-7).", "status": "superseded",
+    "evidence": "Course export belongs to the course store retired by ADR-0085 line 74 (same caveat).", "work": "", "host": "", "protected": []},
+   {"clause": "Disposition of the item's original acceptance given the retired design course.", "status": "po-decision",
+    "evidence": "Needs the PO to confirm ADR-0085 acceptance and close or rewrite the item; the item's Triage is empty.", "work": "", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"}
+]

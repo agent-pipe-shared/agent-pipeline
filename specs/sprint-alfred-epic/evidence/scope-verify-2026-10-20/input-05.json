@@ -1,0 +1,179 @@
+{
+ "part": "05",
+ "rows": [
+  {
+   "n": 38,
+   "itemId": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+   "ac": "AC-138",
+   "file": "backlog/items/2026-10-05-completion-fd-suites-cannot-run-as-single-files.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this proposal and no counted result is stated. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Make the completion-fd suites runnable as single files and state a counted result."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "Confirm the single-file runs in the WSL Full Verify or a Linux run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 39,
+   "itemId": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+   "ac": "AC-139",
+   "file": "backlog/items/2026-10-09-concurrent-session-warning-never-fires-on-native-windows.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches the Windows concurrent-session warning. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Fix the warning on native Windows and pin it."
+    },
+    {
+     "owner": "native-host",
+     "what": "Confirm the warning fires on a native Windows run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 40,
+   "itemId": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+   "ac": "AC-140",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "75",
+   "remeasureReason": "Baseline pin evidence (a0133eb26, 8 pass; 8e86eb900) is unchanged and no commit since 98b6e5ca2 reverts it. Keep 75.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Cover the repair clauses and the non-private State case left open by cff00accd."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 41,
+   "itemId": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+   "ac": "AC-141",
+   "file": "backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md",
+   "stage": "50",
+   "remeasureReason": "10819d460 (E20) names the next step when the Critic course budget is spent, a different subject from this security-review budget-guard defect; PO decision D1 (GST33) is still recorded open. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "po-decision",
+     "what": "Decision D1 (GST33) on the security-review budget is still open."
+    },
+    {
+     "owner": "agent",
+     "what": "Implement the decided budget behaviour and the notes-persistence fix, then pin it."
+    },
+    {
+     "owner": "native-host",
+     "what": "Live verification of a Critic security review is still needed."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 42,
+   "itemId": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+   "ac": "AC-142",
+   "file": "backlog/items/2026-10-07-critic-round-cap-and-delta-scope-are-not-enforced.md",
+   "stage": "75",
+   "remeasureReason": "The AC-142 pin (round cap refusal, delta base/head range binding, role and coordinator text) is stated GREEN 9/9 in 10819d460, with critic-dispatch-preflight 46/46 and close-coordinator 34/34, which covers the original acceptance; the baseline read it as unimplemented. The 0.7.0 T3 close-feature clause (d621b2871) still has no stated pass count.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN result for the T3 close-feature pin in a fixture user repository."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing, including the four-call cap (E3) against the acceptance's third-dispatch wording."
+    }
+   ]
+  },
+  {
+   "n": 43,
+   "itemId": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+   "ac": "AC-143",
+   "file": "backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md",
+   "stage": "25",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item; analysis only. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement an admitted command for random Critic scratch names and pin it."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 44,
+   "itemId": "pipeline.critic-scratch-notes-write-is-refused-again",
+   "ac": "AC-144",
+   "file": "backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches the Critic scratch notes write; skips and the open live check keep it at 50.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Replace the typed skips with counted GREEN cases."
+    },
+    {
+     "owner": "native-host",
+     "what": "Live check of the Critic scratch notes write in an installed host."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

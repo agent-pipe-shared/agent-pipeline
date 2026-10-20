@@ -1,0 +1,179 @@
+{
+ "part": "07",
+ "rows": [
+  {
+   "n": 55,
+   "itemId": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+   "ac": "AC-155",
+   "file": "backlog/items/2026-10-07-design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.md",
+   "stage": "50",
+   "remeasureReason": "496df10b6 adds the decision-continuity check to the single design review (AC-155 pin 23/23) and a fitness-model qualifier, which covers only the 0.7.0 added acceptance; the original PO flow (Advisor on demand, one review, one signature) is not implemented, and the commit names two protected-file steps as open.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement the original flow: Advisor on demand, one merged review, one PO signature, with a counted pin."
+    },
+    {
+     "owner": "po-signature",
+     "what": "Ceremonies for the present-plan precondition in scripts/pipeline-state.mjs and for invoking the fitness qualifier in lib/guard/entry-gates.mjs."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing; E35 records the grammar for it."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 56,
+   "itemId": "pipeline.design-trailer-verifier-lost-after-closure",
+   "ac": "AC-156",
+   "file": "backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item; the baseline AC-156 sweep (runs 8/8, 10/11, 7/7) stands and one item's proof cannot run on this host.",
+   "remeasureOpen": [
+    {
+     "owner": "verify-wsl",
+     "what": "The proof that cannot run on this host needs the WSL Full Verify or a Linux run."
+    },
+    {
+     "owner": "agent",
+     "what": "Close the remaining clause of the AC-156 sweep."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 57,
+   "itemId": "pipeline.design-workflow-package-omits-contract",
+   "ac": "AC-157",
+   "file": "backlog/items/2026-09-28-design-workflow-package-omits-contract.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item; the E1 behavioral checks state no pass count and the other clauses remain text-only. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State counted results for the E1 behavioral checks and test the text-only clauses."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 58,
+   "itemId": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+   "ac": "AC-158",
+   "file": "backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 shows the typed HOST-LIMITATION skips reversed; the item is about Windows and needs a Windows run. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "A native Windows run of the v2 readiness fixture is missing."
+    },
+    {
+     "owner": "agent",
+     "what": "Replace the HOST-LIMITATION skips (due 2026-10-19) or renew them."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 60,
+   "itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+   "ac": "AC-160",
+   "file": "backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+   "stage": "50",
+   "remeasureReason": "Native-target consume commits (6e6ec10fb: suite 172/173 with one skip, security Critic pending; 71b692e81, 8981ea9b9) touch the consume path but state no count for the three-disjoint-actions acceptance; keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Add a counted test for three disjoint signed actions with two sequential deliveries plus target-drift cases."
+    },
+    {
+     "owner": "critic",
+     "what": "The security-class Critic review named in 6e6ec10fb is still pending."
+    },
+    {
+     "owner": "po-signature",
+     "what": "Any protected-file patch for this change needs a PO-signed override."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 61,
+   "itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+   "ac": "AC-161",
+   "file": "backlog/items/2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline addresses the Windows budget lock; the registry-lock commits (4dd82e715, c1bdbe0db) concern a different lock.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Produce a counted GREEN for the bounded-wait pin and its RED mirror."
+    },
+    {
+     "owner": "native-host",
+     "what": "Confirm on native Windows that subagent calls are no longer refused."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 62,
+   "itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+   "ac": "AC-162",
+   "file": "backlog/items/2026-10-03-dispatch-guard-rejects-built-in-capitalized-agent-types.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the clauses appear pinned but no counts are stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the three capitalized-agent-type clauses."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

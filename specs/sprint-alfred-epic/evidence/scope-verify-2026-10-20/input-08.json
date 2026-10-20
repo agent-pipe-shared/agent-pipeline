@@ -1,0 +1,175 @@
+{
+ "part": "08",
+ "rows": [
+  {
+   "n": 63,
+   "itemId": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+   "ac": "AC-163",
+   "file": "backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md",
+   "stage": "50",
+   "remeasureReason": "b4ab07ce5 only gives a test fixture its log entry because a terminal v3 record must already carry one (AC-163); the measurement and fold-in parts remain, so keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Finish the log-entry measurement and the fold-in part, with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 64,
+   "itemId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+   "ac": "AC-164",
+   "file": "backlog/items/2026-10-05-dispatch-record-ownership-binds-an-attempted-creation.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the owner claim is implemented but no pass count is stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Confirm the pin file is tracked and state its counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 67,
+   "itemId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+   "ac": "AC-167",
+   "file": "backlog/items/2026-10-03-draft-phase-guard-blocks-mandatory-bootstrap-preflight.md",
+   "stage": "50",
+   "remeasureReason": "9dda09720 admits only the resume-hint inspect read (pin 4/4, guard-lifecycle-ready 389/389), not the preflight or the other bootstrap commands in the item's Proposal; keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Admit and pin the preflight, onboarding inspect and pipeline-state inspect spellings in draft phase with a counted GREEN."
+    },
+    {
+     "owner": "native-host",
+     "what": "Check the forward-slash and variable spellings on a real Windows host."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 68,
+   "itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+   "ac": "AC-168",
+   "file": "backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md",
+   "stage": "25",
+   "remeasureReason": "No commit since the baseline changes this item; the measurement script and pin carry no counts and real before/after numbers need host evidence.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Collect real before/after context numbers from an installed host."
+    },
+    {
+     "owner": "agent",
+     "what": "Implement the context reduction and pin it with a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 69,
+   "itemId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+   "ac": "AC-169",
+   "file": "backlog/items/2026-10-05-every-dispatch-pays-a-bootstrap-receipt-detour.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the receipt hook registration was a held signature-bound patch.",
+   "remeasureOpen": [
+    {
+     "owner": "po-signature",
+     "what": "The signature-bound patch that registers the receipt hook is still held."
+    },
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the receipt-detour acceptance."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 70,
+   "itemId": "pipeline.evidence-artifacts-carry-no-commit-identity",
+   "ac": "AC-170",
+   "file": "backlog/items/2026-10-08-evidence-artifacts-carry-no-commit-identity.md",
+   "stage": "50",
+   "remeasureReason": "No commit since the baseline changes this item; the pin is committed but no counts are stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the commit-identity pin."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 71,
+   "itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+   "ac": "AC-171",
+   "file": "backlog/items/2026-09-29-existing-signing-key-reuse-deadlocks-onboarding.md",
+   "stage": "50",
+   "remeasureReason": "13ff0433b runs the reused-key trust-anchor case in process (onboarding-init suite 55/55), but the attended first-anchor recovery, Windows spelling and wrong-key clauses are not shown covered; keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the attended first-anchor recovery, path aliases and wrong-key refusal with a counted GREEN."
+    },
+    {
+     "owner": "native-host",
+     "what": "Verify the Windows spelling and consumer onboarding on a real Windows host."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,62 @@
+[
+ {"itemId":"pipeline.implementation-without-dispatch-escapes-review-coverage","ac":"AC-204","read":true,
+  "clauses":[
+   {"clause":"A change in the candidate range with no dispatch record is reported as uncovered by review, not omitted.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/implementation-without-dispatch-escapes-review-coverage.test.mjs, case 'an implementation commit with no dispatch record is reported as a gap' (REPORT-IMPLEMENTATION-WITHOUT-DISPATCH-MAPPING); module lib/candidate-implementation-coverage-report.mjs; registered in harness/verify-suites.json (line ~2901); commit 6a091c345. No counted GREEN found.","work":"","host":"","protected":[]},
+   {"clause":"Empty, zero-row, unprovable-baseline or non-terminal-record comparisons are recorded as unknown, never as covered.","status":"evidence","evidence":"same test file: 'an empty comparison range is explicit but is never coverage', 'without a base commit nothing is certified', 'an unprovable baseline ... degrades to unknown', 'a non-terminal dispatch record does not cover its implementation commit', 'two records claiming one commit are reported ambiguous'. No counted GREEN found.","work":"","host":"","protected":[]},
+   {"clause":"The report is report-only and has no completion effect (accepted M2B forbids a completion gate).","status":"evidence","evidence":"same test file: 'the report is diagnostic only: no completion effect in any state', 'the CLI surfaces the same gap, is report-only' (scripts/acceptance-coverage-report.mjs); RED mirror cases present. No counted GREEN found.","work":"","host":"","protected":[]},
+   {"clause":"Whether the original required a blocking gate for undispatched implementation (conflict with M2B).","status":"po-decision","evidence":"specs/sprint-alfred-epic/plans/acceptance-reconstruction/R4.md is marked RELEASED (K6, 2026-10-16) with the report-only reading, so this is likely already settled; the PO should confirm no gate is wanted.","work":"","host":"","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says the check is not implemented; the report module, CLI and a registered 14-case-style pin (6a091c345) already exist. What is open is only a counted run and the Critic review.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.installed-design-trailer-example-is-rejected-by-git-guard","ac":"AC-205","read":true,
+  "clauses":[
+   {"clause":"Every printed commit example passes the command guard and the commit-msg backstop.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs, 'AC1: every concrete printed Dispatch example is accepted by the command guard and the backstop'; generator fix 2a466fa59. No counted GREEN stated.","work":"","host":"","protected":[]},
+   {"clause":"Dispatch: design (elephant) is accepted for legitimate direct-design commits and rejected for production implementation files.","status":"evidence","evidence":"same test file, 'AC2: Dispatch: design (elephant) is admitted ...' plus the oversized/path-bound verify cases and near-miss refusals; code 8e7dce0f4 (commit-message-policy.mjs, dispatch-authorship-verify.mjs). No counted GREEN stated.","work":"","host":"","protected":[]},
+   {"clause":"Verifier, generator and guard share one classification, including documentation or evidence commits during an implementation phase.","status":"evidence","evidence":"same test file (verify(...) cases and 'both the stage-0 and the admitted design (elephant) form' print test); the implementation-phase doc-only sub-case was not located separately.","work":"","host":"","protected":[]},
+   {"clause":"Existing stage-0-labeled design evidence commits are explicitly dispositioned as provenance debt, history not rewritten.","status":"po-decision","evidence":"Test header says this is a disposition of history, not behavior; no recorded disposition found.","work":"","host":"","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says no commit changes the design-trailer admission; 8e7dce0f4 and 2a466fa59 do, and the stale Triage text still names only 2a466fa59.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.kernel-closure-check-masks-violations-after-the-first","ac":"AC-206","read":true,
+  "clauses":[
+   {"clause":"The kernel closure check reports ALL violations per run, not only the first.","status":"evidence","evidence":"commits 3ea6cf67a and c0af5b2fe; pin file named ...kernel-closure-check-masks-violations-after-the-first.test.mjs (mirror collector, four violations in one run, first-only mutant fails, CLI exits non-zero); lib/guard-maintenance-window-kernel-closure.test.mjs. Note: c0af5b2fe says the live-CLI case accepts green or multi-violation red. No counted GREEN stated.","work":"","host":"","protected":[]},
+   {"clause":"The repair of the live red ratchet (kernel list closed over the receipt write guard).","status":"done","evidence":"73bc8f117: guard-maintenance-window-kernel-closure 11/11 (was 10/11).","work":"","host":"","protected":[]},
+   {"clause":"A red ratchet blocks the candidate stamp.","status":"content","evidence":"c0af5b2fe states the stamp rejection route was not located and stays unbound; git grep for GMWKC01 in scripts, harness and plugin scripts found no stamp wiring.","work":"Locate the candidate-stamp command, make it fail when the closure check is red, add a test in the stamp's existing test file. Size M. Likely touches protected scripts/pipeline-state.mjs or harness/scripts/verify.mjs.","host":"","protected":["scripts/pipeline-state.mjs","harness/scripts/verify.mjs"]}
+  ],
+  "remeasureWrong":"The remeasure lists 'report all violations per run' as missing; 3ea6cf67a and c0af5b2fe already implement and pin it. Only the stamp block is open.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.lifecycle-coordination-commands-refused-as-implementation-writes","ac":"AC-207","read":true,
+  "clauses":[
+   {"clause":"Lifecycle coordination commands that inspect/nextAction emit are admitted by closed argv identity in every phase, with path spelling normalised.","status":"content","evidence":"9dda09720 admits only resume-hint.mjs inspect (command-catalogue.mjs, pin resume-hint-inspect-is-admitted-in-every-lifecycle-state, 4/4). plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs line 506 handles continuity-cas and continuity-integrate-final; whether they are admitted in draft/awaiting-approval was not verified (budget). cancel-submitted-plan: no admission found.","work":"Verify continuity-cas, continuity-integrate-final and cancel-submitted-plan against the devplan shell lanes; add admission and spelling normalisation plus cases in the guard-lifecycle-ready test. Size M.","host":"","protected":["plugins/pipeline-core/lib/guard/*.mjs","plugins/pipeline-core/hooks/guard-devplan.mjs"]},
+   {"clause":"Read-only scripts under scratch/ and prescribed repository checkers are admitted as read-only execution.","status":"content","evidence":"Item 'Observed 2026-10-18' still shows a scratch read-only script refused; no admission found.","work":"Design a closed read-only scratch/checker lane in the guard-devplan shell classification with tests. Size M to L; may need a PO decision on the shape.","host":"","protected":["plugins/pipeline-core/hooks/guard-devplan.mjs","plugins/pipeline-core/lib/guard/*.mjs"]},
+   {"clause":"Onboarding scaffold paths are committable in every phase, or onboarding commits them itself.","status":"content","evidence":"Nothing found in the commits read.","work":"Admit the scaffold paths in the commit-msg/devplan path rules or have onboarding commit them, with a test. Size M.","host":"","protected":["plugins/pipeline-core/hooks/guard-devplan.mjs"]},
+   {"clause":"The governed repair a typed recovery (F6) prescribes is reachable without an override.","status":"content","evidence":"Not found in the commits read; not verified.","work":"Admit the governance inventory repair path for the F6 recovery, with test. Size S to M.","host":"","protected":["plugins/pipeline-core/lib/guard/*.mjs"]},
+   {"clause":"A Windows Git Bash design-course end-to-end test reaches present-plan with zero overrides.","status":"native-host","evidence":"","work":"","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"Partly stale: continuity-cas and integrate-final are referenced in sanctioned-args-scripts.mjs, so some lane may already be admitted; unverified.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.lifecycle-inspect-omits-current-plan-spec-digests","ac":"AC-208","read":true,
+  "clauses":[
+   {"clause":"Inspect observes the actual submitted Plan/Spec bytes before deriving status and recovery action.","status":"content","evidence":"plugins/pipeline-core/scripts/pipeline-state.mjs passes digests to derivePlanLifecycle at lines 4979, 5103, 5838, but calls derivePlanLifecycle(base) without them at lines 10570, 10660, 10967, 11193 (inspect-area callsites, not confirmed which is inspect). The prepared correction is only in scratch/inspect-source-digest-correction-914270f1/ (26/26 host-authorized, not integrated).","work":"Integrate the two-file correction into scripts/pipeline-state.mjs and its lifecycle lib, with regressions. Size M.","host":"","protected":["scripts/pipeline-state.mjs","harness/scripts/pipeline-state.test.mjs"]},
+   {"clause":"Changed PRD and changed Spec each report digest drift with the sanctioned recovery; missing or unreadable source is not promoted to current.","status":"content","evidence":"Same prepared correction, not in Source.","work":"Regression cases in the pipeline-state inspect tests. Size S to M.","host":"","protected":["harness/scripts/pipeline-state.test.mjs"]},
+   {"clause":"An unchanged valid submission keeps its lifecycle result; inspect stays read-only.","status":"content","evidence":"Needs regressions in Source.","work":"Add both cases to the same test file. Size S.","host":"","protected":["harness/scripts/pipeline-state.test.mjs"]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.lifecycle-read-scope-blocks-host-declared-system-skill","ac":"AC-209","read":true,
+  "clauses":[
+   {"clause":"Define and admit the narrow host-owned declared-skill instruction surface with an ordinary route after refusal.","status":"po-decision","evidence":"Item Triage: deferred past 0.7.0 by PO decision of 2026-10-16 (recorded 2026-10-17); AC-209 not counted against the 0.7.0 candidate. Remeasure cites 32829a645 (negative alias refusal only).","work":"","host":"","protected":["plugins/pipeline-core/lib/guard/*.mjs"]},
+   {"clause":"Identical admission for single and bounded diagnostic reads.","status":"po-decision","evidence":"Same deferral.","work":"","host":"","protected":[]},
+   {"clause":"Unrelated outside-root reads, traversal, symlink escapes and private surfaces stay refused.","status":"evidence","evidence":"32829a645 negative pins (AC-147/209 pins A2c and P3c; reported 5/10 and 7/14 with typed holds, per the remeasure); not independently read.","work":"","host":"","protected":[]},
+   {"clause":"Verify declared-skill admission and negative cases at the real installed lifecycle boundary.","status":"native-host","evidence":"","work":"","host":"codex-wsl","protected":[]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback","ac":"AC-210","read":true,
+  "clauses":[
+   {"clause":"A returned non-applied result from the second install rolls the first install back through applyRemoval and raises MandatoryHookReadinessApplyError with the refusal as cause.","status":"done","evidence":"ddabe0ae3 changes plugins/pipeline-core/scripts/clone-hook-readiness.mjs; test plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs case CHRB009; commit states RED 8/9 before, 9/9 after, existing clone-hook-readiness.test.mjs green.","work":"","host":"","protected":[]},
+   {"clause":"A hook that existed before the call is never removed; rollback-failed and nothing-to-roll-back are distinguished.","status":"done","evidence":"CHRB009 sub-cases (rolled back, rollback failed after the hook was modified, nothing to roll back), same commit.","work":"","host":"","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says a counted GREEN is missing; the commit message of ddabe0ae3 states 9/9 after and RED 8/9 before.",
+  "closableAfterTest":"no"}
+]

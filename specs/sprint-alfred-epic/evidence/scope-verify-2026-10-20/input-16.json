@@ -1,0 +1,175 @@
+{
+ "part": "16",
+ "rows": [
+  {
+   "n": 127,
+   "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+   "ac": "AC-227",
+   "file": "backlog/items/2026-09-28-plan-submission-must-not-require-separate-po-approval.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 states a counted result for this item (7c2d7c6fc plan-readiness inspection is a different clause). No counted result.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the plan-submission acceptance with a counted result."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 128,
+   "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+   "ac": "AC-228",
+   "file": "backlog/items/2026-09-27-powershell-bypasses-onboarding-read-boundary.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject. All four bullets are mapped but no counts are stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State counted GREEN results for the four PowerShell read-boundary bullets."
+    },
+    {
+     "owner": "native-host",
+     "what": "Confirm the boundary on a real Windows PowerShell run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 129,
+   "itemId": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+   "ac": "AC-229",
+   "file": "backlog/items/2026-10-06-preflight-hides-the-git-error-behind-gs-git-unavailable.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 shows a clause qualified (ee3148bc3 yields GS-GIT-UNAVAILABLE under a ceiling but does not surface the underlying git error). Baseline kept.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Surface the underlying git error in preflight and pin it with a counted result."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 131,
+   "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+   "ac": "AC-231",
+   "file": "backlog/items/2026-10-07-private-temp-root-not-secure-branch-has-no-test-seam.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject. Seam and NOT_SECURE refusal pinned, skip and missing counts remain.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Close the missing-count clauses and pin them with counted results."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "Run the skipped POSIX case on Linux."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 132,
+   "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+   "ac": "AC-232",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject. 179240f81 pin (27 pass, one typed host skip) stands; AC-232 has no public original and S1-S8 awaits PO release.",
+   "remeasureOpen": [
+    {
+     "owner": "po-decision",
+     "what": "Release S1-S8 and decide the AC-232 scope that has no public original."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "Run the one typed host-skipped case on a Linux host."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 133,
+   "itemId": "pipeline.project-resource-budget-headroom-is-not-reported",
+   "ac": "AC-233",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject. No counted result is stated for the A5-A7 pin and verify wiring.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted result for the A5-A7 pin and wire it into verify."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "Confirm the verify wiring in the WSL Full Verify."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 135,
+   "itemId": "pipeline.push-classifier-deny-list-does-not-converge",
+   "ac": "AC-235",
+   "file": "backlog/items/2026-10-06-push-classifier-deny-list-does-not-converge.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this subject. No pass count for 5c8fb499d.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN result covering the deny-list convergence acceptance."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

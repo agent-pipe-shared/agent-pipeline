@@ -1,0 +1,171 @@
+{
+ "part": "19",
+ "rows": [
+  {
+   "n": 152,
+   "itemId": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+   "ac": "AC-252",
+   "file": "backlog/items/2026-10-06-semgrep-partial-parsing-warnings-fail-the-whole-scan.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches this item; keep-baseline rule.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Finish partial-parsing warning handling and a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 153,
+   "itemId": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+   "ac": "AC-253",
+   "file": "backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches the partial-readiness reason; 9dda09720 admits the resume-hint read but states no readiness-drop count.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Fix the intermittent cleanup root cause and add a counted test for the partial-readiness drop."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "Intermittent cause needs repeated WSL or Linux runs to confirm."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 154,
+   "itemId": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+   "ac": "AC-254",
+   "file": "backlog/items/2026-10-05-shell-classifier-faults-on-heredoc-body-text.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches the heredoc body classifier; keep-baseline rule.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Add a counted test for heredoc body text in the shell classifier."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 155,
+   "itemId": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+   "ac": "AC-255",
+   "file": "backlog/items/2026-10-05-shell-grammar-file-is-a-kernel-path-without-capability-placement.md",
+   "stage": "50",
+   "remeasureReason": "73bc8f117 closes the never-liftable kernel list over the receipt write guard only; no fixture clause or count for the shell grammar file.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Place the shell grammar file in the capability model and add the fixture clause with a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 156,
+   "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+   "ac": "AC-256",
+   "file": "backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches the openssl spawn; the clause is still evidenced only by portable controls.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run the bare-openssl working-directory case on native Windows."
+    },
+    {
+     "owner": "agent",
+     "what": "Add a counted test of the openssl spawn path."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 157,
+   "itemId": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+   "ac": "AC-257",
+   "file": "backlog/items/2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes.md",
+   "stage": "50",
+   "remeasureReason": "809148bc7 (po-human-approval 185/185) only publishes the disclosure index in a test helper, not the scan duration; AC-257 stays partial.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Bound the disclosure scan time and add a counted test for AC-257."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 158,
+   "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+   "ac": "AC-258",
+   "file": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+   "stage": "50",
+   "remeasureReason": "No later commit adds a counted GREEN covering the original ceremony acceptance; 713106862 and 2094014d8 only arm test cases by signature.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Reduce operator work in the ceremony and add a counted test of the original acceptance."
+    },
+    {
+     "owner": "po-signature",
+     "what": "A real signature ceremony run is needed to show it no longer breaks."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  }
+ ]
+}

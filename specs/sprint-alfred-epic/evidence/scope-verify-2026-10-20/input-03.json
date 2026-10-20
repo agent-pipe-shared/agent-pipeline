@@ -1,0 +1,159 @@
+{
+ "part": "03",
+ "rows": [
+  {
+   "n": 23,
+   "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+   "ac": "AC-123",
+   "file": "backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+   "stage": "50",
+   "remeasureReason": "9dda09720 admits only the bootstrap's resume-hint inspect read (pin 4/4), not the design-course verbs present-plan, --run-v2 and continuity writes that the item names; the catalogue pin stays at 10 pass + 1 skip.",
+   "remeasureOpen": [
+    {
+     "owner": "po-decision",
+     "what": "Decide whether the prescribed design-course verbs still apply after the retirement of the v2 run (ADR-0085)."
+    },
+    {
+     "owner": "agent",
+     "what": "Catalogue-admit each remaining prescribed verb and pin it with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 24,
+   "itemId": "pipeline.claude-design-readiness-cannot-start-on-windows",
+   "ac": "AC-124",
+   "file": "backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches the Claude Windows install roots; 70e2e724c retargets the Codex readiness bootstrap to the retirement contract. The R4-9/R4-10 typed sub-reason clause is still absent.",
+   "remeasureOpen": [
+    {
+     "owner": "po-decision",
+     "what": "Decide whether the retired readiness route (ADR-0085, E12) supersedes this item."
+    },
+    {
+     "owner": "native-host",
+     "what": "Reproduce and verify on native Windows with the Claude install roots."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 25,
+   "itemId": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+   "ac": "AC-125",
+   "file": "backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches target selection; the plan-only pin leaves the platform matrix and real apply uncovered.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin target selection across the platform matrix."
+    },
+    {
+     "owner": "native-host",
+     "what": "Run a real apply on a Claude host."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 26,
+   "itemId": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+   "ac": "AC-126",
+   "file": "backlog/items/2026-10-03-claude-session-start-emits-codex-transcript-recovery-hint.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item; the RED mirror of da2958311 is not recorded and the Windows symlink failure is environmental.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Record the RED mirror and a counted GREEN for the Claude session-start hint."
+    },
+    {
+     "owner": "native-host",
+     "what": "Check the Windows symlink case on native Windows."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 27,
+   "itemId": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+   "ac": "AC-127",
+   "file": "backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 changes the V-9, V-10, V-12 or V-13 clauses; baseline 3ed911a79 (124 tests, 117 pass, 1 skip, 6 unrelated GD failures) stands, and 66aacfc2e only fixes the guard-dispatch fixture.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement and pin the V-9, V-10, V-12 and V-13 clauses."
+    },
+    {
+     "owner": "native-host",
+     "what": "Walk the greenfield lifecycle on native Windows with Claude."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 28,
+   "itemId": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+   "ac": "AC-128",
+   "file": "backlog/items/2026-10-03-claude-windows-guard-refuses-every-in-repo-read.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 addresses Windows in-repo reads; baseline 8d4b3613e and 1f1991be3 stand with no stated count.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted pin for the in-repo read shapes."
+    },
+    {
+     "owner": "native-host",
+     "what": "Verify the in-repo reads on a native Windows Claude host."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 29,
+   "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+   "ac": "AC-129",
+   "file": "backlog/items/2026-09-29-codex-advisor-evidence-fails-after-host-update.md",
+   "stage": "50",
+   "remeasureReason": "Only 44d06eb2d touched the Advisor host suite (fixture registry init; count unchanged 0/1, CADH001 stops at native admission); the 4 green cases stand, three skips and the installed replay remain.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Un-skip the three skipped cases and get the Advisor host suite GREEN beyond 0/1."
+    },
+    {
+     "owner": "native-host",
+     "what": "Replay the evidence failure on an installed Codex host after a host update."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  }
+ ]
+}

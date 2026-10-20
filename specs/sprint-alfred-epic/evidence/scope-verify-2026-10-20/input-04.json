@@ -1,0 +1,179 @@
+{
+ "part": "04",
+ "rows": [
+  {
+   "n": 30,
+   "itemId": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+   "ac": "AC-130",
+   "file": "backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches the fresh-identity versus shared 0755 namespace refusal; keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Fix or pin the fresh-identity versus shared-namespace refusal with a counted GREEN test."
+    },
+    {
+     "owner": "native-host",
+     "what": "Confirm on a real Codex/WSL advisor run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 31,
+   "itemId": "pipeline.codex-bootstrap-in-the-typed-next-action",
+   "ac": "AC-131",
+   "file": "backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 fits this item; the inclusion clause stays held. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement the bootstrap inclusion clause in the typed next action and pin it."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 32,
+   "itemId": "pipeline.codex-design-readiness-child-rejects-valid-review",
+   "ac": "AC-132",
+   "file": "backlog/items/2026-09-28-codex-design-readiness-child-rejects-valid-review.md",
+   "stage": "50",
+   "remeasureReason": "No new commit changes the picture; 70e2e724c only retargets the retired design-readiness bootstrap suites (6/6, 9/9) to the retirement contract and qualifies no acceptance clause here. Keep 50.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "A live selected Codex/WSL readiness run is still needed."
+    },
+    {
+     "owner": "agent",
+     "what": "Qualify the authenticated-route and tool-disable clauses with counted tests."
+    },
+    {
+     "owner": "po-decision",
+     "what": "Confirm whether this item is superseded by the ADR-0085 retirement of the Codex design-readiness bootstrap."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 34,
+   "itemId": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+   "ac": "AC-134",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 covers the output-custody points; the reader cap case stays Windows-skipped and point 6 stays open. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement and test the output-custody points, including point 6."
+    },
+    {
+     "owner": "native-host",
+     "what": "Run the Windows-skipped reader cap case natively."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 35,
+   "itemId": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+   "ac": "AC-135",
+   "file": "backlog/items/2026-09-27-codex-wsl-required-advisor-has-no-completable-route.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 gives a completable required-Advisor route; the answered path and receipts need a real Codex/WSL run. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "A real Codex/WSL run reaching a valid Advisor answer or governed unavailable exception is missing."
+    },
+    {
+     "owner": "agent",
+     "what": "Pin the receipts, trail and answered path with counted tests."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 36,
+   "itemId": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+   "ac": "AC-136",
+   "file": "backlog/items/2026-09-29-commit-grammar-hint-still-requires-scratch-message-file.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 changes the commit-grammar hint or skill guidance. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Change the hint and skill guidance so no scratch message file is required, and pin it."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 37,
+   "itemId": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+   "ac": "AC-137",
+   "file": "backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 addresses path-order failures counting against the tool cap; 62a8e2719 names the owned-file commit but is a different subject. Keep baseline.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Stop path-order failures counting against the tool cap and pin it."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  }
+ ]
+}

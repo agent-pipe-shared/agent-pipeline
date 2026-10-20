@@ -1,0 +1,85 @@
+[
+ {"itemId": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review", "ac": "AC-155", "read": true,
+  "clauses": [
+   {"clause": "One review (initial plus at most one delta), no mandatory Advisor stage, no readiness ceremony; signed object carries only the review chain; one PO approval.", "status": "evidence",
+    "evidence": "plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs (cases: one review receipt is enough; capped at one initial plus one delta, DRR-ROUND-EXCEEDED; one PO approval request built from receipts alone). Header states the design course is retired. Counted result stated only as 23/23 in commit 496df10b6.", "work": "", "host": "", "protected": []},
+   {"clause": "Single design review assesses each foundational decision for significance (ADR/register ref or non-significance reason) before PO approval.", "status": "evidence",
+    "evidence": "496df10b6 adds the decision-continuity check; same pin file imports architecture-fitness and design-review-receipt. Elephant to run and count the pin file.", "work": "", "host": "", "protected": []},
+   {"clause": "A materialized fitness model is executed as a candidate check at the implementation boundary; a never-run model is reported, not counted as qualified.", "status": "po-signature",
+    "evidence": "Qualifier code exists per 496df10b6 (scripts/architecture-fitness.mjs); the wiring into lib/guard/entry-gates.mjs is the open protected step.", "work": "", "host": "", "protected": ["plugins/pipeline-core/lib/guard/entry-gates.mjs"]},
+   {"clause": "present-plan precondition requires the review chain (replaces advisor/readiness preconditions).", "status": "po-signature",
+    "evidence": "Commit 496df10b6 names this as an open protected-file step; not re-read in this pass.", "work": "", "host": "", "protected": ["plugins/pipeline-core/scripts/pipeline-state.mjs"]}
+  ],
+  "remeasureWrong": "The remeasure says the original PO flow (Advisor on demand, one review, one signature) is not implemented, but the existing AC-155 pin already tests exactly that one-review, receipt-only approval flow and the design course is retired; only the two protected-file ceremonies, the Critic review and PO acceptance remain.",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.design-trailer-verifier-lost-after-closure", "ac": "AC-156", "read": true,
+  "clauses": [
+   {"clause": "Trailer grammar fixed in one place; exact `design (elephant)` form admitted and verified, near-misses refused.", "status": "evidence",
+    "evidence": "plugins/pipeline-core/lib/pins/design-trailer-verifier-lost-after-closure.test.mjs (AC-A1 stage-0 admitted; NEAR_MISSES refused; PO decision 2026-10-16 #12, commit 8e7dce0f4). Counted sweep per remeasure: runs 8/8, 10/11, 7/7.", "work": "", "host": "", "protected": []},
+   {"clause": "Merge-survival check compares closed items' needles against HEAD and fails when a needle disappears.", "status": "evidence",
+    "evidence": "Same pin imports scripts/check-backlog-done-predicate.mjs (evaluateDoneWhen, checkBacklogDonePredicate) and scans the real source tree for the lost symbol; ELEPHANT_DESIGN_ID is absent from lib, scripts and harness/scripts as the pin expects.", "work": "", "host": "", "protected": []},
+   {"clause": "The dropping merge/import is identified.", "status": "po-decision",
+    "evidence": "The pin states this is a one-off forensic act, not a code property; no recorded finding located in this pass.", "work": "", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "The remeasure's 'remaining clause' and the unrunnable proof are not located: the pin file covers both code clauses; the 10/11 run suggests one case skips or fails on this host, which the Elephant must identify by running the pin file.",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.design-workflow-package-omits-contract", "ac": "AC-157", "read": true,
+  "clauses": [
+   {"clause": "Five committed sources are self-contained for every material requirement, with exact current hashes.", "status": "evidence",
+    "evidence": "Pin plugins/pipeline-core/lib/pins/design-workflow-package-omits-contract.test.mjs exists; plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs covers the validator. Not opened in this pass (budget).", "work": "", "host": "", "protected": []},
+   {"clause": "Package validator and runner transitions reject missing, forged, stale, mismatched, failed and replayed evidence; one final PO decision binds package, readiness and Advisor exception.", "status": "evidence",
+    "evidence": "design-workflow-package-v2.test.mjs (RC12C001 and siblings; win32 cases skip with HOST-LIMITATION). Elephant to run in WSL and count.", "work": "", "host": "", "protected": []},
+   {"clause": "Critic-before-Full-Verify, installed-plugin readback, chat/signature consistency, E1 creation without dependence on own output, and host-verified freshness/read-only evidence have owned acceptance checks.", "status": "evidence",
+    "evidence": "Not individually located; unread beyond the pin file's existence. Treat as unverified: run the pin and look for text-only clauses.", "work": "", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows", "ac": "AC-158", "read": true,
+  "clauses": [
+   {"clause": "Measure which input CRHS-INPUT rejects and decide fixture vs production defect.", "status": "done",
+    "evidence": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs lines 38-39 and 171: readinessFixture reaches codex-design-readiness-host-store, which throws CRHS-INPUT unless the platform is Linux; on win32 the case skips with a typed HOST-LIMITATION. Pin: lib/pins/design-workflow-package-v2-readiness-fixture-fails-on-windows.test.mjs.", "work": "", "host": "", "protected": []},
+   {"clause": "The readiness case runs and its assertions are exercised (a valid approval-request build), not silently skipped.", "status": "native-host",
+    "evidence": "Cases exercise on Linux/WSL; on Windows they remain a typed HOST-LIMITATION skip due 2026-10-19 (now expired as of 2026-10-20).", "work": "", "host": "claude-windows", "protected": []},
+   {"clause": "The HOST-LIMITATION skip carries a current due date or is replaced.", "status": "content",
+    "evidence": "Due 2026-10-19 has lapsed.", "work": "Renew the due date or replace the skip in design-workflow-package-v2.test.mjs (2 skip lines), or make the host store accept win32 paths; size S. No protected path.", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another", "ac": "AC-160", "read": true,
+  "clauses": [
+   {"clause": "Native Edit/Write/apply_patch actions bind sorted eligible targets to path identity and exact content or absence preimages; reclassified at consumption.", "status": "evidence",
+    "evidence": "plugins/pipeline-core/lib/human-guard-override.mjs line 96 defines HGO_NATIVE_TARGET_PREIMAGES_SCHEMA and consume commits 6e6ec10fb, 71b692e81, 8981ea9b9 touch this path (suite 172/173 with one skip per 6e6ec10fb). No test file in lib, hooks or scripts references the schema constant by name.", "work": "", "host": "", "protected": []},
+   {"clause": "An unrelated authorized worktree edit between arming and consumption does not force a new signature; target, ancestry, policy, plugin, state and tool-input drift still fail closed; Bash and plugin installs keep strict whole-repo binding.", "status": "content",
+    "evidence": "No case named for disjoint actions found.", "work": "Add a counted test: three independently signed disjoint actions, two sequential deliveries, then target-byte, absence, symlink, policy, plugin, expiry, replay and audit drift cases, plus a Bash case that stays strict. Target: the existing human-guard-override test file in plugins/pipeline-core/lib (name not confirmed). Size L if the consume logic is missing, M if only the test. Whether the consume logic matches the clause was not verified.", "host": "", "protected": []},
+   {"clause": "Security-class Critic review of the consume change.", "status": "evidence",
+    "evidence": "Named pending in 6e6ec10fb.", "work": "", "host": "", "protected": []},
+   {"clause": "Until a safe contract exists, the signing preparer discloses serial dependence.", "status": "content",
+    "evidence": "Not located.", "work": "Check the prepare-authorization output text in human-guard-override.mjs or its script; S.", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "",
+  "closableAfterTest": "no"},
+ {"itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows", "ac": "AC-161", "read": true,
+  "clauses": [
+   {"clause": "Counter lock has a cross-platform owner identity with the same live/dead/ambiguous semantics.", "status": "evidence",
+    "evidence": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs lines 1016-1159 (win32CounterLockOwner, win32CounterLockOwnerState, w32boot ids), added by commit ca25d6c10. Pin: lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs.", "work": "", "host": "", "protected": []},
+   {"clause": "Bounded wait with backoff while the owner is live, counted exactly once, typed counter-lock-timeout after the bound (R7-11).", "status": "done",
+    "evidence": "Commits d71588d8a, 4262cbcbc, 4311c6f96, 46b500610; plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs cases 'R7-11d: a live holder beyond the bound yields counter-lock-timeout ...' (line 1421), 'R7-11d: at hook level ...' (line 1454), R7-11d-T3, R7-11d-T4.", "work": "", "host": "", "protected": []},
+   {"clause": "A native-Windows regression test runs a budget-counted subagent through Read, Write and Bash under the real hook.", "status": "native-host",
+    "evidence": "Pin exists; the real-hook run must happen on Windows.", "work": "", "host": "claude-windows", "protected": []},
+   {"clause": "Goldfish/Critic briefing templates state the exact bootstrap-receipt/preflight step admitted on every platform spelling.", "status": "evidence",
+    "evidence": "templates/prompts/goldfish-task.md lines 252-258 name the pipeline-start-preflight.mjs --role goldfish step; critic-review.md names critic-dispatch-preflight.mjs. Whether the Windows backslash spelling is stated was not read.", "work": "", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "The remeasure says no commit addresses the Windows budget lock and a GREEN for the bounded-wait pin is missing; in fact the Windows owner identity (ca25d6c10) and the bounded wait with typed timeout (d71588d8a and later) are committed and tested in guard-dispatch-budget.test.mjs.",
+  "closableAfterTest": "yes"},
+ {"itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types", "ac": "AC-162", "read": true,
+  "clauses": [
+   {"clause": "Role normalisation accepts built-in spellings (case-preserving); a batch without the prohibition line returns not-applicable before role parsing.", "status": "evidence",
+    "evidence": "Commit 57e397b0f; plugins/pipeline-core/lib/advisor-prohibition-binding.mjs line 26 (case-preserving); plugins/pipeline-core/hooks/guard-dispatch.test.mjs line 232 loop over Explore, Plan, general-purpose and GD2j (Explore batch without prohibition line). No counted GREEN stated.", "work": "", "host": "", "protected": []},
+   {"clause": "Regression test dispatches Explore, Plan, general-purpose and pipeline-core:* alone and in parallel batches.", "status": "evidence",
+    "evidence": "guard-dispatch.test.mjs lines 232-265 (batch of two Explore; mixed Explore/goldfish-implementor prohibited and unrestricted) and the pin lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs.", "work": "", "host": "", "protected": []},
+   {"clause": "An invalid role produces its own code APB-ROLE-UNPARSEABLE naming the offending value.", "status": "evidence",
+    "evidence": "advisor-prohibition-binding.mjs line 72; guard-dispatch.test.mjs line 274 asserts the code.", "work": "", "host": "", "protected": []}
+  ],
+  "remeasureWrong": "The remeasure implies the clauses lack tests; code and tests exist (57e397b0f). Only a counted GREEN of guard-dispatch.test.mjs and the pin file is missing, plus the host checklist the Triage text names.",
+  "closableAfterTest": "yes"}
+]

@@ -1,0 +1,73 @@
+[
+ {"itemId":"pipeline.plan-submission-must-not-require-separate-po-approval","ac":"AC-227","read":true,
+  "clauses":[
+   {"clause":"Agent submission and complete-package presentation need no new human acknowledgement or signature, and returned actions say so.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs (commit 39716c299, ALF-C-P1-21: no acknowledgement/prompt/signature, next actions runnable without confirmation); no counted GREEN stated","work":"","protected":[]},
+   {"clause":"Genuine onboarding/configuration authority and source integrity are preserved; no fabricated approved plan state.","status":"evidence","evidence":"same pin file (39716c299: stale/forged authority, wrong plan paths, source drift, profile changes refused)","work":"","protected":[]},
+   {"clause":"Advisor and independent readiness precede the final PO presentation.","status":"evidence","evidence":"same pin file, ae262e962 (bullet 3 cases through the real package validator: not-ready/blocking/self-authored readiness refused, authoring-dispatch Advisor receipt refused, answered Advisor without disposition refused)","work":"","protected":[]},
+   {"clause":"Final approval binds the complete current package once; submission/presentation cannot grant implementation authority.","status":"evidence","evidence":"same pin file (39716c299 + ae262e962: complete package ready without implementation authority; present-plan refused without review receipt; DWP-PRESENT-RETIRED)","work":"","protected":[]},
+   {"clause":"A proposed unavailable-Advisor exception sits in the same final decision and cannot waive readiness.","status":"evidence","evidence":"same pin file, ae262e962 (bullet 5; unbacked rationale refused); 3628fb3c9 closed Critic C6e findings on it","work":"","protected":[]},
+   {"clause":"The real sanctioned writer and returned actions are exercised in both approval modes; implementation stays refused until the final decision.","status":"evidence","evidence":"same pin file (commit message states writer driven; not verified here that both signature and chat modes are separate cases - Elephant should confirm when counting)","work":"","protected":[]},
+   {"clause":"Negative checks retained for stale/forged profile authority, source drift, incomplete packages, replayed final approvals.","status":"evidence","evidence":"same pin file (39716c299 message lists each; replayed approvals refused)","work":"","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says no pin exists; the pin file was committed in 39716c299, ae262e962 and 3628fb3c9, only the counted GREEN result is missing.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.powershell-bypasses-onboarding-read-boundary","ac":"AC-228","read":true,
+  "clauses":[
+   {"clause":"Bash and PowerShell both refuse unauthorized outside-root reads and non-ready-phase commands (synthetic fixture).","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs, three A1 cases (commit ee05ce971); no counted GREEN stated","work":"","protected":[]},
+   {"clause":"Legitimate returned onboarding actions work on an explicitly supported lane.","status":"evidence","evidence":"same pin file, case 'A2: returned onboarding actions and contained scratch recovery work on the PowerShell lane'","work":"","protected":[]},
+   {"clause":"Read, Grep and Glob are tested with synthetic outside-root/sensitive paths; no real signing material.","status":"evidence","evidence":"same pin file, case 'A3: Read, Grep and Glob admit in-root targets and refuse synthetic outside-root/sensitive paths'","work":"","protected":[]},
+   {"clause":"Hook registration and guard behaviour agree on the lanes actually enforced.","status":"evidence","evidence":"same pin file, case 'A4: hook registration covers the same tools the guard enforces' (reads plugins/pipeline-core/hooks/hooks.json)","work":"","protected":[]},
+   {"clause":"Confirmation on a real Windows PowerShell run, including the live host permission boundary of Read/Grep/Glob outside the guard (the pin itself names this as not covered).","status":"native-host","evidence":"pin header: 'Not covered (named, not claimed): live host permission boundary ... installed native Windows enforcement'","work":"","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable","ac":"AC-229","read":true,
+  "clauses":[
+   {"clause":"A bounded cause (git exit code plus first stderr line) is surfaced next to GS-GIT-UNAVAILABLE.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/preflight-hides-the-git-error-behind-gs-git-unavailable.test.mjs 'AC-229 point 1'; code in lib/governance-scope.mjs (governanceScopeFailureDiagnostic)","work":"","protected":[]},
+   {"clause":"The cause is first-line-only, control-stripped, path-redacted, length-bounded; a git that cannot start gives a typed null exit and fixed message.","status":"evidence","evidence":"same file, 'AC-229 point 2' and 'point 3'","work":"","protected":[]},
+   {"clause":"The pipeline-governance-unverifiable envelope carries cause, topologyDiagnostic and a typed read-only nextAction.","status":"evidence","evidence":"same file, 'AC-229 point 4' (asserts mutation false, requiresConfirmation false)","work":"","protected":[]},
+   {"clause":"The diagnostic runs the same hardened probe and prints its result; the entry refuses malformed roots; the nextAction is runnable as emitted.","status":"evidence","evidence":"same file, 'point 6' and 'point 7'; script plugins/pipeline-core/scripts/governance-scope-diagnose.mjs exists","work":"","protected":[]},
+   {"clause":"Diagnosis is non-authoritative: no admission change, scope schema not widened.","status":"evidence","evidence":"same file, 'point 5' and 'near-misses'","work":"","protected":[]},
+   {"clause":"Pre-ready guard grammar lets the session reach the diagnosis (the item lists lib/guard/* as affected).","status":"evidence","evidence":"not independently pinned in the pin file beyond the typed nextAction; Elephant should check whether the diagnose script invocation is admitted by the pre-ready guard grammar (a guard change would be protected: plugins/pipeline-core/lib/guard/*.mjs)","work":"","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says the underlying git error is not surfaced; the pin and the scripts/governance-scope-diagnose.mjs code show cause, topologyDiagnostic and nextAction implemented (ee3148bc3 is only the ceiling part).",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.private-temp-root-not-secure-branch-has-no-test-seam","ac":"AC-231","read":true,
+  "clauses":[
+   {"clause":"privateTempRoot accepts injectable harden/assess seams, default unchanged.","status":"done","evidence":"commit 885016ac4; pin plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs cases 'AC-231 P1: with no options...' and 'optional seam parameter does not change the exported signature shape' (the second runs on every host)","work":"","protected":[]},
+   {"clause":"The PRIVATE_TMP_ROOT_NOT_SECURE refusal is pinned: removing it turns a test red; a refused call memoizes nothing.","status":"native-host","evidence":"same pin file: 'P1/P2 injected assess seam drives NOT_SECURE', 'P2 refused call memoizes nothing', two 'P2 RED' scratch-mirror cases, all skip when not win32 (seams consulted on win32 only; PO decision K7). Commit c02db98ba states them","work":"","host":"claude-windows","protected":[]},
+   {"clause":"POSIX branch does not consult the seams (chmod 0700 path).","status":"evidence","evidence":"same file, 'AC-231 host-limitation: POSIX branch does not consult the seams'; skipped on native Windows, runs on Linux/WSL, no counted result stated","work":"","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says missing-count clauses need closing; code (885016ac4) and pins (552cbd2c4, c02db98ba) exist. Only the counted Windows run and the Linux POSIX case count remain.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.project-calibration-retains-new-project-placeholder","ac":"AC-232","read":true,
+  "clauses":[
+   {"clause":"S1-S8 (placeholder never reported as project name, root-derived identity, mismatch/missing/invalid refusals, onboarding writes root-derived identity, consumer verify fails closed with VEP-PROJECT-IDENTITY) are implemented and pinned.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs (S1-S8 per header); remeasure cites 179240f81 with 27 pass and one typed host skip","work":"","protected":[]},
+   {"clause":"The symlink-dependent case runs on a Linux host.","status":"native-host","evidence":"pin HOST_LIMITATION: native Windows cannot create directory symlinks (PO decision K7)","work":"","host":"claude-wsl","protected":[]},
+   {"clause":"The acceptance S1-S8 is an Elephant reconstruction with no public original; PO must release it and decide AC-232 scope.","status":"po-decision","evidence":"pin header: 'No backlog item and no public original exist ... pending PO release'","work":"","protected":[]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.project-resource-budget-headroom-is-not-reported","ac":"AC-233","read":true,
+  "clauses":[
+   {"clause":"The bundled read-only reporter reports headroom as limit minus measured with provenance echoed.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs 'A1 headroom is limit minus measured' and 'A1 exactly at the limit...'; lib project-resource-headroom.mjs","work":"","protected":[]},
+   {"clause":"Missing, stale or malformed observations yield unknown (null) or refusal, never an invented figure.","status":"evidence","evidence":"same file, A2 cases (header)","work":"","protected":[]},
+   {"clause":"The report never claims compliance and the reporter is read-only.","status":"evidence","evidence":"same file, A3 cases (header)","work":"","protected":[]},
+   {"clause":"The reporter is reachable as a read-only CLI and guard route.","status":"evidence","evidence":"same file, A4 cases; scripts/report-resource-headroom.mjs imported by the pin","work":"","protected":[]},
+   {"clause":"The pin is wired into verify.","status":"done","evidence":"harness/verify-suites.json line 3069 registers pin-project-resource-budget-headroom-is-not-reported-tests (file path of the pin); WSL Full Verify count still to be stated","work":"","protected":["harness/verify-suites.json"]},
+   {"clause":"Symlink/mode-bit cases run on a Linux host.","status":"native-host","evidence":"pin HOST_LIMITATION (PO decision K7)","work":"","host":"claude-wsl","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says the pin must be wired into verify; it is already registered in harness/verify-suites.json. Also its 'A5-A7' labels do not match the pin's A1-A4 (original requirements JSON has no AC-233 token; the pin cites specs/sprint-alfred-epic/plans/acceptance-reconstruction/R1.md).",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.push-classifier-deny-list-does-not-converge","ac":"AC-235","read":true,
+  "clauses":[
+   {"clause":"A1: a git word plus a marker ($, backtick, backslash, <<, parentheses/braces, non-ASCII quote) makes a push candidate without shape-specific entries.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs MARKER_CANDIDATES cases and 'A2 convergence'; code lib/git-cmd.mjs commandIsGitPush (commits d9b4bf031, 49d6f928d)","work":"","protected":[]},
+   {"clause":"A2: the Critic's traced GPGL-8 shapes F1, F2, F3 are candidates.","status":"evidence","evidence":"same file, CRITIC_SHAPES cases","work":"","protected":[]},
+   {"clause":"A3: loosening branches stay narrow (plain commands, data here-documents, gitleaks, quoted prose are not candidates).","status":"evidence","evidence":"same file, PLAIN_NOT_CANDIDATES cases","work":"","protected":[]},
+   {"clause":"A4: both consumers (guard-push, codex-pretool-guard) route through the shared classifier.","status":"evidence","evidence":"same file, 'A4 both consumers route through the shared classifier (source wiring)'","work":"","protected":[]},
+   {"clause":"Shape-specific checks are deleted and the deny-list is evidenced RED against the old shape.","status":"evidence","evidence":"same file, 'A5 removal evidenced' and 'A1/A2 RED mirror'","work":"","protected":[]},
+   {"clause":"Item says the candidate host checklist closes it (status stays open until then).","status":"native-host","evidence":"item Triage: 'closes after the 0.7.0 candidate host checklist'; hook-level behaviour on a real host not shown by this pure-function pin","work":"","host":"other","protected":[]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"yes"}
+]

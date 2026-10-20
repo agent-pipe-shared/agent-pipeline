@@ -1,0 +1,73 @@
+[
+ {"itemId":"pipeline.merge-commit-message-skips-conventional-type-check","ac":"AC-211","read":true,
+  "clauses":[
+   {"clause":"git merge messages given by -m, --message, --message=, attached -m, -C, -F and --file are checked for an admitted Conventional type and the GIT-03 trailer rules.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/merge-commit-message-skips-conventional-type-check.test.mjs (commit 15b5b2341, registered in harness/verify-suites.json); the commit states no pass count","work":"","protected":[]},
+   {"clause":"Merges without a message, --squash, --no-commit, --ff-only, --abort are not inspected; a later --commit re-enables inspection; -s/-X values do not swallow the message.","status":"evidence","evidence":"same pin file, 15b5b2341; no counted GREEN stated","work":"","protected":[]},
+   {"clause":"guard-git runs the type check on every inspected message; a mirror without the merge verb skips the merge message (RED mirror).","status":"evidence","evidence":"same pin file, 15b5b2341; no counted GREEN stated. The pin only reads guard-git, no change to it is needed","work":"","protected":[]},
+   {"clause":"The original item body is unresolved (no public backlog file); the acceptance above was reconstructed from title, Merge20 proof and source.","status":"po-decision","evidence":"15b5b2341 commit body; portable-original-requirements.json row has publicOriginalAssociation unresolved","work":"PO or Elephant accepts the reconstructed acceptance as the contract","protected":[]}
+  ],
+  "remeasureWrong":"Partly stale: the pin exists, is registered (verify-suites.json) and covers merge verbs; only the counted GREEN is missing, no code or test work.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.model-family-approval-with-automatic-version-upgrades","ac":"AC-212","read":true,
+  "clauses":[
+   {"clause":"A new model type needs one explicit PO role assignment; versions of the same approved family inherit it automatically with no new signature.","status":"done","evidence":"plugins/pipeline-core/lib/pins/model-family-approval-with-automatic-version-upgrades.test.mjs, A1-A6; commit 215108fc5 states 17 pass, 1 skip","work":"","protected":[]},
+   {"clause":"gpt-6-sol to gpt-6.1-sol and gpt-5.6-luna to gpt-6-luna happen automatically; numerically newest wins regardless of catalog order (6.2 vs 6.10, lexicographic RED mirror).","status":"done","evidence":"same file, A1-A2 (215108fc5, 17 pass)","work":"","protected":[]},
+   {"clause":"Only an explicit PO pin may hold an older version; lookalike, renamed or other-family models are never mapped by name similarity; pin and unpin.","status":"done","evidence":"same file, A3-A4 (215108fc5)","work":"","protected":[]},
+   {"clause":"Bootstrap and new dispatches use the same selection rule; real dispatch ID; running calls and historic evidence are not rewritten.","status":"done","evidence":"same file, B1-B3 (bootstrap CLI) and D1-D4 (real dispatch-ID path, MODEL-FAMILY-INVOCATION-ID-UNAVAILABLE); the 'history not rewritten' part is not separately named in the commit","work":"","protected":[]},
+   {"clause":"Real runner availability and required effort stay checked; unknown versioning, incomplete catalogs and missing current models give a concrete error.","status":"done","evidence":"same file, A5 (unknown effort, stale discovery, unknown family, unreleased head, floor downgrade), 215108fc5","work":"","protected":[]},
+   {"clause":"Migration of signed exact-ID policies preserves their proof without a new version approval; family mapping, pin and chosen ID stay checkable; new and removed role slots stay separate decisions.","status":"evidence","evidence":"same file, A6 one-time v1 migration (215108fc5); the new/removed-slot sub-point is not named in the commit message, so the Elephant should confirm it in the run","work":"","protected":[]},
+   {"clause":"Source, installed-host and candidate acceptance are proved separately; installed-host proof on the real runners.","status":"native-host","evidence":"C1-C4 separation pinned and green; C5 is the single skip (needs createModelFamilyAcceptanceHost installed ports)","work":"","host":"claude-windows, claude-wsl, codex-wsl, antigravity-wsl (installed runners; other = native Windows Codex/Antigravity)","protected":[]},
+   {"clause":"Related host-store/invocation reds MFHS002-008, MFHS023/028, MFI012/013 are not in this item's acceptance; E24/E30/E31/E32 record them as typed latent reds bound to backlog items (async settled-journal phase; reserved-member refusal), the PO is to be told. E33 wedge fix (missing native port refused synchronously) is committed in 738bc0387.","status":"po-decision","evidence":"specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md E24, E29-E33; commit 738bc0387","work":"PO list entry for the latent reds; no fix required for AC-212 unless the PO overrules D6/D10","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure asks to fix E24/E30/E31 as agent work, but E24/E30/E31 deliberately classify those as latent reds bound to other backlog items (not AC-212 acceptance); E33 fix is already in 738bc0387. The AC-212 pin itself has a counted 17 pass.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows","ac":"AC-213","read":true,
+  "clauses":[
+   {"clause":"directoryPathChain starts from the platform root and its last element equals the input on win32 drive paths; POSIX unchanged.","status":"evidence","evidence":"fix 4cead36e4; pin plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs, cases 'P1 win32 drive-letter path', 'P1 win32 UNC path', 'P1 POSIX path is unchanged' (commit fc8dabb45 states no count)","work":"","protected":[]},
+   {"clause":"A registered test covers a win32 drive path and a POSIX path and fails on the old implementation.","status":"evidence","evidence":"same pin, 'P2 RED mirror'; registered in harness/verify-suites.json (pin-model-role-bootstrap-...-tests)","work":"","protected":[]},
+   {"clause":"A native Windows bootstrap reports inactive or the real activation instead of MODEL-FAMILY-GIT-COMMON-DIR-UNAVAILABLE.","status":"native-host","evidence":"P3 cases (real repo, CLI) pin it on this host; the real native run is still needed","work":"","host":"claude-windows","protected":[]},
+   {"clause":"Check the same module for other POSIX-only path assumptions (realpath casing in safeExistingPath).","status":"evidence","evidence":"same pin, 'P4 clause 4' and 'P4 realpath casing' cases; the adjacent import-cycle TDZ defect is fixed in 71cd2bda0 and the entry-first case at line 224 is now a normal test, no longer todo","work":"","protected":[]}
+  ],
+  "remeasureWrong":"Stale: the win32 and POSIX test is already committed (fc8dabb45) and registered in verify-suites.json; the model-family host suites touched later are a different suite. Only a counted GREEN and the native Windows run remain.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.model-role-confirmation-prompt-obscures-required-digest","ac":"AC-214","read":true,
+  "clauses":[
+   {"clause":"The prompt shows the expected input (the 64-character digest) clearly and explains rejection outside the JSON payload.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/model-role-confirmation-prompt-obscures-required-digest.test.mjs, 'AC1' x3 (commit c4cd785a5, no count in message). The item's Source progress also reports 16/16 passing in an older scratch verification","work":"","protected":[]},
+   {"clause":"A noninteractive result offers an attended-terminal route bound to the observed session; no invented session or confirmation.","status":"evidence","evidence":"same pin, 'AC2' x3","work":"","protected":[]},
+   {"clause":"Confirmation stays bound to the exact displayed digest; a changed proposal cannot consume an old confirmation.","status":"evidence","evidence":"same pin, 'AC3'","work":"","protected":[]},
+   {"clause":"Unchanged-mapping receipt reuse and the V3 fallback are preserved; optional confirmation creates no plan-approval gate.","status":"evidence","evidence":"same pin, 'AC4/AC5' and 'AC4' unchanged mapping in a later session","work":"","protected":[]},
+   {"clause":"Targeted transport tests cover interactive success, wrong input, noninteractive guidance and unchanged reuse.","status":"evidence","evidence":"same pin, 9 tests; registered in harness/verify-suites.json","work":"","protected":[]}
+  ],
+  "remeasureWrong":"Stale: a registered pin covering all five points exists (c4cd785a5); only a counted GREEN is missing. The item also asks for installed attended acceptance, which only the PO can give.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.no-uninstall-path-for-a-repository-that-once-opted-in","ac":"AC-216","read":true,
+  "clauses":[
+   {"clause":"Uninstall plan is read-only; apply is bound to the plan digest.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs (c5935770c, real controller, hook installers and Git); no count stated","work":"","protected":[]},
+   {"clause":"Full apply removes shims, impl and marker, keeps content and history byte-identical, ends declined, commit and push to a local bare remote still work; a control shows deleting private state first breaks a commit (B1).","status":"evidence","evidence":"same pin, c5935770c","work":"","protected":[]},
+   {"clause":"Foreign hooks and modified owned-key files refuse typed before any mutation; a modified AGENTS.md is kept.","status":"evidence","evidence":"same pin, c5935770c","work":"","protected":[]},
+   {"clause":"An interrupted apply resumes to the same end state after every journal step; re-onboarding later reactivates with retained records.","status":"evidence","evidence":"same pin, c5935770c","work":"","protected":[]},
+   {"clause":"Uninstalling one worktree beside a declined sibling worktree proceeds; a re-enrolled or newly added sibling refuses.","status":"evidence","evidence":"fix aed777074 (git-hook-footprint.mjs, project-uninstall.mjs) with 3 new pin cases","work":"","protected":[]},
+   {"clause":"Alias (directory symlink) and private-mode refusals.","status":"native-host","evidence":"skipped on this host per c5935770c (needs directory symlinks and mode bits)","work":"","host":"claude-wsl","protected":[]},
+   {"clause":"Per-runner fixtures (Claude, Codex, agy), B2 policy test (remove the plugin dir the impl was baked against: fail safe or re-point), --archive variant, and SETUP.md section 'Uninstalling from a repository'.","status":"content","evidence":"Not found in the pin commit message or stat (one 126-line test file, no doc file in c5935770c/aed777074); the docs grep was refused by the guard, so SETUP.md is unchecked and the Elephant must grep it once","work":"Add B2 fail-safe test and --archive case to the existing pin file; add SETUP.md 'Uninstalling from a repository' section if absent; per-runner fixtures if not already parameterised. Size M. B2 may need a PO policy decision first.","protected":[]}
+  ],
+  "remeasureWrong":"Stale in part: aed777074 touched the uninstall path after the pin and the pin covers the main flow; only the counted GREEN plus the unchecked B2/docs/archive remainder are open.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.node-v24-on-windows-creates-a-real-nul-file","ac":"AC-217","read":true,
+  "clauses":[
+   {"clause":"No \"NUL\" literal as a Node open target anywhere: a ratchet scan in a registered test.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs (d934d69e8: repository-wide scan, six offender fixtures, scratch-mirror RED); registered in harness/verify-suites.json; no count stated","work":"","protected":[]},
+   {"clause":"Git null-device env values use GIT_NULL_DEVICE from lib/git-null-device.mjs, never the \"NUL\" literal.","status":"evidence","evidence":"commits 866be2139, 12ac0a7af (triage); the d934d69e8 scan explicitly allows git env NUL values, so no pin enforces the GIT_NULL_DEVICE half. Whether another existing test covers it was not found","work":"If not covered elsewhere: one ratchet case in the same pin file forbidding a literal NUL in GIT_CONFIG_* env assignments. Size S.","protected":[]},
+   {"clause":"A real native Windows Node v24 run leaves no NUL file in the repository root.","status":"native-host","evidence":"measured originally on Node v24.19.0 win32","work":"","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper","ac":"AC-218","read":true,
+  "clauses":[
+   {"clause":"Public retirement reads reuse the sealed controller's public observation with the same physical root and authority binding.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs, 'the public controller observation root equals the fixture physical root' and the structural case; eb750b36d states pin 9/9","work":"","protected":[]},
+   {"clause":"Inactive roots without history return no journal; valid active non-Git enrollment stays recognized without inventing a retirement record.","status":"done","evidence":"same pin (9/9 counted in eb750b36d): 'inactive non-Git root...', 'valid active non-Git enrollment...', 'valid V3 projection enrollment...'","work":"","protected":[]},
+   {"clause":"Retained, corrupt or unverifiable owned history fails closed with typed diagnostics; no permissive catch.","status":"done","evidence":"same pin: 'corrupt retained history fails closed...', 'unverifiable active enrollment fails closed...' (9/9)","work":"","protected":[]},
+   {"clause":"Preserve all 23 governance-scope callbacks under the exact completion policy.","status":"done","evidence":"same pin, case 'governance-scope.test.mjs registers exactly its 23 callbacks...' (eb750b36d, 9/9)","work":"","protected":[]},
+   {"clause":"Qualify the actual Source corpus and the complete original onboarding controller; reconcile remaining failures from new receipts (earlier run: 184 declared, 54 PASS, 130 FAIL).","status":"evidence","evidence":"No later complete controller receipt found in docs/state.md or decisions file; the controller run is a heavy Elephant run, and failures it shows may turn into new content work","work":"Elephant runs the complete original project-onboarding controller (four shards) and counts it; any remaining failures become new items sized after the run","protected":[]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"no"}
+]

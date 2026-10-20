@@ -1,0 +1,62 @@
+[
+ {"itemId":"pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan","ac":"AC-252","read":true,
+  "clauses":[
+   {"clause":"A warn-level PartialParsing errors[] entry keeps the findings and reports degraded coverage naming the files (PO option B).","status":"evidence","evidence":"Code 28eac0677, d69d39ad5. Tests plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs cases SEM-T (a),(b); pin plugins/pipeline-core/lib/pins/semgrep-partial-parsing-warnings-fail-the-whole-scan.test.mjs. No counted GREEN stated; Elephant runs and counts.","work":"","protected":[]},
+   {"clause":"Error-level entries and timeouts (and warn mixed with error, unreadable shapes) stay scanner_error.","status":"evidence","evidence":"semgrep.test.mjs SEM-T (c),(e) and the unreadable-shape table; run and count.","work":"","protected":[]},
+   {"clause":"Dropped results must not disappear silently: v1 and v2 evidence name partially parsed files.","status":"evidence","evidence":"d69d39ad5 (v2 unsupportedScope partial-parsing:<path>); security-scan.test.mjs and semgrep.test.mjs SEM-T2 (S4); also pins/semgrep-console-coverage-note-has-no-test.test.mjs. Run and count.","work":"","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says handling is unfinished and has no test; code (28eac0677, d69d39ad5) and SEM-T tests are committed. Only a counted GREEN run is missing.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.session-readiness-drops-to-partial-after-bootstrap-ready","ac":"AC-253","read":true,
+  "clauses":[
+   {"clause":"Preflight ends in the readiness state the guard evaluates (probes intent session after a ready bootstrap probe, otherwise names inspect --intent session).","status":"evidence","evidence":"a198fe684; plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs (4 green, 1 todo). Run and count.","work":"","protected":[]},
+   {"clause":"Intermittent cleanup_recovery_observation_unavailable root cause fixed (re-observe on descriptor races).","status":"evidence","evidence":"073a5a230; plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs (15 injected-dependency tests, stated red before / green after). Count the green run.","work":"","protected":[]},
+   {"clause":"The one case 'guard admits the named session inspect command' passes on a POSIX run.","status":"native-host","evidence":"a198fe684 message: case left todo on native Windows.","host":"claude-wsl","protected":[]},
+   {"clause":"Typed reason for the transition to partial, and parallel read-only calls see one consistent readiness snapshot.","status":"content","evidence":"073a5a230 only names the cause in the diagnostic message; no snapshot-consistency test was found.","work":"Add a test that concurrent readiness evaluations return one snapshot; likely plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs, size S-M. Not fully searched (read budget); may be dropped if PO accepts the retry as sufficient.","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says the root cause is unfixed and untested; a198fe684 and 073a5a230 fix and test it. Repeated WSL/Linux runs remain.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.shell-classifier-faults-on-heredoc-body-text","ac":"AC-254","read":true,
+  "clauses":[
+   {"clause":"A quoted-delimiter cat heredoc whose body names git apply raises no fault and takes no write target from the body.","status":"evidence","evidence":"plugins/pipeline-core/lib/pins/shell-classifier-faults-on-heredoc-body-text.test.mjs (A1, every admitted delimiter spelling, with a RED mirror case); commit 7e23d06ff. Run and count.","work":"","protected":[]},
+   {"clause":"The exclusion stays narrow: an executed git apply (plain, after terminator, unterminated, unsupported receivers) still faults.","status":"evidence","evidence":"same pin file, guard-rail cases; run and count.","work":"","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says no counted test exists; a dedicated pin file with controls and RED case is committed. Only a counted GREEN is missing.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement","ac":"AC-255","read":true,
+  "clauses":[
+   {"clause":"plugins/pipeline-core/lib/guard/shell-grammar.mjs is a never-liftable kernel path.","status":"evidence","evidence":"73bc8f117; pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs P1; plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs. Run and count.","work":"","protected":[]},
+   {"clause":"One capability (claude-hook-safety) owns it; architecture map and guard-split-map place it; suite shell-grammar-capability-placement-tests registered with RGCP001-RGCP004.","status":"evidence","evidence":"Pin P2-P4; harness/scripts/shell-grammar-capability-placement.test.mjs; guard-split-contract.test.mjs. Run and count.","work":"","protected":[]},
+   {"clause":"The historical 'fixture issue' of the shell grammar file is resolved.","status":"po-decision","evidence":"Pin header F6: the item never names the fixture or defect, so it cannot be asserted; disclosed gap, owner Coordinator due 2026-10-31.","work":"PO or Coordinator names the fixture defect, or accepts the clause as unactionable and drops it.","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says the capability placement and fixture clause are missing; placement, pin and suite exist. Only the unnamed fixture issue is open.",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows","ac":"AC-256","read":true,
+  "clauses":[
+   {"clause":"The signing spawn sets an explicit cwd outside every repository and neutralizes working-directory lookup on win32 (or resolves openssl by a PATH lookup excluding cwd); readiness probe follows the same rule.","status":"content","evidence":"Not verified in code: item's Residual risk section (PO decision R) implies the key directory is the cwd, but I did not read po-human-approval.mjs command() (read budget exhausted). No pin file named *openssl* exists.","work":"Confirm in plugins/pipeline-core/scripts/po-human-approval.mjs command() (~line 794) and the readiness probe; if absent, S-M change plus decoy test in the existing po-human-approval test file. Touches po-human-approval.mjs (check protected-baseline membership; it is not on the listed baseline).","protected":[]},
+   {"clause":"A regression test with a decoy openssl in the working directory that must never start.","status":"content","evidence":"No pin file matching *openssl* under lib/pins; not found elsewhere (not searched exhaustively).","work":"Add a decoy-executable test to the po-human-approval test file, size S; a new test file would need a harness/verify-suites.json (protected) registration.","protected":["harness/verify-suites.json (only if a new test file)"]},
+   {"clause":"On native Windows the decoy case really does not start the decoy.","status":"native-host","evidence":"Item: mechanism not machine-verified; only portable controls.","host":"other","protected":[]},
+   {"clause":"Residual risk (planted openssl in the PO key directory) accepted.","status":"po-decision","evidence":"Item section 'Residual risk (PO decision R, 2026-10-07)' records the decision.","work":"","protected":[]}
+  ],
+  "remeasureWrong":"",
+  "closableAfterTest":"no"},
+ {"itemId":"pipeline.sign-intent-disclosure-scan-blocks-for-minutes","ac":"AC-257","read":true,
+  "clauses":[
+   {"clause":"A signed quality package is disclosed directly (base commit, paths, digests) before and instead of the GMW/HGO resolvers.","status":"evidence","evidence":"pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs (point 1, two cases: describeSignedQualityPackageIntent, case order in po-human-approval.mjs). Run and count.","work":"","protected":[]},
+   {"clause":"HGO lookup is digest-keyed, never a store scan.","status":"evidence","evidence":"Same pin (point 2); 809148bc7 publishes the disclosure index. The pin header says the full CLI ceremony and store sweep are not exercised on native Windows. Run and count.","work":"","protected":[]},
+   {"clause":"Toolchain/key/directory readiness checks run before any resolver work.","status":"evidence","evidence":"Same pin (point 3); I read only the first 45 lines, so the case is not confirmed by name.","work":"","protected":[]},
+   {"clause":"A sanctioned sweep for consumed or expired HGO requests, and the full ceremony on a real git common dir.","status":"native-host","evidence":"Pin header: sweepHumanGuardOverrideRequests is imported, but the sweep and CLI need secure private-directory modes; Linux/WSL run, owner Coordinator due 2026-10-19, PO decision K7.","host":"claude-wsl","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says the scan time is not bounded and no test exists; a pin covering all four proposal points exists and a digest-keyed index is published. Remaining: counted run and a Linux/WSL run.",
+  "closableAfterTest":"yes"},
+ {"itemId":"pipeline.signature-ceremony-requires-operator-work-and-breaks","ac":"AC-258","read":true,
+  "clauses":[
+   {"clause":"The agent validates candidate, HEAD (including unborn), paths and request digest before the PO gets exactly one single-line signing command.","status":"evidence","evidence":"pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs (born/unborn fixtures through guard-human-override main); commits 713106862, 2094014d8. The pin header says 'RED:' cases may still fail; I did not read which. Run and count, then list failing RED cases.","work":"If RED cases still fail: S-M fix in plugins/pipeline-core/scripts/guard-human-override.mjs / lib/human-guard-override.mjs; those paths are NOT on the listed baseline, but check guard/*.mjs.","protected":[]},
+   {"clause":"Signing works in an unborn-HEAD repository.","status":"evidence","evidence":"Same pin, unborn fixture. Run and count.","work":"","protected":[]},
+   {"clause":"No JSON copy-back into the chat: the agent imports the proof itself.","status":"evidence","evidence":"Not confirmed by name; the pin ends with commit-scoped override-course cases using an in-memory Ed25519 pair. Run and count.","work":"","protected":[]},
+   {"clause":"A PO-signed configuration override is a durable layer later migrations respect, or the route is refused up front.","status":"content","evidence":"Not located in my reads. Needs a check of the pin and the pipeline.user.yaml migration code.","work":"Locate or add the test; M if the migration code needs a change.","protected":[]},
+   {"clause":"Covered by the end-to-end test of 2026-10-03-three-runner-happy-path-with-two-po-approvals.md, and a real ceremony does not break.","status":"po-signature","evidence":"Remeasure: a real signature ceremony run is needed. The happy-path item was not read.","work":"PO signs one real ceremony.","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says no counted GREEN covers the acceptance; a dedicated pin file with unborn/born fixtures exists. Whether RED cases still fail is unverified.",
+  "closableAfterTest":"no"}
+]

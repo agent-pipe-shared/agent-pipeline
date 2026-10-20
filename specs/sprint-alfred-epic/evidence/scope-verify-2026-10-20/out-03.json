@@ -1,0 +1,82 @@
+[
+ {"itemId":"pipeline.catalogue-admit-prescribed-lifecycle-verbs","ac":"AC-123","read":true,
+  "clauses":[
+   {"clause":"present-plan with one or two distinct review receipts (and the emitted concrete command) runs for the agent in design phase, narrowly","status":"done","evidence":"plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs: 'AC-123 present-plan: one and two distinct review receipts...', 'admission stays narrow', two present-plan RED mirrors, 'emitted command' x2; commits f7c7e9240, 078128431; remeasure states 10 pass + 1 skip","work":"","protected":[]},
+   {"clause":"design-course-session --run-v2 exact current shape is admitted for every runner, retired execution refuses, tampered shapes stay refused","status":"done","evidence":"same test file: 'AC-123 design-course-session --run-v2: exact current shape admitted...' and '...tampered shapes stay refused'; ADR-0085 retirement also pinned in lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs","work":"","protected":[]},
+   {"clause":"submit-plan, reopen-design and set-phase prescribed by the course are admitted, wrong shapes are not","status":"done","evidence":"same test file: 'AC-123 submit-plan, reopen-design and set-phase prescribed by the course are admitted; wrong shapes are not'","work":"","protected":[]},
+   {"clause":"continuity writes: the continuity-* writers are not lifecycle verbs of the current course and must not be admitted by accident","status":"done","evidence":"same test file: 'AC-123 continuity-* writers are not catalogue-admitted lifecycle verbs of the current course' (continuity-init, -cas, -apply-native, -select-course)","work":"","protected":[]},
+   {"clause":"present-plan receipt aliases (directory/file symlink) never gain admission","status":"native-host","evidence":"same test file: skipped case 'AC-123 receipt aliases...' (HOST_LIMITATION, native Windows cannot create symlinks); runs on Linux/WSL","host":"codex-wsl (any WSL host; claude-wsl equally)","protected":[]},
+   {"clause":"bootstrap resume-hint inspect read is admitted in every lifecycle state","status":"done","evidence":"9dda09720: lib/pins/resume-hint-inspect-is-admitted-in-every-lifecycle-state.test.mjs, 4/4","work":"","protected":["plugins/pipeline-core/lib/guard/command-catalogue.mjs (already changed)"]}
+  ],
+  "remeasureWrong":"The remeasure says the design-course verbs present-plan, --run-v2 and continuity writes are not admitted, but the pin already tests all three (present-plan admission, run-v2 admitted/retired/tampered, continuity-* explicitly not admitted); only the symlink case is skipped on native Windows. The PO decision on v2 is already encoded: ADR-0085 retired execution and the pin asserts it.",
+  "closableAfterTest":"yes"},
+
+ {"itemId":"pipeline.claude-design-readiness-cannot-start-on-windows","ac":"AC-124","read":true,
+  "clauses":[
+   {"clause":"K5-10: non-Codex readiness argv carries --runner","status":"evidence","evidence":"lib/pins/claude-design-readiness-cannot-start-on-windows.test.mjs 'K5-10: the non-Codex readiness argv carries --runner first' + RED proof case; no counted result stated","work":"","protected":[]},
+   {"clause":"K3-17: documented runner-CLI install roots trusted on every platform (win32 <home>\\.local\\bin, POSIX ~/.local/bin, darwin roots), wrappers and non-executables rejected","status":"evidence","evidence":"same file: four K3-17 cases; commit 13a0dbc1e (POSIX roots) and 7fa1b4332; no counted result stated","work":"","protected":[]},
+   {"clause":"K5-12: schema handed to the Claude CLI has no $schema/$id","status":"evidence","evidence":"same file: 'K5-12: Claude receives the schema without $schema/$id...'","work":"","protected":[]},
+   {"clause":"R4-9/R4-10: each failure class has its own typed sub-reason with bounded sanitized stderr","status":"superseded","evidence":"ADR-0085 (docs/adr/0085-one-review-one-signature-design-approval.md) retired the readiness child route; pin header line 7 and case 'retired child route: a failing child still yields only a bare collapsed result' record that these sub-reasons are not revived; lib/retired-design-codes.mjs","work":"","protected":[]},
+   {"clause":"R4-7: the readiness producer runs on native Windows without an operator hotfix","status":"superseded","evidence":"ADR-0085 retirement; pin cases 'retired: the runner readiness producer refuses before parsing...' and 'retired: the ordinary design course entry starts no readiness child'. Windows run of the retained Claude path stays a host check","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure treats the typed sub-reason clause as absent work; it belongs to the route ADR-0085 retired and the pin says so, so it is superseded, not open. The 'no commit touches the install roots' point is also stale: 13a0dbc1e pinned the install roots.",
+  "closableAfterTest":"yes"},
+
+ {"itemId":"pipeline.claude-greenfield-seeds-unselected-codex-targets","ac":"AC-125","read":true,
+  "clauses":[
+   {"clause":"A fresh project enables only the enrolling runner (claude, codex, antigravity) with matching default","status":"evidence","evidence":"lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs '(a) fresh <runner> plan enables exactly [<runner>]' looped over RUNNERS; no counted result stated","work":"","protected":[]},
+   {"clause":"Claude and Antigravity fresh plans seed no .codex target","status":"evidence","evidence":"same file '(b) fresh <runner> plan has no .codex/ target'","work":"","protected":[]},
+   {"clause":"Migration of a single-runner root reports no false drift for .codex; later explicit Codex selection makes the targets appear without repair","status":"evidence","evidence":"same file '(c) migration of a <runner>-only root reports no drift', '(d) explicitly enabling Codex...', '(d) ...Codex baselines present and only Claude selected still plans no .codex target'","work":"","protected":[]},
+   {"clause":"Verification across supported host platforms (win32, posix path/restart-barrier shapes), beyond the runner dimension","status":"content","evidence":"pin is plan-only with in-process fakes; no case varies the platform","work":"Add a platform loop (win32/linux/darwin via the fakeDeps platform value) to the existing pin test; touches only claude-greenfield-seeds-unselected-codex-targets.test.mjs; size S. Confirm first that the planner reads a platform value at all, otherwise this clause is not testable at plan level and becomes native-host.","protected":[]},
+   {"clause":"A real apply on a Claude host seeds only the selected runner's native runtime and no restart barrier for unselected Codex","status":"native-host","evidence":"pin states 'Plan-only: no apply/activate'","host":"claude-windows (and claude-wsl)","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says 'pin target selection across the platform matrix' is an open agent task, but the runner matrix (a)-(d) is already pinned; only a platform dimension and the real apply are not.",
+  "closableAfterTest":"no"},
+
+ {"itemId":"pipeline.claude-session-start-emits-codex-transcript-recovery-hint","ac":"AC-126","read":true,
+  "clauses":[
+   {"clause":"Claude SessionStart hint wiring declares --runner claude explicitly and the compact matcher carries no second blind path","status":"evidence","evidence":"lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs A1, A1b; hook change da2958311 per remeasure; no counted result stated","work":"","protected":[]},
+   {"clause":"Claude SessionStart output never names another runner (all start sources and a non-enrolled folder), no session identity unlocks list/read, missing or unknown runner never falls back to Codex","status":"evidence","evidence":"same file A2 (per source), A4, A5, A7, with A6 positive control for Codex","work":"","protected":[]},
+   {"clause":"Injected text embeds no absolute host paths of the plugin or repository","status":"evidence","evidence":"same file A3","work":"","protected":[]},
+   {"clause":"Staleness-check ref choice (refs/heads/main vs checked-out branch) is dispositioned","status":"evidence","evidence":"same file A9 (PO decision #25, per-channel ref named with source) and A8","work":"","protected":[]},
+   {"clause":"A RED mirror: a scratch copy of the pre-fix wiring (hint entry without --runner) fails the Claude predicate while the real one passes","status":"content","evidence":"no RED/mirror case exists in the pin file (only A6 positive control)","work":"Add one RED case to claude-session-start-emits-codex-transcript-recovery-hint.test.mjs building the old args [] and asserting the A1/A2 predicate fails; size S. If the pin is not listed in harness/verify-suites.json, a protected registration is needed.","protected":["harness/verify-suites.json (only if the pin is unregistered)"]},
+   {"clause":"Windows symlink behaviour of the hint","status":"native-host","evidence":"no symlink case in the pin; item text names no symlink clause, so this rests on the remeasure hint only","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"Mostly right on the missing RED mirror, but the 'Windows symlink failure' is not in the item acceptance at all and the counted GREEN is only a run of the existing nine cases, not new work.",
+  "closableAfterTest":"no"},
+
+ {"itemId":"pipeline.claude-windows-greenfield-lifecycle-not-walkable","ac":"AC-127","read":true,
+  "clauses":[
+   {"clause":"V-9: --answers-file route carries answers beyond the ~10 KB command-line limit","status":"evidence","evidence":"lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs header: 'V-9 covered'; baseline 3ed911a79 (124 tests, 117 pass, 1 skip, 6 unrelated GD failures)","work":"","protected":[]},
+   {"clause":"V-10: dispatch route digest derives from the briefing actually sent (guard binds inline briefing, producer writes record, admission wiring for native Agent/Task, Codex spawn_agent, Antigravity Subagents, static Workflow agent())","status":"evidence","evidence":"same file cases for guard (ALF-C-P19-05C), producer (05D), caller set (V10-DISP-B) and admission wiring (V10-WIRE); commit a2d61489c","work":"","protected":[]},
+   {"clause":"V-10 typed gaps: Critic and unrelated-role dispatches unrecorded; dynamically built Workflow script has no admission point; Codex/Antigravity registration of guard-dispatch","status":"content","evidence":"declared open in the pin header lines 32-34, owner Coordinator, due 2026-10-31","work":"Record the Critic dispatch route (critic-review.md carries no Slice line) and the Codex/Antigravity registration: hooks/guard-dispatch.mjs, lib/dispatch-briefing-route-record.mjs, test in claude-windows-greenfield-lifecycle-not-walkable.test.mjs; size M. Whether this is required for AC-127 or only dispositioned is a PO call (acceptance says 'fixed or explicitly dispositioned').","protected":["plugins/pipeline-core/hooks/hooks.json (registration for Codex/Antigravity)"]},
+   {"clause":"V-12: language is not asked twice once consent holds a reviewed default","status":"evidence","evidence":"same file header 'V-12 covered'","work":"","protected":[]},
+   {"clause":"V-13: docs/state.md Next action projection re-rendered from live state","status":"evidence","evidence":"same file header 'V-13 covered'","work":"","protected":[]},
+   {"clause":"Claude/Windows greenfield run reaches implementation and push within the two-approval happy path","status":"native-host","evidence":"skipped case 'two-approval happy path to implementation and push' ('native: pending (live interactive Claude/Windows session)')","host":"claude-windows","protected":[]},
+   {"clause":"The CAS/'missing' failure is located and its exact code recorded","status":"native-host","evidence":"item text: not yet located; needs a reproduction on the new candidate","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure says V-9, V-10, V-12 and V-13 are to be implemented; the pin header states all four covered with tests (V-10 wired through the guard, producer and two callers). Only the V-10 typed gaps (a disposition) and the native run remain.",
+  "closableAfterTest":"no"},
+
+ {"itemId":"pipeline.claude-windows-guard-refuses-every-in-repo-read","ac":"AC-128","read":true,
+  "clauses":[
+   {"clause":"Native Read of an in-repo file is admitted in backslash, forward-slash, relative and bounded-limit spellings","status":"evidence","evidence":"lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs AP1; baselines 8d4b3613e and 1f1991be3, no count stated","work":"","protected":[]},
+   {"clause":"Bash head/cat/tail/wc/rg on in-repo paths admitted, rg flags --no-heading and -m N admitted, repeated -g stays refused, unsupported command gets GUARD-READ-COMMAND-UNSUPPORTED never OUTSIDE-ROOT","status":"evidence","evidence":"same file AP2, AP3, AP4","work":"","protected":[]},
+   {"clause":"A case-differing or otherwise unusable auxiliary session root never denies an in-root target","status":"evidence","evidence":"same file AP5 (skipped off win32: 'typed host limitation') and AP6","work":"","protected":[]},
+   {"clause":"Out-of-repo and credential reads stay refused; missing in-repo Read gets distinct GUARD-READ-TARGET-MISSING; in-repo Glob admitted, directory Grep stays refused","status":"evidence","evidence":"same file AP7, AP8, AP9","work":"","protected":[]},
+   {"clause":"K3 lanes: git show <rev>:<path> | head -N and stat -c/--format fixed formats admitted, fail-closed shapes refused","status":"evidence","evidence":"same file AP10 to AP15","work":"","protected":[]},
+   {"clause":"Re-run the live read shapes after install on native Windows (Read, rg directory, Grep/Glob directory) and the case-differing transcript directory (AP5 body)","status":"native-host","evidence":"item 'Verification item: re-run the live shapes above after install'; AP5 runs only on win32","host":"claude-windows","protected":[]}
+  ],
+  "remeasureWrong":"The remeasure asks for a counted pin as agent work; all clauses already have code and test cases (AP1-AP15). The only open parts are a count (run the file once, on WSL and counting AP5 as skip) and the native Windows live check.",
+  "closableAfterTest":"yes"},
+
+ {"itemId":"pipeline.codex-advisor-evidence-fails-after-host-update","ac":"AC-129","read":true,
+  "clauses":[
+   {"clause":"Historical executable is revalidated from the sealed private journal without requiring the current CLI binary to match","status":"evidence","evidence":"lib/pins/codex-advisor-evidence-fails-after-host-update.test.mjs 'A1 (structural supplement)' (no skip) and 'A1/A4: a changed Codex executable...' (skipped only on win32, HOST_LIMITATION); item Source progress states 7/7 targeted suite","work":"","protected":[]},
+   {"clause":"Altered finalization, request, source, receipt or process-ownership evidence is still rejected; the Advisor is never silently omitted","status":"evidence","evidence":"same file 'A2/A3/A4: tampered finalization journal...' and 'A2: altered report or receipt is rejected; ...never silently omitted' (both skipped only on win32)","work":"","protected":[]},
+   {"clause":"A bounded first-failing-subcheck code for a rejected private binding, with no private content or path","status":"evidence","evidence":"same file 'A3: diagnostic contract holds on the real module', 'A3 RED: ...scratch mirrors...', 'A3/A2: an unusable store is a typed failure with a bounded diagnostic' (all unskipped)","work":"","protected":[]},
+   {"clause":"Replay the affected greenfield design package with the installed build after a host update","status":"native-host","evidence":"pin header A4: 'installed-build greenfield replay is a consumer/native hold and is NOT claimed here'","host":"codex-wsl (installed Codex host; other: Codex on native Windows)","protected":[]}
+  ],
+  "remeasureWrong":"The three skips are a win32-only HOST_LIMITATION (POSIX uid/mode bits); on a WSL host they run, so 'un-skip the three cases' is not code work, it is a run. The item's 'safe subcheck diagnostics remain open' note is stale: the A3 cases exist unskipped. The 0/1 CADH001 count refers to a different (Advisor host) suite and needs a separate look before it blocks this item.",
+  "closableAfterTest":"yes"}
+]

@@ -1,0 +1,167 @@
+{
+ "part": "14",
+ "rows": [
+  {
+   "n": 111,
+   "itemId": "pipeline.merge-commit-message-skips-conventional-type-check",
+   "ac": "AC-211",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches the merge-commit message check; the R1-R5 pin has no stated pass count.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the R1-R5 pin."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 112,
+   "itemId": "pipeline.model-family-approval-with-automatic-version-upgrades",
+   "ac": "AC-212",
+   "file": "backlog/items/2026-09-30-model-family-approval-with-automatic-version-upgrades.md",
+   "stage": "50",
+   "remeasureReason": "The host-store suite moved from 1/28 to 19/28 (8ab992513, f54ff439e), but MFHS002-008 (E24 async effect) and MFHS023/028 (E30/E31) are still red, invocation is 12/14 (d92874a11, MFI012/013 latent reds), and the installed-host clause stays a skip.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Fix the E24 settled-phase async effect and the E30/E31 cross-process reserved-member refusal so the host-store and invocation suites are green."
+    },
+    {
+     "owner": "verify-wsl",
+     "what": "A Linux Full Verify of the model-family suites is needed."
+    },
+    {
+     "owner": "native-host",
+     "what": "Installed-host proof on all three runners is needed."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    }
+   ]
+  },
+  {
+   "n": 113,
+   "itemId": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
+   "ac": "AC-213",
+   "file": "backlog/items/2026-10-08-model-role-bootstrap-is-always-unavailable-on-native-windows.md",
+   "stage": "50",
+   "remeasureReason": "The fix 4cead36e4 predates the base; no commit since base maps the acceptance (win32 and POSIX path-chain test, native Windows bootstrap) to a counted GREEN, and the model-family host suites touched since are partly red.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Register the win32 and POSIX directoryPathChain test and state a counted GREEN."
+    },
+    {
+     "owner": "native-host",
+     "what": "A native Windows bootstrap must report inactive or the real activation."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    }
+   ]
+  },
+  {
+   "n": 114,
+   "itemId": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+   "ac": "AC-214",
+   "file": "backlog/items/2026-09-28-model-role-confirmation-prompt-obscures-required-digest.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches the confirmation prompt, and no green counts exist.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the confirmation prompt output with a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 116,
+   "itemId": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+   "ac": "AC-216",
+   "file": "backlog/items/2026-09-28-no-uninstall-path-for-a-repository-that-once-opted-in.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches the uninstall path, and no counted GREEN for the whole pin is stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the whole uninstall pin."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 117,
+   "itemId": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+   "ac": "AC-217",
+   "file": "backlog/items/2026-10-05-node-v24-on-windows-creates-a-real-nul-file.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches nul-file creation; keep-baseline rule applies. Both clauses are covered but no counted pass result is stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN result for both nul-file clauses in a commit or committed evidence."
+    },
+    {
+     "owner": "native-host",
+     "what": "Confirm on a real native Windows Node v24 run that no real nul file is created."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 118,
+   "itemId": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+   "ac": "AC-218",
+   "file": "backlog/items/2026-09-29-nongit-retirement-reader-calls-inaccessible-controller-helper.md",
+   "stage": "50",
+   "remeasureReason": "eb750b36d adds a counted pin 9/9 closing the 23-callback completion-policy acceptance clause only. The clause to qualify the actual Source corpus and complete original onboarding controller is not shown.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Qualify the complete original onboarding controller and reconcile remaining failures with a counted result."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of the batch is not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing; the item stays open until combined candidate acceptance."
+    }
+   ]
+  }
+ ]
+}

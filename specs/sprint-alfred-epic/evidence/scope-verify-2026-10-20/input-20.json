@@ -1,0 +1,171 @@
+{
+ "part": "20",
+ "rows": [
+  {
+   "n": 159,
+   "itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+   "ac": "AC-259",
+   "file": "backlog/items/2026-10-04-signed-quality-package-route-is-not-agent-operable-on-windows.md",
+   "stage": "50",
+   "remeasureReason": "c972bc580 reports signed-quality-package 43/43 and AC-259 pin 14/15 with the real native-Windows case still a typed skip, so the Windows route is not qualified.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run the native Windows agent-operable route; the skip stays open."
+    },
+    {
+     "owner": "agent",
+     "what": "Add the native Windows route for the signed quality package."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 160,
+   "itemId": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+   "ac": "AC-260",
+   "file": "backlog/items/2026-10-07-signing-default-test-fixture-root-escapes-the-repository.md",
+   "stage": "50",
+   "remeasureReason": "ce86fc0c0 (governance-scope 27/27) and a1cd742de isolate other fixtures; neither touches design-workflow-signing-default.test.mjs, and reversed-order RC21C003 coverage is still not shown.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Move the signing-default fixture root off the repository and show RC21C003 reversed order covered with a counted run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 163,
+   "itemId": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+   "ac": "AC-263",
+   "file": "backlog/items/2026-10-05-source-agent-definition-change-locks-that-agent-until-install.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches this item; the AC-263 pin states no pass count.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Record a counted GREEN of the AC-263 pin."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 164,
+   "itemId": "pipeline.three-runner-happy-path-with-two-po-approvals",
+   "ac": "AC-264",
+   "file": "backlog/items/2026-10-03-three-runner-happy-path-with-two-po-approvals.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base adds a counted end-to-end scenario per runner with exactly two PO proofs.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Add a counted end-to-end happy-path scenario per runner with exactly two PO proofs."
+    },
+    {
+     "owner": "native-host",
+     "what": "Run the happy path on installed Codex, Claude and Antigravity hosts."
+    },
+    {
+     "owner": "po-signature",
+     "what": "The two PO approval proofs are needed for a real run."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 165,
+   "itemId": "pipeline.transfer-redaction-alters-digest-bound-files",
+   "ac": "AC-265",
+   "file": "backlog/items/2026-10-08-transfer-redaction-alters-digest-bound-files.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base touches this item; byte-exact carry is pinned but no counts are stated.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Record a counted GREEN of the byte-exact carry pin."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 166,
+   "itemId": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+   "ac": "AC-266",
+   "file": "backlog/items/2026-09-29-unasked-advisor-export-consent-in-fresh-seed.md",
+   "stage": "50",
+   "remeasureReason": "ecaa2dc3d (pin 15/15) covers AC-103 design-course export consent and afa446b8b the advisor answered route, not the fresh-seed guard-admission clause, which is still missing.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Add the guard-admission clause for advisor export consent in a fresh seed with a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  },
+  {
+   "n": 168,
+   "itemId": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+   "ac": "AC-268",
+   "file": "backlog/items/2026-10-07-vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.md",
+   "stage": "50",
+   "remeasureReason": "No commit since base extends the heredoc receiver list for vim -es or busybox; the pin has no stated GREEN count.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Extend the heredoc receiver list to vim -es and busybox and add a counted test."
+    },
+    {
+     "owner": "critic",
+     "what": "Independent Critic review of this item is missing."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is pending."
+    }
+   ]
+  }
+ ]
+}

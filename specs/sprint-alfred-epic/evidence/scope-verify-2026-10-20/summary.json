@@ -1,0 +1,1554 @@
+{
+ "rows": 145,
+ "status": {
+  "evidence": 320,
+  "content": 76,
+  "po-decision": 33,
+  "done": 76,
+  "native-host": 80,
+  "superseded": 15,
+  "po-signature": 7,
+  "unread": 7
+ },
+ "closable": 60,
+ "unread": [
+  "AC-154 pipeline.design-package-parent-metadata-false-drift",
+  "AC-174 pipeline.foreign-worktree-closes-the-implementation-gate",
+  "AC-179 pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes"
+ ],
+ "content": [
+  {
+   "ac": "AC-102",
+   "item": "advertised-git-to-head-pipeline-is-refused",
+   "clause": "PF-17 shapes are admitted in draft/approved: git -C <repo> show HEAD:<path> --format= -- | head -n 3.",
+   "work": "Add admit case(s) for git -C <in-root repo> show HEAD:<path> --format= -- | head -n 3; if refused, widen the git-to-head grammar in plugins/pipeline-core/hooks/guard-command-grammar.mjs (git -C and trailing -- operands). Test in guard-lifecycle-ready.test.mjs. Size M.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs (only if added there; no protected-test name match, but the hook is protected)"
+   ]
+  },
+  {
+   "ac": "AC-102",
+   "item": "advertised-git-to-head-pipeline-is-refused",
+   "clause": "PF-17: rg -o --no-filename, rg -c <pattern> <file> and ls -la <path> inside the project are admitted; the refusal names the triggering flag/operator.",
+   "work": "Add admit tests for rg -c, rg -o --no-filename and ls -la <in-root path>; widen guard-command-grammar.mjs if refused; make GUARD-OPERATOR-UNAPPROVED / GUARD-READ-COMMAND-UNSUPPORTED name the offending token. Size M.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+    "plugins/pipeline-core/hooks/guard-command-grammar.mjs is not on the protected list but is read by the protected hook"
+   ]
+  },
+  {
+   "ac": "AC-104",
+   "item": "advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+   "clause": "Ancestor identity is narrowed to dev/ino/mode plus realpath, isDirectory and not-symlink (mtimeNs/size/nlink dropped for ancestors).",
+   "work": "Add two cases to plugins/pipeline-core/lib/design-advisor-provenance.test.mjs: sibling write in an ancestor is tolerated, replaced ancestor (ino/mode change) fails closed. Size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-108",
+   "item": "agy-driver-dispatch-and-design-routes-incomplete",
+   "clause": "Preflight reports whether the resolved node runs inside the runner's default sandbox and names the one-time remedy.",
+   "work": "Add a node-in-sandbox probe and typed remedy to plugins/pipeline-core/scripts/pipeline-start-preflight.mjs; test in its existing preflight test file. Size M.",
+   "protected": []
+  },
+  {
+   "ac": "AC-108",
+   "item": "agy-driver-dispatch-and-design-routes-incomplete",
+   "clause": "The AGY Goldfish agent template forbids parallel file writes in one turn until the hook race is fixed.",
+   "work": "Add the prohibition to the AGY goldfish agent template and a text pin in its existing test. Size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-108",
+   "item": "agy-driver-dispatch-and-design-routes-incomplete",
+   "clause": "The main agent can update the calibrated handover (docs/state.md) in every phase through an admitted route.",
+   "work": "Add a lifecycle-readiness test that an EL-01-admitted docs/ write is accepted in every phase; fix guard-lifecycle-ready.mjs if refused. Size M.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+   ]
+  },
+  {
+   "ac": "AC-110",
+   "item": "agy-imported-plugin-snapshot-shadows-registered-plugin",
+   "clause": "Preflight yields plugin-refresh-required with IPA-AGY-STALE-MANAGED-COPY / DUPLICATE-SOURCE / FOREIGN-HOOK-WIRING.",
+   "work": "Wire the topology observer verdicts into the preflight with the three reason codes; test in the preflight test file. Size M.",
+   "protected": []
+  },
+  {
+   "ac": "AC-110",
+   "item": "agy-imported-plugin-snapshot-shadows-registered-plugin",
+   "clause": "install-agy.mjs remediates through agy lifecycle commands with preview, idempotence and readback; developer refresh replaces the bare rsync.",
+   "work": "Verify install-agy.mjs for plan preview, agy plugin uninstall ordering, readback and --refresh; add what is missing with fake-agy tests in install-agy.test.mjs. Size L.",
+   "protected": []
+  },
+  {
+   "ac": "AC-110",
+   "item": "agy-imported-plugin-snapshot-shadows-registered-plugin",
+   "clause": "SETUP.md, GEMINI.md, docs/runner-support.md and local-plugin-attestation.md describe the managed directory, single-source rule, refresh command and restart-plus-lock proof.",
+   "work": "Edit four docs; a doc-pin test if the repo has one. Size M.",
+   "protected": []
+  },
+  {
+   "ac": "AC-113",
+   "item": "approval-bound-design-package-lives-in-an-ignored-directory",
+   "clause": "present-plan / approval refuses (fail closed) when a bound path is git-ignored (Proposal 2).",
+   "work": "If absent: refuse in the present-plan/approve route when a bound path is git-ignored; touches plugins/pipeline-core/lib/architecture-design.mjs (or the present-plan writer) and likely scripts/pipeline-state.mjs; test in the AC-113 pin file. Size M.",
+   "protected": [
+    "plugins/pipeline-core/scripts/pipeline-state.mjs (if the refusal lands in the writer)"
+   ]
+  },
+  {
+   "ac": "AC-115",
+   "item": "approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+   "clause": "Added acceptance A: a devplan-lane pin drives the onboarding plan's exact materialize-architecture action (admitted) and the dead --input spelling is refused with a hint naming the bare form.",
+   "work": "Add pin cases for the devplan shell lane (lib/guard/sanctioned-args-scripts.mjs, guard-devplan.mjs): bare materialize-architecture admitted, '--input scratch/x.json' refused with typed hint. Likely a guard-devplan*.test.mjs case (protected) or the AC-115 pin file; source fix only if the hint is missing. Size S-M.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-devplan.mjs (only if hint missing)",
+    "guard-devplan*.test.mjs (if the pin lands there)",
+    "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs (only if hint missing)"
+   ]
+  },
+  {
+   "ac": "AC-115",
+   "item": "approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+   "clause": "Added acceptance B: an opaque 'perl <scratch script>' and other interpreters are no wider in devplan than 'node <scratch script>'.",
+   "work": "Replace the todo with a real case: drive the devplan lane with perl/python/ruby <scratch script> and assert the same verdict as node <scratch script>; fix the lane if wider. Target the devplan lane test (guard-devplan*.test.mjs, protected) or the AC-115 pin file. Size S (test) to M (if lane code must change).",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-devplan.mjs (if lane widened)",
+    "guard-devplan*.test.mjs"
+   ]
+  },
+  {
+   "ac": "AC-117",
+   "item": "bootstrap-should-refresh-hooks-when-the-plugin-updated",
+   "clause": "The bootstrap confirmation line is refused until the hook readback is current and carries the model-role field.",
+   "work": "Locate the confirmation-line validator in the pipeline-core start/preflight scripts; add a refusal case (stale readback or absent model-role field) to the AC-117 pin file, plus code if the line is not yet validated. Size S-M.",
+   "protected": []
+  },
+  {
+   "ac": "AC-117",
+   "item": "bootstrap-should-refresh-hooks-when-the-plugin-updated",
+   "clause": "Preflight 2 todo injection-seam cases (preflight 77/79).",
+   "work": "Implement the two todo cases in the preflight test file named by 4d5bd1af1. Size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-118",
+   "item": "bounded-reader-terminal-binding",
+   "clause": "The current Alfred course binds its actual four reports and final correction without a fabricated fresh Reader verdict (real-course binding record).",
+   "work": "Author the real-course terminal record (4 reports, reviewed commits, 30 finding dispositions from scratch/alfred-reader-finding-reconciliation.md, report-bound adjudication form for the 7 phase-two challenges, resolution commits) and a test that the checker accepts it. Touches the reader-binding record under docs/ or evidence, check-doc-reader-binding.mjs, and the pin file. Size M-L; owner acceptance of unresolved/partial findings is a PO decision.",
+   "protected": []
+  },
+  {
+   "ac": "AC-125",
+   "item": "claude-greenfield-seeds-unselected-codex-targets",
+   "clause": "Verification across supported host platforms (win32, posix path/restart-barrier shapes), beyond the runner dimension",
+   "work": "Add a platform loop (win32/linux/darwin via the fakeDeps platform value) to the existing pin test; touches only claude-greenfield-seeds-unselected-codex-targets.test.mjs; size S. Confirm first that the planner reads a platform value at all, otherwise this clause is not testable at plan level and becomes native-host.",
+   "protected": []
+  },
+  {
+   "ac": "AC-126",
+   "item": "claude-session-start-emits-codex-transcript-recovery-hint",
+   "clause": "A RED mirror: a scratch copy of the pre-fix wiring (hint entry without --runner) fails the Claude predicate while the real one passes",
+   "work": "Add one RED case to claude-session-start-emits-codex-transcript-recovery-hint.test.mjs building the old args [] and asserting the A1/A2 predicate fails; size S. If the pin is not listed in harness/verify-suites.json, a protected registration is needed.",
+   "protected": [
+    "harness/verify-suites.json (only if the pin is unregistered)"
+   ]
+  },
+  {
+   "ac": "AC-127",
+   "item": "claude-windows-greenfield-lifecycle-not-walkable",
+   "clause": "V-10 typed gaps: Critic and unrelated-role dispatches unrecorded; dynamically built Workflow script has no admission point; Codex/Antigravity registration of guard-dispatch",
+   "work": "Record the Critic dispatch route (critic-review.md carries no Slice line) and the Codex/Antigravity registration: hooks/guard-dispatch.mjs, lib/dispatch-briefing-route-record.mjs, test in claude-windows-greenfield-lifecycle-not-walkable.test.mjs; size M. Whether this is required for AC-127 or only dispositioned is a PO call (acceptance says 'fixed or explicitly dispositioned').",
+   "protected": [
+    "plugins/pipeline-core/hooks/hooks.json (registration for Codex/Antigravity)"
+   ]
+  },
+  {
+   "ac": "AC-130",
+   "item": "codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+   "clause": "Optional gap recorded by 76beed502: Readiness store creation directly on a fresh owner-private 0700 shared parent is not covered.",
+   "work": "Add one case to codex-design-readiness-host-store.shared-parent.test.mjs (fresh sanctioned mint, no chmod, create the readiness store, assert success). Not strictly in the written acceptance. Size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-134",
+   "item": "codex-readiness-private-receipt-omits-output-custody",
+   "clause": "Receipt reader rejects a stat-declared oversize file before allocation and reads with an actual 524,288-byte cap plus one byte, with FD/path identity checks.",
+   "work": "Add a stat-oversize case and a concurrent-growth cap+1 case to plugins/pipeline-core/lib/codex-design-readiness-host-store.test.mjs. Linux-only, so it is skipped on Windows. Size S to M.",
+   "protected": []
+  },
+  {
+   "ac": "AC-135",
+   "item": "codex-wsl-required-advisor-has-no-completable-route",
+   "clause": "Answered receipts bind candidate, route, question/evidence digests, observed host result and answer digest; missing execution cannot be answered.",
+   "work": "Productive answered-receipt route: sealed admission recheck before turn/start, Advisor process namespace, custody, store and transaction wiring across codex-host-advisor-route.mjs, advisory-host-bridge.mjs and design-advisory-coordinator.mjs, plus tests in the AC-135 pin. Size L. Probably post-0.7.0 (PO scope call), since the honest unavailable outcome satisfies the item's deadlock requirement.",
+   "protected": []
+  },
+  {
+   "ac": "AC-140",
+   "item": "configure-verify-output-lacks-a-walkable-commit-route",
+   "clause": "Every refusal carries a one-line repair clause (case A assertion /repair/ at :296).",
+   "work": "Add a repair clause per typed code to the refusal at pipeline-state.mjs ~10678 (and the lifecycle/twins refusals at ~10662/~10672). Test: configure-verify-names-the-unmet-approval-condition.test.mjs (already red/asserting). Size S. Needs the signed package, not a plain edit.",
+   "protected": [
+    "plugins/pipeline-core/scripts/pipeline-state.mjs"
+   ]
+  },
+  {
+   "ac": "AC-140",
+   "item": "configure-verify-output-lacks-a-walkable-commit-route",
+   "clause": "A non-private State file is reported as CVCT-FILE, not the generic CVCT-APPROVAL-UNAVAILABLE.",
+   "work": "Rethrow/return the typed CVCT-FILE (and CVCT-PATH/CVCT-CAS) from the bare catch in observeCurrentPlanApprovalForCalibration. Test: configure-verify-names-the-unmet-approval-condition.test.mjs case 'state-file-not-private' (POSIX only; its Windows form is native-host other). Size S.",
+   "protected": [
+    "plugins/pipeline-core/scripts/pipeline-state.mjs"
+   ]
+  },
+  {
+   "ac": "AC-140",
+   "item": "configure-verify-output-lacks-a-walkable-commit-route",
+   "clause": "The distinct-codes case: the unmet conditions are pairwise distinguishable.",
+   "work": "No separate code; follows from the CVCT-FILE and repair work. Size S.",
+   "protected": [
+    "plugins/pipeline-core/scripts/pipeline-state.mjs"
+   ]
+  },
+  {
+   "ac": "AC-142",
+   "item": "critic-round-cap-and-delta-scope-are-not-enforced",
+   "clause": "A running feature whose genesis predates the review-unit rule has a typed route to add its review unit (or a course-free batch Critic route); CCA-REVIEW-UNIT-REQUIRED names it; new features get the unit at registration; critic-review skill asks for Spec path and diff range first; a pin drives a pre-rule feature to an admitted dispatch (D62).",
+   "work": "Add typed amend route (register-feature-package.mjs, PO-signed if manifest authority) or a batch Critic route; update critic-course-admission.mjs message; register path adds unit; plugins/pipeline-core/skills/critic-review/SKILL.md argument check; pin in critic-dispatch-preflight.test.mjs or the AC-142 pin. Size L.",
+   "protected": [
+    "possibly plugins/pipeline-core/lib/protected-baseline.mjs if the manifest-authority route touches signed files"
+   ]
+  },
+  {
+   "ac": "AC-147",
+   "item": "declared-system-skill-read-requires-human-override",
+   "clause": "Unlisted sibling skill files, lookalike paths, transcript files and traversal/tilde spellings are refused (catalog binding).",
+   "work": "Catalog-bound read authority in sessionReadScopeRoots / passive-read-policy plus a catalog producer; target test = the same pin file (unskip). Size L. Deferred past 0.7.0 by PO decision 2026-10-16 (see item Triage 2026-10-17); not counted against the candidate.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+    "plugins/pipeline-core/lib/guard/*.mjs"
+   ]
+  },
+  {
+   "ac": "AC-147",
+   "item": "declared-system-skill-read-requires-human-override",
+   "clause": "Replaced or drifting catalog/file identities invalidate the read authority (A3).",
+   "work": "Identity digest check in the new read-scope seam; same pin file; size M, part of the L work above.",
+   "protected": [
+    "plugins/pipeline-core/lib/guard/*.mjs"
+   ]
+  },
+  {
+   "ac": "AC-148",
+   "item": "denial-names-a-diagnosis-it-refuses",
+   "clause": "An approved feature whose approval cannot be re-verified degrades to advisory instead of locking all execution (PO decision BI).",
+   "work": "Either record this clause as out of AC scope (PO decision) or add a degrade path in guard-devplan / lib/guard devplan-shell-lane and a case in the pin file. Size M.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-devplan.mjs",
+    "plugins/pipeline-core/lib/guard/*.mjs"
+   ]
+  },
+  {
+   "ac": "AC-152",
+   "item": "design-generator-repeats-large-source-material",
+   "clause": "Routine inspect/pendingAsks responses compact after an ask was shown, full ask retrievable (Proposal, stored duplication).",
+   "work": "Compact inspect envelope in the design intake script plus a case in the pin file. Size M.",
+   "protected": []
+  },
+  {
+   "ac": "AC-152",
+   "item": "design-generator-repeats-large-source-material",
+   "clause": "Generated PRD/spec drafts must not say 'do not hand-edit' while the reference requires elaboration before binding (Observed PF-06).",
+   "work": "Change the draft header text in the generator (design intake script) and add a case asserting the header in the pin file; size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-158",
+   "item": "design-workflow-package-v2-readiness-fixture-fails-on-windows",
+   "clause": "The HOST-LIMITATION skip carries a current due date or is replaced.",
+   "work": "Renew the due date or replace the skip in design-workflow-package-v2.test.mjs (2 skip lines), or make the host store accept win32 paths; size S. No protected path.",
+   "protected": []
+  },
+  {
+   "ac": "AC-160",
+   "item": "disjoint-signed-hgo-actions-invalidate-one-another",
+   "clause": "An unrelated authorized worktree edit between arming and consumption does not force a new signature; target, ancestry, policy, plugin, state and tool-input drift still fail closed; Bash and plugin installs keep strict whole-repo binding.",
+   "work": "Add a counted test: three independently signed disjoint actions, two sequential deliveries, then target-byte, absence, symlink, policy, plugin, expiry, replay and audit drift cases, plus a Bash case that stays strict. Target: the existing human-guard-override test file in plugins/pipeline-core/lib (name not confirmed). Size L if the consume logic is missing, M if only the test. Whether the consume logic matches the clause was not verified.",
+   "protected": []
+  },
+  {
+   "ac": "AC-160",
+   "item": "disjoint-signed-hgo-actions-invalidate-one-another",
+   "clause": "Until a safe contract exists, the signing preparer discloses serial dependence.",
+   "work": "Check the prepare-authorization output text in human-guard-override.mjs or its script; S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-163",
+   "item": "dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+   "clause": "A dispatch record can be started from a generated, valid skeleton with digests pre-filled; the agent fills judgment fields only.",
+   "work": "New scaffolder script (e.g. plugins/pipeline-core/scripts/init-dispatch-record.mjs) emitting a schema-valid skeleton (bundleSha256, criteria[], outcomeClassification, criticRequired.appliedRow pre-filled where derivable) plus its test, validated against the existing dispatch-record validator; wire into templates/prompts/goldfish-task.md field 6. Size M.",
+   "protected": [
+    "new test file needs a protected registration in harness/verify-suites.json"
+   ]
+  },
+  {
+   "ac": "AC-163",
+   "item": "dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+   "clause": "A design review can be started from a generated, valid skeleton with digests pre-filled.",
+   "work": "New scaffolder script for the design review with the same pattern and its own test file; update the design-review course docs. Size M.",
+   "protected": [
+    "new test file needs a protected registration in harness/verify-suites.json"
+   ]
+  },
+  {
+   "ac": "AC-163",
+   "item": "dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+   "clause": "Proposal: measure why entries are skipped and fold log appends into existing writes.",
+   "work": "Measurement note plus a template/role wording change (templates/prompts/goldfish-task.md, roles/goldfish.md section 6). Size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-167",
+   "item": "draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+   "clause": "The skill's literal ${PIPELINE_PLUGIN_ROOT} spelling is admitted (or the skill prescribes an admitted spelling).",
+   "work": "Either resolve/admit the variable spelling in the guard or change plugins/pipeline-core/skills/pipeline-start/SKILL.md to an admitted spelling; pin in guard-lifecycle-ready.test.mjs or a new pin under lib/pins. Size S to M.",
+   "protected": [
+    "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+    "new pin test needs harness/verify-suites.json registration"
+   ]
+  },
+  {
+   "ac": "AC-167",
+   "item": "draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+   "clause": "SKILL.md documents handling of the hook-provisioning-required preflight status.",
+   "work": "One paragraph in plugins/pipeline-core/skills/pipeline-start/SKILL.md. Size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-167",
+   "item": "draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+   "clause": "A draft-phase fixture runs the bootstrap sequence to a ready confirmation without an override.",
+   "work": "One regression test in hooks/guard-lifecycle-ready.test.mjs (or a new pin) running preflight, onboarding inspect, governance bootstrap, state inspect in draft. Size M.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs (if the test exposes a gap)"
+   ]
+  },
+  {
+   "ac": "AC-168",
+   "item": "elephant-main-context-spent-on-wake-ups-and-inline-reads",
+   "clause": "One enforcement-layer measure per cause (wake-up replies, inline reads, Explore/Plan refusal, guard false positives, hand-written briefings).",
+   "work": "Up to five separate measures across hooks/templates, each with a test; scope needs a PO/Elephant split by cause. Size L in total.",
+   "protected": [
+    "likely hooks/hooks.json and guard files for wake-up and false-positive causes"
+   ]
+  },
+  {
+   "ac": "AC-171",
+   "item": "existing-signing-key-reuse-deadlocks-onboarding",
+   "clause": "Tests for replay, path aliases and wrong-key refusal.",
+   "work": "Add replay, path-alias and wrong-key refusal cases to scripts/onboarding-init.test.mjs. Size M.",
+   "protected": []
+  },
+  {
+   "ac": "AC-174",
+   "item": "foreign-worktree-closes-the-implementation-gate",
+   "clause": "Reader (design-workflow-package-v2.mjs) keeps the underlying error code instead of a catch-all collapse.",
+   "work": "unverified: inspect design-workflow-package-v2.mjs ~line 142 and the RED pin; a patch in a protected path (guard-devplan / lib/guard) per remeasure; size unknown, assume M",
+   "protected": [
+    "plugins/pipeline-core/lib/guard/*.mjs (probable)"
+   ]
+  },
+  {
+   "ac": "AC-179",
+   "item": "git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+   "clause": "Snapshot bound to installed plugin identity with typed HOOK-SNAPSHOT-STALE diagnostic in preflight and commit refusal, plus refresh in the install flow.",
+   "work": "unverified; installer scripts commit-msg-hook-install.mjs / pre-commit-hook-install.mjs, size M",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs (cp-source clause)"
+   ]
+  },
+  {
+   "ac": "AC-181",
+   "item": "git-stash-list-classified-as-working-tree-write",
+   "clause": "Related sed -i parser symptom (2026-10-03 and 2026-10-18 observed): write-lane classifier reports the sed expression instead of the real target file.",
+   "work": "Decide whether sed target detection is in AC-181 scope. If yes: fix operand selection for sed -i/-e in extractShellWriteTargets (plugins/pipeline-core/lib/protected-test-paths.mjs) and add positive/negative cases to the pin file git-stash-list-classified-as-working-tree-write.test.mjs. Size S-M.",
+   "protected": [
+    "plugins/pipeline-core/lib/protected-test-paths.mjs (if it falls under the protected-test-paths family; check)",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+   ]
+  },
+  {
+   "ac": "AC-186",
+   "item": "goldfish-bugfix-module-conflicts-with-qg-04",
+   "clause": "Added acceptance (2026-10-17): for a product item the delivery route dispatches criterion-bound tests through a separate test-author dispatch before or independent of the implementing owner, and the owner may not modify them.",
+   "work": "Delivery-route producer must emit a test-author dispatch when the consumer config declares a test-author route, with write scopes limited to test paths; the implementer dispatch excludes them. Files: consumer item-delivery producer in plugins/pipeline-core/lib (not located), its test file. Size M-L; needs a design check against consumer-spec-criterion-binds-the-first-item-delivery pin.",
+   "protected": [
+    "possibly scripts/pipeline-state.mjs and guard files if the dispatch write scope is enforced there"
+   ]
+  },
+  {
+   "ac": "AC-186",
+   "item": "goldfish-bugfix-module-conflicts-with-qg-04",
+   "clause": "Added acceptance: the generated item briefing never assigns test ownership to the implementer.",
+   "work": "Add a case asserting the generated briefing text carries no implementer test ownership; target test: plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs plus the producer fix. Size S-M.",
+   "protected": []
+  },
+  {
+   "ac": "AC-186",
+   "item": "goldfish-bugfix-module-conflicts-with-qg-04",
+   "clause": "Added acceptance: a pin proves a consumer item course with a declared test-author route produces two dispatches with disjoint test and implementation write scopes.",
+   "work": "New pin case (same pin file or a new file; a new file needs a verify-suites.json registration). Size M.",
+   "protected": [
+    "harness/verify-suites.json (only if a new test file is added)"
+   ]
+  },
+  {
+   "ac": "AC-187",
+   "item": "goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+   "clause": "Consumer coverage: an emitted-brief consumer exercises the routes (the pin itself states 'no production code emits briefs', so only template text is pinned).",
+   "work": "Establish whether any producer emits Goldfish briefs now; if yes add a case in the pin file (S-M), if no state the clause as not applicable or PO decision. Size S-M.",
+   "protected": []
+  },
+  {
+   "ac": "AC-197",
+   "item": "guard-suite-fails-60-tests-on-native-windows",
+   "clause": "Keep a recorded baseline count so a later change can be attributed.",
+   "work": "Doc-only: add one baseline line (final pass/skip/fail count, host, sha) to specs/sprint-alfred-epic/evidence/counted-runs-2026-10-19/guard-lifecycle-ready-red-classification.md. Size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-201",
+   "item": "hgo-patch-preflight-before-signature",
+   "clause": "A malformed hunk is rejected by a read-only applicability check before a human signature is requested.",
+   "work": "Implement the preflight check and un-pend the point-1 test; size M, test file as named above.",
+   "protected": []
+  },
+  {
+   "ac": "AC-201",
+   "item": "hgo-patch-preflight-before-signature",
+   "clause": "The native EOF marker grammar (Update/rename termination admitted; orphan, duplicate, Add/Delete, nonterminal markers and unknown headers still refused) is admitted by guard-apply-patch.mjs.",
+   "work": "Add EOF-marker admission and refusal cases to guard-apply-patch.mjs and a test next to it. Size M.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-apply-patch.mjs or lib/guard/*.mjs if it lives there",
+    "its guard test files if matching the protected patterns"
+   ]
+  },
+  {
+   "ac": "AC-201",
+   "item": "hgo-patch-preflight-before-signature",
+   "clause": "A validation-only git apply --check --reverse is recognised as read-only without admitting mutation.",
+   "work": "Add a classifier case and test. Size S.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-git.mjs",
+    "guard-git*.test.mjs"
+   ]
+  },
+  {
+   "ac": "AC-203",
+   "item": "host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+   "clause": "Kill Verify mid-run and confirm readiness stays ready (live crash simulation).",
+   "work": "Optional S: a test that kills a spawned verify stand-in and checks readiness, in the same pin file.",
+   "protected": [
+    "harness/scripts/verify.mjs only if the producer must change"
+   ]
+  },
+  {
+   "ac": "AC-206",
+   "item": "kernel-closure-check-masks-violations-after-the-first",
+   "clause": "A red ratchet blocks the candidate stamp.",
+   "work": "Locate the candidate-stamp command, make it fail when the closure check is red, add a test in the stamp's existing test file. Size M. Likely touches protected scripts/pipeline-state.mjs or harness/scripts/verify.mjs.",
+   "protected": [
+    "scripts/pipeline-state.mjs",
+    "harness/scripts/verify.mjs"
+   ]
+  },
+  {
+   "ac": "AC-207",
+   "item": "lifecycle-coordination-commands-refused-as-implementation-writes",
+   "clause": "Lifecycle coordination commands that inspect/nextAction emit are admitted by closed argv identity in every phase, with path spelling normalised.",
+   "work": "Verify continuity-cas, continuity-integrate-final and cancel-submitted-plan against the devplan shell lanes; add admission and spelling normalisation plus cases in the guard-lifecycle-ready test. Size M.",
+   "protected": [
+    "plugins/pipeline-core/lib/guard/*.mjs",
+    "plugins/pipeline-core/hooks/guard-devplan.mjs"
+   ]
+  },
+  {
+   "ac": "AC-207",
+   "item": "lifecycle-coordination-commands-refused-as-implementation-writes",
+   "clause": "Read-only scripts under scratch/ and prescribed repository checkers are admitted as read-only execution.",
+   "work": "Design a closed read-only scratch/checker lane in the guard-devplan shell classification with tests. Size M to L; may need a PO decision on the shape.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-devplan.mjs",
+    "plugins/pipeline-core/lib/guard/*.mjs"
+   ]
+  },
+  {
+   "ac": "AC-207",
+   "item": "lifecycle-coordination-commands-refused-as-implementation-writes",
+   "clause": "Onboarding scaffold paths are committable in every phase, or onboarding commits them itself.",
+   "work": "Admit the scaffold paths in the commit-msg/devplan path rules or have onboarding commit them, with a test. Size M.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-devplan.mjs"
+   ]
+  },
+  {
+   "ac": "AC-207",
+   "item": "lifecycle-coordination-commands-refused-as-implementation-writes",
+   "clause": "The governed repair a typed recovery (F6) prescribes is reachable without an override.",
+   "work": "Admit the governance inventory repair path for the F6 recovery, with test. Size S to M.",
+   "protected": [
+    "plugins/pipeline-core/lib/guard/*.mjs"
+   ]
+  },
+  {
+   "ac": "AC-208",
+   "item": "lifecycle-inspect-omits-current-plan-spec-digests",
+   "clause": "Inspect observes the actual submitted Plan/Spec bytes before deriving status and recovery action.",
+   "work": "Integrate the two-file correction into scripts/pipeline-state.mjs and its lifecycle lib, with regressions. Size M.",
+   "protected": [
+    "scripts/pipeline-state.mjs",
+    "harness/scripts/pipeline-state.test.mjs"
+   ]
+  },
+  {
+   "ac": "AC-208",
+   "item": "lifecycle-inspect-omits-current-plan-spec-digests",
+   "clause": "Changed PRD and changed Spec each report digest drift with the sanctioned recovery; missing or unreadable source is not promoted to current.",
+   "work": "Regression cases in the pipeline-state inspect tests. Size S to M.",
+   "protected": [
+    "harness/scripts/pipeline-state.test.mjs"
+   ]
+  },
+  {
+   "ac": "AC-208",
+   "item": "lifecycle-inspect-omits-current-plan-spec-digests",
+   "clause": "An unchanged valid submission keeps its lifecycle result; inspect stays read-only.",
+   "work": "Add both cases to the same test file. Size S.",
+   "protected": [
+    "harness/scripts/pipeline-state.test.mjs"
+   ]
+  },
+  {
+   "ac": "AC-216",
+   "item": "no-uninstall-path-for-a-repository-that-once-opted-in",
+   "clause": "Per-runner fixtures (Claude, Codex, agy), B2 policy test (remove the plugin dir the impl was baked against: fail safe or re-point), --archive variant, and SETUP.md section 'Uninstalling from a repository'.",
+   "work": "Add B2 fail-safe test and --archive case to the existing pin file; add SETUP.md 'Uninstalling from a repository' section if absent; per-runner fixtures if not already parameterised. Size M. B2 may need a PO policy decision first.",
+   "protected": []
+  },
+  {
+   "ac": "AC-224",
+   "item": "parallel-work-in-one-checkout-is-unsafe",
+   "clause": "Liveness readback for open dispatch records before admitting a second writer (round 3b)",
+   "work": "New liveness readback (pid/heartbeat) checked by the dispatch guard; guard-dispatch*.mjs and dispatch-record lib, test in the parallel-work pin. Size M. Needs PO decision whether it is in scope.",
+   "protected": [
+    "plugins/pipeline-core/lib/guard/*.mjs (if guard code changes)"
+   ]
+  },
+  {
+   "ac": "AC-224",
+   "item": "parallel-work-in-one-checkout-is-unsafe",
+   "clause": "D62: verify-evidence-producer produces Critic evidence for a named earlier commit in a temporary worktree; preflight accepts it; pin with dirty checkout leaves bytes unchanged",
+   "work": "Add a --commit option building a temporary worktree, run, remove; adjust critic-dispatch-preflight to accept it; new pin in lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs. Size M-L. Requires a new Verify registration only if a new test file is added.",
+   "protected": [
+    "harness/verify-suites.json (only if a new test file)"
+   ]
+  },
+  {
+   "ac": "AC-226",
+   "item": "pipeline-hooks-act-in-repositories-that-never-opted-in",
+   "clause": "Docs state the contract in SETUP.md and docs/runner-support.md (proposal 8)",
+   "work": "Verify/add a short paragraph in SETUP.md and docs/runner-support.md. Size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-238",
+   "item": "push-classifier-misses-nested-quotes-and-redirect-before-push",
+   "clause": "A redirect between git and push (git 2>&1 push origin main) is classified a push.",
+   "work": "Add a table in plugins/pipeline-core/lib/git-cmd.test.mjs pinning git 2>&1 push, git >out push, git <in push, git 2>&1 --config-env=x push as pushes. Size S. Test file is not in the protected list (git-cmd.test.mjs is not named there); check it is registered in harness/verify-suites.json.",
+   "protected": []
+  },
+  {
+   "ac": "AC-238",
+   "item": "push-classifier-misses-nested-quotes-and-redirect-before-push",
+   "clause": "The two accepted false positives (git diff with a substituted merge-base; heredoc commit message in a quoted substitution containing a boundary git word) are pinned as documented accepted behaviour.",
+   "work": "Add two rows (expected push-candidate true, comment 'accepted false positive') to the same git-cmd.test.mjs table. Size S.",
+   "protected": []
+  },
+  {
+   "ac": "AC-241",
+   "item": "readiness-input-omits-current-advisor-observation",
+   "clause": "Replace the three typed skips with counted GREEN cases (substituted receipt, wrong candidate/question, drift, oversized, alias, missing context).",
+   "work": "Locate the readiness advisor-observation test file (search git ls-files for readiness-advisor / supplemental) and replace the three skips with real cases. Size S-M. Check whether the file is in harness/verify-suites.json.",
+   "protected": []
+  },
+  {
+   "ac": "AC-245",
+   "item": "role-route-preflight-with-self-dispatch-fallback",
+   "clause": "Added: an explicit atomic recovery state on a failed or refused owner dispatch keeps task identity and attempt history (recovery-state verb, C7).",
+   "work": "Add a recovery-state verb to scripts/pipeline-state.mjs with a test in harness/scripts/pipeline-state.test.mjs (plus a lifecycle guard allow-lane if the verb must be admitted). Size L. Verify with git grep for 'recover' in pipeline-state.mjs before dispatching; it may exist under another name.",
+   "protected": [
+    "plugins/pipeline-core/scripts/pipeline-state.mjs",
+    "harness/scripts/pipeline-state.test.mjs",
+    "harness/verify-suites.json (only if a new test file is added)"
+   ]
+  },
+  {
+   "ac": "AC-247",
+   "item": "scratch-must-remain-writable-across-lifecycle-states",
+   "clause": "Same distinction holds for apply_patch and for admitted shell preparation lanes.",
+   "work": "Add apply_patch-shaped inputs (inert scratch snapshot admitted, real surface refused) to the pin or to hooks/guard-lifecycle-ready.test.mjs (protected-test-path match). Size S-M. Check first whether guard-testpath tests already cover apply_patch.",
+   "protected": [
+    "plugins/pipeline-core/hooks/guard-testpath*.test.mjs (if the case goes there)"
+   ]
+  },
+  {
+   "ac": "AC-249",
+   "item": "security-scanner-failure-provenance",
+   "clause": "Added (Oct 10 suffix, not visible to me in full): inventory of real project push/security prerequisites and authentic rule/candidate/location/sanitized KeyR evidence before repair/suppression; unavailable capability stays unavailable.",
+   "work": "Read the suffix in the original item, then decide. If unmet: extend the pin or lib/security-scanner-diagnostics.test.mjs. Size M. Unverified.",
+   "protected": []
+  },
+  {
+   "ac": "AC-253",
+   "item": "session-readiness-drops-to-partial-after-bootstrap-ready",
+   "clause": "Typed reason for the transition to partial, and parallel read-only calls see one consistent readiness snapshot.",
+   "work": "Add a test that concurrent readiness evaluations return one snapshot; likely plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs, size S-M. Not fully searched (read budget); may be dropped if PO accepts the retry as sufficient.",
+   "protected": []
+  },
+  {
+   "ac": "AC-256",
+   "item": "sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+   "clause": "The signing spawn sets an explicit cwd outside every repository and neutralizes working-directory lookup on win32 (or resolves openssl by a PATH lookup excluding cwd); readiness probe follows the same rule.",
+   "work": "Confirm in plugins/pipeline-core/scripts/po-human-approval.mjs command() (~line 794) and the readiness probe; if absent, S-M change plus decoy test in the existing po-human-approval test file. Touches po-human-approval.mjs (check protected-baseline membership; it is not on the listed baseline).",
+   "protected": []
+  },
+  {
+   "ac": "AC-256",
+   "item": "sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+   "clause": "A regression test with a decoy openssl in the working directory that must never start.",
+   "work": "Add a decoy-executable test to the po-human-approval test file, size S; a new test file would need a harness/verify-suites.json (protected) registration.",
+   "protected": [
+    "harness/verify-suites.json (only if a new test file)"
+   ]
+  },
+  {
+   "ac": "AC-258",
+   "item": "signature-ceremony-requires-operator-work-and-breaks",
+   "clause": "A PO-signed configuration override is a durable layer later migrations respect, or the route is refused up front.",
+   "work": "Locate or add the test; M if the migration code needs a change.",
+   "protected": []
+  },
+  {
+   "ac": "AC-270",
+   "item": "windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+   "clause": "Remaining fixtures moved off os.tmpdir.",
+   "work": "Pin P4 only shows that one existing suite adopts the helper; whether the other v3 onboarding fixtures still use os.tmpdir() was not enumerated. Only needed if the native Windows run still shows DACL failures. Files: fixture helpers in the failing suites. Size M, test carried by the same pin file P4.",
+   "protected": []
+  }
+ ],
+ "decisions": [
+  {
+   "ac": "AC-104",
+   "item": "advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+   "status": "po-decision",
+   "clause": "The security-predicate change has a PO decision and an architecture/security Critic.",
+   "evidence": "Proposal states it needs a PO decision and an architecture/security Critic; Triage is empty and no ADR/decision was located in the items read."
+  },
+  {
+   "ac": "AC-109",
+   "item": "agy-el01-write-authorization-gap",
+   "status": "po-decision",
+   "clause": "Original requirements of this item are not recoverable from the evidence file.",
+   "evidence": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json lists this itemId as publicOriginalAssociation unresolved, candidateCount 0; no public original exists to split into clauses."
+  },
+  {
+   "ac": "AC-110",
+   "item": "agy-imported-plugin-snapshot-shadows-registered-plugin",
+   "status": "po-decision",
+   "clause": "A PO decision picks topology option A or B after the spike.",
+   "evidence": "Proposal section 1; Triage names no choice."
+  },
+  {
+   "ac": "AC-114",
+   "item": "approval-verification-demands-head-equals-candidate",
+   "status": "po-decision",
+   "clause": "The PO hotfix scratch/hotfix-candidate-binding.ps1 is replaced by the source fix and the next stamp carries it.",
+   "evidence": "Source fix commits exist (975352801, 12426da30); stamping is a PO call per candidate-stamping-discipline."
+  },
+  {
+   "ac": "AC-118",
+   "item": "bounded-reader-terminal-binding",
+   "status": "po-decision",
+   "clause": "Report-bound adjudication form for phase-two no-change findings.",
+   "evidence": "Item: resolved/owner-accepted form cannot encode seven no-change adjudications; owner acceptance must not be inferred."
+  },
+  {
+   "ac": "AC-119",
+   "item": "brownfield-implementation-entry-demands-a-greenfield-design-block",
+   "status": "po-decision",
+   "clause": "Established/active repository state with ratcheting baseline (Model gap).",
+   "evidence": "Item assigns this to D3/D4 as target model; hotfix 10 is an interim unblock."
+  },
+  {
+   "ac": "AC-122",
+   "item": "capture-evidence-does-not-normalize-windows-npm-launch",
+   "status": "po-decision",
+   "clause": "'original9/3' and 'Portable Windows metadata and Linux children' retained-scope requirements.",
+   "evidence": "specs/sprint-alfred-epic/plans/acceptance-reconstruction/R2.md: meaning never found in a public source; the original acceptance is unresolved in the portable record, so no further mapping is possible."
+  },
+  {
+   "ac": "AC-132",
+   "item": "codex-design-readiness-child-rejects-valid-review",
+   "status": "po-decision",
+   "clause": "Authenticated route with no model-readable credential reference including after SIGKILL; exact bound report reaches the runtime take path; plugins/MCP/hooks/tools/env disabled with thread-bound inventory.",
+   "evidence": "Ruling needed: confirm AC-132 is superseded by ADR-0085 exactly as E12 did for AC-131 (E12 does not name AC-132). If the PO says it is not superseded, these clauses become content L plus native-host codex-wsl."
+  },
+  {
+   "ac": "AC-134",
+   "item": "codex-readiness-private-receipt-omits-output-custody",
+   "status": "po-decision",
+   "clause": "Point 6: full productive candidate path through the Readiness host/store and readDesignWorkflowPackageFromRepository with default execution verification; forged custody cannot qualify the package.",
+   "evidence": "Needs the real Codex readiness host. The readiness child is retired by ADR-0085, but no record names AC-134 as superseded. Ruling needed: supersede AC-134 point 6, or keep it as native-host codex-wsl."
+  },
+  {
+   "ac": "AC-141",
+   "item": "critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+   "status": "po-decision",
+   "clause": "Template and guard state one budget number (guard working cap vs template base cap 24).",
+   "evidence": "Item Proposal; GST33 / D1 recorded open per remeasure. Pin exists: lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs (not read by me)."
+  },
+  {
+   "ac": "AC-151",
+   "item": "design-course-run-v2-refuses-its-own-documented-routes",
+   "status": "po-decision",
+   "clause": "Every course step including a revision runs from emitted, guard-admitted commands with zero overrides; failed stage resumes idempotently; course evidence outputs writable by the agent (K5-8, K5-9, K5-11, revision path).",
+   "evidence": "Per the remeasure, 70e2e724c retargets the design-course session suite to the ADR-0085 retirement of the v2 run; I did not verify this in the ADR text. Decision needed: mark the item superseded by ADR-0085 (then status superseded, cite ADR-0085) or keep it and fix output collision (design-course-session.mjs), resume, and revision path."
+  },
+  {
+   "ac": "AC-152",
+   "item": "design-generator-repeats-large-source-material",
+   "status": "po-decision",
+   "clause": "A fresh reviewer can understand PRD and Spec from bounded references and explicit source; no requirement disappears.",
+   "evidence": "Needs an independent reader review (pipeline-core:reader-review) of the generated PRD/Spec; not a code test."
+  },
+  {
+   "ac": "AC-155",
+   "item": "design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+   "status": "po-signature",
+   "clause": "A materialized fitness model is executed as a candidate check at the implementation boundary; a never-run model is reported, not counted as qualified.",
+   "evidence": "Qualifier code exists per 496df10b6 (scripts/architecture-fitness.mjs); the wiring into lib/guard/entry-gates.mjs is the open protected step."
+  },
+  {
+   "ac": "AC-155",
+   "item": "design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+   "status": "po-signature",
+   "clause": "present-plan precondition requires the review chain (replaces advisor/readiness preconditions).",
+   "evidence": "Commit 496df10b6 names this as an open protected-file step; not re-read in this pass."
+  },
+  {
+   "ac": "AC-156",
+   "item": "design-trailer-verifier-lost-after-closure",
+   "status": "po-decision",
+   "clause": "The dropping merge/import is identified.",
+   "evidence": "The pin states this is a one-off forensic act, not a code property; no recorded finding located in this pass."
+  },
+  {
+   "ac": "AC-174",
+   "item": "foreign-worktree-closes-the-implementation-gate",
+   "status": "po-signature",
+   "clause": "A foreign registered worktree is a typed environment condition; reopen-design is offered only for verified content drift; the named diagnosis is admitted while the gate is closed.",
+   "evidence": "per remeasure the protected patch needs a PO-signed override; not independently verified."
+  },
+  {
+   "ac": "AC-175",
+   "item": "forensics-and-audit-evidence-not-reconstructable",
+   "status": "po-decision",
+   "clause": "Project-bound transcript export merging segments, child sessions, turn boundaries and usage for all three runners.",
+   "evidence": "Triage in the item: deferred past 0.7.0 by PO decision 2026-10-16; AC-175 not counted against the candidate. Groundwork 17067dca4 (Claude and Codex export; Antigravity typed unavailable)."
+  },
+  {
+   "ac": "AC-175",
+   "item": "forensics-and-audit-evidence-not-reconstructable",
+   "status": "po-decision",
+   "clause": "Bootstrap and dispatch compare continuity source digests with the checkout and surface drift as recovery.",
+   "evidence": "Deferred item; not checked in code."
+  },
+  {
+   "ac": "AC-175",
+   "item": "forensics-and-audit-evidence-not-reconstructable",
+   "status": "po-decision",
+   "clause": "Design course fixes an executable Verify contract activated with the first implementation dispatch.",
+   "evidence": "Deferred; touches verify contract."
+  },
+  {
+   "ac": "AC-175",
+   "item": "forensics-and-audit-evidence-not-reconstructable",
+   "status": "po-decision",
+   "clause": "Generated per-change audit index with explicitly missing steps.",
+   "evidence": "Deferred."
+  },
+  {
+   "ac": "AC-179",
+   "item": "git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+   "status": "po-signature",
+   "clause": "cp/install classify only the destination as write target; mv sources count as written.",
+   "evidence": "Not verified; guard-lifecycle-ready.mjs is a protected path, remeasure says the patch needs a PO-signed override."
+  },
+  {
+   "ac": "AC-181",
+   "item": "git-stash-list-classified-as-working-tree-write",
+   "status": "po-decision",
+   "clause": "Item deferred past 0.7.0 by PO decision (2026-10-16); AC-181 not counted against the 0.7.0 candidate.",
+   "evidence": "item Triage, Decision line"
+  },
+  {
+   "ac": "AC-190",
+   "item": "greenfield-comparisons-need-reproducible-public-evidence",
+   "status": "po-decision",
+   "clause": "A comparison between greenfield runs cites public evidence files only.",
+   "evidence": "Item file backlog/items/2026-10-19-greenfield-comparisons-need-reproducible-public-evidence.md (type requirement, sprint none) records PO decision D21 (2026-10-18): moves after 0.7.0."
+  },
+  {
+   "ac": "AC-190",
+   "item": "greenfield-comparisons-need-reproducible-public-evidence",
+   "status": "po-decision",
+   "clause": "Each evidence file names the Pipeline version, the runner and measured values and holds no private identifiers or machine paths.",
+   "evidence": "Same item; no evidence files or checker exist, and D21 defers the work past 0.7.0. The PO decides scope when it is scheduled."
+  },
+  {
+   "ac": "AC-191",
+   "item": "greenfield-design-course-cost-and-proportionality",
+   "status": "po-decision",
+   "clause": "Record phase wall time, tool time and human wait separately.",
+   "evidence": "Pin case 'telemetry (deferred)' is a typed skip: deferred by PO 2026-10-16 #2, outside 0.7.0; follow-up backlog/items/2026-10-16-design-course-telemetry-is-deferred.md."
+  },
+  {
+   "ac": "AC-204",
+   "item": "implementation-without-dispatch-escapes-review-coverage",
+   "status": "po-decision",
+   "clause": "Whether the original required a blocking gate for undispatched implementation (conflict with M2B).",
+   "evidence": "specs/sprint-alfred-epic/plans/acceptance-reconstruction/R4.md is marked RELEASED (K6, 2026-10-16) with the report-only reading, so this is likely already settled; the PO should confirm no gate is wanted."
+  },
+  {
+   "ac": "AC-205",
+   "item": "installed-design-trailer-example-is-rejected-by-git-guard",
+   "status": "po-decision",
+   "clause": "Existing stage-0-labeled design evidence commits are explicitly dispositioned as provenance debt, history not rewritten.",
+   "evidence": "Test header says this is a disposition of history, not behavior; no recorded disposition found."
+  },
+  {
+   "ac": "AC-209",
+   "item": "lifecycle-read-scope-blocks-host-declared-system-skill",
+   "status": "po-decision",
+   "clause": "Define and admit the narrow host-owned declared-skill instruction surface with an ordinary route after refusal.",
+   "evidence": "Item Triage: deferred past 0.7.0 by PO decision of 2026-10-16 (recorded 2026-10-17); AC-209 not counted against the 0.7.0 candidate. Remeasure cites 32829a645 (negative alias refusal only)."
+  },
+  {
+   "ac": "AC-209",
+   "item": "lifecycle-read-scope-blocks-host-declared-system-skill",
+   "status": "po-decision",
+   "clause": "Identical admission for single and bounded diagnostic reads.",
+   "evidence": "Same deferral."
+  },
+  {
+   "ac": "AC-211",
+   "item": "merge-commit-message-skips-conventional-type-check",
+   "status": "po-decision",
+   "clause": "The original item body is unresolved (no public backlog file); the acceptance above was reconstructed from title, Merge20 proof and source.",
+   "evidence": "15b5b2341 commit body; portable-original-requirements.json row has publicOriginalAssociation unresolved"
+  },
+  {
+   "ac": "AC-212",
+   "item": "model-family-approval-with-automatic-version-upgrades",
+   "status": "po-decision",
+   "clause": "Related host-store/invocation reds MFHS002-008, MFHS023/028, MFI012/013 are not in this item's acceptance; E24/E30/E31/E32 record them as typed latent reds bound to backlog items (async settled-journal phase; reserved-member refusal), the PO is to be told. E33 wedge fix (missing native port refused synchronously) is committed in 738bc0387.",
+   "evidence": "specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md E24, E29-E33; commit 738bc0387"
+  },
+  {
+   "ac": "AC-224",
+   "item": "parallel-work-in-one-checkout-is-unsafe",
+   "status": "po-decision",
+   "clause": "AGY native dispatch prepares disjoint packages for parallel execution in isolated worktrees (post-0.7.0 unless PO pulls in)",
+   "evidence": "PO decision: pull into 0.7.0 or defer. Grep of antigravity-native-dispatch-prepare.mjs for worktree/parallel was refused by the guard, so not re-checked this session; the item text says it has no worktree mode."
+  },
+  {
+   "ac": "AC-232",
+   "item": "project-calibration-retains-new-project-placeholder",
+   "status": "po-decision",
+   "clause": "The acceptance S1-S8 is an Elephant reconstruction with no public original; PO must release it and decide AC-232 scope.",
+   "evidence": "pin header: 'No backlog item and no public original exist ... pending PO release'"
+  },
+  {
+   "ac": "AC-244",
+   "item": "revised-native-design-cannot-reach-a-new-advisor-course",
+   "status": "po-decision",
+   "clause": "Disposition of the item's original acceptance given the retired design course.",
+   "evidence": "Needs the PO to confirm ADR-0085 acceptance and close or rewrite the item; the item's Triage is empty."
+  },
+  {
+   "ac": "AC-245",
+   "item": "role-route-preflight-with-self-dispatch-fallback",
+   "status": "po-decision",
+   "clause": "The course accepts the fallback result as the role's evidence with an honest assurance label instead of a refusal (end to end).",
+   "evidence": "admitRoleFallbackEvidence (scripts/design-course-session.mjs) is pinned by the 'point 2b' cases, but runDesignCourseV2 is retired by ADR-0085 (DESIGN-COURSE-RETIRED), so no live course consumes it; pin header says the end-to-end clause stays HELD."
+  },
+  {
+   "ac": "AC-249",
+   "item": "security-scanner-failure-provenance",
+   "status": "po-signature",
+   "clause": "The protected documentation/registration successor (docs and harness/verify-suites.json registration) awaits its exact signature.",
+   "evidence": "Item 'Progress' section: 'held for its exact signature'. I did not check whether the pin is registered."
+  },
+  {
+   "ac": "AC-255",
+   "item": "shell-grammar-file-is-a-kernel-path-without-capability-placement",
+   "status": "po-decision",
+   "clause": "The historical 'fixture issue' of the shell grammar file is resolved.",
+   "evidence": "Pin header F6: the item never names the fixture or defect, so it cannot be asserted; disclosed gap, owner Coordinator due 2026-10-31."
+  },
+  {
+   "ac": "AC-256",
+   "item": "sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+   "status": "po-decision",
+   "clause": "Residual risk (planted openssl in the PO key directory) accepted.",
+   "evidence": "Item section 'Residual risk (PO decision R, 2026-10-07)' records the decision."
+  },
+  {
+   "ac": "AC-258",
+   "item": "signature-ceremony-requires-operator-work-and-breaks",
+   "status": "po-signature",
+   "clause": "Covered by the end-to-end test of 2026-10-03-three-runner-happy-path-with-two-po-approvals.md, and a real ceremony does not break.",
+   "evidence": "Remeasure: a real signature ceremony run is needed. The happy-path item was not read."
+  },
+  {
+   "ac": "AC-264",
+   "item": "three-runner-happy-path-with-two-po-approvals",
+   "status": "po-signature",
+   "clause": "The two PO approvals of such a run are real signatures (plan approval and push approval).",
+   "evidence": "push approval is signature mode in this repo (CLAUDE.md push policy); plan approval proof via po-human-approval sign-intent --request."
+  }
+ ],
+ "superseded": [
+  {
+   "ac": "AC-124",
+   "item": "claude-design-readiness-cannot-start-on-windows",
+   "clause": "R4-9/R4-10: each failure class has its own typed sub-reason with bounded sanitized stderr",
+   "evidence": "ADR-0085 (docs/adr/0085-one-review-one-signature-design-approval.md) retired the readiness child route; pin header line 7 and case 'retired child route: a failing child still yields only a bare collapsed result' record that these sub-reasons are not revived; lib/retired-design-codes.mjs"
+  },
+  {
+   "ac": "AC-124",
+   "item": "claude-design-readiness-cannot-start-on-windows",
+   "clause": "R4-7: the readiness producer runs on native Windows without an operator hotfix",
+   "evidence": "ADR-0085 retirement; pin cases 'retired: the runner readiness producer refuses before parsing...' and 'retired: the ordinary design course entry starts no readiness child'. Windows run of the retained Claude path stays a host check"
+  },
+  {
+   "ac": "AC-131",
+   "item": "codex-bootstrap-in-the-typed-next-action",
+   "clause": "Verify the premise (PO hand-runs the design-readiness bootstrap on fresh hosts) before work starts.",
+   "evidence": "Item has no toil row (Triage: needs-verification). Elephant decision E12 (d552fe1f2, specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md): AC-131 superseded because the bootstrap now returns DESIGN_COURSE_RETIRED (ADR-0085; plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs line 172)."
+  },
+  {
+   "ac": "AC-131",
+   "item": "codex-bootstrap-in-the-typed-next-action",
+   "clause": "Include the design-readiness bootstrap in the fresh-host typed next action.",
+   "evidence": "Same E12 record: folding a retired route into the next action would advertise a route that only refuses. ADR-0085 (docs/adr/0085-one-review-one-signature-design-approval.md lines 38, 77) retires the separate readiness child."
+  },
+  {
+   "ac": "AC-132",
+   "item": "codex-design-readiness-child-rejects-valid-review",
+   "clause": "Live selected Codex/WSL run publishes a schema-valid exact-candidate readiness receipt or typed unavailable result.",
+   "evidence": "Whole subject is the Codex design-readiness child/host; ADR-0085 retires the separate readiness child as content review (lines 38, 77) and the bootstrap returns DESIGN_COURSE_RETIRED; 70e2e724c retargets its suites to the retirement contract. E12 (d552fe1f2) names AC-131 only, not AC-132."
+  },
+  {
+   "ac": "AC-132",
+   "item": "codex-design-readiness-child-rejects-valid-review",
+   "clause": "commandActions 'unknown' does not abort a read-only review; explicit mutating action, file change or server request still fails.",
+   "evidence": "Same retirement (readiness child). Item Triage records only scratch prototypes and patches, no committed canonical fix."
+  },
+  {
+   "ac": "AC-132",
+   "item": "codex-design-readiness-child-rejects-valid-review",
+   "clause": "Bounded five-source time budget; typed outputSchema accepted by Codex; host/child deadline order; failed turn / invalid schema / timeout / lost stdio distinguishable.",
+   "evidence": "Same retirement; belongs to the retired readiness child."
+  },
+  {
+   "ac": "AC-137",
+   "item": "commit-producer-path-order-failures-count-against-the-tool-cap",
+   "clause": "Producer refusals do not count against the budget guard's tool cap (alternative fix).",
+   "evidence": "The item's proposal is 'sort OR exempt OR at minimum state the order'. Sorting (c277e4aac) was chosen, so the budget-guard counting change is not required."
+  },
+  {
+   "ac": "AC-141",
+   "item": "critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+   "clause": "Decide whether a bounded Bash notes write is admitted in the closing lane or Write/Edit is the only documented route.",
+   "evidence": "f95fc6998 records PO decision L: notes via Write/Edit only, no random command (roles/critic.md, templates/prompts/critic-review.md, agents/critic.md). Closing-lane Write/Edit admitted by db17cafa4."
+  },
+  {
+   "ac": "AC-143",
+   "item": "critic-scratch-name-randomness-has-no-admitted-command",
+   "clause": "Provide an admitted plugin script that draws a CSPRNG suffix, creates the scratch directory and appends notes.",
+   "evidence": "f95fc6998 (PO decision L): no random command; bare mkdir with a1 suffix; notes via Write/Edit only."
+  },
+  {
+   "ac": "AC-191",
+   "item": "greenfield-design-course-cost-and-proportionality",
+   "clause": "v2 end-to-end test asserting zero PO proofs before submission, Advisor and readiness, one final DWP proof.",
+   "evidence": "The Advisor/readiness/DWP route is retired: pin header and design-course.md ('There is no mandatory initial Advisor course', DWP-PRESENT-RETIRED, DESIGN-COURSE-RETIRED in design-course-coordinator.mjs); successor policy is one review receipt then present-plan --review-receipt."
+  },
+  {
+   "ac": "AC-191",
+   "item": "greenfield-design-course-cost-and-proportionality",
+   "clause": "Bound the synthetic Advisor/Readiness host test so a closed stdio channel cannot stall the suite.",
+   "evidence": "Same retirement of the Advisor/readiness course (see above)."
+  },
+  {
+   "ac": "AC-195",
+   "item": "guard-push-refuses-read-only-git-without-push",
+   "clause": "A nested shell's non-push git verbs never reach the push gate.",
+   "evidence": "PO decision Q12 option B (nested-shell fail-closed marker rule, lib/git-cmd.mjs header; Ruling 81/157). Recorded as a deliberate refusal in the pin ('point 2, Q12 supersession retained') and hooks/guard-push.test.mjs PGC-T85d, 'option B accepted false positive'."
+  },
+  {
+   "ac": "AC-244",
+   "item": "revised-native-design-cannot-reach-a-new-advisor-course",
+   "clause": "A native-runner revision opens a child course bound to the registered authoring dispatch; reusing a decision reference is refused.",
+   "evidence": "ADR-0085 lines 68-76 remove authoring-dispatch registration and the private Advisor course store with parent/child courses. Caveat: the ADR text says 'Decision (proposed)'; confirm PO acceptance in docs/state.md."
+  },
+  {
+   "ac": "AC-244",
+   "item": "revised-native-design-cannot-reach-a-new-advisor-course",
+   "clause": "An interrupted export re-run yields byte-identical artifacts; a second re-run is a no-op (R4-7).",
+   "evidence": "Course export belongs to the course store retired by ADR-0085 line 74 (same caveat)."
+  }
+ ],
+ "evidenceFiles": {
+  "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs": [
+   "AC-102",
+   "AC-197",
+   "AC-240"
+  ],
+  "guard-lifecycle-ready.test.mjs": [
+   "AC-102",
+   "AC-167",
+   "AC-240"
+  ],
+  "harness/scripts/generate-agent-obligations.test.mjs": [
+   "AC-106"
+  ],
+  "plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs": [
+   "AC-107"
+  ],
+  "plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs": [
+   "AC-113"
+  ],
+  "bound-path-status-report.test.mjs": [
+   "AC-113"
+  ],
+  "plugins/pipeline-core/lib/pins/approval-verification-demands-head-equals-candidate.test.mjs": [
+   "AC-114"
+  ],
+  "plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs": [
+   "AC-115"
+  ],
+  "plugins/pipeline-core/lib/pins/bootstrap-should-refresh-hooks-when-the-plugin-updated.test.mjs": [
+   "AC-117"
+  ],
+  "plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs": [
+   "AC-118"
+  ],
+  "plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs": [
+   "AC-122"
+  ],
+  "plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs": [
+   "AC-123"
+  ],
+  "lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs": [
+   "AC-123"
+  ],
+  "lib/pins/resume-hint-inspect-is-admitted-in-every-lifecycle-state.test.mjs": [
+   "AC-123"
+  ],
+  "lib/pins/claude-design-readiness-cannot-start-on-windows.test.mjs": [
+   "AC-124"
+  ],
+  "lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs": [
+   "AC-125"
+  ],
+  "lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs": [
+   "AC-126"
+  ],
+  "lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs": [
+   "AC-127"
+  ],
+  "lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs": [
+   "AC-128"
+  ],
+  "lib/pins/codex-advisor-evidence-fails-after-host-update.test.mjs": [
+   "AC-129"
+  ],
+  "plugins/pipeline-core/lib/pins/codex-advisor-shared-namespace-rejects-fresh-repository-identity.test.mjs": [
+   "AC-130"
+  ],
+  "plugins/pipeline-core/lib/codex-design-readiness-host-store.shared-parent.test.mjs": [
+   "AC-130"
+  ],
+  "plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs": [
+   "AC-134"
+  ],
+  "plugins/pipeline-core/lib/pins/codex-readiness-process-root-registration.test.mjs": [
+   "AC-134"
+  ],
+  "plugins/pipeline-core/lib/codex-design-readiness-host-store.test.mjs": [
+   "AC-134"
+  ],
+  "plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs": [
+   "AC-135"
+  ],
+  "plugins/pipeline-core/lib/pins/commit-grammar-hint-still-requires-scratch-message-file.test.mjs": [
+   "AC-136"
+  ],
+  "plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs": [
+   "AC-137"
+  ],
+  "goldfish-commit-command-flow.test.mjs": [
+   "AC-137"
+  ],
+  "plugins/pipeline-core/lib/test-case-completion.test.mjs": [
+   "AC-138"
+  ],
+  "test-case-completion.test.mjs": [
+   "AC-138"
+  ],
+  "lib/worktree-lifecycle.test.mjs": [
+   "AC-139"
+  ],
+  "worktree-lifecycle.test.mjs": [
+   "AC-139"
+  ],
+  "...concurrent-session-warning-never-fires-on-native-windows.test.mjs": [
+   "AC-139"
+  ],
+  "plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs": [
+   "AC-140"
+  ],
+  "pre-commit-hook-install.test.mjs": [
+   "AC-140"
+  ],
+  "configure-verify-names-the-unmet-approval-condition.test.mjs": [
+   "AC-140"
+  ],
+  "dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs": [
+   "AC-141"
+  ],
+  "...critic-round-cap-and-delta-scope-are-not-enforced.test.mjs": [
+   "AC-142"
+  ],
+  "check-critic-skip-coverage.test.mjs": [
+   "AC-142"
+  ],
+  "plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs": [
+   "AC-144"
+  ],
+  "plugins/pipeline-core/lib/pins/cross-runner-chat-intake-reference-needs-host-capture.test.mjs": [
+   "AC-145"
+  ],
+  "plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs": [
+   "AC-147"
+  ],
+  "passive-read-policy.test.mjs": [
+   "AC-147"
+  ],
+  "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs": [
+   "AC-148"
+  ],
+  "plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs": [
+   "AC-150"
+  ],
+  "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs": [
+   "AC-152"
+  ],
+  "plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs": [
+   "AC-155"
+  ],
+  "plugins/pipeline-core/lib/pins/design-trailer-verifier-lost-after-closure.test.mjs": [
+   "AC-156"
+  ],
+  "plugins/pipeline-core/lib/pins/design-workflow-package-omits-contract.test.mjs": [
+   "AC-157"
+  ],
+  "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs": [
+   "AC-157",
+   "AC-158"
+  ],
+  "design-workflow-package-v2.test.mjs": [
+   "AC-157"
+  ],
+  "lib/pins/design-workflow-package-v2-readiness-fixture-fails-on-windows.test.mjs": [
+   "AC-158"
+  ],
+  "lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs": [
+   "AC-161"
+  ],
+  "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs": [
+   "AC-161"
+  ],
+  "plugins/pipeline-core/hooks/guard-dispatch.test.mjs": [
+   "AC-162"
+  ],
+  "guard-dispatch.test.mjs": [
+   "AC-162"
+  ],
+  "lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs": [
+   "AC-162"
+  ],
+  "plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs": [
+   "AC-164"
+  ],
+  "scripts/pipeline-start-preflight.path-spelling.test.mjs": [
+   "AC-167"
+  ],
+  "hooks/guard-lifecycle-ready.test.mjs": [
+   "AC-167"
+  ],
+  "elephant-context-measure.test.mjs": [
+   "AC-168"
+  ],
+  "hooks/subagent-start-receipt.test.mjs": [
+   "AC-169"
+  ],
+  "capture-evidence.test.mjs": [
+   "AC-170"
+  ],
+  "scripts/onboarding-init.test.mjs": [
+   "AC-171",
+   "AC-220"
+  ],
+  "onboarding-init.test.mjs": [
+   "AC-171"
+  ],
+  "plugins/pipeline-core/hooks/guard-push-checkpoint-approval.test.mjs": [
+   "AC-172"
+  ],
+  "guard-push.test.mjs": [
+   "AC-172"
+  ],
+  "plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs": [
+   "AC-172"
+  ],
+  "lib/checkpoint-push-approval.test.mjs": [
+   "AC-172"
+  ],
+  "guard-push-checkpoint-approval.test.mjs": [
+   "AC-172"
+  ],
+  "plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs": [
+   "AC-180"
+  ],
+  "plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs": [
+   "AC-181"
+  ],
+  "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs": [
+   "AC-181"
+  ],
+  "plugins/pipeline-core/lib/pins/gitleaks-content-suppression-does-not-match-on-windows.test.mjs": [
+   "AC-182"
+  ],
+  "plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs": [
+   "AC-182"
+  ],
+  "plugins/pipeline-core/lib/pins/gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.test.mjs": [
+   "AC-183"
+  ],
+  "plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs": [
+   "AC-184"
+  ],
+  "plugins/pipeline-core/lib/pins/goldfish-budgets-omit-the-closing-ceremony.test.mjs": [
+   "AC-185"
+  ],
+  "plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs": [
+   "AC-186"
+  ],
+  "plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs": [
+   "AC-187"
+  ],
+  "plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs": [
+   "AC-191"
+  ],
+  "plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs": [
+   "AC-192"
+  ],
+  "plugins/pipeline-core/lib/pins/guard-override-request-digest-drifts-after-arming.test.mjs": [
+   "AC-193"
+  ],
+  "plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs": [
+   "AC-194"
+  ],
+  "plugins/pipeline-core/hooks/guard-push.test.mjs": [
+   "AC-194"
+  ],
+  "hooks/guard-push.test.mjs": [
+   "AC-194",
+   "AC-195"
+  ],
+  "plugins/pipeline-core/lib/pins/guard-push-refuses-read-only-git-without-push.test.mjs": [
+   "AC-195"
+  ],
+  "plugins/pipeline-core/lib/pins/guard-push-treats-gitleaks-as-a-git-command.test.mjs": [
+   "AC-196"
+  ],
+  "plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs": [
+   "AC-196",
+   "AC-237"
+  ],
+  "guard-push-gitleaks-prefix.test.mjs": [
+   "AC-196"
+  ],
+  "plugins/pipeline-core/lib/pins/handover-doc-committed-without-governance-classification.test.mjs": [
+   "AC-198"
+  ],
+  "plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs": [
+   "AC-199"
+  ],
+  "git-cmd.test.mjs": [
+   "AC-199",
+   "AC-237",
+   "AC-238"
+  ],
+  "plugins/pipeline-core/lib/pins/hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows.test.mjs": [
+   "AC-200"
+  ],
+  "lib/human-guard-override-capability-scan.test.mjs": [
+   "AC-202"
+  ],
+  "lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs": [
+   "AC-202"
+  ],
+  "plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs": [
+   "AC-203"
+  ],
+  "plugins/pipeline-core/lib/pins/implementation-without-dispatch-escapes-review-coverage.test.mjs": [
+   "AC-204"
+  ],
+  "plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs": [
+   "AC-205"
+  ],
+  "...kernel-closure-check-masks-violations-after-the-first.test.mjs": [
+   "AC-206"
+  ],
+  "lib/guard-maintenance-window-kernel-closure.test.mjs": [
+   "AC-206"
+  ],
+  "plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs": [
+   "AC-210"
+  ],
+  "clone-hook-readiness.test.mjs": [
+   "AC-210"
+  ],
+  "plugins/pipeline-core/lib/pins/merge-commit-message-skips-conventional-type-check.test.mjs": [
+   "AC-211"
+  ],
+  "plugins/pipeline-core/lib/pins/model-family-approval-with-automatic-version-upgrades.test.mjs": [
+   "AC-212"
+  ],
+  "plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs": [
+   "AC-213"
+  ],
+  "plugins/pipeline-core/lib/pins/model-role-confirmation-prompt-obscures-required-digest.test.mjs": [
+   "AC-214"
+  ],
+  "plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs": [
+   "AC-216"
+  ],
+  "plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs": [
+   "AC-217"
+  ],
+  "plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs": [
+   "AC-218"
+  ],
+  "governance-scope.test.mjs": [
+   "AC-218",
+   "AC-226"
+  ],
+  "plugins/pipeline-core/lib/pins/onboarding-home-override-does-not-bind-machine-plane.test.mjs": [
+   "AC-219"
+  ],
+  "plugins/pipeline-core/lib/pins/onboarding-init-greenfield-matrix-is-serial-and-slow.test.mjs": [
+   "AC-220"
+  ],
+  "plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs": [
+   "AC-221"
+  ],
+  "plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs": [
+   "AC-222"
+  ],
+  "plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs": [
+   "AC-224"
+  ],
+  "plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs": [
+   "AC-225"
+  ],
+  "plugins/pipeline-core/lib/pins/pipeline-hooks-act-in-repositories-that-never-opted-in.test.mjs": [
+   "AC-226"
+  ],
+  "plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs": [
+   "AC-227"
+  ],
+  "plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs": [
+   "AC-228"
+  ],
+  "plugins/pipeline-core/lib/pins/preflight-hides-the-git-error-behind-gs-git-unavailable.test.mjs": [
+   "AC-229"
+  ],
+  "plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs": [
+   "AC-231"
+  ],
+  "plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs": [
+   "AC-232"
+  ],
+  "plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs": [
+   "AC-233"
+  ],
+  "plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs": [
+   "AC-235"
+  ],
+  "plugins/pipeline-core/lib/git-cmd.test.mjs": [
+   "AC-237"
+  ],
+  "plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs": [
+   "AC-245"
+  ],
+  "lib/role-route-preflight.test.mjs": [
+   "AC-245"
+  ],
+  "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs": [
+   "AC-245"
+  ],
+  "plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs": [
+   "AC-246"
+  ],
+  "scripts/scratch-sweep.test.mjs": [
+   "AC-246"
+  ],
+  "plugins/pipeline-core/lib/pins/scratch-must-remain-writable-across-lifecycle-states.test.mjs": [
+   "AC-247"
+  ],
+  "plugins/pipeline-core/lib/pins/script-mediated-writes-bypass-protected-test-paths.test.mjs": [
+   "AC-248"
+  ],
+  "guard-testpath.test.mjs": [
+   "AC-248"
+  ],
+  "plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs": [
+   "AC-249"
+  ],
+  "lib/security-scanner-diagnostics.test.mjs": [
+   "AC-249"
+  ],
+  "plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs": [
+   "AC-250"
+  ],
+  "scripts/security-scan.test.mjs": [
+   "AC-250",
+   "AC-251"
+  ],
+  "plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs": [
+   "AC-251"
+  ],
+  "lib/pins/security-scanner-failure-provenance.test.mjs": [
+   "AC-251"
+  ],
+  "plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs": [
+   "AC-252"
+  ],
+  "plugins/pipeline-core/lib/pins/semgrep-partial-parsing-warnings-fail-the-whole-scan.test.mjs": [
+   "AC-252"
+  ],
+  "semgrep.test.mjs": [
+   "AC-252"
+  ],
+  "security-scan.test.mjs": [
+   "AC-252"
+  ],
+  "pins/semgrep-console-coverage-note-has-no-test.test.mjs": [
+   "AC-252"
+  ],
+  "plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs": [
+   "AC-253"
+  ],
+  "plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs": [
+   "AC-253"
+  ],
+  "plugins/pipeline-core/lib/pins/shell-classifier-faults-on-heredoc-body-text.test.mjs": [
+   "AC-254"
+  ],
+  "pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs": [
+   "AC-255"
+  ],
+  "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs": [
+   "AC-255"
+  ],
+  "harness/scripts/shell-grammar-capability-placement.test.mjs": [
+   "AC-255"
+  ],
+  "guard-split-contract.test.mjs": [
+   "AC-255"
+  ],
+  "pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs": [
+   "AC-257"
+  ],
+  "pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs": [
+   "AC-258"
+  ],
+  "plugins/pipeline-core/lib/pins/signed-quality-package-route-is-not-agent-operable-on-windows.test.mjs": [
+   "AC-259"
+  ],
+  "plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs": [
+   "AC-260"
+  ],
+  "plugins/pipeline-core/lib/pins/source-agent-definition-change-locks-that-agent-until-install.test.mjs": [
+   "AC-263"
+  ],
+  "lib/native-goldfish-host-state.test.mjs": [
+   "AC-264"
+  ],
+  "lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs": [
+   "AC-264"
+  ],
+  "plugins/pipeline-core/scripts/pipeline-state.test.mjs": [
+   "AC-264"
+  ],
+  "plugins/pipeline-core/lib/pins/transfer-redaction-alters-digest-bound-files.test.mjs": [
+   "AC-265"
+  ],
+  "plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs": [
+   "AC-266"
+  ],
+  "lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs": [
+   "AC-266"
+  ],
+  "plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs": [
+   "AC-268"
+  ],
+  "plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs": [
+   "AC-269"
+  ],
+  "plugins/pipeline-core/lib/pins/windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.test.mjs": [
+   "AC-270"
+  ],
+  "plugins/pipeline-core/lib/pins/windows-portable-seed-rolls-back-with-hidden-worktree-error.test.mjs": [
+   "AC-271"
+  ],
+  "plugins/pipeline-core/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs": [
+   "AC-272"
+  ],
+  "pre-push-hook-install.test.mjs": [
+   "AC-272"
+  ],
+  "plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs": [
+   "AC-274"
+  ]
+ }
+}

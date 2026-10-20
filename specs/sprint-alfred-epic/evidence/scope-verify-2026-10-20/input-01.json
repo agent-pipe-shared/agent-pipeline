@@ -1,0 +1,159 @@
+{
+ "part": "01",
+ "rows": [
+  {
+   "n": 2,
+   "itemId": "pipeline.advertised-git-to-head-pipeline-is-refused",
+   "ac": "AC-102",
+   "file": "backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+   "stage": "75",
+   "remeasureReason": "No commit since 98b6e5ca2 touches git-to-head shapes (801ce9e22 and d233987f9 concern env templates); baseline 56015a99e (57 of 57) stands for the original acceptance.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Cover the PF-17 observed shapes (git -C ... show --format= -- | head, rg -o/-c, ls -la) with a counted pin."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "itemId": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+   "ac": "AC-104",
+   "file": "backlog/items/2026-10-05-advisor-provenance-ancestor-check-fails-on-any-sibling-write.md",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item; the cause-field clause and the policy gate stay uncovered.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement and pin the cause-field clause and the policy gate with a counted GREEN."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 6,
+   "itemId": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+   "ac": "AC-106",
+   "file": "backlog/items/2026-10-09-agent-obligations-recommends-a-commit-spelling-guard-push-refuses.md",
+   "stage": "50",
+   "remeasureReason": "Only 00ef3108d touched the obligations generator since the base, and it adds the EL-01 exception trailer, not the recommended commit spelling; the pin of that spelling through the whole guard union is still not shown.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Pin the recommended commit spelling through guard-git, guard-lifecycle-ready and guard-push with stated counts."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 7,
+   "itemId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+   "ac": "AC-107",
+   "file": "backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md",
+   "stage": "75",
+   "remeasureReason": "No commit since 98b6e5ca2 changes this item (keep-baseline rule); no counted GREEN is stated in the new commits either.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "State a counted GREEN for the pin in a commit message or committed evidence."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    },
+    {
+     "owner": "po-acceptance",
+     "what": "PO acceptance is missing."
+    }
+   ]
+  },
+  {
+   "n": 8,
+   "itemId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+   "ac": "AC-108",
+   "file": "backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+   "stage": "50",
+   "remeasureReason": "AGY test commits (70a419084, d197f213e at 5/7 with tests 1 and 7 open, 077305363) fix fixtures or queue behaviour, not the F-02/F-05 clauses or the Critic/Advisor/Verify routes.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Implement and test the AGY happy path and the Critic, Advisor and Verify routes."
+    },
+    {
+     "owner": "native-host",
+     "what": "Observe the AGY routes on a real Antigravity host."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 9,
+   "itemId": "pipeline.agy-el01-write-authorization-gap",
+   "ac": "AC-109",
+   "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+   "stage": "50",
+   "remeasureReason": "No commit since 98b6e5ca2 touches this item; 00ef3108d concerns the Elephant EL-01 trailer, not the AGY write gap, and no authenticated role carrier is shown.",
+   "remeasureOpen": [
+    {
+     "owner": "agent",
+     "what": "Give the EL-01 tripwire pin a stated pass count."
+    },
+    {
+     "owner": "native-host",
+     "what": "Observe the write gap on a real Antigravity host with an authenticated role carrier."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  },
+  {
+   "n": 10,
+   "itemId": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+   "ac": "AC-110",
+   "file": "backlog/items/2026-09-28-agy-imported-plugin-snapshot-shadows-registered-plugin.md",
+   "stage": "50",
+   "remeasureReason": "c2817beda rewrites dangling Antigravity hook wiring on refresh (pin 29/29, imported-snapshot pin 18/18 unchanged), a refresh-behavior fix only; the spike S1-S6, the lock-version-mismatch reason and the docs clauses are still uncovered.",
+   "remeasureOpen": [
+    {
+     "owner": "native-host",
+     "what": "Run the S1-S6 spike on a real Antigravity CLI and record the loaded root, version and policy."
+    },
+    {
+     "owner": "agent",
+     "what": "Add the lock-version-mismatch preflight reason and the docs clauses with counted pins."
+    },
+    {
+     "owner": "critic",
+     "what": "The independent Critic review of the batch has not finished."
+    }
+   ]
+  }
+ ]
+}
