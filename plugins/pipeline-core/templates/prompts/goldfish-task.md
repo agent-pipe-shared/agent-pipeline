@@ -294,11 +294,15 @@ result through the ordinary recovery path. A local host observation is not a
 provider-signed attestation and is not portable to a fresh clone without a
 separate signed export.
 
-For Claude, the native host path additionally requires the dispatch call to set
-`run_in_background: false`; Claude Code's default/background `async_launched`
-response is not a final return and cannot be host-committed. A missing or true
-background flag leaves the ordinary dispatch available but produces no host
-commit authority.
+For Claude, leave `run_in_background` out of the dispatch call, or set it to
+`true`. Claude Code launches an Agent-tool subagent asynchronously even when the
+call asks for the foreground, so the host commit happens when the child stops,
+through the registered SubagentStop route (D19). An explicit
+`run_in_background: false` selects the foreground route, which commits only when
+the PostToolUse carries the child's final return; when Claude Code answers
+`async_launched` instead, nothing completes the launch, and no host commit or
+record is produced (`NGHF-PENDING-UNAVAILABLE`). The foreground cannot be forced
+from the dispatch call.
 
 The dispatcher selects the native binding for the actual caller and inserts it
 before this copied body. Claude uses schema v1 with its functional agent type;
