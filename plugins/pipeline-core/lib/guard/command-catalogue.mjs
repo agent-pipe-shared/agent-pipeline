@@ -156,6 +156,8 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === CLONE_HOOK_READINESS_SCRIPT) return exactRoot(args, root, 0) && args[2] === "--apply" && args.length === 3;
   if (script === REFRESH_MANDATORY_HOOKS_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
+  // AC-123 (PF-21): the bootstrap's mandatory resume-hint read, exactly `inspect --root <this root>`, in every lifecycle state.
+  if (script === fileURLToPath(new URL("../../scripts/resume-hint.mjs", import.meta.url))) return args[0] === "inspect" && exactRoot(args, root, 1) && args.length === 3;
   // F6 is an obligatory read-only diagnosis after governance bootstrap reports failure.
   if (script === resolve(root, "harness/scripts/check-observation-governance.mjs")) return args.length === 0;
   // OBLIGROUTE-1. templates/prompts/agent-obligations.md SS5 tells every dispatched agent to
