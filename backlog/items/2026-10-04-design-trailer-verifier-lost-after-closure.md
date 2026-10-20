@@ -44,3 +44,20 @@ the same way.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Measured 2026-10-20: the dropping merge
+
+`git log -S ELEPHANT_DESIGN_ID -m --all` lists two merges. Counting the needle with
+`git grep -c -e ELEPHANT_DESIGN_ID <commit> -- plugins harness` in each merge and its parents:
+
+| Commit | Role | `dispatch-authorship-verify.mjs` / `.test.mjs` |
+|---|---|---|
+| `7322abf52` (chore(alfred): merge remote feature branch) | merge | 3 / 1 |
+| `cc1470ffa` | its first parent | 3 / 1 |
+| `0aeaef18f` (merge(nova): integriert aktuellen Nova-Stand, 2026-09-20) | merge | 0 / 0 |
+| `ff904be97` | its first parent | 3 / 1 |
+| `14ebe5ec8` | its second parent | 0 / 0 |
+
+The merge `0aeaef18f` dropped the verifier: it took the second parent's version of both files.
+The first acceptance bullet is met by this measurement. The other two (one trailer grammar, a
+merge-survival check) remain open.
