@@ -47,47 +47,32 @@ import {
   sessionCleanupRecoveryInternals,
 } from "./session-cleanup-recovery.mjs";
 import {
-  applyOnboardingKickoff,
-  bindOnboardingSessionCleanup,
   observeSessionCleanupState,
-  planOnboardingKickoff,
   readOnboardingSessionCleanupBinding,
 } from "./onboarding-continuity.mjs";
 import {
   cleanupSession,
   createDetachedWorktree,
-  inspectSignedDescriptorCustodyRepository,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
   retireSessionDescriptor,
   startSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
-import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
-import { prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
+import {
+  bindInsideRequesterContext,
+  createLegacyLayoutFixture,
+  gitRun,
+  invokeCleanupCli,
+  legacyLayoutRoots,
+  migrateToNeutral,
+  rewriteAsLegacyDescriptor,
+  startDescriptorWithBoundRequester,
+} from "./test-session-cleanup-requester-fixture.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
 import { main as sessionCleanupMain } from "../scripts/session-cleanup.mjs";
-import {
-  applyProjectAuthorityMigration,
-  planProjectAuthorityMigration,
-} from "./project-authority.mjs";
 
 function fixture(name) {
-  const root = mkdtempSync(join(tmpdir(), `session-cleanup-recovery-${name}-`));
-  mkdirSync(join(root, ".claude"), { recursive: true });
-  const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
-  assert.equal(git.status, 0, git.stderr);
-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({
-    project: "fixture",
-    verify: "node verify.mjs",
-    autonomy: "bounded",
-    branchModel: "local",
-    worktree: "supported",
-    stakes: "high",
-    constraints: [],
-  }, null, 2)}\n`);
-  const plan = planOnboardingKickoff({ rootDir: root, goal: "Test cleanup recovery backup net" });
-  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
-  return root;
+  return createLegacyLayoutFixture({ prefix: "session-cleanup-recovery", name, goal: "Test cleanup recovery backup net" });
 }
 
 // Migrates a fixture() root's portable state to the NEUTRAL authority path
@@ -99,97 +84,13 @@ function fixture(name) {
 // independently-maintained test files.
 function neutralFixture(name) {
   const root = fixture(name);
-  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
-  const plan = planProjectAuthorityMigration({ rootDir: root });
-  assert.equal(plan.status, "ready");
-  assert.equal(applyProjectAuthorityMigration(plan, { rootDir: root, activate: true }).status, "applied");
+  migrateToNeutral(root);
   return root;
 }
 
-// K1c3 (AC-203): `bindOnboardingSessionCleanup` refuses outside a Source-owned bound requester context, and
-// binds only the requester's own {sessionId, descriptorSha256}; the same design as
-// `scripts/session-cleanup-binding.test.mjs` (commit 9bf8a8619). Production (session-power-controller.mjs
-// `direct`) creates the session descriptor first, binds a requester to exactly that descriptor, and runs the
-// work inside `withSourceOwnedAuthorityContext`. The `start` verb creates its descriptor and binds in one call,
-// and `bind-orphan` binds a descriptor that already exists, so the fixtures rebuild the production order through
-// the bridge's own fixture builder at the seams this file already drives: descriptor creation returns the
-// descriptor the builder created and bound a requester to, and the REAL `bindOnboardingSessionCleanup` runs
-// inside that requester's own context. Nothing is stubbed into a `bound` result.
-const boundRequesterRuntimes = new Map();
-const registryPreparedRoots = new Set();
-const legacyLayoutRoots = new Set();
-let boundRequesterSequence = 0;
-function boundRequesterKey(repository, sessionId) { return `${repository.primaryRoot}\n${sessionId}`; }
-
-// The existing authority-migration builders, exactly as `neutralFixture` applies them.
-function migrateToNeutral(root) {
-  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
-  const plan = planProjectAuthorityMigration({ rootDir: root });
-  assert.equal(plan.status, "ready");
-  assert.equal(applyProjectAuthorityMigration(plan, { rootDir: root, activate: true }).status, "applied");
-}
-
-function startDescriptorWithBoundRequester(repoPath, options = {}) {
-  const repository = inspectSignedDescriptorCustodyRepository(repoPath);
-  // A Source-owned bound bind is admitted only for a neutral project (`continuityJoinActualBoundCleanupOwner`
-  // requires `observed.neutral`), so the first bound start migrates a legacy-layout fixture through the existing
-  // builders, unless the case pins the legacy layout (that case then stays refused and is named as such).
-  if (!legacyLayoutRoots.has(repository.primaryRoot) && !observeSessionCleanupState(repository.primaryRoot).neutral) {
-    migrateToNeutral(repository.primaryRoot);
-  }
-  // A cleanup binding reserves its member in the session-authority registry: initialize the real, empty registry
-  // (no stub) once per root, on the first bound start.
-  if (!registryPreparedRoots.has(repository.primaryRoot)) {
-    prepareSessionAuthorityRegistryFixture({ root: repository.primaryRoot, excludeFromStatus: true });
-    registryPreparedRoots.add(repository.primaryRoot);
-  }
-  const sessionId = options.sessionId ?? `session-${randomBytes(12).toString("hex")}`;
-  boundRequesterSequence += 1;
-  const runtime = createControlledMethodRuntimeFixture({
-    repository,
-    fixtureRoot: join(repository.commonDir, "agent-pipeline", "controlled-method-fixtures", `${sessionId}-${boundRequesterSequence}`),
-    sessionId,
-  });
-  boundRequesterRuntimes.set(boundRequesterKey(repository, sessionId), runtime);
-  const loaded = loadSessionDescriptor(repoPath, sessionId);
-  return {
-    repo: loaded.repo,
-    path: loaded.path,
-    sessionId: loaded.sessionId,
-    ownerNonce: loaded.ownerNonce,
-    descriptorSha256: loaded.descriptorSha256,
-  };
-}
-
-function bindInsideRequesterContext(request) {
-  const repository = inspectSignedDescriptorCustodyRepository(request.rootDir);
-  const runtime = boundRequesterRuntimes.get(boundRequesterKey(repository, request.sessionCleanup?.sessionId));
-  // No requester bound to this descriptor: run the real function in the caller's plain context (it refuses).
-  if (runtime === undefined) return bindOnboardingSessionCleanup(request);
-  return runtime.run(() => bindOnboardingSessionCleanup(request));
-}
-
-const BOUND_REQUESTER_DEPENDENCIES = Object.freeze({
-  startSessionDescriptorFn: startDescriptorWithBoundRequester,
-  bindOnboardingSessionCleanupFn: bindInsideRequesterContext,
-});
-
-function invoke(argv, dependencies = {}) {
-  let output = "";
-  const code = sessionCleanupMain(argv, {}, {
-    requireProjectOnboardingReadyFn() { return { status: "ready" }; },
-    writeFn(value) { output += value; },
-    ...BOUND_REQUESTER_DEPENDENCIES,
-    ...dependencies,
-  });
-  return { code, output: output === "" ? null : JSON.parse(output) };
-}
-
-function gitRun(root, args) {
-  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
-  assert.equal(result.status, 0, result.stderr);
-  return String(result.stdout).trim();
-}
+// K1c3 (AC-203): the bound-requester fixture shared with `scripts/session-cleanup-binding.test.mjs`
+// (`lib/test-session-cleanup-requester-fixture.mjs`).
+function invoke(argv, dependencies = {}) { return invokeCleanupCli(argv, {}, dependencies); }
 
 function gitCommonDir(root) {
   const result = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
@@ -251,15 +152,6 @@ function assertOnboardingBackups(root, preSnapshot) {
     assert.equal(existsSync(path), true, `missing .bak for onboarding private file ${name}`);
     assert.deepEqual(readFileSync(path), bytes, `.bak for ${name} does not carry the exact pre-recovery bytes`);
   }
-}
-
-function rewriteAsLegacyDescriptor(root, sessionId) {
-  const loaded = loadSessionDescriptor(root, sessionId);
-  const descriptor = JSON.parse(readFileSync(loaded.path, "utf8"));
-  descriptor.schema = "pipeline.session-descriptor.v1";
-  delete descriptor.ownerRuntime;
-  writeFileSync(loaded.path, `${JSON.stringify(descriptor, null, 2)}\n`, { mode: 0o600 });
-  return loadSessionDescriptor(root, sessionId);
 }
 
 // Same construction session-cleanup-binding.test.mjs's own
