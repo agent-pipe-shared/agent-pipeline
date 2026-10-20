@@ -10887,7 +10887,7 @@
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-20",
-      "source": "Ordinal-2 delta Critic of e6fec04a0..f62b5143a, finding F-A (major), 2026-10-20",
+      "source": "Ordinal-2 delta Critic of e6fec04a0..f62b5143a, finding F-A, 2026-10-20",
       "deferred": false,
       "sprint": "none"
     },
