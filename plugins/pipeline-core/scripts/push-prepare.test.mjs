@@ -1091,8 +1091,8 @@ test("PUSHSIG-S4c: profile note and sourceRef push line appear only in the slim 
   const full = pushPrepareReport(CHECKPOINT_ARGV, deps);
   assert.match(slim.lines.profileNote, /feature checkpoint: no Verify\/security\/Critic evidence/u);
   assert.equal("profileNote" in full.lines, false);
-  assert.match(slim.lines.gitPush, /refs\/heads\/feat\/x:refs\/heads\/feat\/x/u);
-  assert.doesNotMatch(slim.lines.gitPush, /HEAD:refs/u);
+  const gitPush = slim.lines.gitPush.replaceAll("'\nCMD=${CMD}'", ""); // a deep checkout path wraps the refspec
+  assert.match(gitPush, /refs\/heads\/feat\/x:refs\/heads\/feat\/x/u); assert.doesNotMatch(gitPush, /HEAD:refs/u);
   let stderr = "";
   printReport(slim, { write: () => {}, writeError: (text) => { stderr += text; } });
   assert.match(stderr, /feature checkpoint: no Verify/u);
