@@ -69,10 +69,23 @@ ceremonies: measure in a throwaway clone with real background dispatches which f
 `registry.lock` behind after a dispatch, then narrow the registry so that it keeps the lock only
 after a real partial effect (the "Not in this item" part of
 `backlog/items/2026-10-20-an-orphaned-registry-lock-blocks-every-dispatch.md`).
+Measured: the lock stays behind when a hook is killed while it holds it; the current build retires
+it at the next launch (pinned in `c1bdbe0db`). The retain was not narrowed, because narrowing does
+not help a killed holder. D57 (third PO call the same day): the ordinal-4 Critic and Full Verify
+move after the PO's local test of the candidate; Q14 (a), Q13 (a), Q6 (b); C6 and C2 land in this
+candidate; the Codex-host half of AC-147/209 moves after 0.7.0.
+Landed since: ceremonies C11+C3+C14 (`73c889ad6`), C12 (`21fba99dc`) and C13 (`7a7ccceae`, the PO's
+terminal commit of hook and test), the C13 doc edits (`8b23eecce`), and the Q13 take-over verb
+`session-authority-repair.mjs take-over` (`e3902a6fb`, SAR10). Implementation complete, not accepted.
 Open:
-- ceremonies C11+C3+C14, C12 and C13 (two), then the C13 doc edits; C6 also ready;
-- the ordinal-4 Critic, the last allowed review of this batch;
-- PO decision Q14, Full Verify (needs a clean tree, Q7) and PO acceptance.
+- ceremonies C6 and C2 (ready, clone proof green);
+- PO decision Q15: `guard-git.test.mjs` is 9 lines past its accepted line bound after C13;
+- the delivery matrix remeasured at the final HEAD, then the PO's call to stamp and push;
+- after the local test: the ordinal-4 Critic and Full Verify (needs a clean tree, Q7).
+  `check-doc-contracts.test.mjs` is red 73/76 already at HEAD (broken links from evidence under
+  `specs/` into `scratch/`, the handover's missing link back to calibration), so Full Verify
+  will report it;
+- PO acceptance.
 
 **Claude WSL session, 2026-10-19:** last pushed candidate `e6fec04a0` (checkpoint over the
 stamp `d52de6154`, version `0.7.0+<runner>.20261019205354.d99774b`), pushed to
