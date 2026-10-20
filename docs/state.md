@@ -94,6 +94,17 @@ red suite; the known reds are fixed (doc contracts, the checkpoint fold, the gua
 the delivery matrix credits earlier per-item Critics and counted Verify results; items with no
 review get a new batch. The 2026-10-20 remeasure (`8063c1ce6`): 7 at 25, 144 at 50, 23 at 75,
 index 52.30%.
+
+**Scope route since D60-D62 (2026-10-20):** the scope pass
+(`specs/sprint-alfred-epic/plans/scope-pass-2026-10-20.md`) found the content scope incomplete
+(145 items with open work). D61: everything goes into the candidate, the larger features too;
+ADR-0085 items close as superseded after a PO-visible list; test hosts are Claude on native
+Windows, Codex and Antigravity on WSL (PO) and Claude on WSL (this Elephant session); every
+signature-bound patch is signed in one bundled sitting before Full Verify. D62 adds PF-34 and
+PF-57 (Critic route) to AC-142 and AC-224. The remeasure's open points proved stale in places,
+so every item is re-read against its acceptance before dispatch (21 read-only readers,
+`scratch/scope-verify/`); then Goldfish dispatches per item, the bundled ceremony sitting, Full
+Verify, corrections, stamp and push.
 Open:
 - T1 and T2;
 - the delivery matrix, remeasured after the PO installed the candidate;
