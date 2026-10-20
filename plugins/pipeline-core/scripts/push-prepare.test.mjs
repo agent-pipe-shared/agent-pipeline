@@ -1440,8 +1440,13 @@ test("PF-36: commit-pipeline-owned commits exactly the Pipeline's own files and 
     const committed = run("--root", root);
     assert.equal(committed.status, "committed", JSON.stringify(committed)); assert.deepEqual(committed.owned, ["specs/unit/slice-queue.json"]);
     assert.equal(git("status", "--porcelain").stdout, "");
-    assert.match(git("log", "-1", "--format=%B").stdout, /AI-Assisted: true\nDispatch: stage-0 \(elephant\)/u);
+    // Ordinal-2 Critic F-C: without --agent the commit carries no provenance trailers, as a PO terminal commit.
+    assert.doesNotMatch(git("log", "-1", "--format=%B").stdout, /AI-Assisted|Dispatch:/u);
     assert.equal(run("--root", root).status, "nothing-to-commit");
+    writeFileSync(join(root, "specs/unit/slice-queue.json"), "{\"next\":1}\n");
+    assert.equal(run("--root", root, "--agent").status, "committed");
+    assert.match(git("log", "-1", "--format=%B").stdout, /\n\nAI-Assisted: true\nDispatch: stage-0 \(elephant\)\n/u);
     assert.equal(run().code, "CPO-ARGS");
+    assert.equal(run("--root", root, "--agent", "--agent").code, "CPO-ARGS", "a repeated flag is refused");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 //
-// commit-pipeline-owned.mjs --root <root> [--dry-run]
+// commit-pipeline-owned.mjs --root <root> [--agent] [--dry-run]
 //
 // PF-31, PF-36, PF-40 (D56 (2)): commits exactly the Pipeline's own dirty state files (the governed slice
 // queue, the guard-override audit log) so the clean-tree checks of push-prepare, push-init and the PO
 // approval pass again. It refuses when anything else is dirty, naming those paths: it never commits, stashes
 // or discards a file the Pipeline does not own. Runs from the agent's shell and from the PO's terminal.
+// The caller states who runs it: `--agent` adds the GIT-03 provenance pair (`AI-Assisted: true`,
+// `Dispatch: stage-0 (elephant)`) for an agent session; without it the commit carries no provenance
+// trailers, as a PO's own terminal commit does (ordinal-2 Critic F-C). Nothing is defaulted from a guess.
 //
 // Prints one JSON result. Exit 0: committed | nothing-to-commit | dry-run. Exit 2: refused.
 import { spawnSync } from "node:child_process";
@@ -17,19 +20,23 @@ import { classifyDirtyTree } from "../lib/pipeline-owned-files.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
 const SCHEMA = "pipeline.commit-pipeline-owned.v1";
-const MESSAGE = "chore(pipeline): commit the Pipeline's own state files\n\n"
+const BODY = "chore(pipeline): commit the Pipeline's own state files\n\n"
   + "Committed by commit-pipeline-owned.mjs (PF-31/PF-36/PF-40): the governed slice queue\n"
   + "and the guard-override audit log are written by the Pipeline itself and would\n"
-  + "otherwise keep the tree a push needs clean dirty.\n\n"
-  + "AI-Assisted: true\n"
-  + "Dispatch: stage-0 (elephant)\n";
+  + "otherwise keep the tree a push needs clean dirty.\n";
+const AGENT_TRAILERS = "\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n";
+
+export function commitPipelineOwnedMessage({ agent }) {
+  return agent ? BODY + AGENT_TRAILERS : BODY;
+}
 
 function parse(argv) {
-  const flags = { dryRun: false };
+  const flags = { dryRun: false, agent: false };
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--dry-run" && !flags.dryRun) { flags.dryRun = true; continue; }
+    if (argv[index] === "--agent" && !flags.agent) { flags.agent = true; continue; }
     if (argv[index] === "--root" && flags.root === undefined && typeof argv[index + 1] === "string" && !argv[index + 1].startsWith("--")) { flags.root = argv[index + 1]; index += 1; continue; }
-    return { error: "usage: commit-pipeline-owned.mjs --root <root> [--dry-run]" };
+    return { error: "usage: commit-pipeline-owned.mjs --root <root> [--agent] [--dry-run]" };
   }
   return flags.root === undefined ? { error: "--root <root> is required" } : flags;
 }
@@ -49,7 +56,7 @@ export function commitPipelineOwned(argv, { spawn = spawnSync } = {}) {
   if (parsed.dryRun) return { status: "dry-run", owned };
   const add = git(["add", "--", ...owned]);
   if (!isSuccessfulSpawn(add)) return { status: "refused", code: "CPO-GIT", reason: "git add failed", owned };
-  const commit = git(["commit", "-m", MESSAGE, "--", ...owned]);
+  const commit = git(["commit", "-m", commitPipelineOwnedMessage({ agent: parsed.agent }), "--", ...owned]);
   if (!isSuccessfulSpawn(commit)) return { status: "refused", code: "CPO-GIT", reason: `git commit failed: ${String(commit.stderr ?? "").trim().slice(0, 300)}`, owned };
   const head = git(["rev-parse", "HEAD"]);
   return { status: "committed", owned, commit: isSuccessfulSpawn(head) ? head.stdout.trim() : null };
