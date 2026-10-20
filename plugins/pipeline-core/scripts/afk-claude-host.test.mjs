@@ -226,7 +226,7 @@ function realRepo(prefix) {
 }
 
 function writeRealPreparedRequest(root, request, mode) {
-  const dir = join(root, ".git", "agent-pipeline", "afk", "worker-requests");
+  const dir = join(root, ".git", "agent-pipeline", "afk-worker-requests");
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   chmodSync(dir, 0o700);
   const path = join(dir, `${request.requestSha256}.json`);

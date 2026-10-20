@@ -113,7 +113,9 @@ function ensurePrivateDirectory(root, components) {
 
 function requestPath(root, requestId) {
   if (!SHA256.test(requestId)) throw new Error("invalid request ID");
-  const parent = ensurePrivateDirectory(commonDir(root), ["agent-pipeline", "afk", "worker-requests"]);
+  // Beside, not inside, the ledger root: the AFK ledger refuses unknown entries under agent-pipeline/afk/.
+  // A request prepared by an older build under the old path is not migrated (local, short-lived state).
+  const parent = ensurePrivateDirectory(commonDir(root), ["agent-pipeline", "afk-worker-requests"]);
   return join(parent, `${requestId}.json`);
 }
 
