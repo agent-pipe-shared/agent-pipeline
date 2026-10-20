@@ -43,9 +43,16 @@ Built, not accepted:
   briefing skeleton;
 - the backlog check is valid again (nine item types, eighteen ledger entries), and four suites red on
   `e6fec04a0` are fixed (repair-map AC-4, the architecture overview, the close audit lifecycle).
+Ordinal-2 delta Critic over `e6fec04a0..f62b5143a`: FAIL on F-A and F-B (major), with F-C, F-D
+and F-E minor. The report and its disposition are in
+[ord2-f62b5143a](../specs/sprint-alfred-epic/evidence/critic/ord2-f62b5143a/disposition.md). The
+corrections are Elephant-built, because the Goldfish route needs Spec item rows these items do not
+have. That puts them under the new PO question Q14, together with the D55/D56 commits.
 Open:
-- ceremonies C11+C3+C14 (one registration ceremony), C12, C13 and C6;
-- Full Verify, an ordinal-2 delta Critic from `e6fec04a0`, and PO acceptance.
+- the corrections of F-B (the guard-override ledger leaves the tree; its guard-git writer is ceremony
+  C13, now on the critical path), F-C and F-D, then an ordinal-3 delta Critic;
+- ceremonies C11+C3+C14 (one registration ceremony, the Edit is prepared), C12 (designed), C13 and C6;
+- PO decision Q14, Full Verify and PO acceptance.
 
 **Claude WSL session, 2026-10-19:** last pushed candidate `e6fec04a0` (checkpoint over the
 stamp `d52de6154`, version `0.7.0+<runner>.20261019205354.d99774b`), pushed to
