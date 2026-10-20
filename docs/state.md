@@ -108,6 +108,8 @@ deferrals, releases the reconstructions and the superseded list; D64 puts the Co
 blockers and majors into AC-123, AC-155, AC-207 and AC-264; D65 and D66 decide eight small design
 calls; C15 and C16 collect the protected registration changes for the bundled sitting. Estimate
 (not measured): 5-8 session days to the content-final candidate.
+Closures: M0 (measurements) and W1 (AC-142B, AC-224, AC-155A, implementation complete at
+`c578670d7`, Critic batch and PO acceptance pending) are closed; K1 is in progress.
 
 **Scope route since D60-D62 (2026-10-20):** the scope pass
 (`specs/sprint-alfred-epic/plans/scope-pass-2026-10-20.md`) found the content scope incomplete

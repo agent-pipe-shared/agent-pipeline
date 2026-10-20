@@ -76,3 +76,44 @@ and the next step.
 - **Next:** check the dispatch admission (item row) for each cluster's owning item; cross K1 with
   the E24/E32 case list (D66 parks those cases as typed pending); order K6 after the wave-1
   packages AC-142 and AC-224, whose write scopes overlap it.
+- **Admission check (done 2026-10-20):** K3 and K5 have no item row (epic AC-19 and AC-12);
+  decided as D68: K3 goes to AC-119, K5's documentation is fixed by the Elephant directly, and its
+  checker change runs under the D68 exception.
+
+### W1 wave-1 Goldfish packages (2026-10-20, closed at `c578670d7`)
+
+- **Status:** closed. Implementation complete; batch Critic review and PO acceptance pending.
+- **AC-142 (PF-34, PF-57 (1)):** the first dispatch `ALF-D61-AC142` measured that the route
+  itself (review unit at registration, `register-feature-package.mjs --add-review-unit`, the v2
+  schema in both templates) was already delivered by `cf658960c`, and spent its budget on that;
+  no edits; slice cancelled `--started`. The follow-up `ALF-D61-AC142B` (`db930a359`, plus
+  whitespace `991da6f54`) adds the `repair` text to the `CCA-REVIEW-UNIT-REQUIRED` refusal and an
+  arguments gate as the first step of the `critic-review` skill. Orchestrator run:
+  critic-dispatch-preflight 46/46 (case CDPF003 RED before, GREEN after per the Goldfish),
+  critic-course-admission 18/18, check-consumer-safe-paths 9/9.
+- **AC-224 (PF-57 (2)):** `ALF-D61-AC224` (`65452bd6f`, plus the one-line CLI parse fix
+  `ac7ce96d1`) adds `verify-evidence-producer.mjs --commit <sha>`: Verify for that local commit in a
+  temporary owner-only worktree under the Git common dir, removed on success and failure; typed
+  codes VEP-COMMIT-INVALID, -NOT-LOCAL, -MODE, -WORKTREE, -CLEANUP. Orchestrator run:
+  verify-evidence-producer 34/39 with exactly the five pre-existing reds (red with the same names
+  at `d02409a8a`, K6), critic-dispatch-preflight 46/46, check-consumer-safe-paths 9/9. The first
+  run of the three worktree cases failed with `VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE` until the
+  container was created 0700.
+- **AC-155A (D64 receipt provenance):** `ALF-D61-AC155A` (`c578670d7`): the receipt producer no
+  longer reads the Critic profile's model; role, requested route and observed identity are
+  reported separately, `reviewer.model` carries the observation or `unknown`. Orchestrator run:
+  design-review-receipt 32/32 and fourteen neighbouring suites green; the two receipt-using pins
+  that stay red (approval-bound-design-package 4/11, configure-verify-names-the-unmet-condition
+  4/6) are red with the same counts in the Full Verify measurement (K2).
+- **Rest, with owner:** the CCA019+ admitted-course case for AC-142 was not built (it needs a new
+  case-id registration, C15/C16); `CCA-REVIEW-UNIT-BINDING` for a course with a retained review stays
+  a PO design point; `--commit` with the Critic-bound options, release, push and `--event-out` is
+  refused, not implemented; a SIGKILLed `--commit` run leaves an orphan container (no sweeper);
+  Windows private-directory handling of that container is unverified; the receipt library cannot
+  persist role and route (`lib/design-review-receipt.mjs` fixes `reviewer` to `{model, runner}`);
+  the receipt test header prose is stale; `codex-isolated-critic-protected-preimage` pins are stale
+  and now also miss the new `skills/critic-review/SKILL.md` digest (K6);
+  `lib/git-cmd.test.mjs` is 1407 lines, past its accepted 1384 (the AC-238 cases, `4838c0efc`),
+  a second architecture-check violation beside guard-git.test (Q15).
+- **Next:** K1 (session-authority domain and continuity binding) with K1h measured first under
+  Verify concurrency; cross K1 with E24/E32 before briefing.

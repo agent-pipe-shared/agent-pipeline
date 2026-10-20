@@ -3,17 +3,77 @@
   "plan": "specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md",
   "rule": "D67: one cluster in-progress at a time; a cluster is closed only when the committed plan carries its closure heading '### <id> '; no dispatch for a cluster that is not in-progress, while the tree is dirty, or while an earlier started cluster lacks its closure.",
   "clusters": [
-    { "id": "M0", "title": "measurements before K1", "status": "closed", "next": "-" },
-    { "id": "W1", "title": "wave-1 Goldfish packages AC-142 (PF-34, PF-57 1), AC-224 (PF-57 2), AC-155A (receipt provenance)", "status": "in-progress", "next": "relaunch ALF-D61-AC142 at current HEAD, then AC-224, then AC-155A, one at a time" },
-    { "id": "K1", "title": "session-authority domain and continuity binding", "status": "open", "next": "cross with E24/E32 case list; check item admission (AC-224, AC-203)" },
-    { "id": "K1h", "title": "hang group and Verify-only reds (with K10)", "status": "open", "next": "measure under Verify concurrency" },
-    { "id": "K2", "title": "ADR-0085 retirement not followed by tests", "status": "open", "next": "check item admission" },
-    { "id": "K3", "title": "architecture decisions (AC-19)", "status": "open", "next": "check item admission; fold into AC-9 diagnosis if no row" },
-    { "id": "K4", "title": "human approval and signed integration", "status": "open", "next": "check item admission" },
-    { "id": "K5", "title": "documentation and text contracts", "status": "open", "next": "owner missing for doc-contracts fix (D60 a)" },
-    { "id": "K6", "title": "dispatch authorship and Critic coverage (regression after d02409a8a)", "status": "open", "next": "after W1; bisect d02409a8a..HEAD first" },
-    { "id": "K7", "title": "registration checkers and case drift", "status": "open", "next": "build C15/C16 drop-ins" },
-    { "id": "K8", "title": "guard hook suites that crash or time out", "status": "open", "next": "diagnose and prepare drop-ins (protected sources)" },
-    { "id": "K9", "title": "remaining single suites", "status": "open", "next": "split by area" }
+    {
+      "id": "M0",
+      "title": "measurements before K1",
+      "status": "closed",
+      "next": "-"
+    },
+    {
+      "id": "W1",
+      "title": "wave-1 Goldfish packages AC-142 (PF-34, PF-57 1), AC-224 (PF-57 2), AC-155A (receipt provenance)",
+      "status": "closed",
+      "next": "-"
+    },
+    {
+      "id": "K1",
+      "title": "session-authority domain and continuity binding",
+      "status": "in-progress",
+      "next": "cross with E24/E32; measure K1h under Verify concurrency; brief one deep package via AC-224 / AC-203"
+    },
+    {
+      "id": "K1h",
+      "title": "hang group and Verify-only reds (with K10)",
+      "status": "open",
+      "next": "measure under Verify concurrency"
+    },
+    {
+      "id": "K2",
+      "title": "ADR-0085 retirement not followed by tests",
+      "status": "open",
+      "next": "check item admission"
+    },
+    {
+      "id": "K3",
+      "title": "architecture decisions (AC-19)",
+      "status": "open",
+      "next": "owner AC-119 (D68)"
+    },
+    {
+      "id": "K4",
+      "title": "human approval and signed integration",
+      "status": "open",
+      "next": "check item admission"
+    },
+    {
+      "id": "K5",
+      "title": "documentation and text contracts",
+      "status": "open",
+      "next": "docs by Elephant; checker change under the D68 exception"
+    },
+    {
+      "id": "K6",
+      "title": "dispatch authorship and Critic coverage (regression after d02409a8a)",
+      "status": "open",
+      "next": "after W1; bisect d02409a8a..HEAD first"
+    },
+    {
+      "id": "K7",
+      "title": "registration checkers and case drift",
+      "status": "open",
+      "next": "build C15/C16 drop-ins"
+    },
+    {
+      "id": "K8",
+      "title": "guard hook suites that crash or time out",
+      "status": "open",
+      "next": "diagnose and prepare drop-ins (protected sources)"
+    },
+    {
+      "id": "K9",
+      "title": "remaining single suites",
+      "status": "open",
+      "next": "split by area"
+    }
   ]
 }
