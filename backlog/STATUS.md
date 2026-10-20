@@ -843,6 +843,7 @@
 | pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries | closed | defect | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.the-guard-git-test-is-past-its-line-bound | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
@@ -947,7 +948,7 @@
 
 ## Counts
 
-- open: 261
+- open: 262
 - in_progress: 0
 - closed: 664
 - rejected: 3

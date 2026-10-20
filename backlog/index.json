@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6353fa79235e634ea3289c19a859c29de9e6f656fff7fd7d882f0c2f3457b890"
+    "transitionHead": "1a190db81aebc48f2f38113958d43bf11a30184359b0023a60b20fc18cd02bb9"
   },
   "counts": {
-    "open": 261,
+    "open": 262,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -10731,6 +10731,16 @@
       "closureRepository": "self",
       "closureCommit": "63c1a8ab06f2169ad490b3a1c3d5b178707f1d4c",
       "closureEvidence": "templates/prompts/goldfish-task.md"
+    },
+    {
+      "id": "pipeline.the-guard-git-test-is-past-its-line-bound",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "architecture-boundary-check.mjs --root . after ceremony C13 (7a7ccceae); PO question Q15",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths",
