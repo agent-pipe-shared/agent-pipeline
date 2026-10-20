@@ -120,8 +120,9 @@ is spent on a push the guard would refuse (PF-32). Adding the policy changes the
 manifest, which the plan approval binds: approve the plan again afterwards (PF-33).
 
 **A tree dirty only with the Pipeline's own files** (the governed
-`specs/<feature>/slice-queue.json` a dispatch binding writes, the guard-override
-audit log a signed push writes) is named by every clean-tree refusal together with
+`specs/<feature>/slice-queue.json` a dispatch binding writes, and a tree
+guard-override audit log an older build left; a current build writes that log under
+the common Git directory) is named by every clean-tree refusal together with
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/commit-pipeline-owned.mjs" --root <repo> --agent`,
 which commits exactly those files and refuses if anything else is dirty
 (PF-31/PF-36/PF-40). The caller states who runs it: `--agent` (an agent session)
@@ -675,7 +676,8 @@ narrowing.
 - A harness-classifier denial arrives *after* `guard-git.mjs` has already
   consumed the one-time `GG-03` token. The token is spent, the push did not
   happen, and the retry needs a fresh token. Do not assume a blocked command
-  left the ledger untouched — read `project/guard-override.log.jsonl`.
+  left the ledger untouched — read `agent-pipeline/guard-override.log.jsonl`
+  under the repository's common Git directory (`git rev-parse --git-common-dir`).
 - `approve-push` writes into the tracked `project/pipeline-state.json`, so the
   tree is dirty from that moment on. **Commit nothing between `approve-push` and
   the push**: every commit moves `HEAD` past the `forCommit` the signature

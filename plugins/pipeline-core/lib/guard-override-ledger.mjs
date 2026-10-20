@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
- * D56 (2): where the guard-override audit ledger is to live once the guard hook uses this module.
+ * D56 (2): where the guard-override audit ledger lives.
  *
  * `hooks/guard-git.mjs` appends one entry for every applied override and signed push. In the tracked
- * tree (`project/guard-override.log.jsonl`, legacy `.claude/guard-override.log.jsonl`) each entry makes
- * the tree dirty, and the next clean-tree check refuses. This module places the ledger under the
+ * tree (`project/guard-override.log.jsonl`, legacy `.claude/guard-override.log.jsonl`) each entry made
+ * the tree dirty, and the next clean-tree check refused. This module places the ledger under the
  * repository's common Git directory, which every worktree of the repository shares, outside the tree.
- *
- * Not yet in effect: `hooks/guard-git.mjs` is a protected file, so it changes to this module only through
- * its signed override route, and until that change lands the hook still appends to the tree ledger and an
- * override still dirties the tree. This module's only caller so far is its test.
  *
  * A ledger an older build left in the tree is still read, before the new one: its entries keep counting
  * as consumed, so an override used before the move cannot be replayed. A root that is not a Git
  * repository has no common directory and keeps the tree ledger the caller resolved.
  *
- * The read side skips an unreadable file and a corrupt line, exactly as the hook does today (each entry is
+ * The read side skips an unreadable file and a corrupt line, exactly as the hook did before the move (each entry is
  * one append of one whole line), so the move changes where the ledger is, not what counts as consumed.
  * A new ledger file is created owner-only (`0o600`). The `0o700` directory mode applies only when this
  * module creates the directory; a directory that already exists keeps its mode.

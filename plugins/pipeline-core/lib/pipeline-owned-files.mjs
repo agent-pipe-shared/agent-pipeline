@@ -2,8 +2,10 @@
 /**
  * PF-31, PF-36, PF-40 (D56 (2)): files the Pipeline itself writes into the working tree.
  *
- * The governed slice queue (`specs/<feature>/slice-queue.json`) is written by a dispatch binding,
- * and the guard-override audit log by a signed push. Each then makes the tree dirty, and the
+ * The governed slice queue (`specs/<feature>/slice-queue.json`) is written by a dispatch binding. An
+ * older build also wrote the guard-override audit log into the tree on a signed push; a current build
+ * writes it under the common Git directory (`lib/guard-override-ledger.mjs`), so in the tree it is only
+ * that older build's leftover. Each then makes the tree dirty, and the
  * Pipeline's own clean-tree checks refused with a bare "commit or stash". The checks stay strict, so a
  * push candidate still binds every file; a refusal now recognizes these files and names the one
  * sanctioned command that commits exactly them, `scripts/commit-pipeline-owned.mjs`.

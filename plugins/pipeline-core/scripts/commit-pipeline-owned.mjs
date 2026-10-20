@@ -4,7 +4,7 @@
 // commit-pipeline-owned.mjs --root <root> (--agent | --human) [--dry-run]
 //
 // PF-31, PF-36, PF-40 (D56 (2)): commits exactly the Pipeline's own dirty state files (the governed slice
-// queue, the guard-override audit log) so the clean-tree checks of push-prepare, push-init and the PO
+// queue, and a tree guard-override audit log an older build left) so the clean-tree checks of push-prepare, push-init and the PO
 // approval pass again. It refuses when anything else is dirty, naming those paths: it never commits, stashes
 // or discards a file the Pipeline does not own. Runs from the agent's shell and from the PO's terminal.
 // The caller states who runs it, and exactly one of the two flags is required: `--agent` adds the GIT-03
@@ -22,9 +22,9 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
 const SCHEMA = "pipeline.commit-pipeline-owned.v1";
 const BODY = "chore(pipeline): commit the Pipeline's own state files\n\n"
-  + "Committed by commit-pipeline-owned.mjs (PF-31/PF-36/PF-40): the governed slice queue\n"
-  + "and the guard-override audit log are written by the Pipeline itself and would\n"
-  + "otherwise keep the tree a push needs clean dirty.\n";
+  + "Committed by commit-pipeline-owned.mjs (PF-31/PF-36/PF-40): the governed slice queue,\n"
+  + "and a tree guard-override audit log an older build left, are written by the Pipeline\n"
+  + "itself and would otherwise keep the tree a push needs clean dirty.\n";
 const AGENT_TRAILERS = "\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n";
 
 export function commitPipelineOwnedMessage({ agent }) {
