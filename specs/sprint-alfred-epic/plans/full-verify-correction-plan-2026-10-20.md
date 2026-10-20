@@ -226,3 +226,33 @@ Interim entry. Changes the direction of K1c4.
   `createControlledMethodRuntimeFixture` (session-requester-bridge.mjs 686) always starts the descriptor
   with the live test pid and has no owner option.
 - **K1c4 is held** until the PO decides A-C (tiles).
+
+### K1 measurement 5 (2026-10-20, dispatch ALF-K1-LOST-BINDING-RELEASE, no edits; orchestrator checks)
+
+Interim entry. PO decided A-C as D70 (all (a)).
+
+- **The first D70 (a) dispatch** spent its budget reading and returned a design, no edits. Corrections it
+  found: call site ~1216 (`applyOrphanDescriptorArchive`) is not an activated recovery verb and stays
+  as it is; the activated sites are ~793 (composite apply) and ~1835 (`release-lost-binding` apply).
+  The two red cases must run the apply in a fresh process, because in one process the bind leaves the
+  binding in `continuityAuthorityDirectBindings`. Design: zero-growth `export` of
+  `releaseOnboardingSessionCleanupInternal` and `continuityAuthorityRepository`; a new module
+  `lib/session-cleanup-lost-binding.mjs` that checks the activated plan itself, the binding tuple, the
+  State CAS and that no descriptor or owner is live, then releases inside `withSessionAuthorityBoundary`.
+- **Registry gap (orchestrator, code reading):** a crashed process leaves the onboarding-continuity
+  member `armed` and bound. `healDrift` (`lib/session-authority-registry.mjs` 310-331) deliberately
+  skips a producer with a bound armed or running member, so after the binding is released the
+  registry would refuse with `onboarding-continuity:namespace-drift`, and its repair text points at
+  slice cancellation, which does not apply to a continuity member. The D70 (a) route therefore also has
+  to bring that member to a terminal state (or the heal has to admit a member whose descriptor is
+  absent and whose owner is not live). This touches the registry.
+- **Line bounds (ratchet):** `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs` reports
+  four violations: `scripts/session-cleanup-binding.test.mjs` 3242 lines (accepted 3138) and
+  `lib/session-cleanup-recovery.test.mjs` 1502 (accepted 1422), both grown by `9bf8a8619` and
+  `7ad584f18`; plus the known `hooks/guard-git.test.mjs` and `lib/git-cmd.test.mjs` (W1 rest, Q15).
+  `lib/onboarding-continuity.mjs` (12295), `lib/session-authority-registry.mjs` (1390) and
+  `lib/session-cleanup-recovery.mjs` (3161) are exactly at their accepted bounds.
+- **Next:** K1s splits the shared bound-requester fixture helpers of both session-cleanup suites into one
+  test fixture module, bringing both files back under their bounds with unchanged counts; then the
+  D70 (a) route is re-dispatched with the corrected design, the registry member in scope, and the rule
+  that new code goes to new modules.
