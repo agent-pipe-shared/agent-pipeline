@@ -94,7 +94,8 @@ test("a produced receipt parses, summarizes, and carries the clock, the report h
   assert.equal(parsed.receipt.report.sha256, sha(readFileSync(join(repo, REPORT1))));
   assert.equal(parsed.receipt.sources.prd.sha256, sha(readFileSync(join(repo, PRD))));
   assert.equal(parsed.receipt.sources.spec.sha256, sha(readFileSync(join(repo, SPEC))));
-  assert.equal(parsed.receipt.reviewer.model, criticModel());
+  assert.equal(parsed.receipt.reviewer.model, "unknown");
+  assert.notEqual(parsed.receipt.reviewer.model, criticModel());
   assert.equal(parsed.receipt.reviewer.runner, "claude");
   assert.equal(parsed.receipt.kind, "initial");
   assert.equal(parsed.receipt.round, 1);
@@ -202,14 +203,57 @@ test("no runner signal is refused and nothing is written", withRepo((repo) => {
   assert.equal(existsSync(join(repo, RECEIPT1)), false);
 }));
 
-test("a Critic agent definition without a usable model line is refused", withRepo((repo) => {
-  const noModel = join(repo, "critic-no-model.md");
-  writeFileSync(noModel, "---\nname: critic\n---\nbody\n");
-  const missing = createReceiptFromDisk(request(repo), { env: CLAUDE, now, criticAgentUrl: pathToFileURL(noModel) });
-  assert.equal(missing.code, "DRC-MODEL-UNAVAILABLE");
-  const absent = createReceiptFromDisk(request(repo), { env: CLAUDE, now, criticAgentUrl: pathToFileURL(join(repo, "absent.md")) });
-  assert.equal(absent.code, "DRC-MODEL-UNAVAILABLE");
+test("the Critic agent definition is never consulted: an agent profile's model cannot become the executed model", withRepo((repo) => {
+  const profile = join(repo, "critic-profile.md");
+  writeFileSync(profile, "---\nname: critic\nmodel: profile-model-7\n---\nbody\n");
+  const result = createReceiptFromDisk(request(repo), { env: CLAUDE, now, criticAgentUrl: pathToFileURL(profile) });
+  assert.equal(result.ok, true);
+  assert.equal(result.receipt.reviewer.model, "unknown");
+  assert.equal(result.observedIdentity, "unknown");
+  assert.notEqual(result.receipt.reviewer.model, "profile-model-7");
+  assert.equal(readFileSync(join(repo, RECEIPT1), "utf8").includes("profile-model-7"), false);
+}));
+
+test("no observation records unknown, with the role named and no requested route", withRepo((repo) => {
+  const result = createReceiptFromDisk(request(repo), { env: CLAUDE, now });
+  assert.equal(result.ok, true);
+  assert.deepEqual([result.reviewerRole, result.requestedRoute, result.observedIdentity], ["critic", null, "unknown"]);
+  assert.equal(result.receipt.reviewer.model, "unknown");
+}));
+
+test("a requested route is recorded as requested and never as executed", withRepo((repo) => {
+  const result = createReceiptFromDisk(request(repo, { requestedRoute: "opus-4-7" }), { env: CLAUDE, now });
+  assert.equal(result.ok, true);
+  assert.equal(result.requestedRoute, "opus-4-7");
+  assert.equal(result.observedIdentity, "unknown");
+  assert.equal(result.receipt.reviewer.model, "unknown");
+  assert.equal(readFileSync(join(repo, RECEIPT1), "utf8").includes("opus-4-7"), false);
+}));
+
+test("a supplied observation is recorded as observed, apart from the requested route", withRepo((repo) => {
+  const result = createReceiptFromDisk(request(repo, { requestedRoute: "opus", observedIdentity: "claude-opus-4-7" }), { env: CLAUDE, now });
+  assert.equal(result.ok, true);
+  assert.equal(result.requestedRoute, "opus");
+  assert.equal(result.observedIdentity, "claude-opus-4-7");
+  assert.equal(result.receipt.reviewer.model, "claude-opus-4-7");
+  assert.equal(parseDesignReviewReceipt(readFileSync(join(repo, RECEIPT1))).ok, true);
+}));
+
+test("a malformed requested route or observed identity is refused and writes nothing", withRepo((repo) => {
+  for (const over of [{ observedIdentity: "has space" }, { observedIdentity: "" }, { requestedRoute: "" }, { requestedRoute: "two words" }]) {
+    const result = createReceiptFromDisk(request(repo, over), { env: CLAUDE, now });
+    assert.deepEqual([result.ok, result.code], [false, "DRC-USAGE"], JSON.stringify(over));
+  }
   assert.equal(existsSync(join(repo, RECEIPT1)), false);
+}));
+
+test("the command line reports role, requested route and observed identity separately", withRepo((repo) => {
+  const plain = runMain(baseArgv(repo));
+  assert.deepEqual([plain.json.reviewerRole, plain.json.requestedRoute, plain.json.observedIdentity], ["critic", null, "unknown"]);
+  const observed = runMain(baseArgv(repo, { out: RECEIPT2, "requested-route": "opus", "observed-identity": "claude-opus-4-7" }));
+  assert.equal(observed.code, 0, observed.stderr);
+  assert.deepEqual([observed.json.requestedRoute, observed.json.observedIdentity], ["opus", "claude-opus-4-7"]);
+  assert.equal(parseDesignReviewReceipt(readFileSync(join(repo, RECEIPT2))).receipt.reviewer.model, "claude-opus-4-7");
 }));
 
 test("library refusals pass through under their own code and write nothing", withRepo((repo) => {
@@ -321,7 +365,8 @@ test("the spawned command reads the real clock and the ambient runner signal", w
   const stamped = Date.parse(parsed.receipt.reviewedAt);
   assert.ok(stamped >= before && stamped <= after, `reviewedAt ${parsed.receipt.reviewedAt} outside [${before}, ${after}]`);
   assert.equal(parsed.receipt.reviewer.runner, "claude");
-  assert.equal(parsed.receipt.reviewer.model, criticModel());
+  assert.equal(parsed.receipt.reviewer.model, "unknown");
+  assert.notEqual(parsed.receipt.reviewer.model, criticModel());
 }));
 
 test("the spawned command with every runner signal stripped refuses and writes nothing", withRepo((repo) => {

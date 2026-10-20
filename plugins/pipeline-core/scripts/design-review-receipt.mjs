@@ -11,7 +11,10 @@
  *   reviewedAt       the clock, at production time (injectable only through the exported API)
  *   reviewer.runner  the runtime signal in the environment (CLAUDECODE, ANTIGRAVITY_AGENT or
  *                    AI_AGENT=antigravity, CODEX_SESSION_ID or CODEX_THREAD_ID); no signal refuses
- *   reviewer.model   the `model:` line of the Critic agent definition (agents/critic.md)
+ *   reviewer.model   the OBSERVED execution identity the caller supplies, else `unknown`. It is never read
+ *                    from an agent profile: a profile's `model:` line is a request, not an observation.
+ *                    The result and the CLI report additionally carry the reviewer role (`critic`) and the
+ *                    requested route, as the caller supplies it, kept apart from the observation.
  *   every sha256     the bytes of the file on disk
  * There is deliberately no flag for a timestamp, a hash, a runner or a model: such a flag is refused
  * as DRC-FORBIDDEN-FLAG. The bytes are the library's own canonical output (createDesignReviewReceipt)
@@ -19,7 +22,7 @@
  *
  * Refusals are typed. Library codes (DRR-*) pass through unchanged; this command adds DRC-USAGE,
  * DRC-UNKNOWN-FLAG, DRC-FORBIDDEN-FLAG, DRC-PATH-UNSAFE, DRC-OUT-EXISTS, DRC-OUT-PARENT-MISSING,
- * DRC-FILE-MISSING, DRC-FILE-UNSAFE, DRC-NO-RUNNER, DRC-MODEL-UNAVAILABLE, DRC-CLOCK,
+ * DRC-FILE-MISSING, DRC-FILE-UNSAFE, DRC-NO-RUNNER, DRC-CLOCK,
  * DRC-REPO-INVALID, DRC-WRITE-FAILED and DRC-INTERNAL.
  *
  * Its pure counterpart is lib/design-review-receipt-write-guard.mjs, which recognises a receipt that
@@ -36,14 +39,19 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
 
 const USAGE = "Usage: design-review-receipt.mjs create --repo <repo-root> --feature <feature-id> --report <critic-report> --prd <prd> --spec <spec> "
-  + "[--companion <path>]... [--previous <receipt>] [--open-finding <id>]... --out <receipt>\n"
-  + "Every path is repo-relative. The review time, runner, reviewer model and all digests are derived, never supplied.";
+  + "[--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] --out <receipt>\n"
+  + "Every path is repo-relative. The review time, runner and all digests are derived, never supplied. The observed identity is "
+  + "recorded only when you supply a direct observation of the concrete review dispatch; otherwise it is `unknown`.";
 
-const DEFAULT_CRITIC_AGENT_URL = new URL("../agents/critic.md", import.meta.url);
+export const OBSERVED_IDENTITY_UNKNOWN = "unknown";
+export const REVIEWER_ROLE = "critic";
+const OBSERVED_IDENTITY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,127}$/u;
+const REQUESTED_ROUTE_PATTERN = /^[\x21-\x7e]{1,128}$/u;
 
 const SINGLE_FLAGS = new Map([
   ["repo", "repo"], ["feature", "featureId"], ["report", "reportPath"], ["prd", "prdPath"],
   ["spec", "specPath"], ["previous", "previousPath"], ["out", "outPath"],
+  ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
 ]);
 const REPEATED_FLAGS = new Map([["companion", "companionPaths"], ["open-finding", "openFindingIds"]]);
 const REQUIRED = ["repo", "feature", "report", "prd", "spec", "out"];
@@ -76,24 +84,6 @@ export function detectRunner(env) {
   if (source.ANTIGRAVITY_AGENT === "1" || source.AI_AGENT === "antigravity") return "antigravity";
   const nonEmpty = (value) => typeof value === "string" && value.length > 0;
   if (nonEmpty(source.CODEX_SESSION_ID) || nonEmpty(source.CODEX_THREAD_ID)) return "codex";
-  return null;
-}
-
-/** The `model:` value of the agent definition's frontmatter, or null. */
-function readCriticModel(url) {
-  let text;
-  try {
-    text = readFileSync(url, "utf8");
-  } catch {
-    return null;
-  }
-  const lines = text.split(/\r?\n/u);
-  if (lines[0] !== "---") return null;
-  for (let index = 1; index < lines.length; index += 1) {
-    if (lines[index] === "---") return null;
-    const match = /^model:[ \t]*(?:"([^"]*)"|'([^']*)'|(\S+))[ \t]*$/u.exec(lines[index]);
-    if (match) return match[1] ?? match[2] ?? match[3];
-  }
   return null;
 }
 
@@ -137,19 +127,27 @@ const sha256Of = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 /**
  * Produce a receipt from files on disk and write it with exclusive create.
- * `deps.now` and `deps.criticAgentUrl` exist for tests; no command-line flag reaches them.
+ * `deps.now` exists for tests; no command-line flag reaches them.
  * @returns {{ ok: true, path: string, sha256: string, receipt: object } | { ok: false, code: string, message: string }}
  */
 export function createReceiptFromDisk(input, deps = {}) {
-  const { env = process.env, now = () => new Date(), criticAgentUrl = DEFAULT_CRITIC_AGENT_URL } = deps;
+  const { env = process.env, now = () => new Date() } = deps;
   const request = input ?? {};
   const companionPaths = request.companionPaths ?? [];
   const openFindingIds = request.openFindingIds ?? [];
   const previousPath = request.previousPath ?? null;
+  const requestedRoute = request.requestedRoute ?? null;
+  const observedIdentity = request.observedIdentity ?? null;
   const isStrings = (value) => Array.isArray(value) && value.every((entry) => typeof entry === "string");
   if (typeof request.repo !== "string" || request.repo === "" || typeof request.featureId !== "string"
     || !isStrings(companionPaths) || !isStrings(openFindingIds) || (previousPath !== null && typeof previousPath !== "string")) {
     return refuse("DRC-USAGE", "the request is malformed");
+  }
+  if (requestedRoute !== null && !(typeof requestedRoute === "string" && REQUESTED_ROUTE_PATTERN.test(requestedRoute))) {
+    return refuse("DRC-USAGE", "the requested route must be 1-128 printable characters without spaces");
+  }
+  if (observedIdentity !== null && !(typeof observedIdentity === "string" && OBSERVED_IDENTITY_PATTERN.test(observedIdentity))) {
+    return refuse("DRC-USAGE", "the observed identity is not a valid model identity");
   }
 
   const named = [["report", request.reportPath], ["PRD", request.prdPath], ["Spec", request.specPath], ["output", request.outPath]];
@@ -195,8 +193,8 @@ export function createReceiptFromDisk(input, deps = {}) {
 
   const runner = detectRunner(env);
   if (runner === null) return refuse("DRC-NO-RUNNER", "no runner signal in the environment (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT=antigravity, CODEX_SESSION_ID or CODEX_THREAD_ID); the reviewer runner is never supplied by hand");
-  const model = readCriticModel(criticAgentUrl);
-  if (model === null) return refuse("DRC-MODEL-UNAVAILABLE", "the Critic agent definition has no readable `model:` line");
+  // The old `reviewer.model` field is kept for existing readers and carries the honest value: the observation, else unknown.
+  const model = observedIdentity ?? OBSERVED_IDENTITY_UNKNOWN;
   const clock = now();
   if (!(clock instanceof Date) || Number.isNaN(clock.getTime())) return refuse("DRC-CLOCK", "the clock did not yield a valid time");
 
@@ -226,7 +224,10 @@ export function createReceiptFromDisk(input, deps = {}) {
     if (error?.code === "ENOENT") return refuse("DRC-OUT-PARENT-MISSING", `the output directory does not exist: ${request.outPath}`);
     return refuse("DRC-WRITE-FAILED", `the receipt could not be written: ${request.outPath}`);
   }
-  return { ok: true, path: request.outPath, sha256: created.sha256, receipt: created.receipt };
+  return {
+    ok: true, path: request.outPath, sha256: created.sha256, receipt: created.receipt,
+    reviewerRole: REVIEWER_ROLE, requestedRoute, observedIdentity: model,
+  };
 }
 
 function parseArgv(argv) {
@@ -244,7 +245,7 @@ function parseArgv(argv) {
     const isRepeated = REPEATED_FLAGS.has(name);
     if (!isSingle && !isRepeated) {
       return DERIVED_VALUE_FLAG.test(name)
-        ? refuse("DRC-FORBIDDEN-FLAG", `--${name} is refused: the review time, runner, reviewer model and digests are derived by the producer, never supplied`)
+        ? refuse("DRC-FORBIDDEN-FLAG", `--${name} is refused: the review time, runner and digests are derived by the producer, never supplied`)
         : refuse("DRC-UNKNOWN-FLAG", `unknown flag --${name}\n${USAGE}`);
     }
     if (equals !== -1) return refuse("DRC-USAGE", `write --${name} <value> as two arguments\n${USAGE}`);
@@ -260,7 +261,7 @@ function parseArgv(argv) {
   }
   const missing = REQUIRED.find((name) => !single.has(name));
   if (missing !== undefined) return refuse("DRC-USAGE", `missing --${missing}\n${USAGE}`);
-  const request = { ...repeated, previousPath: null };
+  const request = { ...repeated, previousPath: null, requestedRoute: null, observedIdentity: null };
   for (const [name, key] of SINGLE_FLAGS) if (single.has(name)) request[key] = single.get(name);
   return { ok: true, request };
 }
@@ -276,7 +277,7 @@ export function main(argv = process.argv.slice(2), env = process.env, deps = {})
   try {
     const parsed = parseArgv(argv);
     if (!parsed.ok) return refused(parsed);
-    const result = createReceiptFromDisk(parsed.request, { env, now: deps.now, criticAgentUrl: deps.criticAgentUrl });
+    const result = createReceiptFromDisk(parsed.request, { env, now: deps.now });
     if (!result.ok) return refused(result);
     write(`${JSON.stringify({
       schema: DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA,
@@ -287,6 +288,9 @@ export function main(argv = process.argv.slice(2), env = process.env, deps = {})
       round: result.receipt.round,
       verdict: result.receipt.verdict,
       reviewedAt: result.receipt.reviewedAt,
+      reviewerRole: result.reviewerRole,
+      requestedRoute: result.requestedRoute,
+      observedIdentity: result.observedIdentity,
     })}\n`);
     return 0;
   } catch (error) {
