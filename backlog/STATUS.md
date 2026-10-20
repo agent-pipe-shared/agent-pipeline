@@ -9,6 +9,7 @@
 | pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
+| pipeline.a-checkpoint-fold-lands-above-the-checkpoint-commit | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.a-critic-has-no-writable-location-for-its-own-report | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs | closed | requirement | pipeline | nova-b | 2026-09-06 | — | — |
@@ -948,7 +949,7 @@
 
 ## Counts
 
-- open: 262
+- open: 263
 - in_progress: 0
 - closed: 664
 - rejected: 3

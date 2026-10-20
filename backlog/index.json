@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1a190db81aebc48f2f38113958d43bf11a30184359b0023a60b20fc18cd02bb9"
+    "transitionHead": "b300016c04aa21c9b76120384cef558f2f14ba34780d9e091cb1fca41ec839af"
   },
   "counts": {
-    "open": 262,
+    "open": 263,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -68,6 +68,16 @@
       "closureRepository": "self",
       "closureCommit": "615bcd247ccc0f339102d669e5d78cd6e684d874",
       "closureEvidence": "backlog/items/2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md"
+    },
+    {
+      "id": "pipeline.a-checkpoint-fold-lands-above-the-checkpoint-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "Push of the 0.7.0 Alfred candidate 0913fa941 on 2026-10-20: one PO push signature spent on a refused push",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair",
