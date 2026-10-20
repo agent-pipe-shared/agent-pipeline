@@ -55,10 +55,24 @@ Corrections built, not accepted:
   directory, and an older tree ledger stays consumed.
 Its writer, guard-git, is ceremony C13. C13 is ready as two whole-file drop-ins (hook and test); a
 clone proof shows guard-git 258/258.
+Ordinal-3 delta Critic over `f62b5143a..254ff0002`: FAIL on F1, F2 and F3 (major), F4 minor
+([ord3-254ff0002](../specs/sprint-alfred-epic/evidence/critic/ord3-254ff0002/disposition.md)).
+Corrections built, not accepted: `commit-pipeline-owned.mjs` requires `--agent` or `--human`
+(F4); PUSHSIG-S4c no longer depends on the checkout path length (F3); the ledger helper says it
+is not yet in effect and creates its file owner-only (F1, closed only by C13). F2 (stage-0
+trailers on commits that exceed stage-0) goes to Q14; backlog commits now use
+`Dispatch: administrative (elephant)`, which needs the paths staged first and the Dispatch line
+before `AI-Assisted`.
+PO decision 2026-10-20: ceremonies first, then the last Critic review (ordinal 4) over the delta
+after them, then the candidate is stamped and pushed. Second PO decision the same day, before the
+ceremonies: measure in a throwaway clone with real background dispatches which fault leaves
+`registry.lock` behind after a dispatch, then narrow the registry so that it keeps the lock only
+after a real partial effect (the "Not in this item" part of
+`backlog/items/2026-10-20-an-orphaned-registry-lock-blocks-every-dispatch.md`).
 Open:
-- an ordinal-3 delta Critic over `f62b5143a..` the corrections;
-- ceremonies C11+C3+C14, C12 and C13 (all ready, each with a clone proof), and C6;
-- PO decision Q14, Full Verify and PO acceptance.
+- ceremonies C11+C3+C14, C12 and C13 (two), then the C13 doc edits; C6 also ready;
+- the ordinal-4 Critic, the last allowed review of this batch;
+- PO decision Q14, Full Verify (needs a clean tree, Q7) and PO acceptance.
 
 **Claude WSL session, 2026-10-19:** last pushed candidate `e6fec04a0` (checkpoint over the
 stamp `d52de6154`, version `0.7.0+<runner>.20261019205354.d99774b`), pushed to
