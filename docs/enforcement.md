@@ -55,6 +55,7 @@ no hand-maintained guard count or command list.
 | Claude Code | SessionStart | startup&#124;resume&#124;clear | node "${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs" |
 | Claude Code | Stop | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs" |
 | Claude Code | SubagentStart | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-start-receipt.mjs" |
+| Claude Code | SubagentStop | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner claude |
 | Claude Code | UserPromptSubmit | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/claude-intake-prompt-capture.mjs" |
 | Codex | PreToolUse | Bash | node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs" |
 | Codex | PreToolUse | apply_patch&#124;Edit&#124;Write | node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs" |
@@ -82,6 +83,6 @@ The hashes bind this generated page to the exact manifest bytes it read.
 
 | Runner | Manifest | SHA-256 |
 | --- | --- | --- |
-| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `493b78d34a6bc2714167e9c5d424d121b47c719daa28e877cd2469b42e196363` |
+| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `004180bee00a9a8351f29b054344c598140b157ed91672dc73c0b6879585e573` |
 | Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `6ea0eba1803ea886a6da30328d1618873d39e03759822acd479b066fa56d1e34` |
 | Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96` |
