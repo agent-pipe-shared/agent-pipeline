@@ -188,8 +188,9 @@ deliberately carries no static copy of that; a second copy is the drift.
   GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover:
   `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, a
   verified generator's `Dispatch: <path> (elephant-generated)`, and the signed
-  `Dispatch: quality-package-<digest> (integration)`; each is verified by its own
-  rule in `dispatch-authorship-verify`.
+  `Dispatch: quality-package-<digest> (integration)`, and `Dispatch: D<n>
+  (elephant-exception)` for work the PO exempted from EL-01 by a recorded
+  decision; each is verified by its own rule in `dispatch-authorship-verify`.
   A commit carrying none of the GIT-03 bindings is unbound to any evidence, and the
   `dispatch-authorship-verify` tool shipped with this plugin
   (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the

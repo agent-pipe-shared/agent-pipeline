@@ -643,6 +643,19 @@ test("(j3) exactly at the bound still PASSes, so the bound is a bound and not an
   assert.equal(verdict.classification, "elephant-direct-declared");
 });
 
+test("(j4) D55 (Q12): a declared PO exception is UNVERIFIABLE with its decision id, and a malformed id FAILs", () => {
+  const declared = verifyCommit("f66f004", commit({ message: "fix(x): repair\n\nDispatch: D54 (elephant-exception)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(declared.verdict, VERDICT.unverifiable);
+  assert.equal(declared.classification, "elephant-exception-declared");
+  assert.equal(declared.taskId, "D54");
+  assert.match(declared.reason, /decision register/u);
+  for (const id of ["D0", "X54", "d54", "D12345"]) {
+    const malformed = verifyCommit("f66f005", commit({ message: `fix(x): repair\n\nDispatch: ${id} (elephant-exception)\nAI-Assisted: true\n`, paths: ["src/thing.mjs"] }));
+    assert.equal(malformed.verdict, VERDICT.fail, id);
+    assert.equal(malformed.classification, "trailer-malformed", id);
+  }
+});
+
 test("(k) two Dispatch trailers on one commit are surfaced, never silently resolved to the topmost", () => {
   const message = "feat(x): a thing\n\nDispatch: DOD-A (goldfish)\nDispatch: stage-0 (elephant)\nAI-Assisted: true\n";
   const parsed = parseDispatchTrailer(message);

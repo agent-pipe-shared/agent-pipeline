@@ -84,10 +84,13 @@ const MARKER_VALUE = "true";
 const DISPATCH_KEY = "Dispatch";
 const DISPATCH_VALUE = /^(\S+) \((goldfish|critic|elephant-generated)\)$/u;
 const PROVENANCE_SIGNAL = /^\s*(?:AI-Assisted|Dispatch)\s*:/imu;
+export const ELEPHANT_EXCEPTION_DISPATCH = /^D[1-9][0-9]{0,3} \(elephant-exception\)$/u;
 
 function admittedDispatchValue(value) {
   if (value === "stage-0 (elephant)" || value === "design (elephant)" || value === "administrative (elephant)") return true;
   if (/^quality-package-[a-f0-9]{64} \(integration\)$/u.test(value)) return true;
+  // D55 (Q12): an Elephant-built commit under a recorded PO exception to EL-01 names that decision.
+  if (ELEPHANT_EXCEPTION_DISPATCH.test(value)) return true;
   const match = DISPATCH_VALUE.exec(value);
   if (!match) return false;
   if (match[2] === "elephant-generated") return /^[A-Za-z0-9._/-]+$/u.test(match[1]) && !match[1].split("/").includes("..");

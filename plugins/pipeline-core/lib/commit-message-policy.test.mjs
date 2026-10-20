@@ -179,6 +179,16 @@ check("CMP11e absent, duplicate and malformed dispatch bindings are distinct fin
   }
 });
 
+// D55 (Q12): a recorded PO exception to EL-01 is declared by its decision id, and only in that exact shape.
+check("CMP11f the elephant-exception binding admits only a D<n> decision id", () => {
+  files.set("exception.txt", "fix(x): x\n\nDispatch: D54 (elephant-exception)\nAI-Assisted: true\n");
+  assert.deepEqual(codes(run("git commit -F exception.txt", { requireMarker: true, requireDispatch: true })), []);
+  for (const value of ["D0 (elephant-exception)", "X54 (elephant-exception)", "D54 (elephant-exceptions)", "D12345 (elephant-exception)", "D54(elephant-exception)"]) {
+    files.set("exception.txt", `fix(x): x\n\nDispatch: ${value}\nAI-Assisted: true\n`);
+    assert.deepEqual(codes(run("git commit -F exception.txt", { requireMarker: true, requireDispatch: true })), ["GIT-03-DISPATCH-MALFORMED"], value);
+  }
+});
+
 // CMP12 -- global options may sit before the verb; a check that missed them would be
 // bypassed by `git -C . commit`.
 check("CMP12 global git options before the subcommand do not hide the commit", () => {

@@ -364,6 +364,16 @@ export function verifyCommit(sha, deps) {
   if (dispatch.malformed) {
     return result(sha, VERDICT.fail, "trailer-malformed", `\`Dispatch: ${dispatch.raw}\` does not match \`<ID> (<role>)\``);
   }
+  if (dispatch.role === "elephant-exception") {
+    // D55 (Q12): the trailer names the PO decision that records an EL-01 exception. This script does not read the
+    // decision register, so the basis is declared, never proved: a reviewer checks it against the register.
+    if (!/^D[1-9][0-9]{0,3}$/u.test(dispatch.id)) {
+      return result(sha, VERDICT.fail, "trailer-malformed", `\`Dispatch: ${dispatch.raw}\` names no decision id of the form D<n>`);
+    }
+    return result(sha, VERDICT.unverifiable, "elephant-exception-declared",
+      `declared Elephant-built under the recorded PO exception \`${dispatch.id}\`; the decision register is not read here, so the exception is checked against it by a reviewer`,
+      { taskId: dispatch.id });
+  }
   if (dispatch.role === "elephant") {
     if (dispatch.id !== ELEPHANT_STAGE0_ID && dispatch.id !== "design") {
       return result(

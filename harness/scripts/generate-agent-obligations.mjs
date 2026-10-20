@@ -278,8 +278,9 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover:");
   put("  `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, a");
   put("  verified generator's `Dispatch: <path> (elephant-generated)`, and the signed");
-  put("  `Dispatch: quality-package-<digest> (integration)`; each is verified by its own");
-  put("  rule in `dispatch-authorship-verify`.");
+  put("  `Dispatch: quality-package-<digest> (integration)`, and `Dispatch: D<n>");
+  put("  (elephant-exception)` for work the PO exempted from EL-01 by a recorded");
+  put("  decision; each is verified by its own rule in `dispatch-authorship-verify`.");
   put("  A commit carrying none of the GIT-03 bindings is unbound to any evidence, and the");
   put("  `dispatch-authorship-verify` tool shipped with this plugin");
   put("  (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the");
