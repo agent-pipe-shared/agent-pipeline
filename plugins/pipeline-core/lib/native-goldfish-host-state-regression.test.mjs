@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { bindNativeCodexStart, prepareNativeGoldfishHostState,
   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
@@ -12,7 +13,9 @@ function fixture(run) {
   const root = mkdtempSync(join(tmpdir(), "native-goldfish-host-state-"));
   const commonDir = join(root, ".git");
   try {
-    mkdirSync(commonDir);
+    // A product path now runs a real Git call, so the fixture root is a real repository.
+    const init = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
+    assert.equal(init.status, 0, init.stderr);
     const commit = "a".repeat(40); const tree = "b".repeat(40);
     const dependencies = {
       git: (_root, args) => args.at(-1) === "HEAD^{commit}" ? commit : tree,
