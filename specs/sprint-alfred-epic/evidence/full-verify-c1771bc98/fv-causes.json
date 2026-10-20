@@ -1,0 +1,1461 @@
+[
+ {
+  "name": "control-placement-tests",
+  "file": "plugins/pipeline-core/scripts/control-placement.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ ships a syntactically complete but deliberately unqualified table until A1 evidence exists (2.80174ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+   "+ actual - expected",
+   "... Skipped lines",
+   "",
+   "[",
+   "'alfred:a1-enforcement-conformance',"
+  ]
+ },
+ {
+  "name": "interruption-receipts-tests",
+  "file": "plugins/pipeline-core/lib/interruption-receipts.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ source adapter and its entire fresh import graph evaluate and run under ambient I/O tripwires (92.500098ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: file://<clone>/plugins/pipeline-core/schemas/pipeline.design-workflow-package.v2.json:2",
+   "\"$schema\": \"https://json-schema.org/draft/2020-12/schema\",",
+   "^",
+   "",
+   "SyntaxError: Unexpected token ':'",
+   "at new Module (node:internal/vm/module:155:21)"
+  ]
+ },
+ {
+  "name": "codex-critic-host-tests",
+  "file": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ CCH136 Codex Critic host case 136 (0.357559ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Got unwanted exception: native-goldfish",
+   "Actual message: \"domain-ancestor-unsafe\"",
+   "at prepareSessionAuthorityRegistryFixture (file://<clone>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:32)",
+   "at signedPreparedCriticFixture (file://<clone>/plugins/pipeline-core/scripts/codex-critic-host.test.mjs:3048:3)",
+   "at file://<clone>/plugins/pipeline-core/scripts/codex-critic-host.test.mjs:3211:19",
+   "at checkAsync (file://<clone>/plugins/pipeline-core/scripts/codex-critic-host.test.mjs:174:15)"
+  ]
+ },
+ {
+  "name": "agy-final-return-tests",
+  "file": "plugins/pipeline-core/lib/agy-final-return.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ AFR18 a store write without a sealed root is a typed refusal and a foreign top level is still refused (199.590126ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "+ actual - expected",
+   "",
+   "+ 'AGY-HOST-STORE-ROOT'",
+   "- 'AGY-HOST-RECEIPT-STORED'",
+   "^"
+  ]
+ },
+ {
+  "name": "session-cleanup-power-tests",
+  "file": "plugins/pipeline-core/scripts/session-cleanup-power.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/scripts/session-cleanup-power.test.mjs (1869.674482ms)",
+  "excerpt": []
+ },
+ {
+  "name": "session-cleanup-binding-tests",
+  "file": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 39,
+  "firstFail": "✖ start binds once, resumes the exact descriptor and rotates only after closure (82.057896ms)",
+  "excerpt": [
+   "✖ start refuses to adopt a provably foreign bound orphan and names the archive action (80.970901ms)",
+   "✖ start honors an explicit --runner over the CLAUDECODE-derived boundary default (81.481386ms)",
+   "✖ start derives the boundary runner from CLAUDECODE when --runner is absent, and fails closed on an invalid explicit value (125.423941ms)",
+   "✔ apply-privatization threads the explicit runner into its own bootstrap-intent readiness check (23.328618ms)",
+   "✖ release-binding completes an interrupted post-cleanup State release (76.050427ms)",
+   "✖ plan-recovery repairs only the exact historical kickoff-promotion cleanup mismatch (100.762022ms)"
+  ]
+ },
+ {
+  "name": "guard-apply-patch-tests",
+  "file": "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/hooks/guard-apply-patch.test.mjs (92181.156604ms)",
+  "excerpt": []
+ },
+ {
+  "name": "guard-devplan-tests",
+  "file": "plugins/pipeline-core/hooks/guard-devplan.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/hooks/guard-devplan.test.mjs (33717.274353ms)",
+  "excerpt": []
+ },
+ {
+  "name": "lifecycle-denial-loop-guard-tests",
+  "file": "plugins/pipeline-core/hooks/lifecycle-denial-loop-guard.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ RC04C001 actual guard retains exit2 and emits bounded alternate action on second exact returned refusal (461.188346ms)",
+  "excerpt": [
+   "✔ RC04C002 actual guard distinguishes same-phase binding drift from a repeated returned refusal (541.190214ms)",
+   "✔ RC04C003 actual guard resets after an admitted lifecycle action and an unrelated command attempt (543.714587ms)",
+   "✔ RC04C004 actual guard isolates native agent scopes and excludes missing session identity (574.984422ms)",
+   "✔ RC04C005 actual guard preserves refusal on telemetry failure and mismatched/invalid observation (3783.659994ms)",
+   "ℹ tests 5",
+   "ℹ suites 0"
+  ]
+ },
+ {
+  "name": "pipeline-state-rebind-runner-tests",
+  "file": "plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ submit-plan mini still refuses missing historical acknowledgement without mutation (475.498909ms)",
+  "excerpt": [
+   "✖ submit-plan mini still refuses missing historical acknowledgement without mutation (475.498909ms)",
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "",
+   "0 !== 2",
+   "",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs:279:10)"
+  ]
+ },
+ {
+  "name": "codex-session-start-hint-tests",
+  "file": "plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ SSH003 direct SessionStart payload and native cwd identity (42.50485ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "+ actual - expected",
+   "",
+   "+ 'Agent Pipeline is active for this repository. Before project work, run pipeline-core:pipeline-start and report the resolved Pipeline version. This governed-repository bootstrap is mandatory; do not substitute a project-local script or st",
+   "- 'Agent Pipeline is active for this repository. Before project work, run pipeline-core:pipeline-start and report the resolved Pipeline version. This governed-repository bootstrap is mandatory; do not substitute a project-local script or st",
+   ""
+  ]
+ },
+ {
+  "name": "guard-push-architecture-tests",
+  "file": "plugins/pipeline-core/hooks/guard-push-architecture.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ GPA001 stale map blocks strict push and explicit checkpoint persists typed debt (767.994853ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.",
+   "Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state record is missing or unreadable, so no approval can be verified).",
+   "Run: push-init.mjs --checkpoint prints the single attended authorize-critical command for this commit; record the result with approve-push, then retry the push.",
+   "",
+   "",
+   "2 !== 0"
+  ]
+ },
+ {
+  "name": "slice-queue-cli-tests",
+  "file": "plugins/pipeline-core/scripts/slice-queue.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ SC15 usage: an unknown verb, a missing --queue and an unknown flag exit 2 with SQ-USAGE (642.157019ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: [\"validate\"]",
+   "",
+   "3 !== 2",
+   "",
+   "at Object.run (file://<clone>/plugins/pipeline-core/scripts/slice-queue.test.mjs:277:12)",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)"
+  ]
+ },
+ {
+  "name": "project-onboarding-e2e-tests",
+  "file": "plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (19637.599945ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: DWP-PRESENT-RETIRED: use present-plan --review-receipt",
+   "",
+   "2 !== 0",
+   "",
+   "at freshDriver (file://<clone>/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:1046:14)",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:1473:27)"
+  ]
+ },
+ {
+  "name": "gate-strength-guard-tests",
+  "file": "plugins/pipeline-core/hooks/guard-gate-strength.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/hooks/guard-gate-strength.test.mjs (83078.217724ms)",
+  "excerpt": []
+ },
+ {
+  "name": "notebook-write-coverage-tests",
+  "file": "plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs (5396.648943ms)",
+  "excerpt": []
+ },
+ {
+  "name": "spec-readiness-host-tests",
+  "file": "plugins/pipeline-core/scripts/spec-readiness-host.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 3,
+  "firstFail": "✖ readiness uses the generic selected duty with only fresh refs and binds the resulting review (1.481613ms)",
+  "excerpt": [
+   "✖ readiness refuses to invent a direct Codex route when the host has no physical sandbox runtime (1.327812ms)",
+   "ℹ tests 3",
+   "ℹ suites 0",
+   "ℹ pass 0",
+   "ℹ fail 3",
+   "ℹ cancelled 0"
+  ]
+ },
+ {
+  "name": "codex-design-readiness-host-tests",
+  "file": "plugins/pipeline-core/scripts/codex-design-readiness-host.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ active readiness carries immutable prompt through real signed S4/S2/S5 and accepts only S6 actual identity (24819.437094ms)",
+  "excerpt": [
+   "✖ active readiness carries immutable prompt through real signed S4/S2/S5 and accepts only S6 actual identity (24819.437094ms)",
+   "AssertionError [ERR_ASSERTION]: MODEL-FAMILY-NATIVE-REQUEST-REFUSED",
+   "+ actual - expected",
+   "",
+   "+ 'unavailable'",
+   "- 'reviewed'"
+  ]
+ },
+ {
+  "name": "codex-host-output-custody-tests",
+  "file": "plugins/pipeline-core/lib/codex-host-output-custody.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 9,
+  "firstFail": "✖ managed output custody: valid (336.668838ms)",
+  "excerpt": [
+   "✔ bounded collector retains at most cap while hashing every actually observed overflow byte (1.070193ms)",
+   "✔ actual stream error event cannot be converted into complete custody (13.902903ms)",
+   "✔ pipe close without genuine end and stdin finish never implies completeness (0.435357ms)",
+   "ℹ tests 12",
+   "ℹ suites 0",
+   "ℹ pass 3"
+  ]
+ },
+ {
+  "name": "pipeline-start-v3-tests",
+  "file": "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ PSV04 kickoff design and normal restart contracts stay explicit (2.328952ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /The PRD and Spec both\\nlink to it and carry a compact traceability table/u. Input:",
+   "",
+   "'# Kickoff intake, the durable design package, and document quality\\n' +",
+   "'\\n' +",
+   "'Load this when a project is pristine, when a first `kickoff plan` is about to\\n' +",
+   "'run, when material design input has arrived, or when a design package is being\\n' +"
+  ]
+ },
+ {
+  "name": "threat-model-approval-request-tests",
+  "file": "plugins/pipeline-core/lib/threat-model-approval-request.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/lib/threat-model-approval-request.test.mjs (297.81497ms)",
+  "excerpt": []
+ },
+ {
+  "name": "guard-gate-strength-ledger-tests",
+  "file": "plugins/pipeline-core/hooks/guard-gate-strength-ledger.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ appendOverrideDeniedLedgerEvent produces a correctly-linked requested+denied pair (68.48991ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "+ actual - expected",
+   "",
+   "+ 'narrower-recovery-required'",
+   "- 'planned'",
+   ""
+  ]
+ },
+ {
+  "name": "spec-retention-check",
+  "file": "plugins/pipeline-core/scripts/check-spec-retention.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/scripts/check-spec-retention.mjs (52.557983ms)",
+  "excerpt": []
+ },
+ {
+  "name": "product-capability-inventory-tests",
+  "file": "harness/scripts/check-product-capability-inventory.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 4,
+  "firstFail": "✖ PCI16 HAW-A04c reads a genuinely consumed private Critic receipt across a committed activation successor (160.459544ms)",
+  "excerpt": [
+   "✖ PCI24 HAW-B01 this repository's own entry points are reachable: never named-but-refused, never admitted-but-unnamed (42.037323ms)",
+   "✔ PCI25 HAW-B02 a consumer-shaped root with no plugins/pipeline-core tree degrades to zero findings, never a crash (0.545285ms)",
+   "✔ PCI26 HAW-B03 a driver the bootstrap docs name but the readiness guard never admits fails as named-but-refused (0.936048ms)",
+   "✔ PCI27 HAW-B04 a script the readiness guard admits but no skill or guard names fails as admitted-but-unnamed (0.671505ms)",
+   "✔ PCI28 HAW-B05 named in the bootstrap docs AND admitted by the guard passes -- removing either makes it fail (AC3) (1.69039ms)",
+   "✔ PCI29 HAW-B06 a comment citing an evidence filename that merely contains a script's stem is not read as an admission (NVA-B-ENTRYSTEM-1) (1.051908ms)"
+  ]
+ },
+ {
+  "name": "pipeline-state-late-verify-tests",
+  "file": "plugins/pipeline-core/scripts/pipeline-state-late-verify.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ baseline-only implementation exposes and completes the typed late verify recovery (74.214786ms)",
+  "excerpt": [
+   "TypeError [Error]: Cannot read properties of undefined (reading 'map')",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/scripts/pipeline-state-late-verify.test.mjs:60:34)",
+   "at Test.runInAsyncScope (node:async_hooks:227:14)",
+   "at Test.run (node:internal/test_runner/test:1402:25)",
+   "at Test.start (node:internal/test_runner/test:1262:17)",
+   "at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)"
+  ]
+ },
+ {
+  "name": "doc-contract-tests",
+  "file": "harness/scripts/check-doc-contracts.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 3,
+  "firstFail": "✖ stateful design checklist is complete on both required documentation surfaces (3407.834064ms)",
+  "excerpt": [
+   "✔ reader binding refuses non-regular covered blobs and malformed CLI arguments (175.471508ms)",
+   "✔ reader snapshot rejects covered blobs above the fixed byte cap (70.185601ms)",
+   "✔ reader binding CLI emits one snapshot or check JSON object and fails an isolated missing-record fixture (662.086247ms)",
+   "✔ each immutable snapshot exclusion suppresses its own exact normalized missing-reference occurrence (12.027206ms)",
+   "✔ an immutable snapshot exclusion does not suppress the same reference id at another line (0.998235ms)",
+   "✔ an immutable snapshot exclusion does not suppress the same line and id in another source (0.913795ms)"
+  ]
+ },
+ {
+  "name": "doc-contract-check",
+  "file": "harness/scripts/check-doc-contracts.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ harness/scripts/check-doc-contracts.mjs (2998.114319ms)",
+  "excerpt": []
+ },
+ {
+  "name": "language-canon-tests",
+  "file": "harness/scripts/check-language-canon.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ the complete German Operating Model copy retains its boundary-aware Verify and QG-13 correction rules (1.701692ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /When the delivery contract explicitly requires actual\\nindependent PASS/. Input:",
+   "",
+   "'# Agent-Pipeline Operating Model (V3)\\n' +",
+   "'\\n' +",
+   "'> _A German reader copy follows below. English is the normative text._\\n' +",
+   "'\\n' +"
+  ]
+ },
+ {
+  "name": "license-contract-check",
+  "file": "harness/scripts/check-license-contract.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ harness/scripts/check-license-contract.mjs (184.845851ms)",
+  "excerpt": []
+ },
+ {
+  "name": "no-autoupdate-key-tests",
+  "file": "harness/scripts/no-autoupdate-key.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ harness/scripts/no-autoupdate-key.test.mjs (50.320579ms)",
+  "excerpt": []
+ },
+ {
+  "name": "phase3-sdlc-coherence-tests",
+  "file": "harness/scripts/check-phase3-sdlc-coherence.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ harness/scripts/check-phase3-sdlc-coherence.test.mjs (62.999301ms)",
+  "excerpt": []
+ },
+ {
+  "name": "session-critic-finalizer-tests",
+  "file": "plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ findings emit REVIEW_FINDINGS and a root-authored record keeps its real empty-tree range (130.995781ms)",
+  "excerpt": [
+   "✔ receipt validation is closed and refuses provider metadata (987.208048ms)",
+   "✔ closed CLI admits before verdict and finalizes only that durable packet (981.582008ms)",
+   "✔ CLI refuses a valid returned verdict when no prelaunch admission exists (154.980687ms)",
+   "✔ CLI closes argv/request vocabulary and reports typed exit-2 errors (122.353308ms)",
+   "✔ a foreign failure inside the generic batch keeps CGB-PHYSICAL and surfaces its original cause (0.564051ms)",
+   "✔ export publishes a consumed review as receipt, report and index with matching hashes (985.92172ms)"
+  ]
+ },
+ {
+  "name": "local-worker-supervisor-cli-tests",
+  "file": "plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 9,
+  "firstFail": "✖ LWSC01 plans and runs two overlapping real child processes in separate no-hardlink Git clones (2991.542098ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: {\"schema\":\"pipeline.local-worker-supervisor-cli.v1\",\"ok\":false,\"code\":\"LWS-UNAVAILABLE\"}",
+   "",
+   "",
+   "2 !== 0",
+   "",
+   "at Object.run (file://<clone>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:370:12)"
+  ]
+ },
+ {
+  "name": "nova-critic-lineage-tests",
+  "file": "plugins/pipeline-core/lib/critic-review-lineage.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/lib/critic-review-lineage.test.mjs (290.473153ms)",
+  "excerpt": []
+ },
+ {
+  "name": "nova-verify-journal-tests",
+  "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 3,
+  "firstFail": "✖ an already-bound cleanup owner remains borrowed after passed and numeric failed terminals (132.993285ms)",
+  "excerpt": [
+   "✔ ADR-0065 candidate (b): a Tier-B suite whose declared reads are actually sufficient still passes under the REAL Node permission model (202.122517ms)",
+   "✔ ADR-0065 candidate (b) regression: a Tier-B suite whose own declared files are unchanged is reused across a candidate whose commit and tree both differ, WHEN allowCrossCandidateReuse: true is explicitly passed (559.959056ms)",
+   "✔ NVA-ADR65TIERFIX-2: WITHOUT allowCrossCandidateReuse (the default, matching harness/scripts/verify.mjs's real unmodified call -- the flag is not passed at all here), a Tier-B suite whose own declared files are unchanged is NOT reused acro",
+   "✔ AGY-VERIFYTUNER-1: steps[] materializes in registration order regardless of real completion order (225.779288ms)",
+   "✔ AGY-VERIFYTUNER-1: a dependsOn suite does not START executing before its dependency's receipt exists, under concurrency > 1 (199.506649ms)",
+   "✔ AGY-VERIFYTUNER-1/2: explicit concurrency: 1 still matches the prior strictly-sequential behavior -- same steps[] content and order, same exit codes (explicit sequential stays available on request) (168.929069ms)"
+  ]
+ },
+ {
+  "name": "verify-case-completion-registry-tests",
+  "file": "harness/scripts/check-verify-case-completion.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ VCR01 the repository registry covers all arrays and pins the observed required-descriptor counts (1037.99616ms)",
+  "excerpt": [
+   "✔ VCR17 required declarative registration still needs actual reachable shipped protocol (1.21605ms)",
+   "✔ VCR18 canonical declarative schema and unknown fields fail closed (5.771421ms)",
+   "✔ VCR19 declarative path and full runtime completion policy constraints are enforced (13.018072ms)",
+   "✔ VCR20 duplicate suite IDs and missing files fail while distinct IDs may share a canonical file (4.931986ms)",
+   "✔ VCR21 physical declarative directory and outside-repository alias cannot become absence (2.413914ms)",
+   "✔ VCR22 candidate JSON, policy and suite bytes cannot borrow matching working-tree bytes (410.74959ms)"
+  ]
+ },
+ {
+  "name": "verify-case-completion-check",
+  "file": "harness/scripts/check-verify-case-completion.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ harness/scripts/check-verify-case-completion.mjs (1060.912681ms)",
+  "excerpt": []
+ },
+ {
+  "name": "afk-transaction-host-tests",
+  "file": "plugins/pipeline-core/lib/afk-transaction-host.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ A2 host finalization drives A3 private commits and A4 keeps a rejected suffix out of feature history (72.498351ms)",
+  "excerpt": [
+   "Error [SessionAuthorityError]: domain-ancestor-unsafe",
+   "at authorityOwnerFailure (file://<clone>/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:21:59)",
+   "at observedChain (file://<clone>/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:28:446)",
+   "at readAuthorityNamespace (file://<clone>/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:118:67)",
+   "at scanAuthorityDomain (file://<clone>/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:127:40)",
+   "at scanLedger (file://<clone>/plugins/pipeline-core/lib/afk-ledger.mjs:621:18)"
+  ]
+ },
+ {
+  "name": "afk-claude-host-tests",
+  "file": "plugins/pipeline-core/scripts/afk-claude-host.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ stale definition/current and missing A3 integration fail closed (2.800037ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "+ actual - expected",
+   "",
+   "+ 'AFK-A3-TRANSACTION-FAILED'",
+   "- 'AFK-PROJECTION-WRITER-UNAVAILABLE'",
+   "^"
+  ]
+ },
+ {
+  "name": "codex-critic-packet-host-tests",
+  "file": "plugins/pipeline-core/scripts/codex-critic-packet-host.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/scripts/codex-critic-packet-host.test.mjs (332.452768ms)",
+  "excerpt": []
+ },
+ {
+  "name": "guard-human-override-tests",
+  "file": "plugins/pipeline-core/scripts/guard-human-override.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 4,
+  "firstFail": "✖ authorize-by-signature reaches authorizeHumanGuardOverrideBySignature() and prints its JSON result on stdout (177.768239ms)",
+  "excerpt": [
+   "✔ render-copy-safe refuses a request-sha256 that was never recorded, with the same HGO-* error other subcommands give (25.165181ms)",
+   "✔ render-copy-safe validates its flag set like the sibling plan subcommand (44.782371ms)",
+   "✔ emit-signature-digest prints the exact digest authorizeHumanGuardOverrideBySignature() gates arming on (235.807398ms)",
+   "✔ emit-signature-digest validates its flag set like the sibling subcommands (0.238593ms)",
+   "✔ emit-signature-digest no longer accepts a --reason flag; a non-canonical value never prints a digest and exits non-zero (97.54717ms)",
+   "✔ authorize-by-signature refuses a caller-supplied trust anchor; the committed anchor is the only trust source (131.126674ms)"
+  ]
+ },
+ {
+  "name": "human-guard-override-capability-scan-tests",
+  "file": "plugins/pipeline-core/lib/human-guard-override-capability-scan.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 3,
+  "firstFail": "✖ RC15C001 HGO-SCAN: authenticated stale matching record cannot shadow a current matching capability (292.108233ms)",
+  "excerpt": [
+   "✖ RC15C002 HGO-SCAN: stale-only candidates remain refused without capability consumption (268.170382ms)",
+   "✖ RC15C003 HGO-SCAN: corrupt authenticated audit still fails globally before later valid candidates (263.693921ms)",
+   "ℹ tests 3",
+   "ℹ suites 0",
+   "ℹ pass 0",
+   "ℹ fail 3"
+  ]
+ },
+ {
+  "name": "pipeline-state-external-push-ledger-tests",
+  "file": "harness/scripts/pipeline-state-external-push-ledger.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ harness/scripts/pipeline-state-external-push-ledger.test.mjs (725.157276ms)",
+  "excerpt": []
+ },
+ {
+  "name": "critical-action-approval-request-tests",
+  "file": "plugins/pipeline-core/lib/critical-action-approval-request.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/lib/critical-action-approval-request.test.mjs (43.725985ms)",
+  "excerpt": []
+ },
+ {
+  "name": "runner-contracts.schema-tests",
+  "file": "plugins/pipeline-core/scripts/runner-contracts.schema.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/scripts/runner-contracts.schema.test.mjs (39.556551ms)",
+  "excerpt": []
+ },
+ {
+  "name": "gitleaks-tests",
+  "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ run() flags a near-miss: a .gitleaksignore entry exists for the same path+rule+column but a different line, and names both lines plus the literal repair command (1.566655ms)",
+  "excerpt": [
+   "✔ repairStaleIgnoreEntry() refuses when no entry matches path+rule+column+old-line (nothing to repair, never guesses) (0.275633ms)",
+   "✔ run() wires the repo's .gitleaks.toml: a ledger-shaped amendment line at backlog/transitions.ndjson produces no sentry-access-token finding, while the identical secret-shaped string elsewhere still does (real gitleaks binary) (44.761677ms",
+   "✔ reproduction: bare `detect` leaks a sibling branch's secret from a detached worktree; --no-git closes it (real gitleaks + git, env-gated) (123.125388ms)",
+   "ℹ tests 23",
+   "ℹ suites 0",
+   "ℹ pass 22"
+  ]
+ },
+ {
+  "name": "verify-suite-registration-tests",
+  "file": "harness/scripts/check-verify-suite-registration.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ harness/scripts/check-verify-suite-registration.test.mjs (137.336301ms)",
+  "excerpt": []
+ },
+ {
+  "name": "verify-suite-registration-check",
+  "file": "harness/scripts/check-verify-suite-registration.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ harness/scripts/check-verify-suite-registration.mjs (70.124393ms)",
+  "excerpt": []
+ },
+ {
+  "name": "afk-activation-tests",
+  "file": "plugins/pipeline-core/scripts/afk-activation.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ missing protected projection writer and A3 failure are explicit and fail closed (1.914366ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "+ actual - expected",
+   "",
+   "+ 'AFK-A3-TRANSACTION-FAILED'",
+   "- 'AFK-PROJECTION-WRITER-UNAVAILABLE'",
+   "^"
+  ]
+ },
+ {
+  "name": "codex-isolated-critic-protected-preimage-tests",
+  "file": "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs (44.460325ms)",
+  "excerpt": []
+ },
+ {
+  "name": "antigravity-pretool-guard-tests",
+  "file": "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs (43031.332291ms)",
+  "excerpt": []
+ },
+ {
+  "name": "verify-evidence-producer-tests",
+  "file": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 5,
+  "firstFail": "✖ candidate Verify carries a consumed Critic only over exact registered evidence commits (1145.185758ms)",
+  "excerpt": [
+   "✔ a dirty working tree is refused before the verify command runs, and the rejection is recorded explicitly (41.689494ms)",
+   "✔ release Verify refuses a missing, conflicting, or forged Critic claim before overwriting evidence (943.199459ms)",
+   "{\"schema\":\"pipeline.verify-progress.v1\",\"runId\":\"verify-1792503918202-6cb17736de977cb0\",\"candidate\":{\"commit\":\"8c3b372537d19d6c3e4f299884932e547059a1e4\",\"tree\":\"fc7503bfe22588e24ab3ae8d82d7aa5e535ab135\"},\"suite\":\"baseline-calibration\",\"inde",
+   "{\"schema\":\"pipeline.verify-progress.v1\",\"runId\":\"verify-1792503918202-6cb17736de977cb0\",\"candidate\":{\"commit\":\"8c3b372537d19d6c3e4f299884932e547059a1e4\",\"tree\":\"fc7503bfe22588e24ab3ae8d82d7aa5e535ab135\"},\"suite\":\"baseline-manifest\",\"index\":",
+   "{\"schema\":\"pipeline.verify-progress.v1\",\"runId\":\"verify-1792503918202-6cb17736de977cb0\",\"candidate\":{\"commit\":\"8c3b372537d19d6c3e4f299884932e547059a1e4\",\"tree\":\"fc7503bfe22588e24ab3ae8d82d7aa5e535ab135\"},\"suite\":\"baseline-verify-contract\",\"",
+   "{\"schema\":\"pipeline.verify-progress.v1\",\"runId\":\"verify-1792503918202-6cb17736de977cb0\",\"candidate\":{\"commit\":\"8c3b372537d19d6c3e4f299884932e547059a1e4\",\"tree\":\"fc7503bfe22588e24ab3ae8d82d7aa5e535ab135\"},\"suite\":\"baseline-repository\",\"index"
+  ]
+ },
+ {
+  "name": "guard-maintenance-window-kernel-closure-tests",
+  "file": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs (691.792893ms)",
+  "excerpt": []
+ },
+ {
+  "name": "session-cleanup-recovery-tests",
+  "file": "plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 6,
+  "firstFail": "✖ bind-orphan auto-executes without confirmation, backs up onboarding private state first, and rebinds the exact active descriptor (138.34828ms)",
+  "excerpt": [
+   "✔ RF2A a descriptor with a cleanup manifest or the requester's own session is never offered and is refused with a typed code naming the signed route (350.093697ms)",
+   "✔ planOrphanWorktreeDirectories reports nothing and creates nothing when .claude/worktrees does not exist (18.446302ms)",
+   "✔ a worktree directory git still knows about is never removed, regardless of age (29.84558ms)",
+   "✔ a directory with no .git pointer file is never a candidate, even though git does not know it (22.998437ms)",
+   "✔ an orphaned worktree directory -- git no longer knows it, and its own gitdir record is gone -- is retired (35.289118ms)",
+   "✔ planOrphanWorktreeDirectories fails every entry closed when git worktree list itself is unavailable (25.025165ms)"
+  ]
+ },
+ {
+  "name": "dispatch-authorship-verify-tests",
+  "file": "plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 7,
+  "firstFail": "✖ v3 records bind authorship and carry exactly one Critic disposition (1.129134ms)",
+  "excerpt": [
+   "✖ actual paths reject false T5 and T0 while honest T1 required/evidence is accepted (0.469ms)",
+   "✖ an honest T0 accepts only generated and lockfile paths (0.433153ms)",
+   "✔ (m) a record without agentType is explicitly pre-v3 and nonbinding (0.228263ms)",
+   "✔ a Dispatch: mentioned in the body prose is not authorship evidence (0.092466ms)",
+   "✔ a malformed Dispatch value FAILs rather than being read as a task id (0.129807ms)",
+   "✔ parseDispatchTrailer reads both sanctioned forms through one grammar (0.137171ms)"
+  ]
+ },
+ {
+  "name": "push-release-flow-docs-contract-tests",
+  "file": "plugins/pipeline-core/scripts/push-release-flow-docs-contract.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 3,
+  "firstFail": "✖ source release documentation names the shipped reader-review workflow and preserves its binding contract (1.51631ms)",
+  "excerpt": [
+   "✔ the historical drifted `materialize-push-threat-model --dir <repo>` argv is refused (proves the fixture would have caught the incident) (2.785811ms)",
+   "✔ every documented push-init.mjs invocation in docs/push-release-flow.md (root) matches the real usage()/parseArgs() (1.006211ms)",
+   "✔ every documented push-init.mjs invocation in plugins/pipeline-core/docs/push-release-flow.md (vendored) matches the real usage()/parseArgs() (0.407775ms)",
+   "✔ every documented push-init.mjs invocation in plugins/pipeline-core/skills/pipeline-start/references/push-approval.md matches the real usage()/parseArgs() (0.355615ms)",
+   "✔ shipped push guidance names PIPELINE_PLUGIN_ROOT, never a repository-source push-init path (0.477136ms)",
+   "ℹ tests 11"
+  ]
+ },
+ {
+  "name": "wire-dispatch-budget-hook-tests",
+  "file": "harness/scripts/wire-dispatch-budget-hook.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 7,
+  "firstFail": "✖ WDB02: invokesGuard recognises the registration the tool actually inserts (0.466636ms)",
+  "excerpt": [
+   "✔ WSH06: a dirty target preimage refuses before an attended apply (3.712009ms)",
+   "ℹ tests 17",
+   "ℹ suites 0",
+   "ℹ pass 10",
+   "ℹ fail 7",
+   "ℹ cancelled 0"
+  ]
+ },
+ {
+  "name": "pipeline-start-preflight-pre-push-observation-tests",
+  "file": "plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ installCommand carries the installer's own documented --install verb, an absolute path to the real installer, and the inspected repo's own rootDir (42.052993ms)",
+  "excerpt": [
+   "✔ wired: an injected observePrePushHookInstallationFn is honored, proving the call site actually forwards cwd rather than a hardcoded value (7.148004ms)",
+   "✔ observeUnseenPushToRemote: a remote-tracking ref with no matching log entry is reported unseen (85.825762ms)",
+   "✔ observeUnseenPushToRemote: a remote-tracking ref whose commit IS in the log is not reported (seen) (86.04567ms)",
+   "✔ observeUnseenPushToRemote: a repository with no log at all reports nothing rather than reporting everything as a bypass (78.664291ms)",
+   "✔ observeUnseenPushToRemote: no remote-tracking ref at all reports nothing (43.301865ms)",
+   "✔ observeUnseenPushToRemote: repository-unresolved (no git repo at all) reports nothing, never crashes (5.409323ms)"
+  ]
+ },
+ {
+  "name": "check-critic-skip-coverage-tests",
+  "file": "plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 5,
+  "firstFail": "✖ immutable authored Agy v4 record can be resolved by the same independently bound Critic addendum (1.494288ms)",
+  "excerpt": [
+   "✔ v4 pending, skipped and evidenced records remain actual coverage consumers, while malformed v4 fails closed (1.678518ms)",
+   "✔ false T5 decisions fail validation for A/G/S, high-risk and rigor triggers (2.547458ms)",
+   "✔ a v3 Critic reference must resolve and match its exact artifact digest (0.499729ms)",
+   "✔ a global critic-named file never exempts an unrelated v3 dispatch (0.379671ms)",
+   "✔ one valid reference does not cover a second unrelated v3 dispatch (0.556767ms)",
+   "✔ wrong task binding, candidate binding, missing artifact and digest mismatch fail closed (1.713444ms)"
+  ]
+ },
+ {
+  "name": "critic-skip-coverage-check",
+  "file": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs (352.243156ms)",
+  "excerpt": []
+ },
+ {
+  "name": "measure-tofu-push-e2e-tests",
+  "file": "plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ full TOFU measurement follows Driver-provided design answers through to a recorded signed push (11320.745821ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: {",
+   "\"schema\": \"pipeline.measure-tofu-push-e2e.v1\",",
+   "\"outcome\": \"onboarding-not-ready\",",
+   "\"steps\": [",
+   "{",
+   "\"step\": \"setup\","
+  ]
+ },
+ {
+  "name": "suite-registration-check",
+  "file": "plugins/pipeline-core/scripts/check-suite-registration.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/scripts/check-suite-registration.mjs (68.203274ms)",
+  "excerpt": []
+ },
+ {
+  "name": "codex-advisor-execution-tests",
+  "file": "plugins/pipeline-core/lib/codex-advisor-execution.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 5,
+  "firstFail": "✖ RC06C001 Advisor actual unknown managed output becomes fresh privately bound initial answer (1630.306741ms)",
+  "excerpt": [
+   "✔ RC06C002 Advisor export denial refuses before any source prompt construction or child launch (90.487736ms)",
+   "✖ RC06C003 Advisor unowned JSON, foreign executable, malformed custody and cross-citations fail (1880.525677ms)",
+   "✔ RC06C004 Advisor empty genuinely managed process never becomes an answered receipt (1919.887123ms)",
+   "✖ RC06C005 Advisor actual raw JSON overflow refuses despite a small valid canonical answer (1899.91782ms)",
+   "✖ RC06C006 Actual acknowledged closed invalid Advisor answer spends a typed failed course observation (1934.273742ms)",
+   "✖ RC06C007 Durable single course finalizes actual managed failed turn without reset or no-child fiction (1907.230833ms)"
+  ]
+ },
+ {
+  "name": "security-scan",
+  "file": "plugins/pipeline-core/scripts/security-scan.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/scripts/security-scan.mjs (107113.236765ms)",
+  "excerpt": []
+ },
+ {
+  "name": "architecture-baseline-tests",
+  "file": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ compiles only byte-validated decisions into the effective identity list and never self-activates a waiver (6.472311ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "+ actual - expected",
+   "",
+   "+ 'inventory-only'",
+   "- 'source-validated'",
+   ""
+  ]
+ },
+ {
+  "name": "architecture-effective-decisions-tests",
+  "file": "plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 7,
+  "firstFail": "✖ AC19 source precondition: two isolated reads of the same validated decision set agree (5.741534ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "+ actual - expected",
+   "",
+   "+ 'advisory'",
+   "- 'ready'",
+   ""
+  ]
+ },
+ {
+  "name": "rigor-floor-tests",
+  "file": "plugins/pipeline-core/scripts/rigor-floor.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 5,
+  "firstFail": "✖ 1. Identical normalized inputs produce identical floor & inputDigest (pinned test) (1.081714ms)",
+  "excerpt": [
+   "✔ 7. Planned surface vs actual surface expansion escalates floor (0.340817ms)",
+   "✔ 7a. A clean worktree cannot hide an over-threshold PO-bound plan surface (3.863297ms)",
+   "✖ 8. Higher human-selected profile is respected beside floor (not lowered to floor) (0.608125ms)",
+   "✔ 9. Lower human-selected profile generates disagreementLog entry (0.345546ms)",
+   "✔ 10. Asymmetric enforcement: agent cannot lower rigor via missing planned fields (0.265485ms)",
+   "✖ 11. CLI --format json emits valid schema (43.69935ms)"
+  ]
+ },
+ {
+  "name": "agy-session-authority-tests",
+  "file": "plugins/pipeline-core/lib/agy-session-authority.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ v2 actual signed family and consent allow two successors through one opaque admission (7.813839ms)",
+  "excerpt": [
+   "✔ dispatch binding refuses widening and expiry changes (0.35274ms)",
+   "ℹ tests 6",
+   "ℹ suites 0",
+   "ℹ pass 4",
+   "ℹ fail 2",
+   "ℹ cancelled 0"
+  ]
+ },
+ {
+  "name": "portable-agy-authorship-export-tests",
+  "file": "plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ PAE05 a committed v4 record uses only its exact signed export in a fresh clone (41.115634ms)",
+  "excerpt": [
+   "Error: terminal dispatch record requires at least one log entry",
+   "at fail (file://<clone>/plugins/pipeline-core/lib/dispatch-record.mjs:26:17)",
+   "at validateRecord (file://<clone>/plugins/pipeline-core/lib/dispatch-record.mjs:165:98)",
+   "at validateDispatchRecord (file://<clone>/plugins/pipeline-core/lib/dispatch-record.mjs:262:7)",
+   "at file://<clone>/plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs:149:18",
+   "at fixture (file://<clone>/plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs:65:18)"
+  ]
+ },
+ {
+  "name": "goldfish-antigravity-live-host-tests",
+  "file": "plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ real temporary session admits two distinct bounded fixture tasks and reuses stored consent (230.965651ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: {\"schema\":\"pipeline.agy-session-dispatch-receipt.v1\",\"status\":\"rejected\",\"code\":\"AGY-SESSION-NATIVE-CARRIER-UNAVAILABLE\",\"field\":\"authorityLifetime\",\"modelCalls\":0,\"launcherCalls\":0}",
+   "+ actual - expected",
+   "",
+   "+ 'rejected'",
+   "- 'completed-undelivered'",
+   ""
+  ]
+ },
+ {
+  "name": "architecture-decision-continuity-tests",
+  "file": "plugins/pipeline-core/lib/architecture-decision-continuity.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ AC-19 productive readback binds local ADR and configured signed inherited feed (7.971148ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "+ actual - expected",
+   "",
+   "+ 'advisory'",
+   "- 'ready'",
+   ""
+  ]
+ },
+ {
+  "name": "design-advisory-admission-cli-tests",
+  "file": "plugins/pipeline-core/scripts/design-advisory-admission.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ answered Advisor inspect rechecks its actual private transaction (11.675473ms)",
+  "excerpt": [
+   "✖ answered Advisor inspect rechecks its actual private transaction (11.675473ms)",
+   "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:",
+   "+ actual - expected",
+   "",
+   "+ undefined",
+   "- 'valid'"
+  ]
+ },
+ {
+  "name": "verify-suite-append-history-check",
+  "file": "harness/scripts/check-verify-suite-append.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ harness/scripts/check-verify-suite-append.mjs (265.377954ms)",
+  "excerpt": []
+ },
+ {
+  "name": "codex-critic-session-route-tests",
+  "file": "plugins/pipeline-core/scripts/codex-critic-session-route.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ signed ordinary and high-risk Critic use one native child and authentic S6 plus existing finalization (1551.493628ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Got unwanted exception: native-goldfish",
+   "Actual message: \"domain-ancestor-unsafe\"",
+   "at signedCriticFixture (file://<clone>/plugins/pipeline-core/scripts/codex-critic-session-route.test.mjs:75:43)",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/scripts/codex-critic-session-route.test.mjs:236:21)",
+   "at Test.runInAsyncScope (node:async_hooks:227:14)",
+   "at Test.run (node:internal/test_runner/test:1402:25)"
+  ]
+ },
+ {
+  "name": "hook-governance-scope-tests",
+  "file": "plugins/pipeline-core/hooks/hook-governance-scope.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ RC03C008 all current runner hook commands are automatically enumerated into the source scope inventory (1.507693ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: unadmitted runner wiring: claude-task-output-scope-posttool.mjs",
+   "at Object.run (file://<clone>/plugins/pipeline-core/hooks/hook-governance-scope.test.mjs:78:142)",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)",
+   "at Test.runInAsyncScope (node:async_hooks:227:14)",
+   "at Test.run (node:internal/test_runner/test:1402:25)",
+   "at Test.processPendingSubtests (node:internal/test_runner/test:974:18)"
+  ]
+ },
+ {
+  "name": "codex-design-advisor-host-tests",
+  "file": "plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ CADH001 active Advisor keeps its signed S4/S2 selection through metadata rechecks and one S5/S6 native launch (1244.578146ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: Got unwanted exception: native-goldfish",
+   "Actual message: \"domain-ancestor-unsafe\"",
+   "at prepareSessionAuthorityRegistryFixture (file://<clone>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:32)",
+   "at Object.run (file://<clone>/plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs:65:2)",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)",
+   "at Test.runInAsyncScope (node:async_hooks:227:14)"
+  ]
+ },
+ {
+  "name": "commit-msg-hook-signed-integration-tests",
+  "file": "plugins/pipeline-core/scripts/commit-msg-hook-signed-integration.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 7,
+  "firstFail": "✖ CMSI001 generated commit-msg hook admits the exact verified intent in a real Git commit (495.900117ms)",
+  "excerpt": [
+   "✖ CMSI002 generated commit-msg hook refuses missing-authorization (477.445317ms)",
+   "✖ CMSI003 generated commit-msg hook refuses forged-signature (489.633923ms)",
+   "✖ CMSI004 generated commit-msg hook refuses wrong-intent (499.141294ms)",
+   "✖ CMSI005 generated commit-msg hook refuses malformed-trailer (488.946925ms)",
+   "✖ CMSI006 generated commit-msg hook refuses extended-trailer (485.041806ms)",
+   "✔ CMSI007 generated source is a self-contained Git boundary bound to the selected plugin library (0.668459ms)"
+  ]
+ },
+ {
+  "name": "guard-dispatch-native-worker-tests",
+  "file": "plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ GDW01 GD15n prepare a native pending binding for a complete dispatched Codex briefing and block failed preparation (384.524397ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: complete v2 briefing should prepare before launch: BLOCKED (guard-dispatch): SQ-AUTHORITY-UNAVAILABLE: Repair: Restore the approved feature's valid v2 slice-queue.json through the governed course writer; lega",
+   "",
+   "",
+   "2 !== 0",
+   "",
+   "at Object.run (file://<clone>/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs:150:12)"
+  ]
+ },
+ {
+  "name": "guard-git-signed-integration-tests",
+  "file": "plugins/pipeline-core/hooks/guard-git-signed-integration.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 5,
+  "firstFail": "✖ GSI001 guard-git admits signed integration only after independent worktree verification with marker mode off (511.797707ms)",
+  "excerpt": [
+   "✖ GSI003 guard-git refuses missing-authorization even when ordinary marker policy is off (503.515133ms)",
+   "✖ GSI004 guard-git refuses wrong-intent even when ordinary marker policy is off (497.294298ms)",
+   "✖ GSI005 guard-git refuses forged-proof even when ordinary marker policy is off (494.004742ms)",
+   "ℹ tests 5",
+   "ℹ suites 0",
+   "ℹ pass 0"
+  ]
+ },
+ {
+  "name": "model-family-execution-tests",
+  "file": "plugins/pipeline-core/lib/model-family-execution.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ MFE018 forged invocation digest, provider result extras, absent ports and legacy receipt kinds fail closed (7.489112ms)",
+  "excerpt": [
+   "Error: S4 activation failed: MODEL-FAMILY-AUTHORITY-UNAVAILABLE",
+   "at realS4Receipt (file://<clone>/plugins/pipeline-core/lib/model-family-execution.test.mjs:134:59)",
+   "at async Object.run (file://<clone>/plugins/pipeline-core/lib/model-family-execution.test.mjs:224:51)",
+   "at async TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)",
+   "at async Test.run (node:internal/test_runner/test:1409:7)",
+   "at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)"
+  ]
+ },
+ {
+  "name": "model-family-main-prelaunch-tests",
+  "file": "plugins/pipeline-core/lib/model-family-main-prelaunch.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ MFMP003 signed S1 opaque S2 S4 S5 path completes distinct correlated main ports for all runners with unknown optional effort telemetry (27893.883391ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: MODEL-FAMILY-NATIVE-REQUEST-REFUSED",
+   "",
+   "false !== true",
+   "",
+   "at prepareLaunchInContext (file://<clone>/plugins/pipeline-core/lib/model-family-main-prelaunch.test.mjs:206:16)",
+   "at async Object.run (file://<clone>/plugins/pipeline-core/lib/model-family-main-prelaunch.test.mjs:221:21)"
+  ]
+ },
+ {
+  "name": "native-goldfish-host-state-regression-tests",
+  "file": "plugins/pipeline-core/lib/native-goldfish-host-state-regression.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 3,
+  "firstFail": "✖ NGHS06 Codex v2 binds the worker native type to the functional Goldfish role and exact start (13.805278ms)",
+  "excerpt": [
+   "✖ NGHS08 Codex v2 refuses ambiguous worker starts and malformed stops (6.310004ms)",
+   "ℹ tests 3",
+   "ℹ suites 0",
+   "ℹ pass 0",
+   "ℹ fail 3",
+   "ℹ cancelled 0"
+  ]
+ },
+ {
+  "name": "model-family-approval-request-tests",
+  "file": "plugins/pipeline-core/scripts/model-family-approval-request.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ MFA010 canonical PO signer resolves the family request before guard fallback and rejects an unresolved family schema (1.717652ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: family requests must receive their own exact disclosure and fail closed before generic HGO/GMW fallback",
+   "at Object.run (file://<clone>/plugins/pipeline-core/scripts/model-family-approval-request.test.mjs:316:10)",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)",
+   "at Test.runInAsyncScope (node:async_hooks:227:14)",
+   "at Test.run (node:internal/test_runner/test:1402:25)",
+   "at Test.processPendingSubtests (node:internal/test_runner/test:974:18)"
+  ]
+ },
+ {
+  "name": "design-workflow-package-builder-tests",
+  "file": "plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 3,
+  "firstFail": "✖ DWPB001 builder publishes one canonical v2 package under the tracked specs/<feature-id>/evidence home and refuses overwrite (1927.261957ms)",
+  "excerpt": [
+   "✖ DWPB001 builder publishes one canonical v2 package under the tracked specs/<feature-id>/evidence home and refuses overwrite (1927.261957ms)",
+   "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"status\":\"recovery-required\",\"code\":\"SDC-AUTHORITY-UNAVAILABLE\",\"courseBinding\":{\"courseId\":\"dac_0f383f5b46615615bcb3f33890d12d9839f31d28\",\"initialContextSha256\":\"e7b90ec1e431e09674097271f588f2949",
+   "",
+   "false !== true",
+   "",
+   "at preparedFixture (file://<clone>/plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs:46:10)"
+  ]
+ },
+ {
+  "name": "guard-dispatch-budget-checkpoint-tests",
+  "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ GDBC10 hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file (1005.404605ms)",
+  "excerpt": [
+   "✔ GDBC15 grant script: refuses malformed arguments, an unknown agent and an unverifiable record; resolves the repo of its working directory (464.483414ms)",
+   "ℹ tests 15",
+   "ℹ suites 0",
+   "ℹ pass 14",
+   "ℹ fail 1",
+   "ℹ cancelled 0"
+  ]
+ },
+ {
+  "name": "pipeline-state-push-anchor-tests",
+  "file": "plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 3,
+  "firstFail": "✖ R7-6-P: case 2 -- with no machine plane the legacy per-repository pointer remains a read-only fallback anchor (43.019295ms)",
+  "excerpt": [
+   "✖ R7-6-P: case 3b -- plane = A and legacy = B: an authority carrying B's pair is refused with LOCAL-ANCHOR-MISMATCH (43.101127ms)",
+   "✔ R7-6-P: case 4 -- neither a machine plane nor a legacy pointer keeps LOCAL-ANCHOR-UNAVAILABLE (80.435797ms)",
+   "ℹ tests 5",
+   "ℹ suites 0",
+   "ℹ pass 2",
+   "ℹ fail 3"
+  ]
+ },
+ {
+  "name": "design-approval-command-admission-tests",
+  "file": "plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ DAGA007 reject missing duplicate blank oversize and flag-form attribution (5.407921ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: imported parser/catalogue policy for [\"approve-plan\",\"--design-approval-request\",\"scratch/design-approval-request-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json\"]",
+   "+ actual - expected",
+   "",
+   "[",
+   "+   true,",
+   "+   true"
+  ]
+ },
+ {
+  "name": "design-workflow-package-route-tests",
+  "file": "plugins/pipeline-core/lib/design-workflow-package-route.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (3.042739ms)",
+  "excerpt": [
+   "✔ R4-T0-8 an exception rationale asserting a fact the receipt does not contain is refused (1.462568ms)",
+   "✔ R4-T0-8 a rationale generated from receipt facts is accepted (1.921078ms)",
+   "✔ R4-T0-9 control: three distinct dispatch bindings are admitted (1.714867ms)",
+   "✔ R4-T0-9 readiness evidence whose full binding equals the authoring dispatch is refused as self-review (1.003326ms)",
+   "✔ R4-T0-9 Advisor evidence whose full binding equals the authoring dispatch is refused as self-review (1.14232ms)",
+   "✔ R4-T0-9 an equal native subagent id alone, under otherwise distinct bindings, is refused as self-review (1.174932ms)"
+  ]
+ },
+ {
+  "name": "pipeline-start-preflight-enforcement-tests",
+  "file": "plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ CONTROL: goldfish readback is unaffected by stale hooks (they never install) (9.548373ms)",
+  "excerpt": [
+   "✔ ENFORCEMENT: a bootstrap that throws is still a present field (`unavailable`), never an absent one (9.065396ms)",
+   "✔ TODO: plugin update under an onboarded project -> one typed refresh nextAction, not a two-step repair (0.07897ms) # not expressible at the preflight seam: the preflight only distinguishes ProjectOnboardingReadyError code PORG-NOT-READY (n",
+   "ℹ tests 20",
+   "ℹ suites 0",
+   "ℹ pass 17",
+   "ℹ fail 2"
+  ]
+ },
+ {
+  "name": "r7-3-bound-paths-tests",
+  "file": "plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ R7-3d every path-naming field of the repository's live State has a classification (2.76957ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: unclassified live State fields: rigorHistory.body.planPath, planPresentation.designApprovalRequestPath",
+   "+ actual - expected",
+   "",
+   "+ [",
+   "+   'rigorHistory.body.planPath',",
+   "+   'planPresentation.designApprovalRequestPath'"
+  ]
+ },
+ {
+  "name": "security-scan-snapshot-tests",
+  "file": "plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ T32 pin 1a (RED): snapshot mode scans HEAD's committed bytes on a dirty tree and binds HEAD's commit and tree (60.800595ms)",
+  "excerpt": [
+   "✔ T32 pin 2 (GREEN today, guards the kept behaviour): shared-tree mode still refuses a dirty tree (58.757313ms)",
+   "ℹ tests 4",
+   "ℹ suites 0",
+   "ℹ pass 2",
+   "ℹ fail 2",
+   "ℹ cancelled 0"
+  ]
+ },
+ {
+  "name": "architecture-entry-required-source-tests",
+  "file": "harness/scripts/architecture-entry-required-source.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ AC19REQ001 resolved decision applicability preserves approved-scoped ready entry (positive control) (14.237207ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: {\"schema\":\"pipeline.architecture-effective-decisions.v1\",\"status\":\"advisory\",\"area\":\"pipeline-core\",\"decisions\":[],\"activeExceptions\":[],\"findings\":[{\"code\":\"decision-adoption-unverified\",\"path\":\"docs/adr/REP",
+   "+ actual - expected",
+   "",
+   "+ 'advisory'",
+   "- 'ready'",
+   ""
+  ]
+ },
+ {
+  "name": "scratch-package-staging-tests",
+  "file": "plugins/pipeline-core/lib/scratch-package-staging.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ plugins/pipeline-core/lib/scratch-package-staging.test.mjs (45.283807ms)",
+  "excerpt": []
+ },
+ {
+  "name": "pin-approval-bound-design-package-lives-in-an-ignored-directory-tests",
+  "file": "plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 4,
+  "firstFail": "✖ [AC-113 present-plan ignored bound path] the review report is git-ignored: present-plan refuses before the PO signs, writes no request (22.507799ms)",
+  "excerpt": [
+   "✖ [AC-113 present-plan ignored bound path] a design companion is git-ignored: present-plan refuses before the PO signs, writes no request (15.532899ms)",
+   "✖ [AC-113 present-plan ignored bound path] the review receipt itself is git-ignored: present-plan refuses before the PO signs, writes no request (14.614907ms)",
+   "✖ [AC-113 present-plan ignored bound path] control: with every bound path tracked, the same fixture still presents (14.02668ms)",
+   "✔ [AC-113 point 1] the output prefix the inspection derives is a tracked home that git does not ignore; the root evidence/ control is ignored (66.788417ms)",
+   "ℹ tests 11",
+   "ℹ suites 0"
+  ]
+ },
+ {
+  "name": "pin-claude-session-start-emits-codex-transcript-recovery-hint-tests",
+  "file": "plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ A6 positive control: the Codex runner still gets the Codex-scoped list (the guard above can fail) (728.746732ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: the drive-letter path detector used in A3 recognises the embedded host path",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs:125:10)",
+   "at Test.runInAsyncScope (node:async_hooks:227:14)",
+   "at Test.run (node:internal/test_runner/test:1402:25)",
+   "at Test.processPendingSubtests (node:internal/test_runner/test:974:18)",
+   "at Test.postRun (node:internal/test_runner/test:1542:19)"
+  ]
+ },
+ {
+  "name": "pin-draft-phase-guard-blocks-mandatory-bootstrap-preflight-tests",
+  "file": "plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ AC-167 point 4b: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity (1.542799ms)",
+  "excerpt": [
+   "✖ AC-167 control: the literal-variable and hook-action admissions are closed -- every other shape stays refused (0.667287ms)",
+   "✔ AC-167 point 6: pipeline-start SKILL.md names the hook-provisioning/refresh preflight status it can receive (0.372447ms)",
+   "ℹ tests 11",
+   "ℹ suites 0",
+   "ℹ pass 9",
+   "ℹ fail 2"
+  ]
+ },
+ {
+  "name": "pin-model-role-bootstrap-is-always-unavailable-on-native-windows-tests",
+  "file": "plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ P3 platform drive-rooted common dir with a real activation marker reports active (17.747309ms)",
+  "excerpt": [
+   "﹣ P4 clause 4 realpath casing via resolvePhysicalRoot/safeExistingPath: a differently-cased injected common dir is accepted or fails closed, never throws (0.233683ms) # win32-only casing case",
+   "✔ model-family-runtime-host.mjs can be entered first (no import-cycle TDZ) (282.501706ms)",
+   "✔ P4 host limitation: directory mode bits and directory symlinks are unavailable on native Windows (0.191113ms)",
+   "ℹ tests 14",
+   "ℹ suites 0",
+   "ℹ pass 11"
+  ]
+ },
+ {
+  "name": "pin-no-uninstall-path-for-a-repository-that-once-opted-in-tests",
+  "file": "plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ alias and private-directory mode refusals (PU-ALIAS, PU-PRIVATE-MODE) need symlinks and mode bits (915.947328ms)",
+  "excerpt": [
+   "✔ SETUP.md documents the uninstall path with exactly the verbs, flags and refusal codes the CLI really has (0.614949ms)",
+   "✔ B2: after the plugin copy a hook was installed from is deleted, owned hooks still run: commit and push succeed and no hook file changes (17365.34567ms)",
+   "ℹ tests 29",
+   "ℹ suites 0",
+   "ℹ pass 28",
+   "ℹ fail 1"
+  ]
+ },
+ {
+  "name": "pin-verify-on-a-wsl-mnt-drive-checkout-hides-its-reason-tests",
+  "file": "plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ P5: real directory path with permissive modes reaches the operator as typed hint (1.717841ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE/u. Input:",
+   "",
+   "'VERIFY-CLEANUP-REGISTRATION-REQUIRED (cause: VERIFY-RUN-RECORD-PATH)'",
+   "",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs:128:12)",
+   "at Test.runInAsyncScope (node:async_hooks:227:14)"
+  ]
+ },
+ {
+  "name": "pin-windows-greenfield-scratch-write-denied-tests",
+  "file": "plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 2,
+  "firstFail": "✖ W1: a physical root alias is resolved before containment (alias root and real root agree) (120.644914ms)",
+  "excerpt": [
+   "✔ W2: a scratch descendant that is a directory alias into product or outside paths is refused (134.753108ms)",
+   "✔ W2: a scratch root that is itself an alias out of the project is refused (3.880149ms)",
+   "✔ W2: a hardlinked scratch file (nlink > 1) is refused, a plain file is admitted (66.266692ms)",
+   "✔ W2: an active plugin root beneath scratch stays excluded (declared live-root seam) (7.560449ms)",
+   "✖ W3: the guard admits PowerShell New-Item and Set-Content/Add-Content for scratch in every non-ready status (186.891722ms)",
+   "✔ W3: the guard rejects PowerShell scratch escapes and unsafe spellings (1001.203446ms)"
+  ]
+ },
+ {
+  "name": "pin-worktrees-share-onboarding-private-state-with-root-bound-intake-tests",
+  "file": "plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ AC-274 first enrollment follows the repository-capability route and unverifiable history gets a supported route (6600.565143ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: {\"schema\":\"pipeline.project-onboarding-plan.v3\",\"status\":\"rolled-back\",\"root\":\"<clone>/scratch/alf07b-plain-aq77Xe\",\"diagnostics\":[{\"path\":\"$.transaction\",\"code\":\"apply_",
+   "+ actual - expected",
+   "",
+   "+ 'rolled-back'",
+   "- 'activation-required'",
+   ""
+  ]
+ },
+ {
+  "name": "pin-orphan-descriptor-recovery-never-offers-the-running-session-tests",
+  "file": "plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 1,
+  "firstFail": "✖ AC-203 own session (a): plan-human-recovery and plan-recovery never offer the running session's own descriptor; a foreign one stays offered (289.645834ms)",
+  "excerpt": [
+   "✔ AC-203 own session (a): plan-archive-orphan lists the running session's own descriptor under refusals with WT-ORPHAN-ARCHIVE-OWN-SESSION (151.262343ms)",
+   "✔ AC-203 own session (a): archive-orphan with the matching digest is refused with WT-ORPHAN-ARCHIVE-OWN-SESSION and leaves the descriptor byte-identical (197.083566ms)",
+   "✔ AC-203 own session: the library entry points honour requesterSessionId at plan and at apply (119.214458ms)",
+   "✔ AC-203 foreign or absent session (b): with a different session id the descriptor is still offered and archive-orphan archives it byte-exact with an audit record (249.474876ms)",
+   "✔ AC-203 foreign or absent session (b): with no CLAUDE_CODE_SESSION_ID the descriptor is still offered and archive-orphan archives it byte-exact with an audit record (247.008372ms)",
+   "✔ AC-203 foreign or absent session (b): with a session id too short to name a hook descriptor the descriptor is still offered and archive-orphan archives it byte-exact with an audit record (249.975051ms)"
+  ]
+ },
+ {
+  "name": "pin-configure-verify-names-the-unmet-approval-condition-tests",
+  "file": "plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs",
+  "exit": 1,
+  "timedOut": false,
+  "fail": 4,
+  "firstFail": "✖ case A: configure-verify names the unmet condition (approved-companion-removed) and a repair (1828.45055ms)",
+  "excerpt": [
+   "AssertionError [ERR_ASSERTION]: an approved companion source vanished after approval (13749-13766 retain()/observeDesignApprovalRequest inputs; a thrown fs error reaches the bare catch 13792): the refusal must carry a one-line repair",
+   "observer={\"status\":\"unavailable\",\"code\":\"CAC-SOURCE-BINDING-MISMATCH\",\"reason\":\"Current original approval evidence or its physical source binding is unavailable.\"}",
+   "configure-verify exit=2 lines=[\"ERR Error: configure-verify commit route unavailable (CAC-SOURCE-BINDING-MISMATCH); zero calibration write.\"]",
+   "at TestContext.<anonymous> (file://<clone>/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs:296:12)",
+   "at Test.runInAsyncScope (node:async_hooks:227:14)",
+   "at Test.run (node:internal/test_runner/test:1402:25)"
+  ]
+ }
+]

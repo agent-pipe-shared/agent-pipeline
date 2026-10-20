@@ -1,0 +1,952 @@
+[
+ {
+  "name": "architecture-baseline-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
+  "exit": 1,
+  "tests": 21,
+  "pass": 20,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "compiles only byte-validated decisions into the effective identity list and never self-activates a waiver (6.604122ms)",
+   "4. CLI options and invocation (925.185169ms)",
+   "architecture-baseline & architecture decision continuity (WP-D1) (936.53264ms)",
+   "compiles only byte-validated decisions into the effective identity list and never self-activates a waiver (6.604122ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Suite.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Suite.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'inventory-only',\n    expected: 'source-validated',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "architecture-effective-decisions-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs",
+  "exit": 1,
+  "tests": 12,
+  "pass": 5,
+  "fail": 7,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "AC19 source precondition: two isolated reads of the same validated decision set agree (5.870058ms)",
+   "AC19 source precondition: a different valid decision body yields typed divergence (2.235485ms)",
+   "AC19 parity validates the projection digest and includes active-exception differences (0.991292ms)",
+   "accepted supersession requires a real superseded predecessor; proposed decisions are not effective (2.323753ms)",
+   "historical ADRs and unscoped v1 module decisions warn without blocking valid decisions (1.448731ms)",
+   "accepted v2 module applicability is effective only for its explicit, validated module IDs (5.311367ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ 'ADR-module' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "rigor-floor-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/rigor-floor.test.mjs",
+  "exit": 1,
+  "tests": 17,
+  "pass": 12,
+  "fail": 5,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "1. Identical normalized inputs produce identical floor & inputDigest (pinned test) (1.048361ms)",
+   "2. Unavailable / unknown inputs can only raise or keep floor, never lower (0.463921ms)",
+   "6. Routine docs/internal-only change permits mini (0.345616ms)",
+   "8. Higher human-selected profile is respected beside floor (not lowered to floor) (0.461717ms)",
+   "11. CLI --format json emits valid schema (41.948665ms)",
+   "WP-B1 / Issue #105: Minimum Rigor Floor Derivation (94.410536ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Suite.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Suite.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'feature',\n    expected: 'mini',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "agy-session-authority-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/agy-session-authority.test.mjs",
+  "exit": 1,
+  "tests": 6,
+  "pass": 4,
+  "fail": 2,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "v2 actual signed family and consent allow two successors through one opaque admission (7.957692ms)",
+   "v2 native permissions bind only their verified implementation task and functional role (2.594617ms)",
+   "v2 actual signed family and consent allow two successors through one opaque admission (7.957692ms)",
+   "v2 native permissions bind only their verified implementation task and functional role (2.594617ms)"
+  ],
+  "tail": "  false !== true\n  \n      at TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/agy-session-authority.test.mjs:57:12)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "agy-session-dispatch-tests",
+  "verifyExit": 1,
+  "cls": "skipped-long",
+  "file": "plugins/pipeline-core/lib/agy-session-dispatch.test.mjs",
+  "durationMs": 16072903
+ },
+ {
+  "name": "portable-agy-authorship-export-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs",
+  "exit": 1,
+  "tests": 5,
+  "pass": 4,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "PAE05 a committed v4 record uses only its exact signed export in a fresh clone (40.288937ms)",
+   "PAE05 a committed v4 record uses only its exact signed export in a fresh clone (40.288937ms)"
+  ],
+  "tail": "      at fail (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/dispatch-record.mjs:26:17)\n      at validateRecord (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/dispatch-record.mjs:165:98)\n      at validateDispatchRecord (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/dispatch-record.mjs:262:7)\n      at file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs:149:18\n      at fixture (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs:65:18)\n      at TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs:146:94)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19) {\n    code: 'record-log'\n  }"
+ },
+ {
+  "name": "goldfish-antigravity-live-host-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs",
+  "exit": 1,
+  "tests": 6,
+  "pass": 5,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "real temporary session admits two distinct bounded fixture tasks and reuses stored consent (234.308596ms)",
+   "real temporary session admits two distinct bounded fixture tasks and reuses stored consent (234.308596ms)"
+  ],
+  "tail": "  - 'completed-undelivered'\n  \n      at TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs:115:10)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'rejected',\n    expected: 'completed-undelivered',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "architecture-decision-continuity-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/architecture-decision-continuity.test.mjs",
+  "exit": 1,
+  "tests": 4,
+  "pass": 3,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "AC-19 productive readback binds local ADR and configured signed inherited feed (7.772441ms)",
+   "AC-19 productive readback binds local ADR and configured signed inherited feed (7.772441ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'advisory',\n    expected: 'ready',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "design-advisory-admission-cli-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/design-advisory-admission.test.mjs",
+  "exit": 1,
+  "tests": 2,
+  "pass": 0,
+  "fail": 2,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "answered Advisor inspect rechecks its actual private transaction (15.304946ms)",
+   "unavailable Advisor inspect never reuses the write-time final approval claim (6.174721ms)",
+   "answered Advisor inspect rechecks its actual private transaction (15.304946ms)",
+   "unavailable Advisor inspect never reuses the write-time final approval claim (6.174721ms)"
+  ],
+  "tail": "      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "verify-suite-append-history-check",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "harness/scripts/check-verify-suite-append.mjs",
+  "exit": 1,
+  "tests": 1,
+  "pass": 0,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "<home>/pipeline-test-tmp/fv-c1771bc98/harness/scripts/check-verify-suite-append.mjs (263.230121ms)",
+   "<home>/pipeline-test-tmp/fv-c1771bc98/harness/scripts/check-verify-suite-append.mjs (263.230121ms)"
+  ],
+  "tail": "ℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 271.735803\n\n✖ failing tests:\n\ntest at harness/scripts/check-verify-suite-append.mjs:1:1\n✖ <home>/pipeline-test-tmp/fv-c1771bc98/harness/scripts/check-verify-suite-append.mjs (263.230121ms)\n  'test failed'"
+ },
+ {
+  "name": "codex-critic-session-route-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/codex-critic-session-route.test.mjs",
+  "exit": 1,
+  "tests": 5,
+  "pass": 4,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "signed ordinary and high-risk Critic use one native child and authentic S6 plus existing finalization (1509.681989ms)",
+   "signed ordinary and high-risk Critic use one native child and authentic S6 plus existing finalization (1509.681989ms)"
+  ],
+  "tail": "        at readAuthorityNamespace (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:118:67)\n        at file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/native-managed-authority-support.mjs:59:84\n        at Array.map (<anonymous>)\n        at readNativeManagedInventory (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/native-managed-authority-support.mjs:59:16)\n        at nativeAuthorityScan (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/native-goldfish-host-state.mjs:377:18)\n        at Object.readBaseline (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/native-goldfish-host-state.mjs:618:31)\n        at file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/scripts/codex-critic-session-route.test.mjs:75:71\n        at getActual (node:assert:611:5),\n    expected: undefined,\n    operator: 'doesNotThrow',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "native-goldfish-host-state-tests",
+  "verifyExit": 1,
+  "cls": "skipped-long",
+  "file": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+  "durationMs": 17956747
+ },
+ {
+  "name": "native-goldfish-host-return-tests",
+  "verifyExit": 1,
+  "cls": "case-drift",
+  "file": "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs",
+  "exit": 0,
+  "tests": 6,
+  "pass": 6,
+  "fail": 0,
+  "declared": 5,
+  "missing": [],
+  "undeclared": [
+   "NGHR06",
+   "NGHR06"
+  ],
+  "failing": []
+ },
+ {
+  "name": "native-goldfish-host-finalizer-tests",
+  "verifyExit": 1,
+  "cls": "skipped-long",
+  "file": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+  "durationMs": 15960953
+ },
+ {
+  "name": "antigravity-topology-refresh-host-tests",
+  "verifyExit": 1,
+  "cls": "case-drift",
+  "file": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs",
+  "exit": 0,
+  "tests": 15,
+  "pass": 15,
+  "fail": 0,
+  "declared": 11,
+  "missing": [],
+  "undeclared": [
+   "RC05C012",
+   "RC05C013",
+   "RC05C014",
+   "RC05C015"
+  ],
+  "failing": []
+ },
+ {
+  "name": "hook-governance-scope-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/hooks/hook-governance-scope.test.mjs",
+  "exit": 1,
+  "tests": 9,
+  "pass": 8,
+  "fail": 1,
+  "declared": 9,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "RC03C008 all current runner hook commands are automatically enumerated into the source scope inventory (1.541768ms)",
+   "RC03C008 all current runner hook commands are automatically enumerated into the source scope inventory (1.541768ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "project-reset-git-hooks-tests",
+  "verifyExit": 1,
+  "cls": "skipped-long",
+  "file": "plugins/pipeline-core/scripts/project-reset-git-hooks.test.mjs",
+  "durationMs": 15889021
+ },
+ {
+  "name": "project-uninstall-tests",
+  "verifyExit": 1,
+  "cls": "case-drift",
+  "file": "plugins/pipeline-core/lib/project-uninstall.test.mjs",
+  "exit": 0,
+  "tests": 17,
+  "pass": 17,
+  "fail": 0,
+  "declared": 7,
+  "missing": [],
+  "undeclared": [
+   "UC02C008",
+   "UC02C009",
+   "UC02C010",
+   "UC02C011",
+   "UC02C012",
+   "UC02C013",
+   "UC02C014",
+   "UC02C015"
+  ],
+  "failing": []
+ },
+ {
+  "name": "security-scanner-diagnostics-tests",
+  "verifyExit": 1,
+  "cls": "green-direct",
+  "file": "plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs",
+  "exit": 0,
+  "tests": 24,
+  "pass": 24,
+  "fail": 0,
+  "declared": 24,
+  "missing": [],
+  "undeclared": [],
+  "failing": []
+ },
+ {
+  "name": "codex-design-advisor-host-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs",
+  "exit": 1,
+  "tests": 1,
+  "pass": 0,
+  "fail": 1,
+  "declared": 1,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "CADH001 active Advisor keeps its signed S4/S2 selection through metadata rechecks and one S5/S6 native launch (1251.305077ms)",
+   "CADH001 active Advisor keeps its signed S4/S2 selection through metadata rechecks and one S5/S6 native launch (1251.305077ms)"
+  ],
+  "tail": "        at readAuthorityNamespace (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:118:67)\n        at file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/native-managed-authority-support.mjs:59:84\n        at Array.map (<anonymous>)\n        at readNativeManagedInventory (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/native-managed-authority-support.mjs:59:16)\n        at nativeAuthorityScan (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/native-goldfish-host-state.mjs:377:18)\n        at Object.readBaseline (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/native-goldfish-host-state.mjs:618:31)\n        at file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:58\n        at getActual (node:assert:611:5),\n    expected: undefined,\n    operator: 'doesNotThrow',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "commit-msg-hook-signed-integration-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/commit-msg-hook-signed-integration.test.mjs",
+  "exit": 1,
+  "tests": 9,
+  "pass": 2,
+  "fail": 7,
+  "declared": 9,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "CMSI001 generated commit-msg hook admits the exact verified intent in a real Git commit (499.586027ms)",
+   "CMSI002 generated commit-msg hook refuses missing-authorization (484.708116ms)",
+   "CMSI003 generated commit-msg hook refuses forged-signature (484.5938ms)",
+   "CMSI004 generated commit-msg hook refuses wrong-intent (481.281675ms)",
+   "CMSI005 generated commit-msg hook refuses malformed-trailer (492.171404ms)",
+   "CMSI006 generated commit-msg hook refuses extended-trailer (568.274908ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "guard-dispatch-native-worker-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs",
+  "exit": 1,
+  "tests": 4,
+  "pass": 2,
+  "fail": 2,
+  "declared": 4,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "GDW01 GD15n prepare a native pending binding for a complete dispatched Codex briefing and block failed preparation (407.813578ms)",
+   "GDW04 GD15m check a marked worker packet against the functional Goldfish briefing (384.203564ms)",
+   "GDW01 GD15n prepare a native pending binding for a complete dispatched Codex briefing and block failed preparation (407.813578ms)",
+   "GDW04 GD15m check a marked worker packet against the functional Goldfish briefing (384.203564ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "guard-git-signed-integration-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/hooks/guard-git-signed-integration.test.mjs",
+  "exit": 1,
+  "tests": 5,
+  "pass": 0,
+  "fail": 5,
+  "declared": 5,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "GSI001 guard-git admits signed integration only after independent worktree verification with marker mode off (521.849736ms)",
+   "GSI002 guard-git admits signed integration only after independent worktree verification with marker mode warn (502.273517ms)",
+   "GSI003 guard-git refuses missing-authorization even when ordinary marker policy is off (490.611866ms)",
+   "GSI004 guard-git refuses wrong-intent even when ordinary marker policy is off (497.714895ms)",
+   "GSI005 guard-git refuses forged-proof even when ordinary marker policy is off (519.948259ms)",
+   "GSI001 guard-git admits signed integration only after independent worktree verification with marker mode off (521.849736ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "model-family-execution-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/model-family-execution.test.mjs",
+  "exit": 1,
+  "tests": 19,
+  "pass": 18,
+  "fail": 1,
+  "declared": 19,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "MFE018 forged invocation digest, provider result extras, absent ports and legacy receipt kinds fail closed (7.606305ms)",
+   "MFE018 forged invocation digest, provider result extras, absent ports and legacy receipt kinds fail closed (7.606305ms)"
+  ],
+  "tail": "ℹ duration_ms 362.700792\n\n✖ failing tests:\n\ntest at plugins/pipeline-core/lib/test-case-completion.mjs:219:5\n✖ MFE018 forged invocation digest, provider result extras, absent ports and legacy receipt kinds fail closed (7.606305ms)\n  Error: S4 activation failed: MODEL-FAMILY-AUTHORITY-UNAVAILABLE\n      at realS4Receipt (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/model-family-execution.test.mjs:134:59)\n      at async Object.run (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/model-family-execution.test.mjs:224:51)\n      at async TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)"
+ },
+ {
+  "name": "model-family-host-store-tests",
+  "verifyExit": 1,
+  "cls": "skipped-long",
+  "file": "plugins/pipeline-core/lib/model-family-host-store.test.mjs",
+  "durationMs": 17763769
+ },
+ {
+  "name": "model-family-invocation-tests",
+  "verifyExit": 1,
+  "cls": "skipped-long",
+  "file": "plugins/pipeline-core/lib/model-family-invocation.test.mjs",
+  "durationMs": 16601840
+ },
+ {
+  "name": "model-family-main-prelaunch-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/model-family-main-prelaunch.test.mjs",
+  "exit": 1,
+  "tests": 3,
+  "pass": 2,
+  "fail": 1,
+  "declared": 3,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "MFMP003 signed S1 opaque S2 S4 S5 path completes distinct correlated main ports for all runners with unknown optional effort telemetry (28959.55792ms)",
+   "MFMP003 signed S1 opaque S2 S4 S5 path completes distinct correlated main ports for all runners with unknown optional effort telemetry (28959.55792ms)"
+  ],
+  "tail": "      at prepareLaunchInContext (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/model-family-main-prelaunch.test.mjs:206:16)\n      at async Object.run (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/model-family-main-prelaunch.test.mjs:221:21)\n      at async TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "model-family-runtime-host-tests",
+  "verifyExit": 1,
+  "cls": "case-drift",
+  "file": "plugins/pipeline-core/lib/model-family-runtime-host.test.mjs",
+  "exit": 0,
+  "tests": 5,
+  "pass": 5,
+  "fail": 0,
+  "declared": 4,
+  "missing": [],
+  "undeclared": [
+   "MFH005"
+  ],
+  "failing": []
+ },
+ {
+  "name": "native-goldfish-host-state-regression-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/native-goldfish-host-state-regression.test.mjs",
+  "exit": 1,
+  "tests": 3,
+  "pass": 0,
+  "fail": 3,
+  "declared": 3,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "NGHS06 Codex v2 binds the worker native type to the functional Goldfish role and exact start (13.33718ms)",
+   "NGHS07 legacy v1 association keeps the unprefixed role in its unchanged schema (7.164938ms)",
+   "NGHS08 Codex v2 refuses ambiguous worker starts and malformed stops (6.227397ms)",
+   "NGHS06 Codex v2 binds the worker native type to the functional Goldfish role and exact start (13.33718ms)",
+   "NGHS07 legacy v1 association keeps the unprefixed role in its unchanged schema (7.164938ms)",
+   "NGHS08 Codex v2 refuses ambiguous worker starts and malformed stops (6.227397ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "model-family-approval-request-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/model-family-approval-request.test.mjs",
+  "exit": 1,
+  "tests": 10,
+  "pass": 9,
+  "fail": 1,
+  "declared": 10,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "MFA010 canonical PO signer resolves the family request before guard fallback and rejects an unresolved family schema (1.938572ms)",
+   "MFA010 canonical PO signer resolves the family request before guard fallback and rejects an unresolved family schema (1.938572ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "design-workflow-package-builder-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs",
+  "exit": 1,
+  "tests": 3,
+  "pass": 0,
+  "fail": 3,
+  "declared": 3,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "DWPB001 builder publishes one canonical v2 package under the tracked specs/<feature-id>/evidence home and refuses overwrite (2121.805885ms)",
+   "DWPB002 builder rejects stale candidate bindings, ignored outputs and unsafe destinations without publishing (2616.497232ms)",
+   "DWPB003 builder retains a canonical no-child Advisor exception as pending PO approval (1977.95107ms)",
+   "DWPB001 builder publishes one canonical v2 package under the tracked specs/<feature-id>/evidence home and refuses overwrite (2121.805885ms)",
+   "DWPB002 builder rejects stale candidate bindings, ignored outputs and unsafe destinations without publishing (2616.497232ms)",
+   "DWPB003 builder retains a canonical no-child Advisor exception as pending PO approval (1977.95107ms)"
+  ],
+  "tail": "      at Object.run (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs:216:10)\n      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n      at async TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'unavailable',\n    expected: 'reviewed',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "design-course-session-tests",
+  "verifyExit": 1,
+  "cls": "case-drift",
+  "file": "plugins/pipeline-core/scripts/design-course-session.test.mjs",
+  "exit": 0,
+  "tests": 9,
+  "pass": 9,
+  "fail": 0,
+  "declared": 6,
+  "missing": [],
+  "undeclared": [
+   "K3C007",
+   "K3C008",
+   "K3C009"
+  ],
+  "failing": []
+ },
+ {
+  "name": "guard-dispatch-budget-checkpoint-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+  "exit": 1,
+  "tests": 15,
+  "pass": 14,
+  "fail": 1,
+  "declared": 15,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "GDBC10 hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file (1031.389715ms)",
+   "GDBC10 hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file (1031.389715ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pipeline-state-push-anchor-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs",
+  "exit": 1,
+  "tests": 5,
+  "pass": 2,
+  "fail": 3,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "R7-6-P: case 2 -- with no machine plane the legacy per-repository pointer remains a read-only fallback anchor (46.04238ms)",
+   "R7-6-P: case 3a -- plane = A and legacy = B: the plane wins, an authority carrying A's pair passes (45.554029ms)",
+   "R7-6-P: case 3b -- plane = A and legacy = B: an authority carrying B's pair is refused with LOCAL-ANCHOR-MISMATCH (45.64408ms)",
+   "R7-6-P: case 2 -- with no machine plane the legacy per-repository pointer remains a read-only fallback anchor (46.04238ms)",
+   "R7-6-P: case 3a -- plane = A and legacy = B: the plane wins, an authority carrying A's pair passes (45.554029ms)",
+   "R7-6-P: case 3b -- plane = A and legacy = B: an authority carrying B's pair is refused with LOCAL-ANCHOR-MISMATCH (45.64408ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "design-approval-command-admission-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs",
+  "exit": 1,
+  "tests": 13,
+  "pass": 12,
+  "fail": 1,
+  "declared": 13,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "DAGA007 reject missing duplicate blank oversize and flag-form attribution (5.486239ms)",
+   "DAGA007 reject missing duplicate blank oversize and flag-form attribution (5.486239ms)"
+  ],
+  "tail": "      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: [ true, true ],\n    expected: [ false, false ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "design-workflow-package-route-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/design-workflow-package-route.test.mjs",
+  "exit": 1,
+  "tests": 15,
+  "pass": 14,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (3.46488ms)",
+   "R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (3.46488ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pipeline-start-preflight-enforcement-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs",
+  "exit": 1,
+  "tests": 20,
+  "pass": 17,
+  "fail": 2,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "CONTROL: goldfish readback is unaffected by stale hooks (they never install) (10.28881ms)",
+   "CONTROL: critic readback is unaffected by stale hooks (they never install) (8.967751ms)",
+   "CONTROL: goldfish readback is unaffected by stale hooks (they never install) (10.28881ms)",
+   "CONTROL: critic readback is unaffected by stale hooks (they never install) (8.967751ms)"
+  ],
+  "tail": "  \n      at assertBaseline (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:162:10)\n      at async TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:301:22)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: 'command',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "r7-3-bound-paths-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs",
+  "exit": 1,
+  "tests": 13,
+  "pass": 12,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "R7-3d every path-naming field of the repository's live State has a classification (2.666915ms)",
+   "R7-3d every path-naming field of the repository's live State has a classification (2.666915ms)"
+  ],
+  "tail": "  - []\n  \n      at TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:290:10)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: [ 'rigorHistory.body.planPath', 'planPresentation.designApprovalRequestPath' ],\n    expected: [],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "security-scan-snapshot-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs",
+  "exit": 1,
+  "tests": 4,
+  "pass": 2,
+  "fail": 2,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "T32 pin 1a (RED): snapshot mode scans HEAD's committed bytes on a dirty tree and binds HEAD's commit and tree (58.737281ms)",
+   "T32 pin 1b (RED): snapshot mode reports the finding HEAD carries even when the dirty tree 'fixes' it (60.675631ms)",
+   "T32 pin 1a (RED): snapshot mode scans HEAD's committed bytes on a dirty tree and binds HEAD's commit and tree (58.737281ms)",
+   "T32 pin 1b (RED): snapshot mode reports the finding HEAD carries even when the dirty tree 'fixes' it (60.675631ms)"
+  ],
+  "tail": "    }\n  \n      at TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs:169:12)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { exitCode: 2, scanners: [ [Object] ], commit: '6b78f999062f885f9a34fa0c4108b85843d9fbcb', tree: 'de7192f7b546439511b58fe1bb6b99d578b0a31f' },\n    expected: { exitCode: 2, scanners: [ [Object] ], commit: '6b78f999062f885f9a34fa0c4108b85843d9fbcb', tree: 'de7192f7b546439511b58fe1bb6b99d578b0a31f' },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "architecture-entry-required-source-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "harness/scripts/architecture-entry-required-source.test.mjs",
+  "exit": 1,
+  "tests": 2,
+  "pass": 0,
+  "fail": 2,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "AC19REQ001 resolved decision applicability preserves approved-scoped ready entry (positive control) (11.906482ms)",
+   "AC19REQ002 mandatory inherited source unavailable blocks approved-scoped entry (required negative contract) (6.5711ms)",
+   "AC19REQ001 resolved decision applicability preserves approved-scoped ready entry (positive control) (11.906482ms)",
+   "AC19REQ002 mandatory inherited source unavailable blocks approved-scoped entry (required negative contract) (6.5711ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'advisory',\n    expected: 'ready',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "architecture-prospective-companion-tests",
+  "verifyExit": 1,
+  "cls": "green-direct",
+  "file": "plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs",
+  "exit": 0,
+  "tests": 3,
+  "pass": 3,
+  "fail": 0,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": []
+ },
+ {
+  "name": "signing-disclosure-sweep-tests",
+  "verifyExit": 1,
+  "cls": "skipped-long",
+  "file": "plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs",
+  "durationMs": 509102
+ },
+ {
+  "name": "scratch-package-staging-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/scratch-package-staging.test.mjs",
+  "exit": 1,
+  "tests": 1,
+  "pass": 0,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/scratch-package-staging.test.mjs (45.455871ms)",
+   "<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/scratch-package-staging.test.mjs (45.455871ms)"
+  ],
+  "tail": "ℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 53.88597\n\n✖ failing tests:\n\ntest at plugins/pipeline-core/lib/scratch-package-staging.test.mjs:1:1\n✖ <home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/scratch-package-staging.test.mjs (45.455871ms)\n  'test failed'"
+ },
+ {
+  "name": "pin-approval-bound-design-package-lives-in-an-ignored-directory-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs",
+  "exit": 1,
+  "tests": 11,
+  "pass": 7,
+  "fail": 4,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "[AC-113 present-plan ignored bound path] the review report is git-ignored: present-plan refuses before the PO signs, writes no request (21.826208ms)",
+   "[AC-113 present-plan ignored bound path] a design companion is git-ignored: present-plan refuses before the PO signs, writes no request (14.856202ms)",
+   "[AC-113 present-plan ignored bound path] the review receipt itself is git-ignored: present-plan refuses before the PO signs, writes no request (13.472515ms)",
+   "[AC-113 present-plan ignored bound path] control: with every bound path tracked, the same fixture still presents (14.852996ms)",
+   "[AC-113 present-plan ignored bound path] the review report is git-ignored: present-plan refuses before the PO signs, writes no request (21.826208ms)",
+   "[AC-113 present-plan ignored bound path] a design companion is git-ignored: present-plan refuses before the PO signs, writes no request (14.856202ms)"
+  ],
+  "tail": "  \n      at routeFixture (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs:195:10)\n      at async TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs:253:14)\n      at async Test.run (node:internal/test_runner/test:1409:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pin-claude-session-start-emits-codex-transcript-recovery-hint-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs",
+  "exit": 1,
+  "tests": 12,
+  "pass": 11,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "A6 positive control: the Codex runner still gets the Codex-scoped list (the guard above can fail) (727.814662ms)",
+   "A6 positive control: the Codex runner still gets the Codex-scoped list (the guard above can fail) (727.814662ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'Agent Pipeline is active for this repository. Before project work, run pipeline-core:pipeline-start and report the resolved Pipeline version. This governed-repository bootstrap is mandatory; do not substitute a project-local script or stale cache path. After a ready bootstrap, the Operating Model and compiled manifest are the gate authority: continue ordinary implementation, focused tests, commits, Verify, Critic preparation and state readback autonomously. Do not invent a human checkpoint for routine work. Request the PO only for a configured decision gate, required final acceptance, an irreversible/external consequence, or a typed hard block with no safe returned recovery action. A guard denial is not by itself a human gate: first execute its exact typed read-only or lifecycle recovery action when one is supplied. On startup, resume, clear or compact restart, use the dedicated read-only transcript list as the safe entry point: node \"<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs\" list --root \"<home>/pipeli"
+ },
+ {
+  "name": "pin-draft-phase-guard-blocks-mandatory-bootstrap-preflight-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs",
+  "exit": 1,
+  "tests": 11,
+  "pass": 9,
+  "fail": 2,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "AC-167 point 4b: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity (1.327882ms)",
+   "AC-167 control: the literal-variable and hook-action admissions are closed -- every other shape stays refused (0.623895ms)",
+   "AC-167 point 4b: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity (1.327882ms)",
+   "AC-167 control: the literal-variable and hook-action admissions are closed -- every other shape stays refused (0.623895ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: 'block',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pin-model-role-bootstrap-is-always-unavailable-on-native-windows-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs",
+  "exit": 1,
+  "tests": 14,
+  "pass": 11,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "P3 platform drive-rooted common dir with a real activation marker reports active (16.581361ms)",
+   "P3 platform drive-rooted common dir with a real activation marker reports active (16.581361ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pin-no-uninstall-path-for-a-repository-that-once-opted-in-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs",
+  "exit": 1,
+  "tests": 29,
+  "pass": 28,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "alias and private-directory mode refusals (PU-ALIAS, PU-PRIVATE-MODE) need symlinks and mode bits (906.303224ms)",
+   "alias and private-directory mode refusals (PU-ALIAS, PU-PRIVATE-MODE) need symlinks and mode bits (906.303224ms)"
+  ],
+  "tail": "      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pin-verify-on-a-wsl-mnt-drive-checkout-hides-its-reason-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs",
+  "exit": 1,
+  "tests": 8,
+  "pass": 6,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "P5: real directory path with permissive modes reaches the operator as typed hint (1.674019ms)",
+   "P5: real directory path with permissive modes reaches the operator as typed hint (1.674019ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'VERIFY-CLEANUP-REGISTRATION-REQUIRED (cause: VERIFY-RUN-RECORD-PATH)',\n    expected: /VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE/u,\n    operator: 'match',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pin-windows-greenfield-scratch-write-denied-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs",
+  "exit": 1,
+  "tests": 12,
+  "pass": 9,
+  "fail": 2,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "W1: a physical root alias is resolved before containment (alias root and real root agree) (118.771598ms)",
+   "W3: the guard admits PowerShell New-Item and Set-Content/Add-Content for scratch in every non-ready status (178.312833ms)",
+   "W1: a physical root alias is resolved before containment (alias root and real root agree) (118.771598ms)",
+   "W3: the guard admits PowerShell New-Item and Set-Content/Add-Content for scratch in every non-ready status (178.312833ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 0,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pin-worktrees-share-onboarding-private-state-with-root-bound-intake-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs",
+  "exit": 1,
+  "tests": 7,
+  "pass": 6,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "AC-274 first enrollment follows the repository-capability route and unverifiable history gets a supported route (6379.638066ms)",
+   "AC-274 first enrollment follows the repository-capability route and unverifiable history gets a supported route (6379.638066ms)"
+  ],
+  "tail": "  \n      at TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs:347:12)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: 'rolled-back',\n    expected: 'activation-required',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pin-orphan-descriptor-recovery-never-offers-the-running-session-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs",
+  "exit": 1,
+  "tests": 7,
+  "pass": 6,
+  "fail": 1,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "AC-203 own session (a): plan-human-recovery and plan-recovery never offer the running session's own descriptor; a foreign one stays offered (275.880954ms)",
+   "AC-203 own session (a): plan-human-recovery and plan-recovery never offer the running session's own descriptor; a foreign one stays offered (275.880954ms)"
+  ],
+  "tail": "      at TestContext.<anonymous> (file://<home>/pipeline-test-tmp/fv-c1771bc98/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs:103:155)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.start (node:internal/test_runner/test:1262:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ 'claude-f1e2d3c4-b5a6-4978-8695-a4b3c2d1e0f9' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "pin-configure-verify-names-the-unmet-approval-condition-tests",
+  "verifyExit": 1,
+  "cls": "test-red",
+  "file": "plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs",
+  "exit": 1,
+  "tests": 6,
+  "pass": 2,
+  "fail": 4,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": [
+   "case A: configure-verify names the unmet condition (approved-companion-removed) and a repair (1817.379065ms)",
+   "case A: configure-verify names the unmet condition (authority-source-edited) and a repair (1681.023236ms)",
+   "case A: configure-verify names the unmet condition (state-file-not-private) and a repair (1643.370786ms)",
+   "case A: the unmet conditions are pairwise distinguishable (no two collapse to one code) (0.340086ms)",
+   "case A: configure-verify names the unmet condition (approved-companion-removed) and a repair (1817.379065ms)",
+   "case A: configure-verify names the unmet condition (authority-source-edited) and a repair (1681.023236ms)"
+  ],
+  "tail": "      at Test.run (node:internal/test_runner/test:1402:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)\n      at Test.postRun (node:internal/test_runner/test:1542:19)\n      at Test.run (node:internal/test_runner/test:1467:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }"
+ },
+ {
+  "name": "session-authority-repair-tests",
+  "verifyExit": 1,
+  "cls": "green-direct",
+  "file": "plugins/pipeline-core/scripts/session-authority-repair.test.mjs",
+  "exit": 0,
+  "tests": 10,
+  "pass": 10,
+  "fail": 0,
+  "declared": 0,
+  "missing": [],
+  "undeclared": [],
+  "failing": []
+ },
+ {
+  "name": "scoped-verify-registration-tests",
+  "verifyExit": 1,
+  "cls": "no-file"
+ },
+ {
+  "name": "toolchain-preflight-tests",
+  "verifyExit": 1,
+  "cls": "no-file"
+ }
+]
