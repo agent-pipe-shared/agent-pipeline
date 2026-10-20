@@ -113,9 +113,19 @@ Closures: M0 (measurements) and W1 (AC-142B, AC-224, AC-155A, implementation com
 interim measurement entries (last: 'K1 measurement 6'). D70 (lost-binding recovery, built at
 `d2602f5cf`/`5e5c7d8f2`, implementation complete) and D71 (the per-user session-power address root
 past its 4096-slot bound: 3769 stale test slots moved aside, product fix in this candidate) are in
-`po-decisions-2026-10-18.md`. Next in K1: the D71 fix (test isolation of the address root; a repair
-verb for the bound), the archive-orphan route's binding release (RF2A, decides which authorization
-may use the lost-binding route), D70 (b) legacy bytes, the binding-suite rest, K1f, K1g, closure.
+`po-decisions-2026-10-18.md`. D72 settles both open K1 calls: the address root stays at the OS home
+and a repair verb cleans it (no redirect), and `archive-orphan` may use the lost-binding release
+after a read-back archive. **K1 handover for the new session (2026-10-20, PO-agreed single
+restart; the remaining waves run in it, autonomously per plan):** tree clean after this commit;
+interim stamp `4d78bb07e` (0.7.0+…20261020195107.231d1a0) may be installed by the PO. Order:
+(1) the D71 repair verb per D72 as one goldfish-deep dispatch from the template (new module, plan
+plus readback, moves absent-repository slots aside, deletes nothing; the 4096 refusal in
+`lib/session-power.mjs` names it; scratch runners run it after each suite; the `verify.mjs`
+per-suite run is collected as a C15 drop-in; neither touched file may pass 1000 lines); (2) RF2A
+per D72 (`applyOrphanDescriptorArchive` in `lib/session-cleanup-recovery.mjs`); (3) D70 (b) legacy
+bytes; (4) the binding-suite rest (49/66) and recovery (37/39); (5) K1f, K1g; (6) the model-family
+group to the D66 package; (7) the K1 closure entry, ledger and state line, then K1h/K10 onward.
+Shell guard: one simple command per call, no pipes; commit messages via `-F`.
 D69 / ADR-0088 (test economy): fast gate plus fresh full run, quarantine with owner and expiry,
 retire on supersede, ratchet, runtime budget; rules 3 and 4 apply in this candidate, the Verify
 rebuild follows 0.7.0 (`backlog/items/2026-10-20-verify-test-economy-rebuild.md`).

@@ -19,7 +19,7 @@
       "id": "K1",
       "title": "session-authority domain and continuity binding",
       "status": "in-progress",
-      "next": "read 'K1 measurement 6'; D71 fix (address-root test isolation, repair verb for the 4096 bound); RF2A archive-orphan binding release (authorization question); D70 (b) legacy bytes; binding-suite rest (17 reds); K1f, K1g; model-family group to the D66 package; then the K1 closure"
+      "next": "read docs/state.md K1 handover and K1 measurement 6; D71 repair verb per D72 (a): new module moving ~/.apsp slots of absent repositories aside via plan and readback, nothing deleted, 4096 refusal names it, runs after each suite in the scratch runners, verify.mjs per-suite run as C15 drop-in; RF2A per D72 (a): archive-orphan uses the lost-binding release after a read-back archive, bound to archived descriptor bytes and digest and a non-live owner; D70 (b) legacy bytes; binding-suite rest (17 reds); K1f, K1g; model-family group to the D66 package; then the K1 closure"
     },
     {
       "id": "K1h",
