@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 //
-// session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait> --root <root> [--no-goldfish-running | --no-pipeline-running] [--reason "<why>"] [--timeout <seconds>]
+// session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root> [--no-goldfish-running | --no-pipeline-running | --no-other-session-running] [--from <session>] [--reason "<why>"] [--timeout <seconds>]
 //
 // D52 (2), PF-55: the general repair every SDC-AUTHORITY-* refusal names. None of the verbs needs a bound
 // session, so each runs from the agent's shell and from the PO's terminal alike.
@@ -26,17 +26,24 @@
 //               owner is provably gone needs no command: the next boundary entry retires it.
 //   wait        FB3-PF-56: waits up to --timeout seconds (1-600, default 60) until the lock is free or its owner
 //               is gone, so a loop waits instead of retrying blind.
+//   take-over   Q13 (a), D57: frees every item operation the named session --from started and did not settle, so
+//               this session can dispatch those slices again. Whether that session still lives cannot be observed,
+//               so this rests on the caller's word (--no-other-session-running) and --reason. Each such slice is
+//               cancelled through the ordinary started cancel (its reservation stops blocking, nothing of it is
+//               delivered), and the decision is retained under session-authority-abandoned like move-aside. It
+//               rewrites no other session's binding and does not transfer the continuity cleanup slot, which
+//               keeps its own typed recovery (session-cleanup.mjs plan-recovery).
 //
-// Prints one JSON result. Exit 0: inspected | healed | moved-aside. Exit 2: refused (typed SAR-* code).
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { createHash } from "node:crypto";
+// Prints one JSON result. Exit 0: inspected | healed | moved-aside | taken-over | nothing-to-take-over. Exit 2: refused (typed SAR-* code).
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
-import { readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
+import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
 import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
 
 const SCHEMA = "pipeline.session-authority-repair.v1";
@@ -55,13 +62,14 @@ export function sessionAuthorityRepairCommand(root, verb = "inspect") {
 }
 
 // Each verb's own assertion flag and value flags (FB3-PF-55: release-lock, wait).
-const ASSERTION = { "move-aside": "no-goldfish-running", "release-lock": "no-pipeline-running" };
-const VALUES = { inspect: ["root"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"] };
+const ASSERTION = { "move-aside": "no-goldfish-running", "release-lock": "no-pipeline-running", "take-over": "no-other-session-running" };
+const VALUES = { inspect: ["root"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"], "take-over": ["root", "from", "reason"] };
 const validReason = (reason) => typeof reason === "string" && reason.trim() !== "" && reason.length <= 500 && !/[\u0000-\u001f\u007f]/u.test(reason);
+const validSession = (session) => typeof session === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(session);
 
 function parse(argv) {
   const [verb, ...rest] = argv;
-  if (!Object.hasOwn(VALUES, verb)) return { error: "usage: session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait> --root <root>" };
+  if (!Object.hasOwn(VALUES, verb)) return { error: "usage: session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root>" };
   const flags = {};
   for (let index = 0; index < rest.length; index += 1) {
     const name = rest[index]?.startsWith("--") ? rest[index].slice(2) : null;
@@ -76,6 +84,8 @@ function parse(argv) {
     return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs) and --reason \"<one line>\"" };
   if (verb === "release-lock" && (flags["no-pipeline-running"] !== true || !validReason(flags.reason)))
     return { error: "release-lock needs --no-pipeline-running (you assert that no Pipeline process runs for this repository) and --reason \"<one line>\"" };
+  if (verb === "take-over" && (flags["no-other-session-running"] !== true || !validSession(flags.from) || !validReason(flags.reason)))
+    return { error: "take-over needs --from <session id>, --no-other-session-running (you assert that the named session and its Goldfish no longer run) and --reason \"<one line>\"" };
   if (verb === "wait") {
     const timeout = flags.timeout === undefined ? 60 : Number(flags.timeout);
     if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600) return { error: "--timeout needs whole seconds from 1 to 600" };
@@ -129,7 +139,7 @@ function reservationReport(repository, root) {
     const queueState = slices.find((row) => row.id === sliceId)?.state ?? null;
     const nativeIntegrated = names.includes(`authority-integration-${sha}.json`);
     const byCommit = sliceId !== null && integrated.has(sliceId);
-    rows.push({ pending: name, sliceId, itemId: state?.delivery?.itemId ?? null, dispatchId: state?.binding?.dispatchId ?? null, queueState,
+    rows.push({ pending: name, sliceId, itemId: state?.delivery?.itemId ?? null, dispatchId: state?.binding?.dispatchId ?? null, sessionId: typeof state?.sessionId === "string" ? state.sessionId : null, queueState,
       settled: nativeIntegrated ? "integrated" : byCommit ? "integrated-by-commit" : queueState === "cancelled" ? "cancelled" : null });
   }
   return rows;
@@ -184,6 +194,10 @@ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
   const open = reservations.filter((row) => row.sliceId && row.settled === null);
   const cancelCommand = (sliceId) => `node ${SLICE_QUEUE} cancel ${sliceId} --started --reason "<why>"`;
   for (const row of open) next.push({ why: `slice ${row.sliceId} still holds its item reservation; if it delivered, commit its work with the trailer "Dispatch: ${row.sliceId} (goldfish)"; if its Goldfish no longer runs, cancel it`, command: cancelCommand(row.sliceId) });
+  // Q13 (a): every slice of a session other than this one is freed at once with take-over.
+  const here = scratchSessionId(scratch?.env ?? {});
+  for (const from of [...new Set(open.map((row) => row.sessionId).filter((id) => validSession(id) && id !== here))].sort())
+    next.push({ why: `session ${from} started ${open.filter((row) => row.sessionId === from).map((row) => row.sliceId).join(", ")}; if that session and its Goldfish no longer run, free them all for this session`, command: `${sessionAuthorityRepairCommand(root, "take-over")} --from ${from} --no-other-session-running --reason "<why>"` });
   const drifted = registry.producers.filter((row) => row.status === "drifted");
   const broken = registry.producers.filter((row) => ["unreadable", "reconcile-refused", "missing"].includes(row.status));
   // A catalogue another plugin version wrote is migrated on the next boundary entry (PF-52), which heal performs.
@@ -224,6 +238,23 @@ function lockRefusal(error, root) {
     repair: typeof error?.repair === "string" ? error.repair : `${sessionAuthorityRepairCommand(root, "wait")} --timeout 120` };
 }
 
+/** Q13 (a): cancels, on the caller's word, every unsettled item slice the named session started, and retains the decision. */
+function takeOver(repository, root, from, reason) {
+  const owned = reservationReport(repository, root).filter((row) => row.sessionId === from && row.sliceId && row.settled === null);
+  const slices = [...new Set(owned.map((row) => row.sliceId))].sort();
+  if (!slices.length) return { status: "nothing-to-take-over", from, reason: `no unsettled item operation of session ${from} is recorded` };
+  const cancelled = [], refused = [];
+  for (const sliceId of slices) {
+    const result = cancelUnstartedGovernedItemSlice({ root, sliceId, reason: `take-over from session ${from}: ${reason}`, started: true });
+    (result.status === "cancelled" ? cancelled : refused).push({ sliceId, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
+  }
+  const dir = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", `${new Date().toISOString().replace(/[^0-9]/gu, "")}-${randomBytes(4).toString("hex")}-take-over`);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  writeFileSync(join(dir, "take-over.json"), `${JSON.stringify({ schema: "pipeline.session-authority-take-over.v1", from, reason, at: new Date().toISOString(), assertion: "no-other-session-running", cancelled, refused }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+  return { status: refused.length ? "refused" : "taken-over", ...(refused.length ? { code: "SAR-TAKE-OVER-INCOMPLETE" } : {}), from, cancelled, refused,
+    note: "the cancelled slices no longer hold their item reservations; queue new slices for those items from this session" };
+}
+
 function markers(repository) {
   const dir = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned");
   return existsSync(dir) && statSync(dir).isDirectory() ? readdirSync(dir).sort() : [];
@@ -248,6 +279,13 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
     } catch (error) {
       return emit(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error) }, 2);
     }
+  }
+  if (parsed.verb === "take-over") {
+    const before = new Set(markers(repository));
+    let taken;
+    try { taken = takeOver(repository, root, parsed.flags.from, parsed.flags.reason.trim()); }
+    catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: short(error) }, 2); }
+    return emit({ ...taken, retained: markers(repository).filter((name) => !before.has(name)), ...inspect(repository, root, { scratch }) }, taken.status === "refused" ? 2 : 0);
   }
   const before = new Set(markers(repository));
   // Independent of the registry, so a registry refusal below never leaves it unrepaired.

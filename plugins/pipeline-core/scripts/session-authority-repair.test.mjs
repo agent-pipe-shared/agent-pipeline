@@ -294,6 +294,23 @@ const cases = [
     assert.match(refused.repair, /slice-queue\.mjs cancel ITEM-AC-1 --started --reason /u);
     assert.match(refused.repair, /session-authority-repair\.mjs inspect --root /u);
   }) },
+  { id: "SAR10", name: "take-over frees every unsettled slice another session started, on the caller's word, and retains the decision (Q13 (a), D57)", run: () => fixture(({ root }) => {
+    const { repository, dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    const named = repair("inspect", "--root", root).result.next.find((row) => / take-over --root /u.test(row.command));
+    assert.match(named?.command ?? "", / take-over --root \S+ --from native-session-one --no-other-session-running --reason /u, JSON.stringify(named));
+    for (const argv of [["take-over", "--root", root, "--from", "native-session-one", "--reason", "x"], ["take-over", "--root", root, "--no-other-session-running", "--reason", "x"],
+      ["take-over", "--root", root, "--from", "../x", "--no-other-session-running", "--reason", "x"]]) assert.equal(repair(...argv).result.code, "SAR-ARGS", JSON.stringify(argv));
+    assert.equal(repair("take-over", "--root", root, "--from", "another-session", "--no-other-session-running", "--reason", "x").result.status, "nothing-to-take-over");
+    const taken = repair("take-over", "--root", root, "--from", "native-session-one", "--no-other-session-running", "--reason", "the old session ended");
+    assert.equal(taken.code, 0, JSON.stringify(taken.result)); assert.equal(taken.result.status, "taken-over");
+    assert.deepEqual(taken.result.cancelled.map((row) => row.sliceId), ["ITEM-AC-1"]);
+    const record = taken.result.retained.find((name) => name.endsWith("-take-over"));
+    const kept = JSON.parse(readFileSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", record, "take-over.json"), "utf8"));
+    assert.equal(kept.from, "native-session-one"); assert.equal(kept.reason, "the old session ended");
+    assert.equal(taken.result.next.some((row) => / take-over /u.test(row.command)), false, "nothing of that session is left to free");
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1B", "native-tool-two").ok, false, "the cancelled slice is not re-dispatched under its old row");
+  }) },
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
