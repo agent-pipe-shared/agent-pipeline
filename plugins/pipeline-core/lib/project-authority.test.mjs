@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -19,6 +19,7 @@ import {
   projectAuthorityInternals,
 } from "./project-authority.mjs";
 import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
+import { appendGuardOverrideLedgerEntry, GUARD_OVERRIDE_LEDGER, guardOverrideLedger, readGuardOverrideLedgerEntries } from "./guard-override-ledger.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const roots = [];
@@ -654,9 +655,36 @@ try {
       hardenWindowsPrivateDirectoryFn() { return { status: "insecure", reason: "private path DACL grants a non-owner principal" }; },
     }), /^Error: project authority adoption archive is unsafe$/);
   });
+  // D56 (2), ordinal-2 Critic F-B: the guard-override ledger leaves the tracked tree.
+  ok("the guard-override ledger lives under the common Git directory, leaves the tree clean and is shared by a worktree", () => {
+    const base = realpathSync(root()); git(base, ["init", "-q"]);
+    git(base, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-q", "-m", "base"]);
+    const ledger = guardOverrideLedger(base);
+    assert.equal(ledger.path, join(base, ".git", "agent-pipeline", "guard-override.log.jsonl"));
+    assert.equal(ledger.label, `<git-common-dir>/${GUARD_OVERRIDE_LEDGER}`);
+    assert.equal(appendGuardOverrideLedgerEntry(ledger, { rule: "GG-01", token: "t1" }), true);
+    assert.equal(git(base, ["status", "--porcelain", "--untracked-files=all"]), "", "an override entry no longer dirties the tree");
+    const worktree = join(base, "wt");
+    git(base, ["worktree", "add", "-q", "--detach", worktree]);
+    assert.equal(guardOverrideLedger(realpathSync(worktree)).path, ledger.path, "every worktree of the repository shares one ledger");
+  });
+  ok("an older tree ledger keeps counting as consumed, and a root without Git keeps the tree ledger", () => {
+    const base = realpathSync(root()); git(base, ["init", "-q"]);
+    write(base, NEUTRAL_GUARD_AUDIT, "{\"rule\":\"GG-01\",\"token\":\"old\"}\nnot json\n");
+    const ledger = guardOverrideLedger(base);
+    assert.equal(appendGuardOverrideLedgerEntry(ledger, { rule: "GG-01", token: "new" }), true);
+    assert.deepEqual(readGuardOverrideLedgerEntries(ledger).map((entry) => entry.token), ["old", "new"],
+      "the tree entries are read first, so an override used before the move cannot be replayed; a corrupt line is skipped");
+    assert.equal(appendGuardOverrideLedgerEntry(ledger, {}, { append() { throw new Error("disk full"); } }), false, "a failed append fails closed");
+    const plain = realpathSync(root());
+    const fallback = guardOverrideLedger(plain, { treeFallback: LEGACY_GUARD_AUDIT });
+    assert.equal(fallback.path, join(plain, LEGACY_GUARD_AUDIT));
+    assert.equal(fallback.label, LEGACY_GUARD_AUDIT);
+    assert.deepEqual(fallback.readPaths, [join(plain, NEUTRAL_GUARD_AUDIT), join(plain, LEGACY_GUARD_AUDIT)]);
+  });
 } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 
-assert.equal(cases.length, 36, "the complete project authority corpus must be registered before execution begins");
+assert.equal(cases.length, 38, "the complete project authority corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
