@@ -43,7 +43,12 @@ Continuity is active, the planner requires the exact repo-relative
 `--continuity-close-request` and binds its bytes, Result and close evidence.
 The confirmed coordinator apply returns the only admissible State-writer
 action. Execute that returned argv exactly after its separate confirmation;
-do not reconstruct it from this prose.
+do not reconstruct it from this prose. A delivery-course slice recorded only by
+its `Dispatch: <slice> (goldfish)` commit, with no dispatch record (a
+background Goldfish), is accepted only on the audit route: the planner refuses
+`CLOSE-AUTHORSHIP-COMMIT-ONLY` until `--audit-request` and
+`--critic-verify-lifecycle` bind a passing Verify and a Critic review to the
+candidate.
 
 The returned action has this shape (the Continuity flag is mandatory whenever
 it is present in the returned argv):

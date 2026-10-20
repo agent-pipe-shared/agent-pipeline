@@ -18,6 +18,7 @@ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feat
 import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
 import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
+import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
 import {
   assertPrivateRegularFile,
   ensurePrivateDirectory,
@@ -121,7 +122,12 @@ function safeFile(root, path, label) {
   let cursor = root;
   for (const component of path.split("/")) {
     cursor = join(cursor, component);
-    const info = lstatSync(cursor);
+    let info;
+    try { info = lstatSync(cursor); }
+    catch (error) {
+      if (error?.code === "ENOENT") fail("CLOSE-PATH-MISSING", `${label} does not exist at ${path}; write it there, or pass the path where it is`);
+      throw error;
+    }
     if (info.isSymbolicLink()) fail("CLOSE-PATH", `${label} contains a symbolic link`);
   }
   const info = lstatSync(absolute);
@@ -389,8 +395,11 @@ function continuityCloseRequest(root, snapshot, path) {
  * Scope is the slice ids of the course beside the approved plan, the file resolveGovernedItemQueue reads;
  * records of other or earlier features never block. No course file means nothing to scope and nothing to
  * refuse. An unreadable, oversized, invalid or foreign course fails closed.
+ * D27/D55 (Q1): a slice recorded only by its orchestrator commit (no dispatch record) is accepted as
+ * authored, but only on the audit route, whose candidate-bound Verify and Critic receipt stand in for
+ * the record's Critic decision (lib/close-authorship-record.mjs).
  */
-function assertCourseCriticEvidence(root, feature) {
+function assertCourseCriticEvidence(root, feature, { audited }) {
   const directory = dirname(feature.planPath);
   const coursePath = directory === "." ? "slice-queue.json" : `${directory}/slice-queue.json`;
   let size;
@@ -399,12 +408,13 @@ function assertCourseCriticEvidence(root, feature) {
     if (error?.code === "ENOENT") return;
     fail("CLOSE-DELIVERY-COURSE-INVALID", "the feature's delivery course is unreadable; the Critic evidence gate fails closed");
   }
-  let ids;
+  let ids, slices;
   try {
     if (size > SLICE_QUEUE_MAX_BYTES) throw new Error("delivery course exceeds the slice-queue size bound");
     const course = readJsonFile(root, coursePath, "delivery course").value;
     if (!validateSliceQueue(course).ok || course.feature !== feature.id) throw new Error("delivery course is invalid or belongs to another feature");
-    ids = course.slices.map((slice) => slice.id);
+    slices = course.slices;
+    ids = slices.map((slice) => slice.id);
   } catch {
     fail("CLOSE-DELIVERY-COURSE-INVALID", "the feature's delivery course is invalid, oversized or belongs to another feature; the Critic evidence gate fails closed");
   }
@@ -414,6 +424,13 @@ function assertCourseCriticEvidence(root, feature) {
   if (coverage.requiredTaskIds.length > 0) {
     fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence; repair: run the Critic dispatch for each of them, bind its evidence to the dispatch record, then plan the transition again; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; one full review plus at most three correction-diff reviews per declared batch; once spent, Elephant self-verification or an explicit PO decision, never another Critic`);
   }
+  let authorship;
+  try { authorship = classifyCourseAuthorship({ root, slices, candidateCommit: git(root, ["rev-parse", "HEAD"]) }); }
+  catch { fail("CLOSE-AUTHORSHIP-UNAVAILABLE", "the authorship record of the feature's delivery course could not be read"); }
+  if (authorship.orchestratorCommit.length > 0 && !audited) {
+    fail("CLOSE-AUTHORSHIP-COMMIT-ONLY", `feature close preparation is blocked: ${authorship.orchestratorCommit.join(", ")} carry no dispatch record, only their \`Dispatch: <slice> (goldfish)\` commit (D27); repair: record the candidate's passing Verify and its Critic review as a Critic/Verify lifecycle, then plan the transition again with --audit-request <path> --critic-verify-lifecycle <id>, which binds them to this exact candidate`);
+  }
+  return authorship;
 }
 async function transitionPlan(values) {
   const root = physicalRoot(values.root);
@@ -472,7 +489,7 @@ async function transitionPlan(values) {
     const observed = authorityFromState(root, snapshot, { requireResult: true });
     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
-    assertCourseCriticEvidence(root, observed.feature);
+    assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined });
     if (values.auditRequest !== undefined) {
       const request = auditRequest(root, values.auditRequest);
       if (!SHA256.test(values.criticVerifyLifecycle ?? "") || values.criticVerifyLifecycle !== request.value.criticVerifyLifecycleId) {

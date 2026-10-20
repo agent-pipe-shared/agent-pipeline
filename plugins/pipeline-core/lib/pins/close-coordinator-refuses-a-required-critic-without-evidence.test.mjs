@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../critic-skip-decision.mjs";
-import { SLICE_QUEUE_SCHEMA, validateSliceQueue } from "../slice-queue.mjs";
+import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_SCHEMA, validateSliceQueue } from "../slice-queue.mjs";
 
 const CLI = fileURLToPath(new URL("../../scripts/close-coordinator.mjs", import.meta.url));
 const CANDIDATE = "a".repeat(40);
@@ -102,8 +102,9 @@ function fixtureRepository(label, files = {}) {
 }
 
 /** The fixture repository with its close lifecycle started and checkpointed. */
-function checkpointed(label, files = {}) {
+function checkpointed(label, files = {}, afterFixture = null) {
   const repo = fixtureRepository(label, files);
+  if (afterFixture) afterFixture(repo.root);
   const common = ["--root", repo.root, "--lifecycle", repo.lifecycle, "--actor", "PO"];
   const start = invoke(["plan-start", ...common, "--close-intent", "durable-stop"]);
   assert.equal(start.status, 0, JSON.stringify(start.body));
@@ -113,8 +114,8 @@ function checkpointed(label, files = {}) {
   assert.equal(invokeAction(checkpoint.body.nextAction).body.status, "applied");
   return {
     ...repo,
-    planPrepared: () => invoke(["plan-transition", ...common, "--phase", "feature-close-prepared",
-      "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]),
+    planPrepared: (...extra) => invoke(["plan-transition", ...common, "--phase", "feature-close-prepared",
+      "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json", ...extra]),
     snapshot: () => ({
       state: readFileSync(join(repo.root, ".claude", "pipeline-state.json"), "utf8"),
       coordinator: readFileSync(join(repo.root, ".git", "agent-pipeline", "publication-close", repo.lifecycle, "coordinator.json"), "utf8"),
@@ -216,4 +217,55 @@ test("(f) a delivery course that belongs to another feature fails closed rather 
   const refused = repo.planPrepared();
   assert.equal(refused.status, 2, JSON.stringify(refused.body));
   assert.equal(refused.body.code, "CLOSE-DELIVERY-COURSE-INVALID", JSON.stringify(refused.body));
+});
+
+// D27/D55 (Q1): a background Goldfish slice has no dispatch record, only its trailer commit. The close
+// accepts that as its authorship record on the audit route only, never silently.
+const itemSlice = (id, baseCommit) => ({
+  id, title: `slice ${id}`, state: "ready", dependsOn: [], writeScope: [`src/${id}.mjs`], readScope: ["specs/feature/spec.md"],
+  tier: "implementor", commitMode: "host-commit", loadClass: "light",
+  delivery: { itemId: id, criteria: ["AC-1"], baseCommit,
+    criterionLocator: { schema: "pipeline.critic-criterion-locator.v1", sourcePath: "specs/feature/spec.md", sourceSha256: "c".repeat(64), criterionId: "AC-1", startByte: 0, endByte: 7, excerptSha256: "d".repeat(64) },
+    checks: [{ id: `${id}-check`, path: `src/${id}.test.mjs`, dependencies: [`src/${id}.mjs`, `src/${id}.test.mjs`] }], approvalSha256: "e".repeat(64) },
+});
+const itemCourse = (slices) => ({ schema: ITEM_QUEUE_SCHEMA, feature: FEATURE, slices });
+/** After the fixture commit: the course and one orchestrator commit carrying `Dispatch: <id> (goldfish)`. */
+const orchestratorCommitted = (id, { trailer = true } = {}) => (root) => {
+  const base = git(root, ["rev-parse", "HEAD"]);
+  writeFileSync(join(root, COURSE_PATH), json(itemCourse([itemSlice(id, base)])));
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src", `${id}.mjs`), "export const work = 1;\n");
+  git(root, ["add", "."]);
+  git(root, ["commit", "-m", "feat(x): background work", ...(trailer ? ["-m", `AI-Assisted: true\nDispatch: ${id} (goldfish)\nCommit-Act: orchestrator`] : [])]);
+};
+
+test("(g) the item course fixture is a valid slice queue", () => {
+  const validated = validateSliceQueue(itemCourse([itemSlice("TASK-BG", "f".repeat(40))]));
+  assert.equal(validated.ok, true, JSON.stringify(validated.errors));
+});
+
+test("(g) a course slice recorded only by its orchestrator commit refuses the close off the audit route, naming it and the repair", () => {
+  const repo = checkpointed("g", {}, orchestratorCommitted("TASK-BG"));
+  const before = repo.snapshot();
+  const refused = repo.planPrepared();
+  assert.equal(refused.status, 2, JSON.stringify(refused.body));
+  assert.equal(refused.body.code, "CLOSE-AUTHORSHIP-COMMIT-ONLY", JSON.stringify(refused.body));
+  assert.match(refused.body.message, /TASK-BG/u);
+  assert.match(refused.body.message, /--audit-request <path> --critic-verify-lifecycle <id>/u);
+  assert.deepEqual(repo.snapshot(), before, "a refused close preparation must leave State and the coordinator byte-identical");
+});
+
+test("(g) on the audit route the commit-only slice is accepted and the audit route's own checks decide", () => {
+  const repo = checkpointed("g-audit", {}, orchestratorCommitted("TASK-BG"));
+  const refused = repo.planPrepared("--audit-request", "evidence/no-such-audit-request.json", "--critic-verify-lifecycle", "0".repeat(64));
+  assert.notEqual(refused.body.code, "CLOSE-AUTHORSHIP-COMMIT-ONLY", JSON.stringify(refused.body));
+  assert.equal(refused.body.code, "CLOSE-PATH-MISSING", JSON.stringify(refused.body));
+  assert.match(refused.body.message, /feature-close audit request does not exist at evidence\/no-such-audit-request\.json/u);
+});
+
+test("(g) a slice whose commit carries no Dispatch trailer is not commit-recorded and plans as before", () => {
+  const repo = checkpointed("g-none", {}, orchestratorCommitted("TASK-BG", { trailer: false }));
+  const planned = repo.planPrepared();
+  assert.equal(planned.status, 0, JSON.stringify(planned.body));
+  assert.equal(planned.body.phase, "feature-close-prepared");
 });
