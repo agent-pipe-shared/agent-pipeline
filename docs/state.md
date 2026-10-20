@@ -79,8 +79,14 @@ terminal commit of hook and test), the C13 doc edits (`8b23eecce`), and the Q13 
 `session-authority-repair.mjs take-over` (`e3902a6fb`, SAR10). Implementation complete, not accepted.
 Then ceremonies C6 (`2efb70679`) and C2 (`9dda09720`, with its pin). D58: Q15 (a), the
 `guard-git.test.mjs` split follows the local test (backlog item); the PO called for the candidate.
+**Pushed 2026-10-20:** candidate `0913fa941` (checkpoint over the stamp `9ad53b50f`, version
+`0.7.0+<runner>.20261020064459.a8ddf85`) to `origin/feat/sprint-alfred` with a signed approval;
+it replaces `e6fec04a0`. The first signature was spent: push-prepare folded the pending approval
+record above the checkpoint commit and reported ready for a HEAD without `Checkpoint-Intent`
+(backlog item `2026-10-20-a-checkpoint-fold-lands-above-the-checkpoint-commit.md`).
+Implementation complete, PO acceptance pending.
 Open:
-- stamp, push-prepare and the PO's push signature (D58);
+- the PO installs the candidate and tests it locally; then T1 and T2;
 - the delivery matrix, remeasured after the PO installed the candidate;
 - after the local test: the ordinal-4 Critic and Full Verify (needs a clean tree, Q7).
   `check-doc-contracts.test.mjs` is red 73/76 already at HEAD (broken links from evidence under
