@@ -86,3 +86,22 @@ Causes, read from `lib/session-authority-registry.mjs`:
   verbs; a lock refusal carries owner, age and the repair.
 - SAR08 covers a legacy lock, a gone owner (retired by the next dispatch), a live owner,
   `release-lock` and `wait`. It is red on e6fec04a0 and green here.
+
+## Measurement (2026-10-20, throwaway clones, real hook scripts)
+
+Driven by the background host-commit pin's fixture, with the lock file watched while each hook ran:
+
+- Only `guard-dispatch` (the launch; it holds the lock about 10 s in the fixture) and
+  `native-goldfish-host` (PostToolUse and SubagentStop) took the lock, and both released it, on
+  `e6fec04a0` and on the candidate. One dispatch, two SubagentStops at nearly the same time, and an
+  orchestrator commit before the stop left no lock. The child's own tool-call hooks stopped before
+  the registry in the fixture (session readiness), so they are not measured.
+- A launch hook killed while it holds the lock (SIGKILL, as at a host timeout or an interrupt) left
+  the lock, and on `e6fec04a0` every later launch was refused `SDC-LOCK-HELD`: the PO's symptom. On
+  the candidate the next launch retired the lock aside and was admitted. Pinned as case (vii) of
+  `lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs`.
+- So "the retain itself" (above, "Not in this item") is not the cause of the symptom: a retained
+  lock outlives only its own process, which the next entry then retires. It is not narrowed.
+- The PO's flow also set `run_in_background: false`, which the Goldfish template asked for.
+  Claude Code launched asynchronously anyway, and the foreground route then completes nothing
+  (`NGHF-PENDING-UNAVAILABLE`). The template now says to leave the key out (D19 SubagentStop route).
