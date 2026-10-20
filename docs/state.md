@@ -77,10 +77,11 @@ candidate; the Codex-host half of AC-147/209 moves after 0.7.0.
 Landed since: ceremonies C11+C3+C14 (`73c889ad6`), C12 (`21fba99dc`) and C13 (`7a7ccceae`, the PO's
 terminal commit of hook and test), the C13 doc edits (`8b23eecce`), and the Q13 take-over verb
 `session-authority-repair.mjs take-over` (`e3902a6fb`, SAR10). Implementation complete, not accepted.
+Then ceremonies C6 (`2efb70679`) and C2 (`9dda09720`, with its pin). D58: Q15 (a), the
+`guard-git.test.mjs` split follows the local test (backlog item); the PO called for the candidate.
 Open:
-- ceremonies C6 and C2 (ready, clone proof green);
-- PO decision Q15: `guard-git.test.mjs` is 9 lines past its accepted line bound after C13;
-- the delivery matrix remeasured at the final HEAD, then the PO's call to stamp and push;
+- stamp, push-prepare and the PO's push signature (D58);
+- the delivery matrix, remeasured after the PO installed the candidate;
 - after the local test: the ordinal-4 Critic and Full Verify (needs a clean tree, Q7).
   `check-doc-contracts.test.mjs` is red 73/76 already at HEAD (broken links from evidence under
   `specs/` into `scratch/`, the handover's missing link back to calibration), so Full Verify
