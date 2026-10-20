@@ -337,3 +337,36 @@ Interim entry. Changes the direction of RF2A.
   fixture helper plus the 7 legacy binding cases and the recovery `release-closed-feature` case; then
   package B (deep): restore the RF2A2 draft, rewire the RF2A bound case and the lost-binding cases onto
   A's helper, drop the bridge option; then the remaining binding reds; then the K1 closure.
+
+### K1 measurement 8 (2026-10-21, dispatches ALF-K1-LEGACY-BINDING-BYTES, ALF-K1-RF2A-ARCHIVE-RELEASE3/4, ALF-K1FG2, ALF-K1FG3-GDW-QUEUE, ALF-K1FG4-GDW-ADMISSION)
+
+Interim entry.
+
+- **D70 (b) delivered:** `edb60e98c`, `writeHistoricLegacyBinding` (the historic legacy writer as a
+  fixture artifact). Binding suite 49/66 → 56/66, recovery 37/39 → 38/39.
+- **RF2A delivered (implementation complete; D72 security read in the Critic batch and PO acceptance
+  pending):** `4467aa5b0`. `applyOrphanDescriptorArchive` releases through `releaseArchivedOrphanBinding`
+  (read-back archive whose bytes hash to the descriptor, its audit entry, no active descriptor, owner not
+  live, binding tuple under the State CAS; typed `WT-ORPHAN-RELEASE-*` refusals that write nothing).
+  Counted: lost-binding 6/6 (needs C16 registration), recovery 39/39, binding 56/66 unchanged, address
+  repair 17/17, architecture check only the two known entries. Scope of the proof: the historic binding
+  reserved no registry member, so the D72 crash case proves convergence with the member step at
+  `{status: 'none'}`, not a member-released-then-crash window; `WT-ORPHAN-RELEASE-MEMBER` has no
+  dedicated case. RED-to-GREEN against the old code not re-measured.
+- **K1g native-goldfish-host-state-regression:** `16677e01d`, fixture is a real Git repository, 0/3 → 3/3.
+- **K1f GDW01 (`hooks/guard-dispatch-native-worker.test.mjs`, 3/4) parked.** Three dispatches peeled the
+  layers of the governed item admission for a Codex `spawn_agent` dispatch, each a later contract:
+  `SQ-AUTHORITY-UNAVAILABLE` (no v2 slice queue) → `NGHS-ITEM-NOT-READY` (briefing `Slice`/`Write scope`
+  lines) → `NGHS-ITEM-BASE-MISMATCH` (`delivery.baseCommit` must equal the candidate,
+  `native-goldfish-host-state.mjs` ~215) → `SDC-AUTHORITY-UNAVAILABLE` (registry not initialised) →
+  `NGHS-ADMISSION-UNAVAILABLE` hiding `resolveV3DutyRoute` 'pipeline.user.yaml is unreadable'
+  (`critic-route-v3.mjs` 41, via `configuredNativeCodexRoute`) → now `item-delivery-owner-unbound`
+  (`native-goldfish-host-state.mjs` 722). `nativeManagedCurrentOwner` is bound only through a
+  source-owned requester carrier (`controlled-unit-method`, in-process) or the Claude hook owner, and
+  `guard-dispatch.mjs` 660-663 enters the hook owner only for `Task`/`Agent`, never for `spawn_agent`.
+  Open question: whether a Codex governed item dispatch through the hook has any owner route at all
+  (product gap) or the case needs a full governed-session fixture; this is a design question, not a
+  fourth fixture layer. Interim file: `scratch/k1fg4-gdw-interim.test.mjs`. It joins the bound-owner
+  theme of the binding reds (package C).
+- **Next:** design-workflow-package-builder (0/3), the AFK worker-request package, then package C (deep,
+  binding reds plus the GDW01 owner question with a shared fixture module in scope).
