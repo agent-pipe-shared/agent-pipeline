@@ -2,7 +2,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 
@@ -22,6 +21,7 @@ import {
   executeAfkActivationHostTransaction,
   executeAfkReviewHostTransaction,
 } from "./afk-transaction-host.mjs";
+import { nativeContractFixtureParent, prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
 import { canonicalJsonFile } from "./afk-assumption-mode.mjs";
 import { finalizeClaudeWorker, prepareClaudeWorker, validateClaudeWorkerDefinition } from "../scripts/afk-claude-host.mjs";
 
@@ -43,7 +43,7 @@ function git(root, ...args) {
 }
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "afk-host-e2e-"));
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "afk-host-e2e-"));
   execFileSync("git", ["init", "-b", "feat/batman", root]);
   git(root, "config", "user.name", "Host Test");
   git(root, "config", "user.email", "host@example.invalid");
@@ -53,6 +53,8 @@ function fixture() {
   writeFileSync(join(root, "plugins/pipeline-core/lib/target.mjs"), BEFORE);
   git(root, "add", ".");
   git(root, "commit", "-m", "base");
+  // The session-authority registry initializes over this checkout; its two authority inputs stay out of `git status`.
+  prepareSessionAuthorityRegistryFixture({ root, excludeFromStatus: true });
   const baseCommit = git(root, "rev-parse", "HEAD");
   const baseTree = git(root, "rev-parse", "HEAD^{tree}");
   git(root, "checkout", "--detach", baseCommit);
