@@ -20,11 +20,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
+import { bindContinuitySessionCleanup } from "./continuity-state.mjs";
 import {
   applyOnboardingKickoff,
   bindOnboardingSessionCleanup,
   observeSessionCleanupState,
   planOnboardingKickoff,
+  readOnboardingSessionCleanupBinding,
 } from "./onboarding-continuity.mjs";
 import {
   applyProjectAuthorityMigration,
@@ -32,7 +34,11 @@ import {
 } from "./project-authority.mjs";
 import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
 import { prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
-import { inspectSignedDescriptorCustodyRepository, loadSessionDescriptor } from "./worktree-lifecycle.mjs";
+import {
+  inspectSignedDescriptorCustodyRepository,
+  loadSessionDescriptor,
+  startSessionDescriptor,
+} from "./worktree-lifecycle.mjs";
 import { main as sessionCleanupMain } from "../scripts/session-cleanup.mjs";
 
 // A real `git init` project with the legacy layout (State in `.claude/pipeline-state.json`), activated through the
@@ -116,6 +122,35 @@ export function startDescriptorWithBoundRequester(repoPath, options = {}) {
     ownerNonce: loaded.ownerNonce,
     descriptorSha256: loaded.descriptorSha256,
   };
+}
+
+// A binding the way the historic legacy writer left it (D70 (b)): bytes in the legacy State, as an artifact. A Source-owned
+// bound bind admits only a neutral project (`continuityJoinActualBoundCleanupOwner` requires `observed.neutral`), so a
+// legacy-layout root (State in `.claude/pipeline-state.json`) can no longer reach `bound` through `start`. The legacy
+// writer is `bindOnboardingSessionCleanupInternal`'s non-neutral branch (`lib/onboarding-continuity.mjs`): the real
+// `bindContinuitySessionCleanup` over the State's continuity (revision + 1, `runtime.sessionCleanup` = the exact
+// {sessionId, descriptorSha256}), written as `JSON.stringify(state, null, 2)` plus a newline at 0o600. The reader
+// (`observeSessionCleanupState` / `readOnboardingSessionCleanupBinding`) then returns `bound` for that tuple. A plain
+// descriptor is started (a legacy root admits it); nothing is stubbed into a `bound` result, and the reader is asserted.
+// Returns the shape of the `start` output the cases read: `{ code: 0, output: { sessionId, descriptorSha256 } }`.
+export function writeHistoricLegacyBinding({ root, sessionId }) {
+  const observed = observeSessionCleanupState(root);
+  assert.equal(observed.neutral, false, "a historic legacy binding is written only into a legacy-layout State");
+  assert.equal(observed.sessionCleanup, null, "the legacy State must be unbound before the historic binding is written");
+  const descriptor = startSessionDescriptor(root, { sessionId });
+  const sessionCleanup = { sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256 };
+  const proposal = bindContinuitySessionCleanup(observed.state.continuity, {
+    expectedRevision: observed.revision,
+    sessionCleanup,
+  }, observed.activeFeatureId);
+  assert.equal(proposal.ok, true, `the historic legacy bind was rejected (${proposal.code})`);
+  const next = structuredClone(observed.state);
+  next.continuity = proposal.state;
+  writeFileSync(observed.path, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+  const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
+  assert.equal(binding.status, "bound");
+  assert.deepEqual(binding.sessionCleanup, sessionCleanup);
+  return { code: 0, output: { ...sessionCleanup } };
 }
 
 export function bindInsideRequesterContext(request) {

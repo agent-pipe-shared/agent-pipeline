@@ -49,6 +49,7 @@ import {
   legacyLayoutRoots,
   migrateToNeutral,
   rewriteAsLegacyDescriptor,
+  writeHistoricLegacyBinding,
 } from "../lib/test-session-cleanup-requester-fixture.mjs";
 import {
   cleanupSession,
@@ -723,8 +724,9 @@ test("privatization apply rejects portable State drift after planning", () => {
 
 function legacyClosedCleanupFixture(name) {
   const root = legacyFixture(name);
-  legacyLayoutRoots.add(root); // pins `.claude/pipeline-state.json`: never migrated, so its bound start stays refused
-  const started = invoke(["start", "--repo", root, "--session", `session-${name}`]);
+  legacyLayoutRoots.add(root); // pins `.claude/pipeline-state.json`: never migrated, so a later bound start stays refused
+  // The historic legacy binding, written as bytes (D70 (b)): a Source-owned bound bind refuses a non-neutral State.
+  const started = writeHistoricLegacyBinding({ root, sessionId: `session-${name}` });
   const statePath = join(root, ".claude", "pipeline-state.json");
   const state = JSON.parse(readFileSync(statePath, "utf8"));
   mkdirSync(join(root, "specs"), { recursive: true });

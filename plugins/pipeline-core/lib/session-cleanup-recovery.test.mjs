@@ -67,6 +67,7 @@ import {
   migrateToNeutral,
   rewriteAsLegacyDescriptor,
   startDescriptorWithBoundRequester,
+  writeHistoricLegacyBinding,
 } from "./test-session-cleanup-requester-fixture.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
 import { main as sessionCleanupMain } from "../scripts/session-cleanup.mjs";
@@ -161,9 +162,9 @@ function assertOnboardingBackups(root, preSnapshot) {
 function legacyClosedCleanupFixture(name) {
   const root = fixture(name);
   // This fixture pins the LEGACY layout (State in `.claude/pipeline-state.json`); a Source-owned bound bind is
-  // admitted only for a neutral project, so the bound start below is not migrated and stays refused (named K1c3 finding).
+  // admitted only for a neutral project, so the binding is written as the historic legacy bytes (D70 (b)) instead.
   legacyLayoutRoots.add(root);
-  const started = invoke(["start", "--repo", root, "--session", `session-${name}`]);
+  const started = writeHistoricLegacyBinding({ root, sessionId: `session-${name}` });
   assert.equal(started.code, 0);
   const statePath = join(root, ".claude", "pipeline-state.json");
   const state = JSON.parse(readFileSync(statePath, "utf8"));
