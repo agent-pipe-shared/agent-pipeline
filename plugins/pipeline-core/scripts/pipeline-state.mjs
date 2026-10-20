@@ -12949,7 +12949,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           const record = path => JSON.parse(readFileSync(join(repository.commonDir, path), "utf8"));
           inFlight = ["onboarding-continuity", "state-push-challenge"].some(id => {
             const path = join("agent-pipeline", "session-authority", "producers", `${id}.json`);
-            if (!existsSync(join(repository.commonDir, path))) return false;
+            if (!existsSync(join(repository.commonDir, path))) throw new Error(`${id} producer record missing`);
             return record(path).members.some(entry => {
               const member = record(String(entry.memberRef.path).replace(/^\.git\//u, ""));
               return member.association?.state === "bound" && ["armed", "running"].includes(member.phase);

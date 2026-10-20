@@ -177,6 +177,13 @@ const cases = [
     assert.equal(refused.status, 2);
     assert.match(refused.text, /State authority route unavailable \(SDC-AUTHORITY-UNAVAILABLE: state-producer-unreadable\)/u, refused.text);
     assert.match(refused.text, /Repair: node \S+session-authority-repair\.mjs inspect --root /u, refused.text);
+    // Critic F6 (C12): both State producers are fixed participants, so with the catalogue present a missing
+    // producer record is a broken registry, never an idle producer.
+    rmSync(producerPath);
+    const missing = subject();
+    assert.equal(missing.status, 2, missing.text);
+    assert.match(missing.text, /State authority route unavailable \(SDC-AUTHORITY-UNAVAILABLE: state-producer-unreadable\)/u, missing.text);
+    assert.match(missing.text, /Repair: node \S+session-authority-repair\.mjs inspect --root /u, missing.text);
   }) },
   { id: "SAR07", name: "a session's unbound, dead-anchored or directory-less scratch binding is named with heal, and heal binds or re-anchors it; outside a session nothing changes (D54)", run: () => fixture(({ root }) => {
     course(root);
