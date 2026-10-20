@@ -14,6 +14,7 @@ import {
   resolveSessionPowerContext,
   writeSessionPowerRecord,
 } from "../lib/session-power.mjs";
+import { prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
 import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,8 @@ function fixture() {
   writeFileSync(join(root, "README.md"), "fixture\n");
   git(root, ["add", "README.md"]);
   git(root, ["commit", "-m", "fixture"]);
+  // The power record reserves its member in the session-authority registry; initialize the real one (no stub).
+  prepareSessionAuthorityRegistryFixture({ root, excludeFromStatus: true });
   const session = startSessionDescriptor(root, { sessionId: "session-hawkeye-01" });
   return { root, session, context: resolveSessionPowerContext(root, session.sessionId, session.descriptorSha256) };
 }
