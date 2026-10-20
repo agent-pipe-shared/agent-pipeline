@@ -110,6 +110,9 @@ calls; C15 and C16 collect the protected registration changes for the bundled si
 (not measured): 5-8 session days to the content-final candidate.
 Closures: M0 (measurements) and W1 (AC-142B, AC-224, AC-155A, implementation complete at
 `c578670d7`, Critic batch and PO acceptance pending) are closed; K1 is in progress.
+D69 / ADR-0088 (test economy): fast gate plus fresh full run, quarantine with owner and expiry,
+retire on supersede, ratchet, runtime budget; rules 3 and 4 apply in this candidate, the Verify
+rebuild follows 0.7.0 (`backlog/items/2026-10-20-verify-test-economy-rebuild.md`).
 
 **Scope route since D60-D62 (2026-10-20):** the scope pass
 (`specs/sprint-alfred-epic/plans/scope-pass-2026-10-20.md`) found the content scope incomplete

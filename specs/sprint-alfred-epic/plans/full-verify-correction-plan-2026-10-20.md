@@ -117,3 +117,28 @@ and the next step.
   a second architecture-check violation beside guard-git.test (Q15).
 - **Next:** K1 (session-authority domain and continuity binding) with K1h measured first under
   Verify concurrency; cross K1 with E24/E32 before briefing.
+
+### K1 measurement 1 (2026-10-20, dispatch ALF-K1A-SESSION-CLEANUP, no edits)
+
+Interim entry, not a closure. Owner item: AC-203 (the only session-cleanup item with a Spec row);
+the earlier holding slices ALF-C-SDC-AUTHORITY2, -3 and ALF-W3-SESSION-REGISTRY were cancelled as
+never started. The dispatch stopped at its budget checkpoint after classifying:
+
+- `scripts/session-cleanup-binding.test.mjs` red 39/65 and `lib/session-cleanup-recovery.test.mjs`
+  red 6/39 (the briefing named a wrong `scripts/` path for it; the briefing generator now checks
+  every scope and check path) share one cause: `bindOnboardingSessionCleanup`
+  (`lib/onboarding-continuity.mjs` 9566-9575) refuses outside a source-owned bound context. The
+  context is `bound` only inside `withSourceOwnedAuthorityContext` (`lib/session-requester-bridge.mjs`
+  197-205) over a requester bound by `bindSourceOwnedRequesterInvocation` (184); fixture-side
+  builders exist (`createControlledMethodRuntimeFixture` 686,
+  `createSourceOwnedApprovedControllerRequesterRuntime` 1599, `lib/test-item-approved-course-fixture.mjs`).
+  Open design point: the binding also requires `request.sessionCleanup` to equal the requester's own
+  `{sessionId, descriptorSha256}` (9574-9575), while the `start` verb creates the descriptor and binds
+  in one call; whether a test seam can supply that, or a product change is needed, is unresolved.
+- `scripts/session-cleanup-power.test.mjs` (0/2) has another cause: its fixture never initializes the
+  session-authority registry (`catalogue.json` ENOENT through `writeSessionPowerRecord` ->
+  `reserveSessionAuthorityMember`, `lib/session-authority-registry.mjs` 108/386/409); the existing
+  route is `initializeSessionAuthorityRegistry` (395) as used by `lib/test-item-approved-course-fixture.mjs`
+  line 59. Under a world-writable TMPDIR the same call fails earlier with `domain-ancestor-unsafe`.
+- **Next:** K1b (power fixture: initialize the registry, small) and K1c (binding and recovery:
+  settle the descriptor-tuple question first, then the fixtures), one at a time.

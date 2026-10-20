@@ -286,6 +286,7 @@
           "docs/adr/0086-canonical-dab-windows-course-and-separate-legacy-api-checks.md",
           "docs/adr/0087-owning-verification-authenticated-controller-test-channel.json",
           "docs/adr/0087-owning-verification-authenticated-controller-test-channel.md",
+          "docs/adr/0088-test-economy.md",
           "docs/adr/README.md"
         ]
       },
