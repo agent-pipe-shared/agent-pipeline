@@ -99,6 +99,7 @@ export const PROBES = Object.freeze([
   { label: "cross-boundary target", toolName: "Bash", toolInput: { command: "cat /etc/shadow" } },
   { label: "ungrammatical command", toolName: "Bash", toolInput: { command: "cat 'unterminated/quote" } },
   { label: "pipeline plugin source edit", toolName: "Edit", toolInput: { file_path: "plugins/pipeline-core/scripts/repair-map.mjs" } },
+  { label: "user configuration edit", toolName: "Edit", toolInput: { file_path: "pipeline.user.yaml" } },
   {
     label: "mixed plugin and ordinary patch",
     toolName: "apply_patch",
