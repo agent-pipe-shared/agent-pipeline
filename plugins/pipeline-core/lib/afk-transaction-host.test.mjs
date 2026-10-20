@@ -19,6 +19,7 @@ import { createAfkWorkerResult } from "./afk-capability-worker.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import {
   executeAfkActivationHostTransaction,
+  executeAfkEntryHostTransaction,
   executeAfkReviewHostTransaction,
 } from "./afk-transaction-host.mjs";
 import { nativeContractFixtureParent, prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
@@ -217,4 +218,17 @@ test("production defaults fail closed before WAL when the protected projection w
   });
   assert.equal(outcome.code, "AFK-PROJECTION-WRITER-UNAVAILABLE");
   assert.throws(() => git(repository.root, "show-ref", `refs/agent-pipeline/afk/${ACTIVATION}`));
+});
+
+test("a missing projection writer is refused with its own typed code before the authority lifetime opens", () => {
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "afk-host-norepo-"));
+  const outcome = executeAfkEntryHostTransaction({
+    root,
+    request: { activationId: ACTIVATION },
+    proposal: {},
+    recordedAt: "2026-07-18T20:00:00.000Z",
+  });
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.code, "AFK-PROJECTION-WRITER-UNAVAILABLE");
+  assert.equal(outcome.mutation, "none");
 });
