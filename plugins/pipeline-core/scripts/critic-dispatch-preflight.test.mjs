@@ -217,12 +217,20 @@ for (const declared of [false, true, "unit-drift", "singleton", "wrong-main", "f
       assert.equal(result.status, "refused", JSON.stringify(result));
       assert.equal(result.code, "CCA-REVIEW-UNIT-REQUIRED");
       assert.equal(result.dispatch.packetCreated, false);
+      // PF-34: the refusal names the sanctioned route to the missing unit, not only the missing artifact.
+      assert.equal(typeof result.repair, "string", JSON.stringify(result));
+      assert.match(result.repair, /register-feature-package\.mjs --root <root> --add-review-unit/u);
+      assert.match(result.repair, /commit both printed paths in one commit/u);
+      assert.match(result.repair, /base of the first review/u);
+      assert.match(result.repair, /retained review keeps its first base/u);
       return;
     }
     if (typeof declared === "string") {
       assert.equal(result.status, "refused", JSON.stringify(result));
       assert.equal(result.code, {"unit-drift": "CGB-REVIEW-UNIT-BINDING", singleton: "CGB-SINGLETON-RATIONALE", "wrong-main": "CGB-MAIN-INTEGRATION", "foreign-spec": "CDP-COURSE-CONTEXT", "empty-range": "CCA-GENESIS-RANGE"}[declared]);
       assert.equal(result.dispatch.packetCreated, false);
+      // The add-review-unit route repairs only the missing unit; every other refusal stays unannotated.
+      assert.equal(Object.hasOwn(result, "repair"), false, JSON.stringify(result));
       return;
     }
     assert.equal(result.status, "packet-ready", JSON.stringify(result));

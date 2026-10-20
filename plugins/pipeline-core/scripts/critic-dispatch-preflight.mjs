@@ -28,7 +28,7 @@ import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
 } from "../lib/requirement-traceability.mjs";
-import { readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+import { criticCourseRepair, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
 import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
@@ -373,8 +373,10 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       deltaRequestPath: context.deltaRequestPath });
     if (admission?.decision?.status !== "admitted") {
       observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
+      const repair = criticCourseRepair(admission?.decision?.code);
       return Object.freeze({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
         status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
+        ...(repair === null ? {} : { repair }),
         dispatch: { childCreated: false, packetCreated: false, stateMutated: false, spawnAuthorized: false } });
     }
     // Defense at the actual packet preflight: history may remain readable in

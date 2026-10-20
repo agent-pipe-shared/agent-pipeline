@@ -32,7 +32,17 @@ export class CriticCourseAdmissionError extends Error {
   }
 }
 const fail = (code) => { throw new CriticCourseAdmissionError(code); };
-const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+// PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay
+// closed, so the route travels beside the decision; ${PIPELINE_PLUGIN_ROOT} is a literal placeholder.
+const REPAIRS = Object.freeze({
+  "CCA-REVIEW-UNIT-REQUIRED": "This feature's genesis manifest lists no Critic review unit. Add it: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-review-unit. Then commit both printed paths in one commit; that commit is the base of the first review, so start the course's first review from it. A course that already has a retained review keeps its first base and cannot use the unit.",
+});
+/** Read-only repair text for a refusal code, or null when no sanctioned route exists for it. */
+export function criticCourseRepair(code) {
+  return typeof code === "string" && Object.hasOwn(REPAIRS, code) ? REPAIRS[code] : null;
+}
+const digest =(bytes) => createHash("sha256").update(bytes).digest("hex");
 
 function gitBytes(root, args, code) {
   try {
