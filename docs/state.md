@@ -95,6 +95,20 @@ the delivery matrix credits earlier per-item Critics and counted Verify results;
 review get a new batch. The 2026-10-20 remeasure (`8063c1ce6`): 7 at 25, 144 at 50, 23 at 75,
 index 52.30%.
 
+**Correction route since D63-D67 (2026-10-20), read this first.** Run
+`node specs/sprint-alfred-epic/plans/correction-ledger-check.mjs` before any work: it prints the
+one cluster in progress and its next step from the committed ledger (D67, enforced: no briefing
+for a cluster that is not in progress, while the tree is dirty, or while a started cluster has no
+committed closure). Read that cluster's closure entries in
+`specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md` and do not re-measure
+what they record. Facts: the Full Verify measurement of `c1771bc98` has 138 of 1057 steps red
+(`specs/sprint-alfred-epic/evidence/full-verify-c1771bc98/`); all 103 test-red suites are also red
+in the working checkout; they form ten clusters K1-K10 with an owning item each. D63 confirms the
+deferrals, releases the reconstructions and the superseded list; D64 puts the Codex happy-path
+blockers and majors into AC-123, AC-155, AC-207 and AC-264; D65 and D66 decide eight small design
+calls; C15 and C16 collect the protected registration changes for the bundled sitting. Estimate
+(not measured): 5-8 session days to the content-final candidate.
+
 **Scope route since D60-D62 (2026-10-20):** the scope pass
 (`specs/sprint-alfred-epic/plans/scope-pass-2026-10-20.md`) found the content scope incomplete
 (145 items with open work). D61: everything goes into the candidate, the larger features too;
