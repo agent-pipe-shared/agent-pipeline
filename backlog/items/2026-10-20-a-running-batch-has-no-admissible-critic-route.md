@@ -58,6 +58,9 @@ Planned fix:
    and names the commit that becomes the review base.
 3. The template names the `.v2` registration request.
 
+Delivered through AC-142 (D62, 2026-10-20): the PO calls this critical for the next candidate,
+and `backlog/items/2026-10-07-critic-round-cap-and-delta-scope-are-not-enforced.md` owns it.
+
 ## Acceptance
 
 - The review unit is created, or required with a named command, when a feature enters

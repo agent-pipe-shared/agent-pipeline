@@ -78,6 +78,35 @@ Added acceptance (0.7.0, major: a quality gate that does not hold in a user repo
   rigor. No per-project rigor source exists, and the operating model sets rigor per change,
   so a rigor-0 slice inside an epic feature is legitimate.
 
+## Observed 2026-10-20: no admissible Critic route for a running feature (PF-34, PF-57)
+
+Source: PO report after handover 03, findings PF-34 (addendum) and PF-57 (1), installed
+`pipeline-core` `0.7.0+claude.20261020064459.a8ddf85`. The PO calls both critical and puts
+them into the next candidate (D62).
+
+- PF-34: with a clean tree and fresh, passing Verify evidence (`--mode critic`, bound to the
+  candidate), `critic-dispatch-preflight` refuses with `CCA-REVIEW-UNIT-REQUIRED`. The feature's
+  genesis manifest must list exactly one immutable design artifact
+  `specs/<feature>/design/critic-review-unit.json`; a feature whose genesis predates that rule
+  cannot add it, and no route amends the manifest. So the Critic review owed before the next
+  release cannot run at all. The measured cause and a planned fix are in
+  `backlog/items/2026-10-20-a-running-batch-has-no-admissible-critic-route.md`, which this item
+  now owns.
+- PF-57 (1): the `critic-review` skill, started without arguments, launched a background fork that
+  stopped at once for want of a Spec path and a diff range.
+
+Added acceptance (0.7.0, D62):
+
+- A running feature has a sanctioned, typed route to add its review unit (for example a
+  manifest amendment through `register-feature-package.mjs`, PO-signed if the manifest is
+  authority), or a batch Critic route that needs no course binding; `CCA-REVIEW-UNIT-REQUIRED`
+  names that route.
+- A new feature gets its review unit when it is registered.
+- The `critic-review` skill asks for its Spec path and diff range, or sends the caller to the
+  preflight, before it starts any dispatch.
+- A pin drives a feature whose genesis predates the review-unit rule through the route to an
+  admitted Critic dispatch.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted for the next local 0.7.0 candidate (PO 2026-10-07:

@@ -76,6 +76,29 @@ Added acceptance (post-0.7.0 unless the PO pulls it in): AGY native dispatch pre
 disjoint packages for parallel execution in isolated worktrees, under the
 single-committer rule above.
 
+## Observed 2026-10-20: a Critic cannot run beside a Goldfish in one checkout (PF-57)
+
+Source: PO report after handover 03, findings PF-57 (2) and the PF-55 addendum, installed
+`pipeline-core` `0.7.0+claude.20261020064459.a8ddf85`. The PO calls it critical and puts it into
+the next candidate (D62).
+
+- `critic-dispatch-preflight` requires fresh Verify evidence bound to the exact candidate commit
+  and tree (`CDP-EVIDENCE-REQUIRED`). `verify-evidence-producer` produces it only for the current
+  checkout, and a full Verify run there collides with a running Goldfish's writes. So a Critic
+  review and a Goldfish cannot run in parallel on a shared checkout.
+- PF-55 addendum: a single dispatch on the new build leaves the session-authority registry clean
+  (`lock: absent`, `read: readable`); the parallel case is not yet checked.
+
+Added acceptance (0.7.0, D62):
+
+- `verify-evidence-producer` can produce Critic evidence for a named earlier commit without
+  touching the shared checkout (for example in a temporary worktree it creates and removes), and
+  the preflight accepts that evidence for that commit.
+- A pin runs the producer for an older commit while the checkout has uncommitted changes, and the
+  checkout's bytes are unchanged afterwards.
+- The session-authority registry stays readable with no orphaned lock after a Critic and a
+  Goldfish dispatch ran in parallel; a pin or a recorded live run shows it.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
