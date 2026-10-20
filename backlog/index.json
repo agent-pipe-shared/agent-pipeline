@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b71975cf045b659d0fd0dd4654fa94f90e801aacb71f1718bfa6ee76d6a1cd18"
+    "transitionHead": "d343e2f8cc55e25e74c7d4d5fd223073745423ab98dccb8ff8f0767f166679b4"
   },
   "counts": {
-    "open": 255,
+    "open": 256,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -182,6 +182,16 @@
       "closureRepository": "self",
       "closureCommit": "a64b09eafb3986ae1259806f01d7321b638897e2",
       "closureEvidence": "backlog/evidence/2026-09-18-ai-hardening-and-doc-obligations-closure.md"
+    },
+    {
+      "id": "pipeline.a-feature-closes-over-a-slice-with-no-delivery-evidence",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "Elephant observation while building D27/D55 (Q1), 2026-10-20: the close route's authorship classification names slices with neither a dispatch record nor commit evidence, and does not gate them",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback",
