@@ -839,6 +839,7 @@
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | closed | defect | pipeline | nova-b | 2026-08-28 | — | Scheduled for Nova B (PO decision 2026-08-28) |
 | pipeline.the-architecture-map-is-not-enforced | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink | closed | defect | pipeline | nova-b | 2026-09-07 | — | — |
+| pipeline.the-critic-diagnostic-runs-nested-test-suites-in-a-shared-test-context | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries | closed | defect | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
@@ -946,7 +947,7 @@
 
 ## Counts
 
-- open: 260
+- open: 261
 - in_progress: 0
 - closed: 664
 - rejected: 3
