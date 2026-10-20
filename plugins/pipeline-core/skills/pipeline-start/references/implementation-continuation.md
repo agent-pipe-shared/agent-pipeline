@@ -79,7 +79,13 @@ feature and no design step writes them, so the command creates a missing one its
 (Pipeline-owned, `authority: false`, immutable: an acceptance pointer to the approved
 Spec's path and digest that adds no criterion, and a result record that says
 implementation is in progress and is not acceptance) and registers an existing one
-as found, never rewritten. Order: commit everything in `commitPaths` first (the
+as found, never rewritten. It also writes the Critic review unit
+`specs/<feature>/design/critic-review-unit.json` (a `design` entry, `retention:
+retain`), which a Critic review of the course reads at its first review's base. A
+manifest registered before that unit existed gets it through
+`register-feature-package.mjs --root <root> --add-review-unit`, which adds only that
+entry; commit both paths it names in one commit, before the first Critic review.
+Order: commit everything in `commitPaths` first (the
 manifest, any generated file, and the envelope when it is untracked), then generate
 the binding below; a binding generated before that commit carries a stale candidate.
 The result also names the manifest's `rigor` and its `rigorSource`

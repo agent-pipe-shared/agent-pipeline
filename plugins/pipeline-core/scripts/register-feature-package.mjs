@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 //
-// register-feature-package.mjs --root <root>
+// register-feature-package.mjs --root <root> [--add-review-unit]
+//
+// `--add-review-unit` (PF-34) adds the Critic review unit and its manifest entry to a feature
+// registered before the unit existed; it prints the two paths to commit and the review base.
 //
 // Registers the accepted delivery contract envelope of an approved plan (plan approval v9)
 // in `specs/<feature>/lifecycle.json`, the manifest that `readAcceptedDeliveryContract`
@@ -20,7 +23,7 @@ import { spawnSync } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+import { addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
 import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
 
 function git(root, args) {
@@ -45,8 +48,10 @@ function commitPlan(root, result) {
 export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.write(text)) {
   const rootIndex = argv.indexOf("--root");
   const rootValue = rootIndex >= 0 ? argv[rootIndex + 1] : undefined;
-  if (argv.length !== 2 || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root>" })}\n`);
+  // PF-34: `--add-review-unit` adds the Critic review unit to a feature registered before it existed.
+  const addReviewUnit = argv.length === 3 && argv[2] === "--add-review-unit";
+  if ((argv.length !== 2 && !addReviewUnit) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit]" })}\n`);
     return 2;
   }
   let root;
@@ -59,6 +64,11 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   if (read?.status !== "ok") {
     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-NO-APPROVED-PLAN", reason: "the project authority State is unavailable; run set-feature, submit-plan, present-plan and approve-plan first", stateStatus: read?.status ?? null })}\n`);
     return 2;
+  }
+  if (addReviewUnit) {
+    const added = addCriticReviewUnit({ root, state: read.state, readAcceptedDeliveryContract });
+    out(`${JSON.stringify(added)}\n`);
+    return added.status === "refused" ? 2 : 0;
   }
   const result = registerFeaturePackage({ root, state: read.state, readAcceptedDeliveryContract });
   const printed = result.status === "registered" || result.status === "already-registered" ? { ...result, ...commitPlan(root, result) } : result;

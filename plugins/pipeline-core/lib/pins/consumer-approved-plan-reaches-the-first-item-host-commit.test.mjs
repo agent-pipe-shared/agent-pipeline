@@ -38,6 +38,7 @@ import { compileDecisionSummary } from "../../scripts/architecture-baseline.mjs"
 import { runDispatchBriefing } from "../../scripts/dispatch-briefing.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
 import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
+import { readCriticReviewUnit } from "../critic-generic-batch.mjs";
 import { renderAcceptancePointer, renderResultRecord } from "../feature-package-registration.mjs";
 import { createGovernanceScopeController } from "../governance-scope.mjs";
 import { NEUTRAL_MANIFEST } from "../project-authority.mjs";
@@ -58,6 +59,7 @@ const SPEC = "specs/e2e/spec.md";
 const ACCEPTANCE = "specs/e2e/acceptance.md";
 const RESULT = "specs/e2e/result.md";
 const MANIFEST = "specs/e2e/lifecycle.json";
+const REVIEW_UNIT = "specs/e2e/design/critic-review-unit.json";
 const COMPANIONS = ["specs/e2e/design.md", "specs/e2e/traceability.md"];
 const REPORT = "specs/e2e/review/design-review-1.md";
 const RECEIPT = "specs/e2e/review/design-review-receipt-1.json";
@@ -201,8 +203,8 @@ function binding(fx) {
   assert.equal(out.ok, true, JSON.stringify(out));
   return out.binding;
 }
-function register(fx) {
-  const out = spawnSync(process.execPath, [CLI, "--root", fx.root], { cwd: fx.root, encoding: "utf8", timeout: 50000, env: fx.env });
+function register(fx, ...extra) {
+  const out = spawnSync(process.execPath, [CLI, "--root", fx.root, ...extra], { cwd: fx.root, encoding: "utf8", timeout: 50000, env: fx.env });
   let json = null;
   try { json = JSON.parse(out.stdout.trim().split(/\r?\n/u).at(-1)); } catch { /* reported below */ }
   return { status: out.status, json, stderr: out.stderr, stdout: out.stdout };
@@ -226,20 +228,28 @@ test("(b) consumer-shaped: the CLI registers and creates both missing files; aft
   assert.equal(result.json.manifestPath, MANIFEST);
   assert.equal(result.json.rigorSource, "profile-mapping", "the CLI names the source of the rigor level");
   assert.ok([1, 2].includes(result.json.rigor), result.stdout);
-  assert.deepEqual(result.json.generated.map((entry) => entry.path), [ACCEPTANCE, RESULT], "both missing files were generated");
+  assert.deepEqual(result.json.generated.map((entry) => entry.path), [ACCEPTANCE, RESULT, REVIEW_UNIT], "both missing files and the Critic review unit (PF-34) were generated");
   assert.deepEqual(result.json.found, [], "nothing was found: a consumer authors neither file");
-  assert.deepEqual(result.json.commitPaths, [MANIFEST, result.json.envelopePath, ACCEPTANCE, RESULT], "every generated file is in commitPaths");
+  assert.deepEqual(result.json.commitPaths, [MANIFEST, result.json.envelopePath, ACCEPTANCE, RESULT, REVIEW_UNIT], "every generated file is in commitPaths");
+  assert.deepEqual(result.json.reviewUnit, { status: "generated", path: REVIEW_UNIT });
   assert.deepEqual(result.json.order.map((step) => step.step), [1, 2, 3, 4], "the printed order ends with the binding, after the commit");
   state.manifestBytes = fx.read(MANIFEST);
   const manifest = JSON.parse(state.manifestBytes);
   assert.equal(manifest.state, "implementing");
   assert.equal(manifest.feature.id, FEATURE);
   assert.equal(manifest.feature.rigor, result.json.rigor);
-  assert.deepEqual(manifest.artifacts.map((artifact) => artifact.class), ["prd", "spec", "acceptance", "result", "candidate-evidence"]);
+  assert.deepEqual(manifest.artifacts.map((artifact) => artifact.class), ["prd", "spec", "acceptance", "result", "design", "candidate-evidence"]);
   for (const path of [ACCEPTANCE, RESULT]) {
     const generated = manifest.artifacts.find((artifact) => artifact.path === path);
     assert.deepEqual([generated.authority, generated.mutability, generated.retention, generated.sha256], [false, "immutable", "active", sha256(fx.read(path))], `${path} is Pipeline-owned and non-authoritative`);
   }
+  // PF-34: exactly the entry Critic course admission requires (featureReviewUnit), one course for the whole feature.
+  const unitEntry = manifest.artifacts.find((artifact) => artifact.path === REVIEW_UNIT);
+  assert.deepEqual([unitEntry.authority, unitEntry.mutability, unitEntry.retention, unitEntry.sha256], [false, "immutable", "retain", sha256(fx.read(REVIEW_UNIT))]);
+  const unit = JSON.parse(fx.read(REVIEW_UNIT));
+  assert.deepEqual([unit.schema, unit.kind, unit.specPath, unit.logicalWorkIds, unit.deliveryBoundary.mainRef.startsWith("refs/heads/")],
+    ["pipeline.critic-review-unit.v1", "independent-delivery", SPEC, [FEATURE], true]);
+  assert.ok(unit.criterionIds.length > 0 && unit.criterionIds.every((id) => fx.read(SPEC).toString("utf8").includes(id)), JSON.stringify(unit.criterionIds));
   state.generated = { acceptance: fx.read(ACCEPTANCE), result: fx.read(RESULT) };
   const envelope = manifest.artifacts.at(-1);
   assert.deepEqual([envelope.authority, envelope.mutability, envelope.retention, envelope.sha256], [false, "immutable", "retain", sha256(fx.read(envelope.path))]);
@@ -247,8 +257,11 @@ test("(b) consumer-shaped: the CLI registers and creates both missing files; aft
   fx.gitOk(...(result.json.envelopeIgnored && !result.json.envelopeTracked ? ["add", "-f", "--", result.json.envelopePath] : ["add", "--", result.json.envelopePath]));
   fx.gitOk("add", "--", ...result.json.commitPaths.filter((path) => path !== result.json.envelopePath));
   fx.gitOk("commit", "-q", "-m", "register the feature package");
-  assert.equal(fx.gitOk("status", "--porcelain", "--untracked-files=all", "--", MANIFEST, ACCEPTANCE, RESULT), "", "the printed commitPaths left none of the registered package files uncommitted");
+  assert.equal(fx.gitOk("status", "--porcelain", "--untracked-files=all", "--", MANIFEST, ACCEPTANCE, RESULT, REVIEW_UNIT), "", "the printed commitPaths left none of the registered package files uncommitted");
   const head = fx.gitOk("rev-parse", "HEAD");
+  // PF-34: the committed unit reads back through the Critic's own review-unit reader, from the registration commit on.
+  const observedUnit = readCriticReviewUnit({ repoRoot: fx.root, baseCommit: head, candidateCommit: head, specPath: SPEC, logicalWorkIds: [FEATURE], reviewUnitPath: REVIEW_UNIT });
+  assert.equal(observedUnit.reference.sha256, sha256(fx.read(REVIEW_UNIT)), JSON.stringify(observedUnit.reference));
   const regenerated = binding(fx);
   assert.equal(regenerated.candidateCommit, head, "the regenerated binding carries the registration commit as candidate");
   assert.notEqual(regenerated.candidateCommit, state.firstBinding.candidateCommit, "the pre-registration binding carried a stale candidate");
@@ -269,9 +282,9 @@ test("(c) authored variant: existing acceptance.md and result.md are registered 
   const result = register(fx);
   assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
   assert.equal(result.json.status, "registered", result.stdout);
-  assert.deepEqual(result.json.generated, [], "an existing file is never regenerated");
+  assert.deepEqual(result.json.generated.map((entry) => entry.path), [REVIEW_UNIT], "an existing file is never regenerated; only the review unit is new");
   assert.deepEqual(result.json.found.map((entry) => entry.path), [ACCEPTANCE, RESULT]);
-  assert.deepEqual(result.json.commitPaths, [MANIFEST, result.json.envelopePath], "found files were committed by their author, only the manifest is new");
+  assert.deepEqual(result.json.commitPaths, [MANIFEST, result.json.envelopePath, REVIEW_UNIT], "found files were committed by their author; the manifest and the review unit are new");
   assert.ok(fx.read(ACCEPTANCE).equals(before.acceptance), "acceptance.md bytes are unchanged");
   assert.ok(fx.read(RESULT).equals(before.result), "result.md bytes are unchanged");
   assert.equal(fx.gitOk("status", "--porcelain", "--", ACCEPTANCE, RESULT), "", "the found files are not modified in the working tree");
@@ -319,4 +332,24 @@ test("(f) the generated files name the Spec path and digest and nothing else fro
     assert.ok(![fx.root, WORK, REPO_ROOT, PLAN, "/home/", "/Users/", "\\Users\\"].some((leak) => text.includes(leak)), "no machine path, no repository root, no PRD content");
     assert.ok([...text.matchAll(/[a-f0-9]{64}/gu)].every((match) => match[0] === specSha256), "the only digest is the Spec's");
   }
+});
+
+test("(g) PF-34: a feature registered before the review unit existed gets it with --add-review-unit, once", () => {
+  const fx = authoredConsumer();
+  // The manifest an earlier version registered: no design entry, no unit file.
+  const manifest = JSON.parse(fx.read(MANIFEST));
+  fx.write(MANIFEST, `${JSON.stringify({ ...manifest, artifacts: manifest.artifacts.filter((artifact) => artifact.path !== REVIEW_UNIT) }, null, 2)}\n`);
+  rmSync(join(fx.root, REVIEW_UNIT));
+  const added = register(fx, "--add-review-unit");
+  assert.equal(added.status, 0, `${added.stdout}${added.stderr}`);
+  assert.equal(added.json.status, "review-unit-added", added.stdout);
+  assert.deepEqual(added.json.commitPaths, [MANIFEST, REVIEW_UNIT]);
+  assert.match(added.json.next, /earliest base a Critic review of this feature course can use/u);
+  const amended = JSON.parse(fx.read(MANIFEST));
+  assert.deepEqual(amended.artifacts.slice(0, -1), manifest.artifacts.filter((artifact) => artifact.path !== REVIEW_UNIT), "nothing else of the manifest changes");
+  assert.deepEqual(amended.artifacts.at(-1), { class: "design", path: REVIEW_UNIT, sha256: sha256(fx.read(REVIEW_UNIT)), authority: false, mutability: "immutable", retention: "retain" });
+  const again = register(fx, "--add-review-unit");
+  assert.equal(again.json.status, "already-present", again.stdout);
+  const usage = register(fx, "--add-review-unit", "extra");
+  assert.equal(usage.json.code, "FPR-ARGS");
 });

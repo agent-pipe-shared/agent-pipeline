@@ -29,11 +29,13 @@
  * signed change.
  *
  * Contract: never overwrites, never rewrites the envelope, never changes authority
- * state, never commits. Typed codes are FPR-*.
+ * state, never commits. Typed codes are FPR-*. The one amendment of an existing manifest
+ * is `addCriticReviewUnit` (PF-34), which appends the review unit's entry and nothing else.
  */
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 
@@ -98,6 +100,42 @@ export function renderResultRecord({ featureId }) {
     "- This record is not acceptance. Acceptance is a separate decision and is not recorded here.",
     "",
   ].join("\n");
+}
+
+/**
+ * PF-34: the Critic review unit of the feature course. Critic course admission
+ * (`featureReviewUnit`, critic-course-admission.mjs) requires it as a non-authority, immutable,
+ * retained `design` artifact of the manifest; no route created it. The whole feature is one
+ * course, so its one logical work id is the feature; the criteria are the `AC-<n>` ids its Spec
+ * names. A Spec that names none gets no unit, and the result says so.
+ */
+export const CRITIC_REVIEW_UNIT_SCHEMA = "pipeline.critic-review-unit.v1";
+const REVIEW_UNIT_CRITERION = /\bAC-[0-9]{1,6}\b/gu;
+export const criticReviewUnitPath = (featureId) => `specs/${featureId}/design/critic-review-unit.json`;
+const REVIEW_UNIT_ARTIFACT = Object.freeze({ authority: false, mutability: "immutable", retention: "retain" });
+
+/** The primary checkout's branch, which a reviewed candidate must be integrated into (critic-generic-batch.mjs). */
+function primaryMainRef(root) {
+  const common = spawnSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8", shell: false, timeout: 10000 });
+  if (common.status !== 0) return null;
+  const primary = dirname(common.stdout.trim());
+  const ref = spawnSync("git", ["-C", primary, "symbolic-ref", "HEAD"], { encoding: "utf8", shell: false, timeout: 10000 });
+  const value = ref.status === 0 ? ref.stdout.trim() : "";
+  return value.startsWith("refs/heads/") ? value : null;
+}
+
+/** The unit's bytes, or the reason none is written. */
+export function renderCriticReviewUnit({ featureId, specPath, specBytes, mainRef }) {
+  const criterionIds = [...new Set(String(specBytes ?? "").match(REVIEW_UNIT_CRITERION) ?? [])].sort().slice(0, 128);
+  if (criterionIds.length === 0) return { ok: false, reason: `the Spec ${specPath} names no AC-<n> criterion id, which the review unit binds` };
+  if (typeof mainRef !== "string") return { ok: false, reason: "the primary checkout is on no branch, which the review unit names as its delivery boundary" };
+  const unit = {
+    schema: CRITIC_REVIEW_UNIT_SCHEMA, kind: "independent-delivery",
+    purpose: `The Critic review unit of the feature course ${featureId}: the feature package is reviewed as one course against its approved Spec.`,
+    specPath, logicalWorkIds: [featureId], criterionIds, deliveryBoundary: { mainRef },
+    singletonRationale: "the feature is reviewed as one course, so its one logical work id is the feature itself",
+  };
+  return { ok: true, bytes: Buffer.from(`${JSON.stringify(unit, null, 2)}\n`) };
 }
 
 /**
@@ -210,6 +248,19 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
     }
   }
 
+  // PF-34: the Critic review unit, registered as found or generated; a Spec without criterion ids gets none.
+  const unitPath = criticReviewUnitPath(featureId), unitSeen = inspect(root, unitPath);
+  let reviewUnit;
+  if (unitSeen.kind === "other") return refused("FPR-ARTIFACT-INVALID", `${unitPath} exists but is not a regular file; it is never replaced`, { path: unitPath, manifestPath });
+  if (unitSeen.kind === "file") {
+    entries.push({ class: "design", path: unitPath, bytes: unitSeen.bytes, generated: false, ...REVIEW_UNIT_ARTIFACT });
+    reviewUnit = { status: "found", path: unitPath };
+  } else {
+    const rendered = renderCriticReviewUnit({ featureId, specPath, specBytes, mainRef: primaryMainRef(root) });
+    if (rendered.ok) entries.push({ class: "design", path: unitPath, bytes: rendered.bytes, generated: true, ...REVIEW_UNIT_ARTIFACT });
+    reviewUnit = rendered.ok ? { status: "generated", path: unitPath } : { status: "not-generated", path: unitPath, reason: rendered.reason };
+  }
+
   const rigor = resolveRigor(state);
   if (!rigor) return refused("FPR-RIGOR-UNRESOLVED", "the State yields neither a submitted profile nor a retained rigor floor to map to a rigor level");
 
@@ -219,10 +270,17 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   const bytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 
   // 6. Exclusive creates only (never overwrite): the generated documents first, the manifest last. Any later failure undoes exactly what was created here.
-  const created = [];
-  const rollback = () => { for (const path of created.reverse()) { try { unlinkSync(join(root, path)); } catch { /* a file this call just created */ } } };
+  const created = [], createdDirectories = [];
+  const rollback = () => {
+    for (const path of created.reverse()) { try { unlinkSync(join(root, path)); } catch { /* a file this call just created */ } }
+    for (const path of createdDirectories.reverse()) { try { rmdirSync(path); } catch { /* a directory this call just created */ } }
+  };
   for (const [path, content] of [...entries.filter((entry) => entry.generated).map((entry) => [entry.path, entry.bytes]), [manifestPath, bytes]]) {
-    try { writeFileSync(join(root, path), content, { flag: "wx", mode: 0o644 }); created.push(path); }
+    try {
+      const directory = dirname(join(root, path));
+      if (!existsSync(directory)) { mkdirSync(directory, { mode: 0o755 }); createdDirectories.push(directory); }
+      writeFileSync(join(root, path), content, { flag: "wx", mode: 0o644 }); created.push(path);
+    }
     catch (error) { rollback(); return refused("FPR-WRITE-FAILED", `${path} could not be created exclusively (${error?.code ?? "error"}); nothing this call created was kept`, { path, manifestPath }); }
   }
   const validated = validateFeaturePackage(root, manifestPath);
@@ -238,8 +296,10 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
     manifestSha256: digest(bytes), readerCode: reread?.code ?? null,
     rigor: rigor.rigor, rigorSource: rigor.source,
     generated: entries.filter((entry) => entry.generated).map(summary),
-    found: entries.filter((entry) => !entry.generated && (entry.class === "acceptance" || entry.class === "result")).map(summary),
+    found: entries.filter((entry) => !entry.generated && (entry.class === "acceptance" || entry.class === "result" || entry.class === "design")).map(summary),
+    reviewUnit,
     choices: {
+      design: "the Critic review unit: absent -> generated for the whole feature as one course, binding the Spec's AC-<n> ids (authority:false, immutable, retain); present -> registered as found; a Spec with no criterion id gets none (reviewUnit names why)",
       state: `${lifecycle.status} (the plan lifecycle status; the topology requires prd, spec, acceptance, result and candidate-evidence for it)`,
       rigor: `${rigor.rigor} (${rigor.source}: ${rigor.basis}; judgment call, no shipped source defines the profile-to-level mapping)`,
       prd: "authority:true, mutable, active (the approved bytes are already bound by the signed envelope; the topology fixes no mutability for this class)",
@@ -250,5 +310,75 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
       candidate: "null (only verifying/completed require a candidate binding)",
       supersedes: "null (no relationship; only superseded/retained require one)",
     },
+  };
+}
+
+/**
+ * PF-34 (b): a feature registered before the review unit existed gets it through this one typed amendment: the unit
+ * (registered as found, or generated as in registration) and its `design` entry appended to the manifest. Nothing
+ * else of the manifest changes. A failure restores the manifest's bytes and removes what this call created.
+ * The course's genesis base is its first review's base (critic-course-admission.mjs), so the commit that adds the
+ * unit is the earliest base a Critic review of this course can use; a course that already has a retained review
+ * keeps its first base and cannot use the unit.
+ */
+export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDeliveryContract } = {}) {
+  if (typeof readAcceptedDeliveryContract !== "function" || !object(state)) return refused("FPR-ARGS", "root, state and the envelope reader are required");
+  let root;
+  try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
+  const featureId = state.activeFeature?.id;
+  if (!SAFE_ID.test(featureId ?? "")) return refused("FPR-NO-APPROVED-PLAN", "no active feature; set-feature first");
+  const manifestPath = `specs/${featureId}/lifecycle.json`, unitPath = criticReviewUnitPath(featureId);
+  const manifestRead = inspect(root, manifestPath);
+  if (manifestRead.kind !== "file") return refused("FPR-MANIFEST-MISSING", `no manifest ${manifestPath}; register the feature package first (register-feature-package.mjs --root <root>), which writes the review unit with it`, { manifestPath });
+  const checked = validateFeaturePackage(root, manifestPath);
+  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+  let manifest;
+  try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
+  if (manifest.artifacts.some((entry) => entry.path === unitPath)) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-present", manifestPath, reviewUnitPath: unitPath };
+  const specs = manifest.artifacts.filter((entry) => entry.class === "spec" && entry.authority === true);
+  const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence");
+  if (specs.length !== 1) return refused("FPR-MANIFEST-CONFLICT", "the manifest names no single authority Spec for the review unit to bind", { manifestPath });
+  const specRead = inspect(root, specs[0].path);
+  if (specRead.kind !== "file") return refused("FPR-ARTIFACT-MISSING", "the manifest's Spec is missing", { manifestPath, missing: [{ class: "spec", path: specs[0].path }] });
+  const unitSeen = inspect(root, unitPath);
+  if (unitSeen.kind === "other") return refused("FPR-ARTIFACT-INVALID", `${unitPath} exists but is not a regular file; it is never replaced`, { path: unitPath, manifestPath });
+  let unitBytes = unitSeen.kind === "file" ? unitSeen.bytes : null;
+  if (!unitBytes) {
+    const rendered = renderCriticReviewUnit({ featureId, specPath: specs[0].path, specBytes: specRead.bytes, mainRef: primaryMainRef(root) });
+    if (!rendered.ok) return refused("FPR-REVIEW-UNIT-UNAVAILABLE", rendered.reason, { manifestPath, path: unitPath });
+    unitBytes = rendered.bytes;
+  }
+  const amended = { ...manifest, artifacts: [...manifest.artifacts, { class: "design", path: unitPath, sha256: digest(unitBytes), ...REVIEW_UNIT_ARTIFACT }] };
+  const bytes = Buffer.from(`${JSON.stringify(amended, null, 2)}\n`);
+  const createdDirectories = [];
+  let unitCreated = false;
+  const restore = () => {
+    try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* the readback below reports a manifest it cannot restore */ }
+    if (unitCreated) { try { unlinkSync(join(root, unitPath)); } catch { /* a file this call just created */ } }
+    for (const path of createdDirectories.reverse()) { try { rmdirSync(path); } catch { /* a directory this call just created */ } }
+  };
+  try {
+    if (unitSeen.kind === "absent") {
+      const directory = dirname(join(root, unitPath));
+      if (!existsSync(directory)) { mkdirSync(directory, { mode: 0o755 }); createdDirectories.push(directory); }
+      writeFileSync(join(root, unitPath), unitBytes, { flag: "wx", mode: 0o644 }); unitCreated = true;
+    }
+    const temp = join(root, `${manifestPath}.review-unit-${process.pid}.tmp`);
+    writeFileSync(temp, bytes, { flag: "wx", mode: 0o644 }); renameSync(temp, join(root, manifestPath));
+  } catch (error) { restore(); return refused("FPR-WRITE-FAILED", `the review unit could not be added (${error?.code ?? "error"}); the manifest was restored`, { manifestPath, path: unitPath }); }
+  const validated = validateFeaturePackage(root, manifestPath);
+  if (!validated.ok) { restore(); return refused("FPR-VALIDATION-FAILED", "the topology validator refused the amended manifest; it was restored", { manifestPath, findings: validated.findings }); }
+  if (envelopes.length === 1) {
+    const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
+    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
+      restore();
+      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code });
+    }
+  }
+  return {
+    schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "review-unit-added", manifestPath, reviewUnitPath: unitPath,
+    reviewUnit: { status: unitSeen.kind === "file" ? "found" : "generated", path: unitPath, sha256: digest(unitBytes) },
+    manifestSha256: digest(bytes), commitPaths: [manifestPath, unitPath],
+    next: "commit both paths in one commit. That commit is the earliest base a Critic review of this feature course can use: start the course's first review from it. A course that already has a retained review keeps its first base and cannot use this unit",
   };
 }
