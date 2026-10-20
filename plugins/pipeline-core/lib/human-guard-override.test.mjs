@@ -58,6 +58,10 @@ import {
   sweepHumanGuardOverrideRequests,
 } from "./human-guard-override.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry } from "./session-authority-registry.mjs";
+import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+import { createGovernanceScopeController } from "./governance-scope.mjs";
+import { prepareApprovedItemCourseFixture } from "./test-item-approved-course-fixture.mjs";
 import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 import { probeSymlinkCapability, symlinkCapability, symlinkSkip } from "./symlink-capability.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
@@ -7162,7 +7166,7 @@ test("PF-53: expired artifacts of a retired schema do not block the authority in
   }
 });
 
-test("PF-55: a legacy armed-capability member still names its capability after a commit moves HEAD", () => {
+test("PF-55: a legacy armed-capability member still names its capability after a commit moves HEAD; other armed bytes at its path are drift, and a gone capability is discharged", () => {
   const root = fixtureSignature();
   try {
     const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"), toolInput = { file_path: "notes.md", content: "PF-55 legacy member\n" };
@@ -7186,6 +7190,67 @@ test("PF-55: a legacy armed-capability member still names its capability after a
     git(root, "commit", "-qm", "move HEAD");
     assert.doesNotThrow(() => portAt().reconcile({ producerRecord: {}, memberRecords: [member], releaseRecords: [] }),
       "the legacy binding digest includes HEAD; the member's source fact still names its capability");
+    // Critic F5: different armed bytes at the member's path are drift; once no capability is armed there, the arm
+    // can never be consumed again and is discharged.
+    const capabilities = join(physical, ".git", "agent-pipeline", "human-guard-overrides", "capabilities");
+    const [capabilityName, ...others] = readdirSync(capabilities);
+    assert.deepEqual(others, [], "the fixture arms exactly one capability");
+    const capabilityPath = join(capabilities, capabilityName), capabilityBytes = readFileSync(capabilityPath, "utf8");
+    writeFileSync(capabilityPath, `${capabilityBytes.trimEnd()} \n`);
+    assert.throws(() => portAt().reconcile({ producerRecord: {}, memberRecords: [member], releaseRecords: [] }), /hgo:legacy-member-source-drift/u);
+    rmSync(capabilityPath);
+    assert.doesNotThrow(() => portAt().reconcile({ producerRecord: {}, memberRecords: [member], releaseRecords: [] }),
+      "a capability that is gone is discharged");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Q9 (D55): a plugin update after a commit rebinds the registry and keeps the legacy armed-capability member", () => {
+  const root = fixtureSignature();
+  try {
+    // The registry is initialized only for an approved course, as on a real repository.
+    const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") });
+    const decision = controller.planDecision({ rootDir: root, decision: "enroll", by: "fixture explicit course" });
+    assert.equal(controller.applyDecision(decision, { activate: true, planSha256: decision.planSha256 }).state, "active");
+    prepareApprovedItemCourseFixture({ root });
+    const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"), toolInput = { file_path: "notes.md", content: "Q9 rebind member\n" };
+    const request = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: Date.now() - 3000 });
+    const plan = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: Date.now() - 2000, scriptPath: script });
+    const reason = "PO attended Q9 rebind fixture";
+    const prepared = prepareHumanGuardOverrideAuthorization({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: Date.now() - 1500, scriptPath: script });
+    assert.equal(armBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
+      nowMs: Date.now() - 1000, scriptPath: script,
+    }).status, "armed");
+    const repository = inspectSignedDescriptorCustodyRepository(realpathSync(root));
+    const initialized = initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository }));
+    assert.equal(initialized.status, "initialized", JSON.stringify(initialized));
+    const registry = join(repository.commonDir, "agent-pipeline", "session-authority"), cataloguePath = join(registry, "catalogue.json");
+    const hgoMembers = () => {
+      const dir = join(registry, "members", "human-guard-override");
+      return existsSync(dir) ? Object.fromEntries(readdirSync(dir).map((name) => [name, readFileSync(join(dir, name), "utf8")])) : {};
+    };
+    const held = hgoMembers();
+    assert.equal(Object.keys(held).length, 1, "the capability armed before the registry is its one legacy member");
+    assert.match(Object.values(held)[0], /"state":"unbound"/u);
+    writeFileSync(join(root, "committed.txt"), "moves HEAD\n");
+    git(root, "add", "committed.txt");
+    git(root, "commit", "-qm", "move HEAD");
+    // An installed plugin update: the catalogue an earlier version wrote names another source digest for one producer.
+    const catalogue = JSON.parse(readFileSync(cataloguePath, "utf8")), index = catalogue.participants.findIndex((row) => row.producerId === "human-guard-override");
+    catalogue.participants[index] = { ...catalogue.participants[index], sourceSha256: "f".repeat(64) };
+    catalogue.participantSetSha256 = createHash("sha256").update(canonical(catalogue.participants)).digest("hex");
+    writeFileSync(cataloguePath, canonical(catalogue));
+    migrateSourceUpdatedSessionAuthorityRegistry({ repository: inspectSignedDescriptorCustodyRepository(realpathSync(root)) });
+    const abandoned = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned");
+    const [migrated, ...more] = readdirSync(abandoned).filter((name) => name.includes("-source-update-"));
+    assert.deepEqual(more, []);
+    const marker = JSON.parse(readFileSync(join(abandoned, migrated, "migration.json"), "utf8"));
+    assert.equal(marker.mode, "rebound", JSON.stringify(marker));
+    assert.deepEqual(hgoMembers(), held, "the legacy member survives the rebind byte for byte");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
