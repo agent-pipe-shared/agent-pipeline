@@ -36,6 +36,15 @@
  *   node verify-evidence-producer.mjs [--out <repo-relative path>] [--event-out <repo-relative path>] [--root <repo>]
  *   node verify-evidence-producer.mjs --prepare [--root <repo>]
  *   node verify-evidence-producer.mjs --root <repo> --mode <boundary> [--base <ref>] [--no-reuse]
+ *   node verify-evidence-producer.mjs --root <repo> --mode critic --base <ref> --commit <sha> --out <repo-relative path>
+ *
+ * `--commit <sha>` produces the evidence for that EARLIER local commit and its tree in a temporary
+ * worktree (inside the git common directory, removed afterwards, success or failure) instead of in
+ * the checkout, so a Critic's evidence can be made while a Goldfish keeps working there. The
+ * checkout's files, index and HEAD are not touched; only the `--out` file is written into it. The
+ * release and push modes, the Critic-bound options and `--event-out` are refused (VEP-COMMIT-MODE).
+ * A commit that is not a local object is refused with VEP-COMMIT-NOT-LOCAL; the named commit's own
+ * committed files are what runs, so untracked, ignored dependencies of the checkout are absent.
  *
  * Existing projects explicitly prepare and commit the deterministic adapter
  * first; onboarding seeds it in the portable transaction. Runs never seed it.
@@ -58,7 +67,7 @@
  */
 import { randomBytes, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -84,7 +93,7 @@ import {
 
 export const VERIFY_EVIDENCE_SCHEMA = "pipeline.verify-evidence.v0";
 const CLI_HELP = [
-  "Usage: verify-evidence-producer.mjs [--root <repo>] [--out <repo-relative path>] [--event-out <repo-relative path>] [--mode <work|critic|push|candidate|release>] [--base <ref>] [--no-reuse] [--critic-packet-id <id> [--critic-evidence-feature-id <id>] | --critic-reverify-receipt-id <id>]",
+  "Usage: verify-evidence-producer.mjs [--root <repo>] [--out <repo-relative path>] [--event-out <repo-relative path>] [--mode <work|critic|push|candidate|release>] [--base <ref>] [--commit <sha>] [--no-reuse] [--critic-packet-id <id> [--critic-evidence-feature-id <id>] | --critic-reverify-receipt-id <id>]",
   "       verify-evidence-producer.mjs --prepare [--root <repo>]",
   "       verify-evidence-producer.mjs --help",
   "",
@@ -127,14 +136,14 @@ export function summarizeVerifyFailures(run) {
   });
 }
 
-function git(root, args) {
+function git(root, args, timeout = 10_000) {
   const result = spawnSync("git", ["-C", root, ...args], {
     encoding: "utf8",
     env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
     shell: false,
     // Inert off win32; on native Windows it stops each git probe opening a console window.
     windowsHide: true,
-    timeout: 10_000,
+    timeout,
     maxBuffer: 16 * 1024 * 1024,
   });
   if (!isSuccessfulSpawn(result)) fail("VEP-GIT", `Git observation failed for ${args[0]}.`);
@@ -250,13 +259,97 @@ function preflightGovernedCriticAdmission({ root, mode, candidate: sourceCandida
     featureId: metadata.receipt.carryForward?.proof.featureId ?? null });
 }
 
+const COMMIT_NAME = /^[0-9a-fA-F]{7,64}$/u;
+const FULL_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+// A full checkout of a large repository is slower than the 10 s every other git observation gets.
+const COMMIT_WORKTREE_TIMEOUT_MS = 300_000;
+
+/**
+ * Create `path` and every missing ancestor below `base` as an owner-only directory. The Verify journal
+ * keeps its state below the same `agent-pipeline` directories and refuses group- or world-accessible
+ * ones, so a directory this run creates first must already be private. Existing directories are left alone.
+ */
+function mkdirPrivate(base, path) {
+  let current = base;
+  for (const part of relative(base, path).split(sep).filter(Boolean)) {
+    current = join(current, part);
+    if (existsSync(current)) continue;
+    mkdirSync(current, { mode: 0o700 });
+    chmodSync(current, 0o700); // the umask may only narrow a mode; state it explicitly anyway
+  }
+}
+
+/** Remove a temporary named-commit worktree. Never throws; reports whether it is really gone. */
+function removeCommitWorktree(root, container) {
+  try { git(root, ["worktree", "remove", "--force", join(container, "checkout")], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* the filesystem removal below still runs */ }
+  try { rmSync(container, { recursive: true, force: true }); } catch { /* reported through the return value */ }
+  try { git(root, ["worktree", "prune"], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* a stale admin record is pruned by the next worktree command */ }
+  return !existsSync(container);
+}
+
+/**
+ * Evidence for a NAMED commit (ALF-D61-AC224, PF-57 (2)). The commit is checked out detached into a
+ * temporary worktree inside the git common directory -- invisible to `git status`, so a Goldfish
+ * working in the shared checkout never sees it -- and the ordinary run executes there. The shared
+ * checkout's files, index and HEAD are never touched: the only thing written into it is the
+ * requested evidence file. The worktree is removed on success and on failure.
+ *
+ * Only the lanes that bind a plain commit/tree are supported. The release and push lanes, the
+ * Critic-bound options and an action event are bound to the checkout itself and are refused
+ * (VEP-COMMIT-MODE) rather than silently producing evidence bound to something else.
+ */
+async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
+  const { outPath, eventOutPath, mode, criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId } = options;
+  if (["release", "push"].includes(mode) || eventOutPath !== null || criticPacketId !== null || criticReverifyReceiptId !== null || criticEvidenceFeatureId !== null) {
+    fail("VEP-COMMIT-MODE", "A named-commit run (--commit) produces work, critic or candidate evidence for that commit alone; the release and push lanes, the Critic-bound options and an action event bind the checkout itself. Run those without --commit in the checkout.");
+  }
+  if (typeof commit !== "string" || !COMMIT_NAME.test(commit)) {
+    fail("VEP-COMMIT-INVALID", `--commit must be a hexadecimal commit id of 7 to 64 characters; got ${JSON.stringify(String(commit).slice(0, 80))}.`);
+  }
+  let sha = "";
+  try { sha = git(root, ["rev-parse", "--verify", "--quiet", `${commit}^{commit}`]); } catch { /* reported as not-local below */ }
+  if (!FULL_OBJECT_ID.test(sha)) {
+    fail("VEP-COMMIT-NOT-LOCAL", `Commit ${commit} is not a unique local commit object in this repository. Fetch it (git fetch) or name a commit that exists here, then retry.`);
+  }
+  const target = safeOutPath(root, outPath);
+  // Same rule as the checkout run: a replacement attempt never leaves the previous green consumable.
+  rmSync(target, { force: true });
+  const common = realpathSync(resolve(root, git(root, ["rev-parse", "--git-common-dir"])));
+  const container = join(common, "agent-pipeline", "verify", "commit-worktrees", `${sha.slice(0, 12)}-${randomBytes(6).toString("hex")}`);
+  const hooks = join(container, "no-hooks");
+  let result;
+  try {
+    mkdirPrivate(common, hooks);
+    // An empty hooks directory: a post-checkout hook of the shared repository must not run for this plumbing.
+    try { git(root, ["-c", `core.hooksPath=${hooks}`, "worktree", "add", "--detach", "--quiet", join(container, "checkout"), sha], COMMIT_WORKTREE_TIMEOUT_MS); }
+    catch { fail("VEP-COMMIT-WORKTREE", `Could not create the temporary worktree for commit ${sha}.`); }
+    const produced = await produceVerifyEvidence({ ...options, rootDir: join(container, "checkout"), commit: null });
+    // The run above wrote into the temporary worktree; publish the evidence into the requested path of the checkout.
+    writeEvidence(root, target, produced.evidence);
+    result = { ...produced, outPath: target };
+  } catch (error) {
+    removeCommitWorktree(root, container); // never masks the run's own error
+    throw error;
+  }
+  if (!removeCommitWorktree(root, container)) {
+    fail("VEP-COMMIT-CLEANUP", `Evidence was written to ${relative(root, target).replaceAll("\\", "/")}, but the temporary worktree <git-common-dir>/agent-pipeline/verify/commit-worktrees/${relative(dirname(container), container)} could not be removed. Remove it with git worktree remove --force on its checkout directory, then git worktree prune.`);
+  }
+  return result;
+}
+
 /**
  * Run the project's configured verify command and, only on an honest pass,
  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
  * was verified. Never creates history, never invents a command.
+ * With `commit`, the same run is made for that earlier commit in a temporary
+ * worktree and the shared checkout stays untouched (see
+ * `produceVerifyEvidenceForCommit`).
  */
-export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null, criticEvidenceFeatureId = null, assessPushHookBackstop = realAssessPushHookBackstop }) {
+export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null, criticEvidenceFeatureId = null, commit = null, assessPushHookBackstop = realAssessPushHookBackstop }) {
   const root = resolve(rootDir);
+  if (commit !== null) {
+    return await produceVerifyEvidenceForCommit({ root, commit, outPath, eventOutPath, mode, base, reuseReceipts, criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId, assessPushHookBackstop });
+  }
   if (criticEvidenceFeatureId !== null && (criticPacketId === null || !["candidate", "release"].includes(mode))) {
     fail("VEP-CRITIC-CARRY-INPUT", "Evidence-only carry-forward requires a Critic-bound candidate or release Verify.");
   }
@@ -512,7 +605,7 @@ function parseArgs(argv) {
     const flag = argv[index];
     if (flag === "--prepare") { value.prepare = true; continue; }
     if (flag === "--no-reuse") { value.reuseReceipts = false; continue; }
-    if (!["--root", "--out", "--event-out", "--mode", "--base", "--critic-packet-id", "--critic-reverify-receipt-id", "--critic-evidence-feature-id"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
+    if (!["--root", "--out", "--event-out", "--mode", "--base", "--commit", "--critic-packet-id", "--critic-reverify-receipt-id", "--critic-evidence-feature-id"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
     const next = argv[++index];
     if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) {
       fail("VEP-USAGE", "Usage: verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]");
@@ -521,7 +614,7 @@ function parseArgs(argv) {
   }
   const mode = value["--mode"] ?? "candidate";
   if (!["work", "critic", "push", "candidate", "release"].includes(mode)) fail("VEP-USAGE", `Unknown Verify mode: ${mode}`);
-  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath: value["--event-out"] ?? null, mode, base: value["--base"] ?? null, reuseReceipts: value.reuseReceipts !== false, criticPacketId: value["--critic-packet-id"] ?? null, criticReverifyReceiptId: value["--critic-reverify-receipt-id"] ?? null, criticEvidenceFeatureId: value["--critic-evidence-feature-id"] ?? null };
+  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath: value["--event-out"] ?? null, mode, base: value["--base"] ?? null, commit: value["--commit"] ?? null, reuseReceipts: value.reuseReceipts !== false, criticPacketId: value["--critic-packet-id"] ?? null, criticReverifyReceiptId: value["--critic-reverify-receipt-id"] ?? null, criticEvidenceFeatureId: value["--critic-evidence-feature-id"] ?? null };
 }
 
 if (isDirectInvocation(import.meta.url)) {

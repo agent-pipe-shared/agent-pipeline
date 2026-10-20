@@ -21,6 +21,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
 import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 
 function run(executable, args, options = {}) {
   const result = spawnSync(executable, args, { encoding: "utf8", ...options });
@@ -690,4 +691,159 @@ test("the producer registers the git common dir as a Windows boundary before reg
   assert.ok(register > 0, "registerVerifyRunRecord call present");
   assert.ok(boundary > 0, "verifyWindowsRegisterCommon(gitCommonDir) call present");
   assert.ok(boundary < register, "boundary registered before the run record");
+});
+
+// ALF-D61-AC224 (PF-57 (2)): Critic evidence for a named earlier commit, produced without touching the
+// shared checkout, so a Critic review and a Goldfish can work side by side.
+const COMMIT_WORKTREE_AREA = [".git", "agent-pipeline", "verify", "commit-worktrees"];
+function commitFile(root, paths, message) {
+  git(root, ["add", "--", ...paths]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+  return git(root, ["rev-parse", "HEAD"]);
+}
+/** first -> older candidate (manifest + spec) -> head (README moved on), then the checkout is left dirty. */
+function olderCandidateBehindDirtyHead(root) {
+  const first = git(root, ["rev-parse", "HEAD"]);
+  mkdirSync(join(root, "specs"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Older candidate\n");
+  const older = commitFile(root, [".claude/pipeline.yaml", "specs/spec.md"], "older candidate");
+  writeFileSync(join(root, "README.md"), "# Fixture moved on\n");
+  const head = commitFile(root, ["README.md"], "head moved on");
+  writeFileSync(join(root, "specs", "spec.md"), "# uncommitted edit of a tracked file\n");
+  writeFileSync(join(root, "README.md"), "# uncommitted edit of another tracked file\n");
+  writeFileSync(join(root, "untracked-note.txt"), "an untracked file the Goldfish is writing\n");
+  return { first, older, olderTree: git(root, ["rev-parse", `${older}^{tree}`]), head };
+}
+/** Every path and byte of the checkout outside .git and the evidence output directory. */
+function checkoutBytes(root, rel = "") {
+  const found = {};
+  for (const entry of readdirSync(join(root, rel), { withFileTypes: true })) {
+    const path = rel === "" ? entry.name : `${rel}/${entry.name}`;
+    if (path === ".git" || path === "evidence") continue;
+    if (entry.isDirectory()) { found[`${path}/`] = "directory"; Object.assign(found, checkoutBytes(root, path)); }
+    else found[path] = createHash("sha256").update(readFileSync(join(root, path))).digest("hex");
+  }
+  return found;
+}
+function observeCheckout(root) {
+  return {
+    head: git(root, ["rev-parse", "HEAD"]),
+    status: git(root, ["status", "--porcelain=v1", "--untracked-files=all"]),
+    bytes: checkoutBytes(root),
+    worktrees: git(root, ["worktree", "list", "--porcelain"]).split("\n").filter((line) => line.startsWith("worktree ")),
+  };
+}
+function assertNoCommitWorktree(root) {
+  const area = join(root, ...COMMIT_WORKTREE_AREA);
+  assert.deepEqual(existsSync(area) ? readdirSync(area) : [], [], "the temporary worktree area must be empty again");
+  assert.equal(git(root, ["worktree", "list", "--porcelain"]).split("\n").filter((line) => line.startsWith("worktree ")).length, 1, "git must not list a leftover worktree");
+}
+
+test("Critic evidence for a named earlier commit is bound to it, leaves a dirty checkout untouched, and the preflight accepts it", async () => {
+  // Passes only inside a clean checkout of the OLDER commit: the shared checkout has a different spec.md.
+  await withFixture(`node -e "process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)"`, async (root) => {
+    const { first, older, olderTree, head } = olderCandidateBehindDirtyHead(root);
+    assert.notEqual(older, head);
+    const before = observeCheckout(root);
+    assert.match(before.status, /README\.md/u);
+    assert.match(before.status, /\?\? untracked-note\.txt/u);
+
+    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", base: first, commit: older });
+
+    assert.equal(result.status, "passed");
+    assert.equal(result.outPath, join(root, "evidence", "critic-older.json"));
+    assert.equal(result.evidence.commit, older);
+    assert.equal(result.evidence.tree, olderTree);
+    assert.deepEqual(result.evidence.candidate, { commit: older, tree: olderTree });
+    assert.equal(result.evidence.exitCode, 0);
+    assert.equal(result.evidence.selection.mode, "critic");
+    assert.equal(result.evidence.selection.candidateCommit, older);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, "evidence", "critic-older.json"), "utf8")), result.evidence);
+    assert.deepEqual(readdirSync(join(root, "evidence")), ["critic-older.json"], "the evidence file is the only thing written into the checkout");
+
+    assert.deepEqual(observeCheckout(root), before, "HEAD, status, every tracked and untracked byte and the worktree list are unchanged");
+    assertNoCommitWorktree(root);
+
+    const accepted = preflightCriticDispatch({ root, base: first, candidate: older, specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/critic-older.json"] });
+    assert.deepEqual(accepted.candidate, { commit: older, tree: olderTree });
+    assert.deepEqual(accepted.evidence.map(({ path, candidate }) => ({ path, candidate })), [{ path: "evidence/critic-older.json", candidate: { commit: older, tree: olderTree } }]);
+    assert.throws(() => preflightCriticDispatch({ root, base: first, candidate: head, specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/critic-older.json"] }),
+      (error) => error.code === "CDP-EVIDENCE-BINDING", "the evidence must not satisfy any other commit");
+  });
+});
+
+test("a failed run for a named earlier commit still removes its temporary worktree and leaves no consumable evidence", async () => {
+  await withFixture('node -e "process.exit(3)"', async (root) => {
+    const { first, older } = olderCandidateBehindDirtyHead(root);
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(join(root, "evidence", "critic-older.json"), "stale evidence from an earlier attempt\n");
+    const before = observeCheckout(root);
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", base: first, commit: older }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-VERIFY-FAILED" && /"suite":"configured-verify","exitCode":3/u.test(error.message),
+    );
+    assert.equal(existsSync(join(root, "evidence", "critic-older.json")), false, "a failed replacement must not leave the stale green behind");
+    assert.deepEqual(observeCheckout(root), before);
+    assertNoCommitWorktree(root);
+  });
+});
+
+test("a named commit that is not a local object is refused with a typed code that names it, before anything changes", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const { first } = olderCandidateBehindDirtyHead(root);
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(join(root, "evidence", "critic-older.json"), "prior evidence\n");
+    const before = observeCheckout(root);
+    const absent = "f".repeat(40);
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", base: first, commit: absent }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-COMMIT-NOT-LOCAL" && error.message.includes(absent),
+    );
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", commit: "not-a-ref" }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-COMMIT-INVALID" && error.message.includes("not-a-ref"),
+    );
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", commit: "--upload-pack=x" }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-COMMIT-INVALID",
+    );
+    assert.equal(readFileSync(join(root, "evidence", "critic-older.json"), "utf8"), "prior evidence\n", "a refusal leaves prior evidence alone");
+    assert.deepEqual(observeCheckout(root), before);
+    assertNoCommitWorktree(root);
+  });
+});
+
+test("a named commit is refused for the release and push lanes, the Critic-bound options and an action event, with the repair named", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const commit = git(root, ["rev-parse", "HEAD"]);
+    const before = observeCheckout(root);
+    for (const options of [{ mode: "release" }, { mode: "push" }, { mode: "candidate", criticPacketId: "a".repeat(32) }, { mode: "candidate", criticReverifyReceiptId: "b".repeat(64) }, { mode: "critic", eventOutPath: "evidence/actions/verify.json" }]) {
+      await assert.rejects(
+        () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/never.json", commit, ...options }),
+        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-COMMIT-MODE" && /without --commit/u.test(error.message),
+      );
+    }
+    assert.deepEqual(observeCheckout(root), before);
+    assert.equal(existsSync(join(root, "evidence")), false);
+    assertNoCommitWorktree(root);
+  });
+});
+
+test("the CLI accepts --commit and reports the named commit", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const { first, older, olderTree } = olderCandidateBehindDirtyHead(root);
+    const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+    const result = spawnSync(process.execPath, [script, "--root", root, "--mode", "critic", "--base", first, "--commit", older, "--out", "evidence/cli-older.json"], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "passed");
+    assert.deepEqual(output.candidate, { commit: older, tree: olderTree });
+    assert.equal(JSON.parse(readFileSync(join(root, "evidence", "cli-older.json"), "utf8")).commit, older);
+    assertNoCommitWorktree(root);
+    const missing = spawnSync(process.execPath, [script, "--root", root, "--commit", "f".repeat(40)], { encoding: "utf8" });
+    assert.equal(missing.status, 2);
+    assert.match(missing.stderr, /VEP-COMMIT-NOT-LOCAL/u);
+    assert.match(spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" }).stdout, /--commit <sha>/u);
+  });
 });
