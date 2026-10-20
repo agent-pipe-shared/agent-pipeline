@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -23,6 +23,7 @@ import {
 import {
   applyOrphanSessionCleanupBindingRelease,
   applyOnboardingKickoff,
+  bindOnboardingSessionCleanup,
   applyOnboardingKickoffPromotion,
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
@@ -44,9 +45,12 @@ import {
   validateGovernanceRecoveryRetry,
 } from "../lib/governance-recovery-reconciliation-action.mjs";
 import { validateContinuityState } from "../lib/continuity-state.mjs";
+import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
+import { prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
 import {
   cleanupSession,
   createDetachedWorktree,
+  inspectSignedDescriptorCustodyRepository,
   listActiveSessionDescriptors,
   inspectSessionOwnerRuntime,
   loadSessionDescriptor,
@@ -60,7 +64,10 @@ import {
   planProjectAuthorityMigration,
 } from "../lib/project-authority.mjs";
 
-function fixture(name) {
+// K1c (AC-203): the legacy layout (State in `.claude/pipeline-state.json`). A Source-owned bound bind is admitted
+// only for a neutral project (`continuityJoinActualBoundCleanupOwner` requires `observed.neutral`), so a case that
+// needs a legacy-layout binding cannot create one through the bound path; `fixture()` below is the neutral default.
+function legacyFixture(name) {
   const root = mkdtempSync(join(tmpdir(), `session-cleanup-binding-${name}-`));
   mkdirSync(join(root, ".claude"), { recursive: true });
   const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
@@ -83,8 +90,14 @@ function fixture(name) {
   return root;
 }
 
+// The default fixture keeps the legacy layout (many cases pin legacy and closed-transition behaviour); a case that
+// starts a session through the bound requester is migrated to a neutral project on its first bound start.
+function fixture(name) {
+  return legacyFixture(name);
+}
+
 function neutralFixture(name) {
-  const root = fixture(name);
+  const root = legacyFixture(name);
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
   const plan = planProjectAuthorityMigration({ rootDir: root });
   assert.equal(plan.status, "ready");
@@ -92,19 +105,92 @@ function neutralFixture(name) {
   return root;
 }
 
-function invoke(argv, dependencies = {}) {
-  let output = "";
-  const code = sessionCleanupMain(argv, {}, {
-    requireProjectOnboardingReadyFn() { return { status: "ready" }; },
-    writeFn(value) { output += value; },
-    ...dependencies,
+// K1c (AC-203): `bindOnboardingSessionCleanup` refuses outside a Source-owned bound requester context, and
+// binds only the requester's own {sessionId, descriptorSha256}. Production (session-power-controller.mjs
+// `direct`) creates the session descriptor first, binds a requester to exactly that descriptor, and runs the
+// work inside `withSourceOwnedAuthorityContext`. The `start` verb creates its descriptor and binds in one call,
+// so the fixtures rebuild the production order through the bridge's own fixture builder at the two points the CLI
+// already exposes as dependencies: descriptor creation returns the descriptor the builder created and bound a
+// requester to, and the real `bindOnboardingSessionCleanup` runs inside that requester's own context. Nothing is
+// stubbed into a `bound` result; a plain process is still refused (see `invokePlain`).
+const boundRequesterRuntimes = new Map();
+const registryPreparedRoots = new Set();
+const legacyLayoutRoots = new Set();
+let boundRequesterSequence = 0;
+function boundRequesterKey(repository, sessionId) { return `${repository.primaryRoot}\n${sessionId}`; }
+
+// The existing authority-migration builders, exactly as `neutralFixture` applies them.
+function migrateToNeutral(root) {
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const plan = planProjectAuthorityMigration({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(applyProjectAuthorityMigration(plan, { rootDir: root, activate: true }).status, "applied");
+}
+
+function startDescriptorWithBoundRequester(repoPath, options = {}) {
+  const repository = inspectSignedDescriptorCustodyRepository(repoPath);
+  // A Source-owned bound bind is admitted only for a neutral project (`continuityJoinActualBoundCleanupOwner`
+  // requires `observed.neutral`), so the first bound start migrates a legacy-layout fixture through the existing
+  // builders, unless the case pins the legacy layout (that case then stays refused and is named as such).
+  if (!legacyLayoutRoots.has(repository.primaryRoot) && !observeSessionCleanupState(repository.primaryRoot).neutral) {
+    migrateToNeutral(repository.primaryRoot);
+  }
+  // A cleanup binding reserves its member in the session-authority registry: initialize the real, empty registry
+  // (no stub) once per root, on the first bound start, so cases that never start stay fast.
+  if (!registryPreparedRoots.has(repository.primaryRoot)) {
+    prepareSessionAuthorityRegistryFixture({ root: repository.primaryRoot, excludeFromStatus: true });
+    registryPreparedRoots.add(repository.primaryRoot);
+  }
+  const sessionId = options.sessionId ?? `session-${randomBytes(12).toString("hex")}`;
+  boundRequesterSequence += 1;
+  const runtime = createControlledMethodRuntimeFixture({
+    repository,
+    fixtureRoot: join(repository.commonDir, "agent-pipeline", "controlled-method-fixtures", `${sessionId}-${boundRequesterSequence}`),
+    sessionId,
   });
-  return { code, output: output === "" ? null : JSON.parse(output) };
+  boundRequesterRuntimes.set(boundRequesterKey(repository, sessionId), runtime);
+  const loaded = loadSessionDescriptor(repoPath, sessionId);
+  return {
+    repo: loaded.repo,
+    path: loaded.path,
+    sessionId: loaded.sessionId,
+    ownerNonce: loaded.ownerNonce,
+    descriptorSha256: loaded.descriptorSha256,
+  };
+}
+
+function bindInsideRequesterContext(request) {
+  const repository = inspectSignedDescriptorCustodyRepository(request.rootDir);
+  const runtime = boundRequesterRuntimes.get(boundRequesterKey(repository, request.sessionCleanup?.sessionId));
+  // No requester bound to this descriptor: run the real function in the caller's plain context (it refuses).
+  if (runtime === undefined) return bindOnboardingSessionCleanup(request);
+  return runtime.run(() => bindOnboardingSessionCleanup(request));
+}
+
+const BOUND_REQUESTER_DEPENDENCIES = Object.freeze({
+  startSessionDescriptorFn: startDescriptorWithBoundRequester,
+  bindOnboardingSessionCleanupFn: bindInsideRequesterContext,
+});
+
+function invoke(argv, dependencies = {}) {
+  return invokeWithEnv(argv, {}, dependencies);
 }
 
 function invokeWithEnv(argv, env, dependencies = {}) {
   let output = "";
   const code = sessionCleanupMain(argv, env, {
+    requireProjectOnboardingReadyFn() { return { status: "ready" }; },
+    writeFn(value) { output += value; },
+    ...BOUND_REQUESTER_DEPENDENCIES,
+    ...dependencies,
+  });
+  return { code, output: output === "" ? null : JSON.parse(output) };
+}
+
+// The pre-K1c shape: the CLI exactly as a plain terminal reaches it, with no requester context.
+function invokePlain(argv, dependencies = {}) {
+  let output = "";
+  const code = sessionCleanupMain(argv, {}, {
     requireProjectOnboardingReadyFn() { return { status: "ready" }; },
     writeFn(value) { output += value; },
     ...dependencies,
@@ -235,6 +321,23 @@ test("start binds once, resumes the exact descriptor and rotates only after clos
     const next = invoke(["start", "--repo", root, "--session", "session-binding-next"]);
     assert.equal(next.output.code, "WT-SESSION-STARTED");
     assert.equal(next.output.sessionId, "session-binding-next");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// K1c (AC-203): the plain terminal keeps being refused. `start` from a process with no Source-owned requester
+// context reaches the real `bindOnboardingSessionCleanup`, which refuses with the typed code and writes no binding.
+test("start from a plain process is refused with SDC-AUTHORITY-UNAVAILABLE and writes no binding", () => {
+  const root = fixture("plain-process-refusal");
+  try {
+    assert.throws(
+      () => invokePlain(["start", "--repo", root, "--session", "session-plain-refused"]),
+      (error) => error?.code === "SDC-AUTHORITY-UNAVAILABLE"
+        && /continuity current invocation required before binding/u.test(error.message),
+    );
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json")), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -745,7 +848,8 @@ function gitRun(root, args) {
 }
 
 function legacyClosedCleanupFixture(name) {
-  const root = fixture(name);
+  const root = legacyFixture(name);
+  legacyLayoutRoots.add(root); // pins `.claude/pipeline-state.json`: never migrated, so its bound start stays refused
   const started = invoke(["start", "--repo", root, "--session", `session-${name}`]);
   const statePath = join(root, ".claude", "pipeline-state.json");
   const state = JSON.parse(readFileSync(statePath, "utf8"));
