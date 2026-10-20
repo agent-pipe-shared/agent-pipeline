@@ -19,7 +19,7 @@
 //   (iv)  keyless, route UNREGISTERED : today's warning, no pending state, PostToolUse names NGHS-CLAUDE-FOREGROUND-REQUIRED
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
@@ -416,4 +416,24 @@ test("(vi) a launch the hook refuses after it prepared the queue row leaves the 
   assert.deepEqual(memberFiles(), membersBefore, "no reserved registry member is left behind");
   fx.gitOk("checkout", "-q", "--", "README.md");
   launchedPending(fx, "toolu_pf55_clean", {});
+});
+
+test("(vii) a launch hook killed while it holds the registry lock does not block the next launch (FB3-PF-55)", { skip: process.platform === "win32" ? "the gone-owner proof reads the Linux process identity; elsewhere the lock is named with release-lock (SAR08)" : false }, async () => {
+  const fx = buildConsumer("killed-holder");
+  const lock = join(fx.root, ".git", "agent-pipeline", "session-authority", "registry.lock");
+  const aside = join(fx.root, ".git", "agent-pipeline", "session-authority-abandoned");
+  // The host kills a hook at its timeout or on an interrupt; SIGKILL runs no finally, so the lock stays behind.
+  const killed = await new Promise((done) => {
+    const child = spawn(process.execPath, [GUARD], { env: { ...process.env, CLAUDE_PROJECT_DIR: fx.root, GIT_CEILING_DIRECTORIES: fx.parent, HOME: fx.home, USERPROFILE: fx.home } });
+    child.stdout.resume(); child.stderr.resume();
+    let sent = false;
+    const poll = setInterval(() => { if (!sent && existsSync(lock)) { sent = true; child.kill("SIGKILL"); } }, 2);
+    child.on("close", (status, signal) => { clearInterval(poll); done({ sent, signal }); });
+    child.stdin.end(JSON.stringify(call(fx, "PreToolUse", "toolu_pf55_killed", {})));
+  });
+  assert.equal(killed.sent, true, "the hook was killed while it held the lock");
+  assert.equal(existsSync(lock), true, "SETUP the killed holder left its lock");
+  launchedPending(fx, "toolu_pf55_after_kill", {});
+  assert.equal(existsSync(lock), false, "the next launch released the lock it took");
+  assert.equal(readdirSync(aside).filter((name) => name.endsWith("-registry-lock")).length, 1, "the gone owner's lock was retired aside, not deleted");
 });
