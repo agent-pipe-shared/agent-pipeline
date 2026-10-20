@@ -201,3 +201,28 @@ private TMPDIR the four `domain-ancestor-unsafe` suites are still red, with thes
 - **Packages:** K1c3 (recovery port), K1c4 (binding rest), K1f (native-goldfish-host-state-regression and
   guard-dispatch-native-worker), K1g (afk-transaction-host, design-workflow-package-builder, MFE018);
   the model-family group goes to the D66 typed-pending package.
+
+### K1 measurement 4 (2026-10-20, dispatch ALF-K1C3-SESSION-RECOVERY and orchestrator code reading)
+
+Interim entry. Changes the direction of K1c4.
+
+- **K1c3:** `7ad584f18`, session-cleanup-recovery 35/39 (HEAD 33/39; the 4 reds are a subset of the 6
+  HEAD reds; orchestrator run `node scratch/run-quiet.mjs`). Binding suite unchanged 46/66.
+- **Finding A, a product dead end (AC-203's own defect):** the production recovery routes
+  `release-lost-binding` and `retire-orphans-release-lost-binding` (`lib/session-cleanup-recovery.mjs`
+  ~793, ~1216, ~1835) call the public `releaseOnboardingSessionCleanup`. That function releases only
+  a binding recorded in the in-process map `continuityAuthorityDirectBindings` (onboarding-continuity.mjs
+  ~9594-9596, 'continuity owning execution recovery required before release'); the owning terminal
+  `continuityAuthorityFinish` (~9508) needs `continuityAuthorityCurrent` (~9310), which accepts only a
+  live bound requester or a retired-owner scope built from an owner invocation retained in the same
+  process (~11103-11123). After a host crash the process is gone and the descriptor is lost, so neither
+  exists: the recovery verb the AC-203 item asks for refuses. Entering the requester context fails
+  earlier with `WT-SESSION-MISSING` (the descriptor is gone). Same cause as group (b), 10 binding cases.
+- **Finding B, legacy layout:** a bound bind refuses a non-neutral State (`continuityJoinActualBoundCleanupOwner`
+  ~9850). ADR-0054 keeps the `.claude/` tier supported "for several releases", so the cases that
+  recover a historic legacy binding stay valid; they need the historic binding bytes written by the
+  fixture as an artifact, not a bound bind (7 binding cases, 1 recovery case).
+- **Finding C, fixture builder gap:** RF2A needs a bound descriptor whose owner is unavailable;
+  `createControlledMethodRuntimeFixture` (session-requester-bridge.mjs 686) always starts the descriptor
+  with the live test pid and has no owner option.
+- **K1c4 is held** until the PO decides A-C (tiles).
