@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0e45978c8dd6c2690d0bb7dba631f5105600cc38d1683f90a4a1dc3e76f70a1f"
+    "transitionHead": "e0ba7c94fee40a8d820895829f399bcd943c39bf9cfa58d5f8ad443cbebc2d01"
   },
   "counts": {
-    "open": 264,
+    "open": 265,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -11755,6 +11755,16 @@
       "closureRepository": "self",
       "closureCommit": "a8c11b5ae31e8cb848d71ee75e834052319dea7d",
       "closureEvidence": "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
+    },
+    {
+      "id": "pipeline.verify-test-economy-rebuild",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "PO decision D69 (2026-10-20) and ADR-0088, after the Full Verify measurement of c1771bc98 (138 red steps, about 13 000 cases, 5 h).",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
