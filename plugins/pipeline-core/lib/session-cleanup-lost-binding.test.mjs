@@ -167,6 +167,7 @@ test("releaseLostSessionAuthorityMember refuses while the target's active descri
       return true;
     });
     assert.deepEqual(snapshot(root), before);
-    assert.deepEqual(readdirSync(join(registryRoot(root), "releases")), []);
+    const releasesDirectory = join(registryRoot(root), "releases");
+    assert.deepEqual(existsSync(releasesDirectory) ? readdirSync(releasesDirectory) : [], []);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

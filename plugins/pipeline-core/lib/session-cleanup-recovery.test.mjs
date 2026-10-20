@@ -59,7 +59,7 @@ import {
   startSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
 import {
-  bindInsideRequesterContext,
+  applyRecoveryInFreshProcess, bindInsideRequesterContext,
   createLegacyLayoutFixture,
   gitRun,
   invokeCleanupCli,
@@ -319,9 +319,7 @@ test("retire-orphans-release-lost-binding (composite) auto-executes without conf
     assert.equal(plan.status, "ready");
     assert.equal(plan.recovery, "retire-orphans-release-lost-binding");
     assert.equal(plan.applyAction.requiresConfirmation, false);
-    const applied = applySessionCleanupRecovery({
-      rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
-    });
+    const applied = applyRecoveryInFreshProcess({ rootDir: root, expectedPlanSha256: plan.planSha256 });
     assert.equal(applied.status, "recovered");
     assert.deepEqual(readFileSync(backupPath(root, `session-descriptor.${first.sessionId}`)), preFirst);
     assert.deepEqual(readFileSync(backupPath(root, `session-descriptor.${second.sessionId}`)), preSecond);
@@ -346,9 +344,7 @@ test("release-lost-binding auto-executes without confirmation, backs up onboardi
     assert.equal(plan.status, "ready");
     assert.equal(plan.recovery, "release-lost-binding");
     assert.equal(plan.applyAction.requiresConfirmation, false);
-    const applied = applySessionCleanupRecovery({
-      rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
-    });
+    const applied = applyRecoveryInFreshProcess({ rootDir: root, expectedPlanSha256: plan.planSha256 });
     assert.equal(applied.status, "recovered");
     assertOnboardingBackups(root, preOnboarding);
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");

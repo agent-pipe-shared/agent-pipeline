@@ -74,54 +74,7 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function canonicalJson(value) {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (isObject(value)) {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function digest(value) {
-  return createHash("sha256").update(Buffer.from(canonicalJson(value), "utf8")).digest("hex");
-}
-
-function recoveryBinding(plan) {
-  const binding = {
-    schema: plan.schema,
-    root: plan.root,
-    stateSha256: plan.stateSha256,
-    revision: plan.revision,
-    sessionCleanup: plan.sessionCleanup,
-    closure: plan.closure,
-    activeDescriptorCount: plan.activeDescriptorCount,
-    recovery: plan.recovery,
-    releaseProof: plan.releaseProof ?? null,
-    coordinatorCloseSha256: plan.coordinatorCloseSha256 ?? null,
-  };
-  if (Object.hasOwn(plan, "orphanDescriptors")) {
-    binding.orphanDescriptors = plan.orphanDescriptors;
-  }
-  if (Object.hasOwn(plan, "externalRetirements")) {
-    binding.externalRetirements = plan.externalRetirements;
-  }
-  if (Object.hasOwn(plan, "expectedBindingStatus")) {
-    binding.expectedBindingStatus = plan.expectedBindingStatus;
-  }
-  if (Object.hasOwn(plan, "privateReceiptRecoverySha256")) {
-    binding.privateReceiptRecoverySha256 = plan.privateReceiptRecoverySha256;
-  }
-  if (Object.hasOwn(plan, "expectedPostStateSha256")) {
-    binding.expectedPostStateSha256 = plan.expectedPostStateSha256;
-  }
-  if (Object.hasOwn(plan, "expectedPostRevision")) {
-    binding.expectedPostRevision = plan.expectedPostRevision;
-  }
-  if (Object.hasOwn(plan, "writerIdentity")) {
-    binding.writerIdentity = plan.writerIdentity;
-  }
-  return binding;
-}
+import { canonicalJson, digest, recoveryBinding, releaseLostSessionCleanupBinding } from "./session-cleanup-lost-binding.mjs";
 
 function observeWriterIdentity(scriptPath, deps) {
   if (typeof deps.observeWriterIdentityFn === "function") {
@@ -790,14 +743,12 @@ function applyCompositeSessionCleanupRecovery({
       }
       journal = updateCompositeJournal(paths, journal, { phase: "releasing" }, journalSecurity);
       backupOnboardingPrivateState(plan.root, deps);
-      const release = deps.releaseOnboardingSessionCleanupFn
-        ?? releaseOnboardingSessionCleanup;
-      const released = release({
+      const released = deps.releaseOnboardingSessionCleanupFn ? deps.releaseOnboardingSessionCleanupFn({
         rootDir: plan.root,
         expectedStateSha256: plan.stateSha256,
         expectedRevision: plan.revision,
         sessionCleanup: plan.sessionCleanup,
-      });
+      }) : releaseLostSessionCleanupBinding({ plan, expectedPlanSha256, activate: true, scriptPath, deps });
       if (released.status !== "released" || released.sessionCleanup !== null
         || released.revision !== journal.expectedPostRevision
         || released.stateSha256 !== journal.expectedPostStateSha256) {
@@ -1832,14 +1783,12 @@ export function applySessionCleanupRecovery({
     fail("WT-SESSION-RECOVERY-PLAN", "cleanup recovery plan mode is invalid");
   }
   backupOnboardingPrivateState(plan.root, deps);
-  const release = deps.releaseOnboardingSessionCleanupFn
-    ?? releaseOnboardingSessionCleanup;
-  const result = release({
+  const result = deps.releaseOnboardingSessionCleanupFn ? deps.releaseOnboardingSessionCleanupFn({
     rootDir: plan.root,
     expectedStateSha256: plan.stateSha256,
     expectedRevision: plan.revision,
     sessionCleanup: plan.sessionCleanup,
-  });
+  }) : releaseLostSessionCleanupBinding({ plan, expectedPlanSha256, activate: true, scriptPath, deps });
   if (result.status !== "released" || result.sessionCleanup !== null) {
     fail("WT-SESSION-RECOVERY-READBACK", "cleanup recovery did not release the exact State handle");
   }
