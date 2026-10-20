@@ -78,7 +78,7 @@ export function main(rawInput = undefined, dependencies = {}) {
 
 // Dedicated Controller entry. Caller stdin/dependencies cannot issue admission.
 // The fixed FD number is transport syntax only; requester authentication is mandatory.
-export async function runSourceOwnedContinuityVerificationGuard() {
+async function runSourceOwnedContinuityVerificationGuard() {
   const argv = process.argv.slice(2);
   const exact = ["--runner", "codex", "--consume-owned-verification-guard", "--channel-fd", "4"];
   if (argv.length !== exact.length || exact.some((value, index) => argv[index] !== value)) {
