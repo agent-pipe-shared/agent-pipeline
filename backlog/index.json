@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1276888af256a99d8affb165f03f1f36c0b5b8e3ec72b6a17e1d68af3b9a6c94"
+    "transitionHead": "b71975cf045b659d0fd0dd4654fa94f90e801aacb71f1718bfa6ee76d6a1cd18"
   },
   "counts": {
-    "open": 237,
+    "open": 255,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -227,6 +227,16 @@
       "closureEvidence": "backlog/evidence/2026-09-11-ledger-oid-403-critic-pass.md"
     },
     {
+      "id": "pipeline.a-member-reserved-by-another-process-is-refused-as-unowned",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "Elephant decision E30 (2026-10-19): MFHS028 measurement by ALF-B10-MFH",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.a-node-script-defeats-every-file-protection-guard",
       "status": "closed",
       "type": "defect",
@@ -269,6 +279,16 @@
       "closureEvidence": "backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md"
     },
     {
+      "id": "pipeline.a-push-leaves-the-next-item-dispatch-refused",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "Live dispatch of ALF-F7B-PRETOOL-PARITY on this repository, right after the c27576438 checkpoint push (2026-10-19)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.a-read-only-command-is-refused-for-naming-a-protected-path",
       "status": "closed",
       "type": "defect",
@@ -308,6 +328,16 @@
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs"
     },
     {
+      "id": "pipeline.a-restore-of-a-protected-file-to-its-committed-bytes-is-refused",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "Elephant decision E25 (2026-10-19, under PO decision D26): TR-L-F (toil-resolution-2026-10-08 row T84, section 5 row 9) leaves 0.7.0",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.a-runner-improvised-the-po-signature-instructions",
       "status": "open",
       "type": "defect",
@@ -330,6 +360,16 @@
       "closureRepository": "self",
       "closureCommit": "1a1de6ef4545ed8fcce812434f1edc02cfb9f26b",
       "closureEvidence": "backlog/items/2026-08-29-a-runner-proposed-abandoning-pipeline-setup-as-too-laborious.md"
+    },
+    {
+      "id": "pipeline.a-running-batch-has-no-admissible-critic-route",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "PO report scratch/pipeline-feedback-03.md, finding PF-34; the same refusal on this repository (CCA-REVIEW-UNIT-REQUIRED, Critic of e6fec04a0, 2026-10-19)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path",
@@ -385,7 +425,7 @@
     {
       "id": "pipeline.a-symlinked-project-root-is-refused-by-the-state-authority-route",
       "status": "open",
-      "type": "improvement",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-19",
       "source": "Elephant decision E18 (2026-10-19): the RGt block of harness/scripts/pipeline-state.test.mjs, ceremony C4 c-3",
@@ -833,6 +873,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.agy-greenfield-report-residuals",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "PO report scratch/pipeline-analyse-greenfield_agy_20261020.md (a greenfield run on Antigravity, 2026-10-17/18, manifest version 0.6.2); checked read-only against the 0.7.0 candidate on 2026-10-20; deferred by the PO (not in this candidate)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.agy-greenfield-run-used-stale-plugin",
       "status": "closed",
       "type": "requirement",
@@ -931,6 +981,16 @@
       "source": "Re-Critic vtpgate2-368458af finding F2; incident during NVA-VTPGATE-2, 2026-08-28",
       "deferred": false,
       "sprint": "nightwing"
+    },
+    {
+      "id": "pipeline.an-orphaned-registry-lock-blocks-every-dispatch",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "PO report scratch/pipeline-feedback-03.md, finding PF-55 (named FB3-PF-55 here, D56); PO again 2026-10-20: blocked hard by registry.lock, no repair, recovered only by moving the file by hand",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run",
@@ -1883,6 +1943,16 @@
       "closureRepository": "self",
       "closureCommit": "589278edd930b14a9070d0f66481e2c5915a3b37",
       "closureEvidence": "backlog/items/2026-08-25-chat-mode-push-approval-has-no-enforced-human-turn-boundary.md"
+    },
+    {
+      "id": "pipeline.checkpoint-push-policy-is-checked-too-late",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "PO report scratch/pipeline-feedback-03.md, findings PF-32 and PF-33; PO decision D56 (3)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.ci-failure-reporter-has-no-recorded-requirement",
@@ -3191,7 +3261,7 @@
     {
       "id": "pipeline.design-course-phase-telemetry-is-not-recorded",
       "status": "open",
-      "type": "improvement",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-19",
       "source": "PO decision D25 (2026-10-18): the telemetry clause of greenfield-design-course-cost-and-proportionality leaves the 0.7.0 acceptance",
@@ -4755,7 +4825,7 @@
     {
       "id": "pipeline.goldfish-mechanic-is-not-routed-to-the-haiku-tier",
       "status": "open",
-      "type": "improvement",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-19",
       "source": "Elephant decision E7 (2026-10-19, under PO decision D26): point (e) MECH-HAIKU of opus-critic-only-batched-for-architecture-and-security leaves 0.7.0",
@@ -4865,7 +4935,7 @@
     {
       "id": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
       "status": "open",
-      "type": "improvement",
+      "type": "requirement",
       "owner": "pipeline",
       "created": "2026-10-19",
       "source": "PO decision D21 (2026-10-18): moves after 0.7.0; the Alfred inventory had no public original for this item (AC-190)",
@@ -5606,6 +5676,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
+      "id": "pipeline.hgo-audit-ledger-segment-checkpoint",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "PO decision D47 (2026-10-19): PF-51, found by the live item dispatch on build 677f8ec",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store",
       "status": "closed",
       "type": "defect",
@@ -6158,6 +6238,16 @@
       "closureEvidence": "backlog/evidence/2026-08-09-language-selection-scope-fix-closure.md"
     },
     {
+      "id": "pipeline.large-files-are-too-complex-for-agents-to-change-safely",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "PO request (2026-10-19): find the large files that are too complex for agents and split them later",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base",
       "status": "closed",
       "type": "defect",
@@ -6613,6 +6703,16 @@
       "source": "Explicit PO direction: approve new model types once; automatically select their latest version; retain old versions only on explicit PO request.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.model-family-async-effects-need-a-settled-journal-phase",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "Elephant decisions E23 and E24 (2026-10-19, under PO decision D26): the model-family async-lifetime defect is latent and is not fixed in 0.7.0",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.model-role-bootstrap-ignores-version-bumps-within-a-family",
@@ -7613,6 +7713,16 @@
       "source": "PO question 2026-09-28 (read-only diagnosis session): with a global (user-scope) plugin install, must every Pipeline hook stay inert in a repository that never opted in? Measured with backlog/evidence/2026-09-28-ungoverned-hook-probe.mjs (334 hook runs, Claude + Codex + Antigravity wiring, ungoverned git and non-git fixtures, isolated HOME) plus source reading.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.pipeline-owned-files-dirty-the-push-tree",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "PO report scratch/pipeline-feedback-03.md, findings PF-31, PF-36 and PF-40; PO decision D56 (2)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions",
@@ -9046,6 +9156,16 @@
       "closureEvidence": "harness/scripts/check-product-capability-inventory.test.mjs"
     },
     {
+      "id": "pipeline.registry-source-migration-gaps-after-a-plugin-update",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "PO decisions D46/D48 (2026-10-19): PF-50, PF-52; Critic review of 823dbb754/677f8ec93 (partial, minor F1-F4)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.regulated-document-hooks",
       "status": "deferred",
       "type": "workflow-improvement",
@@ -9176,6 +9296,16 @@
       "closureRepository": "self",
       "closureCommit": "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
       "closureEvidence": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md"
+    },
+    {
+      "id": "pipeline.report-03-later-findings",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "PO report scratch/pipeline-feedback-03.md, findings PF-30, PF-35, PF-37, PF-38, PF-39, PF-43; deferred per D56",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice",
@@ -9341,7 +9471,7 @@
     {
       "id": "pipeline.retired-design-route-admit-tails-are-not-re-expressed-on-the-review-receipt-route",
       "status": "open",
-      "type": "improvement",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-19",
       "source": "Elephant decision E15 (2026-10-19): the admit-side tails that ceremony C4 leaves dormant in pipeline-state.test.mjs",
@@ -9827,6 +9957,16 @@
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
     },
     {
+      "id": "pipeline.session-authority-repair-gaps-after-pf55",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "PF-55 / D52 Tier 1 build on this repository (2026-10-19); measured gaps the build does not close",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.session-keep-awake",
       "status": "closed",
       "type": "workflow-improvement",
@@ -9849,6 +9989,16 @@
       "source": "Manual observation, Claude Code session on Windows, 2026-10-03, feat/sprint-alfred at a0d83ce78.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.session-scratch-binding-stays-unbound",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "PO test of e6fec04a0 in the main project (D54); measured on this repository, 2026-10-19",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard",
@@ -10294,6 +10444,16 @@
       "closureEvidence": "backlog/items/2026-09-09-standing-critic-consent-reprompts-host-approval.md"
     },
     {
+      "id": "pipeline.state-routes-refused-once-a-registry-catalogue-exists",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "Live run on this repository after the c27576438 push (2026-10-19), PF-54",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.stateful-design-contract-template",
       "status": "deferred",
       "type": "workflow-improvement",
@@ -10331,6 +10491,16 @@
       "closureRepository": "self",
       "closureCommit": "771587abfc94917095548e95e2d907b62829c725",
       "closureEvidence": "backlog/evidence/2026-09-11-runtime-subagent-identity-closure.md"
+    },
+    {
+      "id": "pipeline.suites-red-on-this-checkout-before-pf55",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "PF-55 baseline comparison: each case below fails identically on an export of d769449e8 (before PF-55) and on the PF-55 tree (2026-10-19)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry",
@@ -10455,6 +10625,16 @@
       "closureRepository": "self",
       "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
       "closureEvidence": "backlog/evidence/2026-09-18-ai-hardening-and-doc-obligations-closure.md"
+    },
+    {
+      "id": "pipeline.the-architecture-map-is-not-enforced",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "PO report scratch/pipeline-feedback-03.md, finding PF-54 (named FB3-PF-54 here), PO class major; scope D56 (1)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink",

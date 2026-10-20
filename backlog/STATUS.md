@@ -20,19 +20,23 @@
 | pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand. |
 | pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.a-member-reserved-by-another-process-is-refused-as-unowned | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
 | pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.a-push-leaves-the-next-item-dispatch-refused | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | closed | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.a-registered-but-abandoned-worktree-is-never-retired | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
+| pipeline.a-restore-of-a-protected-file-to-its-committed-bytes-is-refused | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.a-runner-improvised-the-po-signature-instructions | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
+| pipeline.a-running-batch-has-no-admissible-critic-route | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
-| pipeline.a-symlinked-project-root-is-refused-by-the-state-authority-route | open | improvement | pipeline | none | 2026-10-19 | — | — |
+| pipeline.a-symlinked-project-root-is-refused-by-the-state-authority-route | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20 | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
@@ -67,6 +71,7 @@
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | nightwing | 2026-08-09 | 2026-08-20 | — |
 | pipeline.agents-talk-the-po-out-of-the-signature | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident. |
 | pipeline.agy-driver-dispatch-and-design-routes-incomplete | open | defect | pipeline | alfred | 2026-10-03 | — | — |
+| pipeline.agy-greenfield-report-residuals | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.agy-greenfield-run-used-stale-plugin | closed | requirement | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.agy-managed-copy-first-start-lacks-attestation | open | defect | pipeline | none | 2026-09-29 | — | — |
@@ -75,6 +80,7 @@
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable | open | defect | pipeline | nightwing | 2026-08-28 | — | — |
+| pipeline.an-orphaned-registry-lock-blocks-every-dispatch | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — a failing suite reports one failure and hides an unknown number of cases that never executed. The gate cannot distinguish 'one case failed' from 'one case failed and eight never ran'. |
 | pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.anchor-check-passes-on-wrong-language-content | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -149,6 +155,7 @@
 | pipeline.catalogue-admit-prescribed-lifecycle-verbs | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | — | 2026-08-25 | — | — |
+| pipeline.checkpoint-push-policy-is-checked-too-late | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.ci-failure-reporter-has-no-recorded-requirement | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec. |
 | pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.ci-topology-preflight-cannot-pass-on-this-branch | closed | defect | pipeline | none | 2026-08-28 | — | — |
@@ -251,7 +258,7 @@
 | pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-course-does-not-name-the-criterion-renderings-the-delivery-course-admits | open | defect | pipeline | none | 2026-10-18 | — | — |
-| pipeline.design-course-phase-telemetry-is-not-recorded | open | improvement | pipeline | none | 2026-10-19 | — | — |
+| pipeline.design-course-phase-telemetry-is-not-recorded | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.design-course-run-v2-refuses-its-own-documented-routes | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.design-course-telemetry-is-deferred | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.design-generator-repeats-large-source-material | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
@@ -377,7 +384,7 @@
 | pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | closed | workflow-improvement | pipeline | alfred | 2026-08-17 | — | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | — | 2026-08-18 | — | — |
-| pipeline.goldfish-mechanic-is-not-routed-to-the-haiku-tier | open | improvement | pipeline | none | 2026-10-19 | — | — |
+| pipeline.goldfish-mechanic-is-not-routed-to-the-haiku-tier | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.goldfish-quick-field-has-no-emitter | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
@@ -386,7 +393,7 @@
 | pipeline.greenfield-approval-policy-applies-after-intake-transition | open | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.greenfield-ask-before-install-duty-ignored-live | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.greenfield-browser-evidence-is-not-portably-provisioned | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — all three reports distinguish valid static/offline verification from unavailable browser evidence, but the consumer path does not make that capability gap early and actionable. |
-| pipeline.greenfield-comparisons-need-reproducible-public-evidence | open | improvement | pipeline | none | 2026-10-19 | — | — |
+| pipeline.greenfield-comparisons-need-reproducible-public-evidence | open | requirement | pipeline | none | 2026-10-19 | — | — |
 | pipeline.greenfield-design-course-cost-and-proportionality | open | workflow-improvement | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.greenfield-handover-claims-absent-supersession-marker | closed | defect | pipeline | none | 2026-09-27 | — | — |
 | pipeline.greenfield-machine-output-and-skill-budget | open | workflow-improvement | pipeline | alfred | 2026-09-29 | — | — |
@@ -443,6 +450,7 @@
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.heredoc-refusal-teaches-no-substitute | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
+| pipeline.hgo-audit-ledger-segment-checkpoint | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit. |
 | pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
@@ -486,6 +494,7 @@
 | pipeline.kickoff-staging-directory-mismatch | closed | defect | pipeline | — | 2026-08-21 | — | — |
 | pipeline.kickoff-untracked-files-missing-from-commits | closed | defect | pipeline | — | 2026-08-21 | — | — |
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-16 | — |
+| pipeline.large-files-are-too-complex-for-agents-to-change-safely | open | requirement | pipeline | none | 2026-10-19 | — | — |
 | pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.ledger-commit-discipline-rules-live-only-in-checkpoint-prose | closed | workflow-improvement | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.ledger-drift-classification-has-no-reachability-cutoff | closed | defect | pipeline | — | 2026-08-16 | — | — |
@@ -522,6 +531,7 @@
 | pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.model-family-approval-with-automatic-version-upgrades | open | workflow-improvement | pipeline | alfred | 2026-09-30 | — | — |
+| pipeline.model-family-async-effects-need-a-settled-journal-phase | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.model-role-bootstrap-ignores-version-bumps-within-a-family | open | defect | pipeline | none | 2026-10-16 | — | — |
 | pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows | open | defect | pipeline | alfred | 2026-10-08 | — | — |
 | pipeline.model-role-confirmation-prompt-obscures-required-digest | open | workflow-improvement | pipeline | alfred | 2026-09-28 | — | — |
@@ -599,6 +609,7 @@
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed. |
 | pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in | open | defect | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.pipeline-owned-files-dirty-the-push-tree | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | — | 2026-08-05 | — | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
@@ -708,6 +719,7 @@
 | pipeline.refused-read-flags-cost-goldfish-budget-and-are-not-listed-for-agents | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation | closed | workflow-improvement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory | closed | defect | pipeline | none | 2026-08-27 | — | — |
+| pipeline.registry-source-migration-gaps-after-a-plugin-update | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.regulated-document-hooks | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.relative-commit-message-file-unreadable-from-a-worktree | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found |
 | pipeline.release-evidence-promotion-repeats-full-qualification | closed | requirement | pipeline | nova-b | 2026-09-17 | — | — |
@@ -718,6 +730,7 @@
 | pipeline.reopened-approved-plan-blocks-po-acknowledgement | closed | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.repeated-lifecycle-denials-are-not-counted | closed | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
+| pipeline.report-03-later-findings | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.resolved-backlog-items-can-keep-status-open-indefinitely | closed | defect | pipeline | nova-b | 2026-08-27 | — | — |
@@ -730,7 +743,7 @@
 | pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.resume-hint-test-unregistered-in-verify-gate | closed | defect | pipeline | — | 2026-08-18 | — | — |
-| pipeline.retired-design-route-admit-tails-are-not-re-expressed-on-the-review-receipt-route | open | improvement | pipeline | none | 2026-10-19 | — | — |
+| pipeline.retired-design-route-admit-tails-are-not-re-expressed-on-the-review-receipt-route | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.retirement-reader-masks-typed-unsafe-layout-inspection | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.revised-native-design-cannot-reach-a-new-advisor-course | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.rg-pipe-lexical-containment-gap | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — NVA-B-READCONTAIN-1 restored realpath-aware containment for the single-command read lane, the cat-pipeline lane, and the git-pipeline lane in guard-lifecycle-ready.mjs. It deliberately did not touch guard-command-grammar.mjs's approvedReadPath(), which backs the rg-to-rg/rg-to-head bounded pipeline (isBoundedReadOnlyPipeline) — that function stays purely lexical (resolve()+pathInside(), no existsSync/realpathSync at all), a strictly weaker check than even NVA-B-READCONTAIN-1's own round-1 (direct-symlink-only) fix. Traced and confirmed by the Elephant, 2026-09-06, while filing related gaps found during the same package's closure. |
@@ -768,8 +781,10 @@
 | pipeline.sendmessage-mid-task-scope-relay-rule-has-no-durable-home | closed | workflow-improvement | pipeline | alfred | 2026-08-26 | — | — |
 | pipeline.sentinel-epic-acceptance-matrix-archive-drift | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-08-10 | — |
+| pipeline.session-authority-repair-gaps-after-pf55 | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.session-keep-awake | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.session-readiness-drops-to-partial-after-bootstrap-ready | open | defect | pipeline | alfred | 2026-10-03 | — | — |
+| pipeline.session-scratch-binding-stays-unbound | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.session-told-ready-but-not-how-to-repair | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
@@ -805,9 +820,11 @@
 | pipeline.stale-worktree-directories-accumulate-with-no-sweep | closed | defect | pipeline | nova | 2026-08-27 | — | — |
 | pipeline.staleness-check-unsettled-top-level-await-warning | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.standing-critic-consent-reprompts-host-approval | closed | requirement | pipeline | none | 2026-09-09 | — | — |
+| pipeline.state-routes-refused-once-a-registry-catalogue-exists | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.stateful-design-contract-template | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.strip-for-dispatch-misses-resolution-heading | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — discovered while assembling the T1 Critic dispatch for NVA-B-TILDEFIX-1. The backlog item being cited as spec had accumulated a '## Resolution' section (implementor narrative: which commit fixed it, how, and why the fix is believed correct) after its originating dispatch landed. backlog-item-strip-for-dispatch.mjs's output still carried that section verbatim — it only strips known Triage/Closure verdict-shaped headings, and 'Resolution' is not one of the patterns it recognizes. |
 | pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.suites-red-on-this-checkout-before-pf55 | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.t1-governance-path-preflight | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | closed | workflow-improvement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -817,6 +834,7 @@
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | closed | defect | pipeline | alfred | 2026-08-08 | 2026-08-15 | — |
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | closed | defect | pipeline | nova-b | 2026-08-28 | — | Scheduled for Nova B (PO decision 2026-08-28) |
+| pipeline.the-architecture-map-is-not-enforced | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink | closed | defect | pipeline | nova-b | 2026-09-07 | — | — |
 | pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries | closed | defect | pipeline | nova-b | 2026-09-06 | — | — |
@@ -923,7 +941,7 @@
 
 ## Counts
 
-- open: 237
+- open: 255
 - in_progress: 0
 - closed: 664
 - rejected: 3
