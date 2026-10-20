@@ -48,10 +48,16 @@ and F-E minor. The report and its disposition are in
 [ord2-f62b5143a](../specs/sprint-alfred-epic/evidence/critic/ord2-f62b5143a/disposition.md). The
 corrections are Elephant-built, because the Goldfish route needs Spec item rows these items do not
 have. That puts them under the new PO question Q14, together with the D55/D56 commits.
+Corrections built, not accepted:
+- F-D: the close plan reports each slice's authorship record (`courseAuthorship`);
+- F-C: `commit-pipeline-owned.mjs` writes provenance trailers only with `--agent`;
+- F-B, unprotected half: `lib/guard-override-ledger.mjs` resolves the ledger under the common Git
+  directory, and an older tree ledger stays consumed.
+Its writer, guard-git, is ceremony C13. C13 is ready as two whole-file drop-ins (hook and test); a
+clone proof shows guard-git 258/258.
 Open:
-- the corrections of F-B (the guard-override ledger leaves the tree; its guard-git writer is ceremony
-  C13, now on the critical path), F-C and F-D, then an ordinal-3 delta Critic;
-- ceremonies C11+C3+C14 (one registration ceremony, the Edit is prepared), C12 (designed), C13 and C6;
+- an ordinal-3 delta Critic over `f62b5143a..` the corrections;
+- ceremonies C11+C3+C14, C12 and C13 (all ready, each with a clone proof), and C6;
 - PO decision Q14, Full Verify and PO acceptance.
 
 **Claude WSL session, 2026-10-19:** last pushed candidate `e6fec04a0` (checkpoint over the
