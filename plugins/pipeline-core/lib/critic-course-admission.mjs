@@ -42,7 +42,7 @@ const REPAIRS = Object.freeze({
 export function criticCourseRepair(code) {
   return typeof code === "string" && Object.hasOwn(REPAIRS, code) ? REPAIRS[code] : null;
 }
-const digest =(bytes) => createHash("sha256").update(bytes).digest("hex");
+const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 function gitBytes(root, args, code) {
   try {
