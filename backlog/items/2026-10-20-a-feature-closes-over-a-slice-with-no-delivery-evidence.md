@@ -21,6 +21,12 @@ blocked slice legitimately has nothing behind it. A `ready` slice with neither, 
 the course still names as deliverable, and the feature can be closed over it without any
 refusal or report.
 
+## Status
+
+2026-10-20, after the ordinal-2 Critic (F-D): the `feature-close-prepared` plan now reports the
+classification as `courseAuthorship`, so an `unrecorded` slice is named, no longer passed silently.
+Whether a `ready` one refuses the close is still open.
+
 ## Acceptance
 
 - The close names each `ready` slice with no delivery evidence, and either refuses until it is
