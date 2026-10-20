@@ -30,7 +30,13 @@ Kept as a verification item, not new work: after install, simulate a crash (kill
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted as new work, not only a verification item (PO D70, 2026-10-20).
+- **Rationale:** K1 measurement 4 (`specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md`)
+  showed by code reading and by the suites that `release-lost-binding` and
+  `retire-orphans-release-lost-binding` refuse after a host crash: the release accepts only a live bound
+  requester or an owner invocation retained in the same process, and both are gone. That is the dead end
+  this item describes.
+- **Assignment (if accepted):** sprint alfred, 0.7.0 candidate: a recovery context for a lost or retired
+  descriptor's binding (goldfish-deep, Critic batch with the security read); the session-cleanup
+  fixtures (K1c) and an owner option on the controlled-method fixture builder.
+- **Date:** 2026-10-20
