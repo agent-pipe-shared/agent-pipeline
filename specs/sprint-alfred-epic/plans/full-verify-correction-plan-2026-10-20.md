@@ -177,3 +177,27 @@ Interim entry, not a closure.
   under umask 002 would be refused the same way; its repair text is unchecked.
 - **Next:** K1c3 ports the pair to session-cleanup-recovery; K1c4 diagnoses (b)-(e) and builds (a);
   K1d measures the four ancestor suites under a private TMPDIR.
+
+### K1 measurement 3 (2026-10-20, orchestrator, private TMPDIR via `scratch/run-quiet.mjs` / `run-detail.mjs`)
+
+Interim entry. The ambient-TMPDIR hypothesis explains only the Verify spelling of the failure: under a
+private TMPDIR the four `domain-ancestor-unsafe` suites are still red, with these causes:
+
+- afk-transaction-host 0/2: `catalogue.json` ENOENT from `reserveSessionAuthorityMember`, the K1b cause
+  (fixture never initializes the session-authority registry). Fixture fix.
+- codex-critic-host 135/137 (CCH136, CCH137), codex-critic-session-route 4/5, codex-design-advisor-host
+  0/1 (CADH001): `MODEL-FAMILY-NATIVE-REQUEST-REFUSED` (CCH137 surfaces as `child-spawn-failed`).
+  CCH136 and CADH001 are already bound to E24 and parked by D66 as typed pending; CCH137 and the
+  session-route case take the same path and go to the D66 package for confirmation and binding.
+- design-workflow-package-builder 0/3: `CTFR-HOST-UNAVAILABLE`, transport `host-process-repository-drift`.
+- guard-dispatch-native-worker 3/4 (GDW01): `SQ-AUTHORITY-UNAVAILABLE` (the fixture has no valid v2
+  `slice-queue.json` for an approved feature).
+- native-goldfish-host-state-regression 0/3: `WT-GIT-FAILED` from `prepareNativeGoldfishHostState`; the
+  fixture is a bare `.git` directory with an injected `git`, so a product path now runs a real Git call.
+- model-family-execution 18/19 (MFE018): `S4 activation failed: MODEL-FAMILY-AUTHORITY-UNAVAILABLE`.
+- Verify-level rest (K1h/K10): Verify passes the ambient TMPDIR to every suite; whether Verify should
+  give each suite a private TMPDIR (protected `verify.mjs`, a C15 drop-in) or the fixtures move to
+  `mkdtempTestScratch` is decided with K1h.
+- **Packages:** K1c3 (recovery port), K1c4 (binding rest), K1f (native-goldfish-host-state-regression and
+  guard-dispatch-native-worker), K1g (afk-transaction-host, design-workflow-package-builder, MFE018);
+  the model-family group goes to the D66 typed-pending package.
