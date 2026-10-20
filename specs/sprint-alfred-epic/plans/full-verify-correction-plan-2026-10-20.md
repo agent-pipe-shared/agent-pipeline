@@ -44,3 +44,35 @@ real defect green.
    then the final Full Verify in a fresh clone.
 
 Each package names its owning item, so the item route admits the dispatch.
+
+## Cluster closure rule (PO, 2026-10-20)
+
+"wir brauchen nach jedem cluster einem Abschluss weil sonst durch neue Sessions und compacts das
+wissen verloren geht". After each cluster (and after each measurement that changes a cluster's
+direction) the Elephant appends a closure entry below and commits it before starting the next
+cluster, and adds one line to `docs/state.md`. A new session or a Compact resumes from these
+entries and does not re-measure what they record. Each entry names: status (closed, partly closed
+with named rest, or re-scoped), what was measured, the cause, the commits, the counted green runs
+(command and counts), the cases still red and where they went (item, ceremony entry, decision),
+and the next step.
+
+## Cluster closures
+
+### M0 measurements before K1 (2026-10-20, HEAD `2f267d2a9`)
+
+- **Status:** measurement done; changes the direction of K1, K1h and K6.
+- **Pre-existing at the checkpoint import:** in a scratch worktree at `d02409a8a` (2026-10-12),
+  `session-cleanup-binding.test.mjs` is red 39/64 with the same cases, and
+  `architecture-effective-decisions.test.mjs` is red 7/12. K1's session-cleanup part and K3 were
+  imported red; they are not a regression of the D47-D52/PF-55 work.
+- **Regression after the import:** `dispatch-authorship-verify.test.mjs` is green 64/64 at
+  `d02409a8a` and red 7/65 now. K6 is a regression after the import; its package bisects
+  `d02409a8a..HEAD` first.
+- **Hang group is Verify-only:** `native-goldfish-host-finalizer.test.mjs` alone in the working
+  checkout runs green 15/15 in 551 s (`node scratch/run-capped.mjs 600 <file>`); in Verify it ran
+  16 000 s and failed. The K1h cause is parallel contention or a shared resource under Verify, not
+  eight suite defects; the suite is also slow alone (551 s). K1h and K10 become one Verify
+  scheduling or shared-state package, measured under Verify's own concurrency.
+- **Next:** check the dispatch admission (item row) for each cluster's owning item; cross K1 with
+  the E24/E32 case list (D66 parks those cases as typed pending); order K6 after the wave-1
+  packages AC-142 and AC-224, whose write scopes overlap it.
