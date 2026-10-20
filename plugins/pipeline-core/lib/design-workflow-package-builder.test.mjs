@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { openSync } from "node:fs";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
@@ -33,6 +33,15 @@ function test(name, run) {
 // feature's tracked home `specs/<feature-id>/evidence/` and refuses any output path that is git-ignored.
 const TRACKED_HOME = "specs/advisor-feature/evidence";
 const trackedHomeDirectory = (root) => join(root, "specs", "advisor-feature", "evidence");
+
+// The launch directory must lie inside the store's own repository (host-process-repository-drift) but outside the scanned managed namespaces.
+function launchDirectoryInsideStoreRepository(f, readinessHost) {
+  const inputs = join(f.root, ".git", "agent-pipeline", "design-readiness-inputs", f.repoFingerprint);
+  mkdirSync(inputs, { recursive: true, mode: 0o700 });
+  const input = mkdtempSync(join(inputs, "input-"));
+  writeFileSync(join(input, "app-server"), readFileSync(join(readinessHost.input, "app-server")));
+  return input;
+}
 
 async function preparedFixture(t) {
   const f = advisorHostFixture(t);
@@ -91,7 +100,7 @@ async function preparedFixture(t) {
   const ready = await runCodexToolFreeDesignReadiness({
     repoRoot: f.root, repoFingerprint: f.repoFingerprint, codexPath: process.execPath,
     store: f.store, dispatchId: "final-readiness", candidate, sources: sources.sources,
-    route, inputDirectory: readinessHost.input, advisorObservation: prepRead.advisorObservation,
+    route, inputDirectory: launchDirectoryInsideStoreRepository(f, readinessHost), advisorObservation: prepRead.advisorObservation,
     invokeHost: (input) => runIsolatedStructuredHost(input),
     readCandidate: () => observeAdvisorCandidate(f.root),
     readCommittedSource: (_root, commit, path) => execFileSync("git", ["-C", f.root, "show", `${commit}:${path}`], { timeout: 10000 }),
@@ -208,7 +217,7 @@ test("builder retains a canonical no-child Advisor exception as pending PO appro
   const ready = await runCodexToolFreeDesignReadiness({
     repoRoot: f.root, repoFingerprint: f.repoFingerprint, codexPath: process.execPath,
     store: f.store, dispatchId: "exception-readiness", candidate, sources: sources.sources,
-    route: { ...f.route, candidateCommit: candidate.commit }, inputDirectory: readinessHost.input,
+    route: { ...f.route, candidateCommit: candidate.commit }, inputDirectory: launchDirectoryInsideStoreRepository(f, readinessHost),
     advisorObservation: prepared.advisorObservation, invokeHost: (input) => runIsolatedStructuredHost(input),
     readCandidate: () => observeAdvisorCandidate(f.root),
     readCommittedSource: (_root, commit, path) => execFileSync("git", ["-C", f.root, "show", `${commit}:${path}`], { timeout: 10000 }),
