@@ -256,3 +256,30 @@ Interim entry. PO decided A-C as D70 (all (a)).
   test fixture module, bringing both files back under their bounds with unchanged counts; then the
   D70 (a) route is re-dispatched with the corrected design, the registry member in scope, and the rule
   that new code goes to new modules.
+
+### K1 measurement 6 (2026-10-20, dispatches ALF-K1S, ALF-K1-LOST-BINDING-RELEASE2/3, ALF-K1-LOST-BINDING-WIRE)
+
+Interim entry.
+
+- **K1s:** `d82f24747`, the shared fixture module `lib/test-session-cleanup-requester-fixture.mjs`; both
+  session-cleanup suites back under their line bounds, counts unchanged.
+- **D70 (a) delivered (implementation complete; Critic batch with the security read and PO acceptance
+  pending):** `d2602f5cf` (route, registry step, fresh-process helper) and `5e5c7d8f2` (wiring).
+  `lib/session-cleanup-lost-binding.mjs` checks activation, plan digest, binding tuple, State CAS and
+  that no descriptor or owner is live; inside one registry boundary it first closes the crashed
+  in-flight continuity member (`releaseLostSessionAuthorityMember`, the only new registry export, which
+  refuses while the target's active descriptor exists), then releases the binding, then heals and reads
+  the registry back. Member-first order keeps a crash between the steps recoverable. The registry step
+  first took the descriptor custody lock, which needs the absent active descriptor; removed. Draft
+  rejected on review: a registry "kit" exporting raw writers.
+- **Environment cause found (D71):** the per-user session-power address root held 4097 slots, past the
+  4096 bound, so every session-power address preparation refused (`SP-ADDRESS`); test fixtures leak one
+  slot per fixture repository into the real home. 3769 stale slots moved aside (none deleted). The
+  binding-suite counts measured before that (32/66, 25/66) are invalid.
+- **Counted (orchestrator, `node scratch/run-quiet.mjs`, after the D71 cleanup):** lost-binding 4/4 (new,
+  needs C16 registration), session-cleanup-recovery 37/39, session-cleanup-binding 49/66 (the 17 reds are
+  a subset of the 20 before), session-authority-repair 10/10, session-cleanup-power 2/2,
+  check-consumer-safe-paths 9/9; architecture check: only the known guard-git.test and git-cmd.test.
+- **Next:** D71 product fix (test isolation of the address root, repair verb for the bound); D70 (c)
+  RF2A owner option; D70 (b) legacy historic bytes (7 binding + 1 recovery case); the remaining binding
+  reds; K1f, K1g; then the K1 closure.
