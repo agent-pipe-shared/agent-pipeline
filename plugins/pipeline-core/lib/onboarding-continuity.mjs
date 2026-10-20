@@ -4051,7 +4051,7 @@ export function releaseOrphanSessionCleanupBinding({
  * closure completed. Unknown or different handles never rotate through this
  * routine.
  */
-function releaseOnboardingSessionCleanupInternal({
+export function releaseOnboardingSessionCleanupInternal({
   rootDir,
   expectedStateSha256,
   expectedRevision,
@@ -9147,7 +9147,7 @@ function continuityAuthorityEqual(a,b) { return canonicalJson(a) === canonicalJs
 function continuityAuthorityHandle(map, value) {
   const handle = Object.freeze({}); map.set(handle,value); return handle;
 }
-function continuityAuthorityRepository(repository) {
+export function continuityAuthorityRepository(repository) {
   const actual = inspectSignedDescriptorCustodyRepository(repository?.primaryRoot);
   if (!continuityAuthorityEqual(actual,repository))
     fail('SDC-ROOT','continuity authority repository changed');

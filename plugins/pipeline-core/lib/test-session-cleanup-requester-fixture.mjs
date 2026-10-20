@@ -143,3 +143,26 @@ export function invokeCleanupCli(argv, env, dependencies = {}, { bound = true } 
   });
   return { code, output: output === "" ? null : JSON.parse(output) };
 }
+
+
+// A recovery apply in a process of its own, as the PO's terminal reaches it: no requester context inherited from this
+// test process. The child prints one JSON line (the result, or { error }); the parent parses the last stdout line.
+export function applyRecoveryInFreshProcess({ rootDir, expectedPlanSha256 }) {
+  const moduleUrl = new URL("./session-cleanup-recovery.mjs", import.meta.url).href;
+  const code = "import { applySessionCleanupRecovery } from " + JSON.stringify(moduleUrl) + ";\n"
+    + "try {\n"
+    + "  const result = applySessionCleanupRecovery({ rootDir: " + JSON.stringify(rootDir)
+    + ", expectedPlanSha256: " + JSON.stringify(expectedPlanSha256) + ", activate: true });\n"
+    + "  console.log(JSON.stringify(result));\n"
+    + "} catch (error) {\n"
+    + "  console.log(JSON.stringify({ error: { code: error?.code ?? null, message: String(error?.message ?? error), repair: error?.repair ?? null } }));\n"
+    + "}\n";
+  const run = spawnSync(process.execPath, ["--input-type=module", "-e", code], { encoding: "utf8", shell: false });
+  const lines = String(run.stdout ?? "").trim().split("\n");
+  let parsed = null;
+  try { parsed = JSON.parse(lines[lines.length - 1]); } catch { parsed = null; }
+  if (parsed === null || parsed.error !== undefined) {
+    throw new Error("fresh-process recovery failed: " + JSON.stringify(parsed?.error ?? { status: run.status, stderr: String(run.stderr ?? "").slice(-600) }));
+  }
+  return parsed;
+}
