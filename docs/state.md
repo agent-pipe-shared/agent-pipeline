@@ -19,6 +19,27 @@ Read these three files first, in this order, before any other work:
    the closing steps in order, the Critic scope, and the open Windows findings with their
    measurements, so they are built on and not rediscovered.
 
+**Claude WSL session, 2026-10-20:** the content of the next candidate is being built on
+`feat/sprint-alfred` after `e6fec04a0`. It is not stamped or pushed; that waits for the PO's call
+(D18, D56 (4)). PO decisions D54-D56 and the triage of report 03 are in
+[po-decisions-2026-10-18](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md) and
+[feedback-03-triage](../specs/sprint-alfred-epic/plans/feedback-03-triage.md). PO steps and open
+questions (Q13 new) are in
+[po-ceremonies-pending](../specs/sprint-alfred-epic/plans/po-ceremonies-pending.md).
+Built, not accepted:
+- the orphaned `registry.lock` (FB3-PF-55/56): it is retired once its owner is gone, and
+  `release-lock` and `wait` are added;
+- the checkpoint-lane check before signing (PF-32/33);
+- the commit route for Pipeline-owned files (PF-31/36/40);
+- the Critic findings of `e6fec04a0`: F2, F4, F5, F7, F8, F9 and F11, plus F1's D52 (2) part;
+- PF-34: the Critic review unit is registered with the feature package, and
+  `register-feature-package.mjs --add-review-unit` adds it to an existing manifest;
+- the Q12 trailer form `Dispatch: D<n> (elephant-exception)` (D55).
+Open:
+- Q1's close path and the first stage of the architecture map;
+- ceremonies C11+C3, C12, C13 and C6;
+- Full Verify, an ordinal-2 delta Critic from `e6fec04a0`, and PO acceptance.
+
 **Claude WSL session, 2026-10-19:** last pushed candidate `e6fec04a0` (checkpoint over the
 stamp `d52de6154`, version `0.7.0+<runner>.20261019205354.d99774b`), pushed to
 `origin/feat/sprint-alfred` with a signed approval. It replaces every candidate named below and

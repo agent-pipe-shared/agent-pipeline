@@ -26,7 +26,17 @@ by it. All three look environmental, but none is classified yet.
 | `hooks/guard-dispatch-native-worker.test.mjs` | GDW01 | Red on both; not yet read in detail |
 | `lib/model-family-host-store.test.mjs` | MFHS002-MFHS008, MFHS023, MFHS028 | The same nine cases fail on `e6fec04a0` (a separate worktree, 2026-10-20) and on the FB3 correction tree; MFHS002 reports `domain-transition-partial-effect-retained` from an asynchronous launch |
 | `scripts/session-cleanup-binding.test.mjs` | 39 of 64 | Identical on `e6fec04a0` and on the FB3 correction tree (2026-10-20). Every failing case binds through the public `bindOnboardingSessionCleanup`, which since D48 refuses outside a session-power-controlled invocation (`continuity current invocation required before binding`); the fixtures call it from a plain test process |
+| `lib/agy-final-return.test.mjs` | AFR18 | Identical on `e6fec04a0` (2026-10-20) |
+| `lib/model-family-invocation.test.mjs` | MFI012, MFI013 | Identical on `e6fec04a0` (2026-10-20) |
+| `lib/model-family-main-prelaunch.test.mjs` | MFMP003 | Identical on `e6fec04a0` (2026-10-20) |
+| `hooks/guard-dispatch-budget-checkpoint.test.mjs` | GDBC10 | Identical on `e6fec04a0` (2026-10-20) |
 | `scripts/push-release-flow-docs-contract.test.mjs` | three cases | Identical on `e6fec04a0` and on the FB3 correction tree (2026-10-20) |
+| `scripts/dispatch-authorship-verify.test.mjs` | the seven v3/v4 record cases ("v3 records bind authorship …" through "an honest T0 …") | Identical on `e6fec04a0` (2026-10-20) |
+| `scripts/session-critic-finalizer.test.mjs` | "findings emit REVIEW_FINDINGS and a root-authored record …" | Identical on `e6fec04a0` (2026-10-20) |
+| `skills/pipeline-start/pipeline-start-v3.test.mjs` | PSV04 | Identical on `e6fec04a0` (2026-10-20) |
+
+`scripts/repair-map.test.mjs` AC-4 was red on `e6fec04a0` too (`HGO-NONOVERRIDABLE-USER-CONFIG` had no
+probe and so no row); it is fixed by a probe for `pipeline.user.yaml` (2026-10-20).
 
 Separately, `lib/native-goldfish-host-state.test.mjs` exceeds `run-quiet.mjs`'s 15-minute
 per-file timeout once NGHS37 is added. It is run with `scratch/run-long.mjs` (one hour).
