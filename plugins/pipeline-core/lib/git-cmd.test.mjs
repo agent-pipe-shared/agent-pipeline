@@ -1373,6 +1373,29 @@ const GREP_PINS_R2_DENY_TABLE = [
 ];
 recordQ12Table("GREP-PINS-R2: DENY", true, GREP_PINS_R2_DENY_TABLE);
 
+// ---- commandIsGitPush: redirect before the push word, nested quotes in a substitution, accepted false positives (AC-238) ----
+// Pins the residual shapes of the backlog item push-classifier-misses-nested-quotes-and-redirect-before-push. Every command text
+// is DATA handed to `commandIsGitPush`, never executed. Fail closed: a missed push is the failure, a false positive is accepted.
+const AC238_REDIRECT_BEFORE_PUSH_TABLE = [
+  ["git 2>&1 push origin main", "a fd-duplication redirect between git and the push word"],
+  ["git >out push origin main", "an output redirect between git and the push word"],
+  ["git <in push origin main", "an input redirect between git and the push word"],
+  ["git 2>&1 --config-env=x=y push origin main", "a redirect followed by a global option before the push word"],
+];
+recordQ12Table("AC238-REDIRECT-BEFORE-PUSH", true, AC238_REDIRECT_BEFORE_PUSH_TABLE);
+const AC238_NESTED_QUOTE_SUBSTITUTION_TABLE = [
+  ['echo "$(echo "a"; git push origin main)"', "inner double quotes would end the outer span early for a naive scanner, hiding the push statement"],
+  ['x="$(echo "a" && git push origin main)"', "the same nesting inside an assignment"],
+];
+recordQ12Table("AC238-NESTED-QUOTE-SUBSTITUTION", true, AC238_NESTED_QUOTE_SUBSTITUTION_TABLE);
+// ACCEPTED false positives: benign, but routed to the push gate by design (fail closed). Pinned so a later narrowing is a
+// deliberate decision, not a silent behaviour change.
+const AC238_ACCEPTED_FALSE_POSITIVE_TABLE = [
+  ['git diff "$(git merge-base HEAD main)"', "ACCEPTED false positive: git diff with a substituted merge-base"],
+  ["git commit -m \"$(cat <<'EOF'\nfix: explain the git push gate\nEOF\n)\"", "ACCEPTED false positive: heredoc commit message inside a quoted substitution containing a boundary git word"],
+];
+recordQ12Table("AC238-ACCEPTED-FP", true, AC238_ACCEPTED_FALSE_POSITIVE_TABLE);
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
