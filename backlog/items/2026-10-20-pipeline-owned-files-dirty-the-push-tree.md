@@ -35,3 +35,11 @@ refuse:
 - The guard-override log is written under `.git/agent-pipeline/` and no longer into the
   tracked tree. A log already in the tree is still read.
 - Tests cover a queue written after `push-init` and a log after a signed push.
+
+## Implementation state (2026-10-20)
+
+Implementation complete, PO acceptance pending (the PO's local test of the next candidate). The
+refusals name `scripts/commit-pipeline-owned.mjs` (`--agent` or `--human`), and since ceremony C13
+(`7a7ccceae`, doc follow-up `8b23eecce`) `hooks/guard-git.mjs` writes the override ledger through
+`lib/guard-override-ledger.mjs` under the common Git directory, still reading a tree ledger an older
+build left. The item stays open until the PO accepts it.
