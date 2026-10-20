@@ -1,0 +1,1957 @@
+{
+ "base": "98b6e5ca2",
+ "unmappedCommits": [
+  {
+   "sha": "c2817beda",
+   "subject": "fix(pipeline-core): rewrite Antigravity hook wiring that points into a removed managed copy",
+   "dispatch": [
+    "ALF-AGY5-DANGLING-HOOK-WIRING"
+   ]
+  },
+  {
+   "sha": "cdf72aa2f",
+   "subject": "chore(pipeline-core): stamp the 0.7.0 Alfred local test candidate for c2817be",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f20386edb",
+   "subject": "docs(state): record PO decisions D16 and D17, one bundled candidate and the GG-11 admission",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e6948f433",
+   "subject": "docs(state): record PO decision D18, no new candidate until the PO calls for one",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "801ce9e22",
+   "subject": "fix(pipeline-core): let the git guard stage env templates and test fixtures",
+   "dispatch": [
+    "ALF-PF27-GG11-ENV-TEMPLATES"
+   ]
+  },
+  {
+   "sha": "b5c14e8fe",
+   "subject": "docs(state): record Elephant decision D19, the keyless Claude launch takes the SubagentStop route",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d7fd3602f",
+   "subject": "docs(state): record PO decision D20, every 0.7.0 item's open agent work is finished",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "aabfd86c9",
+   "subject": "docs(backlog): record three medium and low findings of the second greenfield report",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "04b880329",
+   "subject": "chore(backlog): reconcile the ledger for three new items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "88762718c",
+   "subject": "docs(state): record PO decisions D21 to D26 on the open item decisions of the delivery matrix",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e22deebda",
+   "subject": "docs(sprint-alfred-epic): collect the pending PO ceremonies in one list",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b01df8eb0",
+   "subject": "fix(pipeline-core): let a keyless Claude Goldfish launch take the SubagentStop completion route",
+   "dispatch": [
+    "ALF-PF26B-BACKGROUND-GOLDFISH-COMMIT"
+   ]
+  },
+  {
+   "sha": "52a821272",
+   "subject": "chore(backlog): reconcile the ledger for two new items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6d68c1d43",
+   "subject": "docs(sprint-alfred-epic): record the Elephant decisions delegated by D26",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b8ca8fada",
+   "subject": "chore(backlog): reconcile the ledger for two new items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a0f87d35f",
+   "subject": "fix(pipeline-core): name the typed reason when a native Goldfish preparation is refused",
+   "dispatch": [
+    "ALF-PF26C-SDC-AUTHORITY-CAUSE"
+   ]
+  },
+  {
+   "sha": "4735976be",
+   "subject": "docs(sprint-alfred-epic): record E11 on the PF-26 pin's slice-state expectation",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1f91f18a5",
+   "subject": "test(pipeline-core): pin the SubagentStop host commit of a background Claude Goldfish end to end",
+   "dispatch": [
+    "ALF-PF26E-PIN-DELIVERY"
+   ]
+  },
+  {
+   "sha": "a2a7ff619",
+   "subject": "docs(backlog): record the route-record path mismatch and the PF-26 pin registration ceremony",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f6e71163d",
+   "subject": "chore(backlog): reconcile the ledger for one new item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "51d7637e6",
+   "subject": "docs(sprint-alfred-epic): record the counted pin runs for the D20 items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d552fe1f2",
+   "subject": "docs(sprint-alfred-epic): record E12, AC-131 superseded by the retired readiness route",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "afd983716",
+   "subject": "docs(sprint-alfred-epic): add ceremony C4 for the protected pipeline-state suite",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d5d1abb32",
+   "subject": "test(pipeline-core): give the RC14C007 legacy-authority fixture its project identity",
+   "dispatch": [
+    "ALF-B2-AC226"
+   ]
+  },
+  {
+   "sha": "c972bc580",
+   "subject": "test(pipeline-core): ignore scratch/ in the quality-package fixtures and run the win32 admission seam here",
+   "dispatch": [
+    "ALF-B2-AC259"
+   ]
+  },
+  {
+   "sha": "8852637b5",
+   "subject": "docs(backlog): add the quality-package scratch drift to the own-artifacts drift item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9738cf3bd",
+   "subject": "test(pipeline-core): prove the aliased protected-baseline catalog refusal on every host",
+   "dispatch": [
+    "ALF-B3-AC178"
+   ]
+  },
+  {
+   "sha": "3bca6bab2",
+   "subject": "docs(sprint-alfred-epic): record the guard-lifecycle-ready red classification",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f3f98d75c",
+   "subject": "test(pipeline-core): run the AC-226 non-git inert case without an env override",
+   "dispatch": [
+    "ALF-B3-AC226"
+   ]
+  },
+  {
+   "sha": "70e2e724c",
+   "subject": "test(pipeline-core): retarget the retired design-course suites to the retirement contract",
+   "dispatch": [
+    "ALF-B2-RETIRED"
+   ]
+  },
+  {
+   "sha": "02725ddf3",
+   "subject": "docs(sprint-alfred-epic): record E13-E15 for the pipeline-state suite and file the dormant-tail gap",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "210ea9e11",
+   "subject": "chore(backlog): reconcile the ledger for the dormant-tail item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "dcc6e810c",
+   "subject": "docs(sprint-alfred-epic): record E16 for the guard suites and correct the C4 target",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "76beed502",
+   "subject": "test(pipeline-core): follow the owner-private shared-namespace mint in the readiness shared-parent case",
+   "dispatch": [
+    "ALF-B3-AC130"
+   ]
+  },
+  {
+   "sha": "ecaa2dc3d",
+   "subject": "test(pipeline-core): run the AC-103 export-consent denial case on every host",
+   "dispatch": [
+    "ALF-B3-AC103"
+   ]
+  },
+  {
+   "sha": "8ab992513",
+   "subject": "test(pipeline-core): give the model-family host-store fixtures a real initialised authority domain",
+   "dispatch": [
+    "ALF-B3-AC212"
+   ]
+  },
+  {
+   "sha": "713106862",
+   "subject": "test(pipeline-core): arm the override suite's post-arming cases by signature and the chat cases under a real pty",
+   "dispatch": [
+    "ALF-B3-HGO"
+   ]
+  },
+  {
+   "sha": "392f320ba",
+   "subject": "docs(sprint-alfred-epic): record E17 for the out-of-root native override target",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "df9c8d5e5",
+   "subject": "docs(sprint-alfred-epic): record E18 for the symlinked project root case",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "73dfd5a3d",
+   "subject": "chore(backlog): reconcile the ledger for the dormant-tail item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5632bf6d9",
+   "subject": "test(pipeline-core): retarget the plugin pipeline-state suite to the retired design route and its current gates",
+   "dispatch": [
+    "ALF-B4-AC150"
+   ]
+  },
+  {
+   "sha": "07a946996",
+   "subject": "test(pipeline-core): repair eight stale lifecycle-guard cases per E16",
+   "dispatch": [
+    "ALF-B3-AC197"
+   ]
+  },
+  {
+   "sha": "f13f69a7f",
+   "subject": "docs(sprint-alfred-epic): mark ceremony C4 ready with its prepared drop-in",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "18bfd534d",
+   "subject": "test(pipeline-core): execute the AC-270 POSIX hardening case and a simulated P2 case",
+   "dispatch": [
+    "ALF-B4-AC270"
+   ]
+  },
+  {
+   "sha": "2a51b7cdb",
+   "subject": "test(pipeline-core): keep the AC-111 first-start receipt inside the fixture home",
+   "dispatch": [
+    "ALF-B4-AC111"
+   ]
+  },
+  {
+   "sha": "de833b6b0",
+   "subject": "docs(sprint-alfred-epic): add a PO manual task for stray AGY receipts",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a37132a91",
+   "subject": "test(pipeline-core): replay the AC-189 chat-to-signature intake transition",
+   "dispatch": [
+    "ALF-B3-AC189"
+   ]
+  },
+  {
+   "sha": "b4ab07ce5",
+   "subject": "test(pipeline-core): give the CDPF046 terminal dispatch record its log entry",
+   "dispatch": [
+    "ALF-B4-AC142"
+   ]
+  },
+  {
+   "sha": "8647c23e2",
+   "subject": "docs(sprint-alfred-epic): record E19 to E22 from the fourth dispatch wave",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8981ea9b9",
+   "subject": "fix(pipeline-core): bind out-of-root native override targets to their own root (E17)",
+   "dispatch": [
+    "ALF-B4-HGO"
+   ]
+  },
+  {
+   "sha": "146d23641",
+   "subject": "test(pipeline-core): align the lifecycle-guard suite with its E16 verdicts",
+   "dispatch": [
+    "ALF-B4-AC197"
+   ]
+  },
+  {
+   "sha": "10819d460",
+   "subject": "fix(pipeline-core): name the next step when the Critic budget is spent (E20)",
+   "dispatch": [
+    "ALF-B5-AC142"
+   ]
+  },
+  {
+   "sha": "0dede37e1",
+   "subject": "docs(sprint-alfred-epic): record E23 for the model-family async lifetime",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a31afd823",
+   "subject": "test(pipeline-core): repair the stale po-human-approval examiners",
+   "dispatch": [
+    "ALF-B5-AC256"
+   ]
+  },
+  {
+   "sha": "9b99e00f4",
+   "subject": "test(pipeline-core): move eight HGO cases onto their current verdicts",
+   "dispatch": [
+    "ALF-B5-HGO"
+   ]
+  },
+  {
+   "sha": "44d06eb2d",
+   "subject": "test(pipeline-core): add a shared session-authority registry fixture",
+   "dispatch": [
+    "ALF-B5-MFF"
+   ]
+  },
+  {
+   "sha": "7ed07fc35",
+   "subject": "test(pipeline-core): give the MFI entry fixture a real authority checkout",
+   "dispatch": [
+    "ALF-B5-MFI"
+   ]
+  },
+  {
+   "sha": "be7c027c3",
+   "subject": "test(pipeline-core): classify an outside git -C status as a forbidden mutation",
+   "dispatch": [
+    "ALF-B6-AC197"
+   ]
+  },
+  {
+   "sha": "01ef64ece",
+   "subject": "docs(sprint-alfred-epic): collect PO questions on dispatch records and a ledger trace",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "75828e6ac",
+   "subject": "test(pipeline-core): keep the registry fixture's inputs out of a shared candidate's status",
+   "dispatch": [
+    "ALF-B6-MFF"
+   ]
+  },
+  {
+   "sha": "6e6ec10fb",
+   "subject": "fix(pipeline-core): reclassify a native override at consume from its recording vantage",
+   "dispatch": [
+    "ALF-B6-HGO"
+   ]
+  },
+  {
+   "sha": "13ff0433b",
+   "subject": "test(pipeline-core): run the reused-key trust-anchor setup in process",
+   "dispatch": [
+    "ALF-B6-AC189"
+   ]
+  },
+  {
+   "sha": "71b692e81",
+   "subject": "test(pipeline-core): pin the cross-repository apply_patch preflight",
+   "dispatch": [
+    "ALF-B7-HGO"
+   ]
+  },
+  {
+   "sha": "809148bc7",
+   "subject": "test(pipeline-core): publish the HGO disclosure index before sign-intent reads it",
+   "dispatch": [
+    "ALF-B7-AC256"
+   ]
+  },
+  {
+   "sha": "b6cbf1ee4",
+   "subject": "docs(sprint-alfred): record E24 and backlog the model-family settled phase",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d92874a11",
+   "subject": "test(pipeline-core): create the model-family runtime before the registry",
+   "dispatch": [
+    "ALF-B6-MFI"
+   ]
+  },
+  {
+   "sha": "54deacb82",
+   "subject": "fix(harness): allowlist the Class B source-only paths in the plugin tree",
+   "dispatch": [
+    "ALF-B7-CSP"
+   ]
+  },
+  {
+   "sha": "a646a5569",
+   "subject": "docs(sprint-alfred): record E25 and backlog the committed-bytes restore",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "90cd4405f",
+   "subject": "test(pipeline-core): restore owner access before the parent-mode fixture cleanup",
+   "dispatch": [
+    "ALF-B8-AC154"
+   ]
+  },
+  {
+   "sha": "5a48d330d",
+   "subject": "docs(sprint-alfred): record E26 and E27 and ceremony C6",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "19e454fd9",
+   "subject": "test(pipeline-core): retarget the reordering pin's CLI cases to the retirement",
+   "dispatch": [
+    "ALF-B9-AC149"
+   ]
+  },
+  {
+   "sha": "4239b0273",
+   "subject": "docs(sprint-alfred): mark ceremony C5 ready",
+   "dispatch": [
+    "ALF-B8-C5"
+   ]
+  },
+  {
+   "sha": "70a419084",
+   "subject": "test(pipeline-core): give the AGY family fixture an owned authority lifecycle",
+   "dispatch": [
+    "ALF-B7-MFF"
+   ]
+  },
+  {
+   "sha": "41bc64e82",
+   "subject": "docs(sprint-alfred): bind MFHS003, MFHS004 and CCH136 to E24",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "eb750b36d",
+   "subject": "test(pipeline-core): pin governance-scope's 23-callback completion policy",
+   "dispatch": [
+    "ALF-B9-AC218"
+   ]
+  },
+  {
+   "sha": "32829a645",
+   "subject": "fix(pipeline-core): refuse a passive read that reaches the skill tree through an alias",
+   "dispatch": [
+    "ALF-B8-AC147"
+   ]
+  },
+  {
+   "sha": "aa5c76af1",
+   "subject": "docs(sprint-alfred): record E28 and PO question Q3 for AC-147",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "afa446b8b",
+   "subject": "test(pipeline-core): drive the advisor answered route end to end in the AC-105 pin",
+   "dispatch": [
+    "ALF-B9-AC105"
+   ]
+  },
+  {
+   "sha": "58693aef2",
+   "subject": "test(pipeline-core): ignore /evidence/ in the approved-course fixture and pin the PO output",
+   "dispatch": [
+    "ALF-B10-AC264"
+   ]
+  },
+  {
+   "sha": "1ca801ed9",
+   "subject": "docs(sprint-alfred): record PO question Q4 for the AC-264 plan-readiness clause",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "bbf7da31a",
+   "subject": "test(pipeline-core): follow the review-economy refusals in CCH026/044 and isolate the signed critic fixture",
+   "dispatch": [
+    "ALF-B9-MFF"
+   ]
+  },
+  {
+   "sha": "6da486ab1",
+   "subject": "docs(sprint-alfred): record E29 for the AC-212 model-family test reds",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ce69474ef",
+   "subject": "docs(sprint-alfred): record E30 and backlog the cross-process reserved-member refusal",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9d7e08abe",
+   "subject": "docs(sprint-alfred): record E31 and bind MFHS023 to the cross-process backlog item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "bf8c28986",
+   "subject": "test(pipeline-core): retarget the onboarding design-approval cases to the review-receipt route",
+   "dispatch": [
+    "ALF-B13-ONB"
+   ]
+  },
+  {
+   "sha": "f54ff439e",
+   "subject": "test(pipeline-core): follow the fail-closed host-store refusals and retry the typed registry lock",
+   "dispatch": [
+    "ALF-B11-MFH"
+   ]
+  },
+  {
+   "sha": "44021266f",
+   "subject": "docs(sprint-alfred): record E32 and bind CADH001 and the readiness-host case to the E24 item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d197f213e",
+   "subject": "test(pipeline-core): run the Agy native dispatch cases under a controlled-method carrier",
+   "dispatch": [
+    "ALF-B11-AGY"
+   ]
+  },
+  {
+   "sha": "b92d23f93",
+   "subject": "docs(sprint-alfred): record E33, the measured registry wedge behind E24",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a1cd742de",
+   "subject": "test(pipeline-core): share one ephemeral signer per root across the design fixtures",
+   "dispatch": [
+    "ALF-B16-ONB"
+   ]
+  },
+  {
+   "sha": "738bc0387",
+   "subject": "fix(pipeline-core): refuse a missing native admission port before the authority lifecycle",
+   "dispatch": [
+    "ALF-E33-FIX"
+   ]
+  },
+  {
+   "sha": "387bddbf1",
+   "subject": "test(pipeline-core): give the same-session Agy consent case a stored consent and carrier",
+   "dispatch": [
+    "ALF-B12-AGY"
+   ]
+  },
+  {
+   "sha": "79732b923",
+   "subject": "test(pipeline-core): align four onboarding cases with the current staging and readiness contracts",
+   "dispatch": [
+    "ALF-B19-ONB"
+   ]
+  },
+  {
+   "sha": "73bc8f117",
+   "subject": "fix(pipeline-core): close the never-liftable kernel list over the receipt write guard",
+   "dispatch": [
+    "ALF-B20-GMWK"
+   ]
+  },
+  {
+   "sha": "7fc28f828",
+   "subject": "docs(sprint-alfred): record the PO's answers to Q1-Q4 as D27-D30",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e7de738e3",
+   "subject": "docs(backlog): add an item to find and split files too large for agents",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5f8922b2e",
+   "subject": "docs(sprint-alfred): record the 0.7.0 coverage gaps as the tracked work list",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5b160f2f8",
+   "subject": "test(harness): retarget pipeline-state.test to the current fixture and plan contracts (C4)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6609dfc5c",
+   "subject": "docs(sprint-alfred): mark ceremony C4 done and record its route",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4ea2b4031",
+   "subject": "feat(roles): add EL-36/EL-37/EL-38 and mark --by as a label, not authority (G9b)",
+   "dispatch": [
+    "ALF-B23-G9B"
+   ]
+  },
+  {
+   "sha": "048892945",
+   "subject": "docs(sprint-alfred): track the fixture-escape incident fixes and the G9 outcome",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9ba051ce5",
+   "subject": "docs(sprint-alfred): record the PO's answers on G6 and the test base as D31-D32",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "fb99d8f62",
+   "subject": "docs(sprint-alfred): record the PO's answers on G9c, G7, E3 and scope as D33-D36",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0a392f6a7",
+   "subject": "docs(sprint-alfred): bring the coverage-gaps list in line with D31-D36",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0507cc9ea",
+   "subject": "docs(adr): draft PO acceptance points that hold only their dependent slices (D33)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "030a6111f",
+   "subject": "docs(licensing): state a 0 EUR price today instead of a vague future-fee outlook (D36)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "afe20cc0d",
+   "subject": "docs(sprint-alfred): move the restricted-put fix after 0.7.0 (D37)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ce86fc0c0",
+   "subject": "test(pipeline-core): refuse governance-scope fixtures that resolve into an enclosing checkout",
+   "dispatch": [
+    "ALF-B24-FIXESC3"
+   ]
+  },
+  {
+   "sha": "38b3b8a65",
+   "subject": "docs(sprint-alfred): record E34, the AC-245 dispositions",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a71e3cbae",
+   "subject": "docs(sprint-alfred): record E35 and the bundled pipeline-state ceremony C7-C9",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ee3148bc3",
+   "subject": "fix(pipeline-core): honour GIT_CEILING_DIRECTORIES in production Git discovery",
+   "dispatch": [
+    "ALF-B26-CEILING"
+   ]
+  },
+  {
+   "sha": "203a53687",
+   "subject": "docs(templates): pass --role goldfish in the Goldfish Step 0 preflight (E34c)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "894b0d130",
+   "subject": "docs(sprint-alfred): close C9 as not needed and track three red guard-dispatch cases",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "66aacfc2e",
+   "subject": "test(pipeline-core): give the guard-dispatch fixture its authority files and an implement-tier Critic fill",
+   "dispatch": [
+    "ALF-B28-GD2"
+   ]
+  },
+  {
+   "sha": "096d6bd09",
+   "subject": "docs(sprint-alfred): record the guard-dispatch GD22/26/27 cause and fix in the delivery matrix",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7c2d7c6fc",
+   "subject": "feat(pipeline-core): inspect whether a governed Spec can be handed off to item delivery (D30)",
+   "dispatch": [
+    "ALF-B27-D30B"
+   ]
+  },
+  {
+   "sha": "580617c29",
+   "subject": "docs(sprint-alfred): record the D30 plan-readiness lib delivery in the delivery matrix",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4f78a22ed",
+   "subject": "docs(sprint-alfred): record D38, an interim stamped local install for the ceremonies",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d4b1a2796",
+   "subject": "chore(pipeline-core): stamp an interim 0.7.0 Alfred local install for 7c2d7c6",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d233987f9",
+   "subject": "test(pipeline-core): expect git add .env.example to be allowed (D17)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2094014d8",
+   "subject": "test(pipeline-core): arm the post-arming override cases by signature (E16)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4beefe5c4",
+   "subject": "docs(sprint-alfred): record C1 and C5 done, D39, and the AGY re-test in the delivery matrix",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1cd2b131c",
+   "subject": "docs(sprint-alfred): record Q5, dispatches held on unrecorded integration",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d49a90ea2",
+   "subject": "docs(sprint-alfred): record Q5, dispatches held on unrecorded integration",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ad2bc72ed",
+   "subject": "docs(sprint-alfred): record D40a, superseded attempts released on commit evidence",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8ee52639f",
+   "subject": "feat(pipeline-core): release item dependencies on orchestrator commit evidence (D40)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0492a0dc9",
+   "subject": "docs(sprint-alfred): record Q6 and Q7, correct D40a on cancelled dependencies",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "75ad0b3e0",
+   "subject": "docs(sprint-alfred): record D40 dependency admission in the delivery matrix",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c830bd742",
+   "subject": "fix(pipeline-core): supersede only ready predecessors and pin D40 negative paths",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0605def03",
+   "subject": "chore(pipeline-core): stamp an interim 0.7.0 Alfred candidate for c830bd7",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d189539f7",
+   "subject": "docs(sprint-alfred): record Q5, dispatches held on unrecorded integration",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f8183d643",
+   "subject": "docs(sprint-alfred): record the D40 Critic result and the interim stamp checkpoint",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "027075e41",
+   "subject": "chore(pipeline-state): fold pending push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6c9286765",
+   "subject": "chore(sprint-alfred): mark the interim 0.7.0 Alfred checkpoint",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "571253680",
+   "subject": "fix(pipeline-core): read dispatch commit evidence without a registry and name held dependencies (D40b, PF-41)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "65206a3ac",
+   "subject": "fix(pipeline-core): carry the Slice and Write scope lines in the dispatch skeleton (PF-42)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e3e294e8a",
+   "subject": "docs(sprint-alfred): record Q6 and Q7, correct D40a on cancelled dependencies",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "84c4b06e4",
+   "subject": "chore(pipeline-core): stamp an interim 0.7.0 Alfred candidate for 65206a3",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "22e228112",
+   "subject": "chore(pipeline-state): fold pending push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6e6a63d50",
+   "subject": "chore(sprint-alfred): mark the interim 0.7.0 Alfred checkpoint",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "15576d49c",
+   "subject": "fix(pipeline-core): create the session-authority registry on the first item dispatch (D44, PF-48)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "45d730a4d",
+   "subject": "fix(pipeline-core): show the queue-preparation refusal reason and the binding drift repair (PF-47)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f4463934b",
+   "subject": "docs(sprint-alfred): record D44, the registry and refusal-reason priority-0 fixes",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "29b3ccef3",
+   "subject": "chore(pipeline-core): stamp an interim 0.7.0 Alfred candidate for 45d730a",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "221947f56",
+   "subject": "chore(pipeline-state): fold pending push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1f978d382",
+   "subject": "chore(sprint-alfred): mark the interim 0.7.0 Alfred checkpoint",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7dfe301fe",
+   "subject": "fix(pipeline-core): cancel a never-started slice and refuse a held dependency before the queue is written (PF-45, D45)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "bc5afc4c6",
+   "subject": "fix(pipeline-core): refuse a dispatch binding that drifts from its governed queue row (PF-47, D45)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2b7dccfc6",
+   "subject": "fix(pipeline-core): name the recommended recovery and the swallowed apply failure (PF-44, D45)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c8e365b2a",
+   "subject": "docs(sprint-alfred): record D45 and Q8, the queue-cancel and Critic-correction fixes",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d59c050ad",
+   "subject": "chore(pipeline-core): stamp an interim 0.7.0 Alfred candidate for 2b7dccf",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e18fd3cc4",
+   "subject": "chore(sprint-alfred): mark the interim 0.7.0 Alfred checkpoint for 2b7dccf",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "823dbb754",
+   "subject": "fix(pipeline-core): read commit evidence in the final pre-launch dependency check (PF-49, D46)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "677f8ec93",
+   "subject": "fix(pipeline-core): keep the Claude hook identity anchor out of cleanup recovery (PF-50, D46)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "cea637fed",
+   "subject": "docs(sprint-alfred): record D46, the publish dependency check and the hook identity anchor fixes",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c4271f79f",
+   "subject": "chore(pipeline-core): stamp an interim 0.7.0 Alfred candidate for 677f8ec",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "88ab5aeca",
+   "subject": "chore(pipeline-state): fold pending push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4873d97a0",
+   "subject": "chore(sprint-alfred): mark the interim 0.7.0 Alfred checkpoint for 677f8ec",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5de3033fe",
+   "subject": "fix(pipeline-core): stop the override journals from blocking item dispatch at 1 MiB (PF-51, D47)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "24aea3630",
+   "subject": "fix(pipeline-core): migrate the session-authority catalogue after a plugin update (PF-52, D48)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8484bf193",
+   "subject": "docs(sprint-alfred): record D47 and D48, the journal bound and the catalogue migration",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "fd34afe30",
+   "subject": "fix(pipeline-core): check a rebound session-authority registry against its producers (PF-52, D48)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "81340fbcf",
+   "subject": "fix(pipeline-core): stop retired override artifacts and a shared run directory from blocking the registry (PF-53, D49)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "133e0481a",
+   "subject": "docs(sprint-alfred): record D49, the follow-up blockers found by the live run on this repository",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "39d6cadf5",
+   "subject": "docs(sprint-alfred): state what D48 builds and open Q9 on the rebind and the EL-01 exception",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d5686dc17",
+   "subject": "fix(pipeline-core): make sweep-requests work at the inventory bound and mark every migration (Critic F2, F7, F9)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8848a4036",
+   "subject": "chore(pipeline-core): stamp an interim 0.7.0 Alfred candidate for d5686dc",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3b0671e7e",
+   "subject": "chore(pipeline-state): fold pending push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c27576438",
+   "subject": "chore(sprint-alfred): mark the interim 0.7.0 Alfred checkpoint for d5686dc",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e137ecbc4",
+   "subject": "docs(backlog): record that a push leaves the next item dispatch refused",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5c0307184",
+   "subject": "chore(pipeline-state): fold pending push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ef3dc439d",
+   "subject": "docs(backlog): record PF-54 and the live rebind fault",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b5ea9ea3e",
+   "subject": "docs(sprint-alfred): record D50, the drifted registry that blocks every dispatch, and open Q10",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9131ad24f",
+   "subject": "docs(sprint-alfred): record D51, the PO's answers to Q10",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8d58767ae",
+   "subject": "docs(sprint-alfred): record D52, late session binding and a general authority repair",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f52d20a12",
+   "subject": "fix(pipeline-core): heal a registry namespace that changed outside it (PF-55, D51)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d769449e8",
+   "subject": "fix(pipeline-core): match a legacy override member by its source after a commit (PF-55)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e64562c6a",
+   "subject": "fix(pipeline-core): release settled reservations and name a repair for every authority refusal (PF-55)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7f6004233",
+   "subject": "docs(sprint-alfred): record E36 and the gaps PF-55 leaves open",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "cfcd01b6f",
+   "subject": "test(pipeline-core): pin a State route that runs while a registry catalogue exists (PF-54)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "426e4afbe",
+   "subject": "fix(pipeline-core): run unadopted State routes while a registry catalogue exists (PF-54)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "dbbe0c585",
+   "subject": "docs(sprint-alfred): record D53 and the PF-54 ceremony",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5bbe8be71",
+   "subject": "chore(pipeline-core): stamp a 0.7.0 Alfred candidate for dbbe0c5",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "978ed05aa",
+   "subject": "chore(sprint-alfred): mark the 0.7.0 Alfred checkpoint for dbbe0c5",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d99774b17",
+   "subject": "fix(pipeline-core): keep a settled foreign slice's commit known to a concurrent host commit (PF-55)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d52de6154",
+   "subject": "chore(pipeline-core): stamp a 0.7.0 Alfred candidate for d99774b",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e6fec04a0",
+   "subject": "chore(sprint-alfred): mark the 0.7.0 Alfred checkpoint for d99774b",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d28b77b44",
+   "subject": "docs(state): record the pushed 0.7.0 Alfred candidate e6fec04a0",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "851bc4f78",
+   "subject": "docs(sprint-alfred): record D54, a repairable session binding and autonomous work",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ff362e352",
+   "subject": "docs(sprint-alfred): record the unbound scratch binding, E37, Q11 and C11",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "34835cc8e",
+   "subject": "fix(pipeline-core): bind the session's scratch descriptor and let heal repair it (D54)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "21e3a466b",
+   "subject": "docs(sprint-alfred): record the PF-54/PF-55 Critic FAIL and its disposition",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a4a345044",
+   "subject": "docs(sprint-alfred): record D55, D56 and the triage of report 03",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "077305363",
+   "subject": "fix(pipeline-core): count an AGY reservation as started and print runnable repairs",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4dd82e715",
+   "subject": "fix(pipeline-core): never let an orphaned registry lock block for good",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "62a8e2719",
+   "subject": "fix(pipeline-core): check the checkpoint lane before signing, name the owned-file commit",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1c3b2b096",
+   "subject": "fix(pipeline-core): leave no state behind a refused dispatch, name every repair",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4457e2680",
+   "subject": "test(pipeline-core): pin the legacy override branches and the rebind that keeps them",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "290b19d54",
+   "subject": "docs(sprint-alfred): record Q13, ceremony C13 and the pre-existing reds",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "cf658960c",
+   "subject": "fix(pipeline-core): register the Critic review unit with the feature package",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "00ef3108d",
+   "subject": "feat(pipeline-core): declare a recorded EL-01 exception in the Dispatch trailer",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f0789bbd4",
+   "subject": "fix(pipeline-core): give the user-configuration refusal its repair-map row",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "71f67dab7",
+   "subject": "docs(pipeline-core): resync the vendored push and release flow",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "154909d8e",
+   "subject": "docs(sprint-alfred): record the 2026-10-20 build state and the pre-existing reds",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8ed2def1f",
+   "subject": "feat(pipeline-core): check the architecture map over the tracked tree",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c0c40c312",
+   "subject": "chore(backlog): reconcile the ledger for eighteen items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3b3b37aac",
+   "subject": "docs(architecture): regenerate the overview from the current map",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "40c74a01e",
+   "subject": "feat(pipeline-core): accept a commit-recorded slice at close only on the audit route",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "455b4af21",
+   "subject": "test(pipeline-core): give the close audit fixture its generic Critic batch",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b5a346a27",
+   "subject": "docs(sprint-alfred): record Q1, the boundary check and the fixed reds",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f62b5143a",
+   "subject": "chore(backlog): reconcile the ledger for one new item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a4ff03f8e",
+   "subject": "docs(sprint-alfred): record the ordinal-2 Critic FAIL and its disposition",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "756b32621",
+   "subject": "fix(pipeline-core): report each course slice's authorship record at close",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ad638524a",
+   "subject": "fix(pipeline-core): let the caller state who commits the Pipeline's own files",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ff0d7f552",
+   "subject": "test(pipeline-core): keep the push-prepare suite inside its line ratchet",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0ce02d25f",
+   "subject": "chore(backlog): file four defects seen around the ordinal-2 Critic",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8b52ed2d2",
+   "subject": "chore(backlog): reconcile the ledger for four new items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "74a77e0e8",
+   "subject": "feat(pipeline-core): resolve the guard-override ledger outside the tree",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "73b552c02",
+   "subject": "chore(backlog): cite the stage-0 verifier item's Critic finding by ID only",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ff1e33de9",
+   "subject": "chore(backlog): regenerate the index after the source edit",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "254ff0002",
+   "subject": "docs(sprint-alfred): record ceremonies C12 and C13 as ready",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9a15050e3",
+   "subject": "fix(pipeline-core): make commit-pipeline-owned require --agent or --human",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b5b1ff6f8",
+   "subject": "test(pipeline-core): read the slim push refspec across a wrapped copy line",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4ecc69146",
+   "subject": "fix(pipeline-core): state that the ledger helper is not yet in effect",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "03887dbaf",
+   "subject": "chore(backlog): file the Critic diagnostic's shared test context",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "44ef2d584",
+   "subject": "chore(backlog): reconcile the ledger for the Critic diagnostic item",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "c61eece26",
+   "subject": "docs(sprint-alfred): record the ordinal-3 Critic and its disposition",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0809f8b56",
+   "subject": "docs(templates): tell a Claude dispatch to leave run_in_background out",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c1bdbe0db",
+   "subject": "test(pipeline-core): pin that a killed lock holder does not block the next launch",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4bbb98172",
+   "subject": "chore(backlog): record the registry-lock measurement",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "73c889ad6",
+   "subject": "chore(harness): register three suites in Full Verify (ceremonies C11, C3, C14)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "21fba99dc",
+   "subject": "fix(pipeline-core): refuse a missing State producer record like an unreadable one (ceremony C12)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7a7ccceae",
+   "subject": "feat(pipeline-core): write the guard-override ledger outside the tree (ceremony C13)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "95e72d304",
+   "subject": "docs(sprint-alfred): record the PO's decisions of 2026-10-20 (D57)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e3902a6fb",
+   "subject": "feat(pipeline-core): let session-authority-repair take over another session's slices",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8b23eecce",
+   "subject": "docs(pipeline-core): describe the guard-override ledger outside the tree",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e779200cf",
+   "subject": "docs: regenerate the enforcement page for the SubagentStop hook",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "23bf086a0",
+   "subject": "chore(backlog): record the implementation state of the Pipeline-owned files item",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "530f7bfb9",
+   "subject": "docs(sprint-alfred): record the landed ceremonies and the open steps",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2efb70679",
+   "subject": "fix(pipeline-core): keep the Controller entry out of the guard facade's exports (ceremony C6)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9dda09720",
+   "subject": "fix(pipeline-core): admit the bootstrap's resume-hint read in every lifecycle state (ceremony C2)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5aa832989",
+   "subject": "chore(backlog): file the guard-git test's line bound",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "9241d9276",
+   "subject": "chore(backlog): reconcile the ledger for the guard-git line-bound item",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "a8ddf85e5",
+   "subject": "docs(sprint-alfred): record C6, C2 and the PO's call for the candidate (D58)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9ad53b50f",
+   "subject": "chore(pipeline-core): stamp a 0.7.0 Alfred candidate for a8ddf85",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6af32708d",
+   "subject": "chore(sprint-alfred): mark the 0.7.0 Alfred checkpoint for a8ddf85",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c46c95325",
+   "subject": "chore(pipeline-state): fold pending push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2cd1deca2",
+   "subject": "chore(sprint-alfred): mark the 0.7.0 Alfred checkpoint for a8ddf85",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4a41c374b",
+   "subject": "chore(pipeline-state): fold pending push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0913fa941",
+   "subject": "chore(sprint-alfred): mark the 0.7.0 Alfred checkpoint for a8ddf85",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d065cf347",
+   "subject": "chore(backlog): file the checkpoint fold that lands above the checkpoint",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "480c3f360",
+   "subject": "chore(backlog): reconcile the ledger for the checkpoint fold item",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "9f9c1a456",
+   "subject": "docs(state): record the pushed 0.7.0 Alfred candidate 0913fa941",
+   "dispatch": [
+    "stage-0"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "itemId": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject (8869464c2 and 0b06f4092 concern the registry and producer, not nul files). Baseline kept: both clauses covered but no counted pass result is stated.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: only the structural observe call is pinned.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: explicit override retention is still not shown.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 changes the matrix wall-time clause (fixture-isolation commits like ad326d4cd concern a different suite). Baseline kept: the wall-time skip remains.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: criteria 1-3 pinned, criterion 4 deferred.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 states a counted green result for this item (d621b2871 and 765caa121 touch Critic close gate and finalizer, not the model-tier acceptance). Baseline kept: triage still lists open points.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since 76fe529b3 changes the picture. Baseline kept (clause coverage with negatives and RED mirror).",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+   "stageBaseline": "50",
+   "reasonBaseline": "dacf773b6 is docs-only: it folds an AGY serial-packages finding into the item, adding open scope; no counted green result and restart-liveness is not implemented. Baseline kept.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: the /etc/shadow clause remains a typed skip.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: real hook entrypoints pinned for git fixtures, non-git skipped.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 states a counted result for this item (8e0b276a9 rebinds plan approval on another device, a different clause). Baseline kept: no counted result.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: all four bullets mapped but no counts.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: no clause can be shown qualified.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since 76fe529b3 changes the picture. Baseline kept: 13 tests, 12 pass, 1 POSIX-only skip (29984e731, 31bd8c354).",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: seam and NOT_SECURE refusal pinned, skip and missing counts remain.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: 179240f81 pin (27 pass, one typed host skip), AC-232 has no public original and S1-S8 awaits PO release.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.project-resource-budget-headroom-is-not-reported",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: no counted result stated for the A5-A7 pin and verify wiring.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since 76fe529b3 changes the picture. Baseline kept: 105ed7b74 pin GREEN 7/7 with the fix a90869af9 in history.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.push-classifier-deny-list-does-not-converge",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject (ef3278d58 admits non-push git commands with shell markers, a different clause with no count here). Baseline kept: no pass count for 5c8fb499d.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since 76fe529b3 changes the picture. Baseline kept: 19/19 GREEN pin.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: shapes pinned without counts.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: no count for the item.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: most original clauses still held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: skips and lanes remain.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.readiness-input-omits-current-advisor-observation",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: 6 green, 3 clauses are typed skips.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: output classes pinned, native clause held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: only the typed-unsafe clause is pinned.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 76fe529b3 touches this item's subject. Baseline kept: route retired, surviving observer 5 green, 2 skips.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+   "stageBaseline": "50",
+   "reasonBaseline": "0ac30fb44 is docs-only and adds finding P1-1 (Goldfish given an Elephant action) to the item; no code or test change. Baseline kept: pinned 9/9, point 2b held.",
+   "mappedCommits": [
+    {
+     "sha": "b59e44303",
+     "subject": "feat(pipeline-core): withhold coordinator actions from a Goldfish or Critic preflight"
+    }
+   ]
+  }
+ ]
+}
