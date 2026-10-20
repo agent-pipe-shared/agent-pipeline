@@ -35,8 +35,13 @@ by it. All three look environmental, but none is classified yet.
 | `scripts/session-critic-finalizer.test.mjs` | "findings emit REVIEW_FINDINGS and a root-authored record …" | Identical on `e6fec04a0` (2026-10-20) |
 | `skills/pipeline-start/pipeline-start-v3.test.mjs` | PSV04 | Identical on `e6fec04a0` (2026-10-20) |
 
-`scripts/repair-map.test.mjs` AC-4 was red on `e6fec04a0` too (`HGO-NONOVERRIDABLE-USER-CONFIG` had no
-probe and so no row); it is fixed by a probe for `pipeline.user.yaml` (2026-10-20).
+Fixed on 2026-10-20, each red on `e6fec04a0` too:
+- `scripts/repair-map.test.mjs` AC-4: `HGO-NONOVERRIDABLE-USER-CONFIG` had no probe and so no row; a
+  probe for `pipeline.user.yaml` adds it.
+- `scripts/module-inventory.test.mjs` "generated architecture overview": `architecture/map/overview.html`
+  was stale; regenerated.
+- `scripts/close-coordinator-audit-lifecycle.test.mjs`, all eight cases: the fixture registered no generic
+  Critic batch, which the session finalizer requires; it now does.
 
 Separately, `lib/native-goldfish-host-state.test.mjs` exceeds `run-quiet.mjs`'s 15-minute
 per-file timeout once NGHS37 is added. It is run with `scratch/run-long.mjs` (one hour).

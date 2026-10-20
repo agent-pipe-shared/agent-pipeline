@@ -34,10 +34,17 @@ Built, not accepted:
 - the Critic findings of `e6fec04a0`: F2, F4, F5, F7, F8, F9 and F11, plus F1's D52 (2) part;
 - PF-34: the Critic review unit is registered with the feature package, and
   `register-feature-package.mjs --add-review-unit` adds it to an existing manifest;
-- the Q12 trailer form `Dispatch: D<n> (elephant-exception)` (D55).
+- the Q12 trailer form `Dispatch: D<n> (elephant-exception)` (D55);
+- Q1 (D27/D55): a course slice recorded only by its orchestrator commit is accepted at close on the
+  audit route only (`CLOSE-AUTHORSHIP-COMMIT-ONLY` otherwise). This sprint's own close therefore
+  runs `feature-close-prepared` with `--audit-request` and `--critic-verify-lifecycle`;
+- FB3-PF-54 first stage (D56 (1)): `architecture-boundary-check.mjs` over the tracked tree with
+  `architecture/boundary-policy.json` (pass here, 115 accepted entries), and the module facts in the
+  briefing skeleton;
+- the backlog check is valid again (nine item types, eighteen ledger entries), and four suites red on
+  `e6fec04a0` are fixed (repair-map AC-4, the architecture overview, the close audit lifecycle).
 Open:
-- Q1's close path and the first stage of the architecture map;
-- ceremonies C11+C3, C12, C13 and C6;
+- ceremonies C11+C3+C14 (one registration ceremony), C12, C13 and C6;
 - Full Verify, an ordinal-2 delta Critic from `e6fec04a0`, and PO acceptance.
 
 **Claude WSL session, 2026-10-19:** last pushed candidate `e6fec04a0` (checkpoint over the
