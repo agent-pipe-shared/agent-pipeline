@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
-import { planVerifySelection } from "../lib/verify-selection.mjs";
+import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { finishFeature } from "./finish-feature.mjs";
 
@@ -38,13 +38,35 @@ function fixture(t) {
   mkdirSync(join(ROOT, "scratch/test-tmp"), { recursive: true });
   const root = mkdtempSync(join(ROOT, "scratch/test-tmp/close-audit-lifecycle-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const [path, text] of [["specs/audit-feature/prd.md", "# PRD\n"], ["specs/audit-feature/spec.md", "# Spec\n"], ["specs/audit-feature/result.md", "# Result\n"], ["evidence/close.txt", "close\n"], ["docs/state.md", "# State\n"]]) put(root, path, text);
+  // A non-feature session Critic needs a generic batch over a review unit committed at the base.
+  const reviewUnit = { schema: "pipeline.critic-review-unit.v1", kind: "related-fixes", purpose: "Close the audit feature as one delivery",
+    specPath: "specs/audit-feature/spec.md", logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"],
+    deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null };
+  for (const [path, text] of [["specs/audit-feature/prd.md", "# PRD\n"], ["specs/audit-feature/spec.md", "# Spec\nAC-1 AC-2\n"], ["specs/audit-feature/result.md", "# Result\n"], ["specs/review-unit.json", JSON.stringify(reviewUnit)], ["evidence/close.txt", "close\n"], ["docs/state.md", "# State\n"]]) put(root, path, text);
   mkdirSync(join(root, ".claude"));
-  git(root, ["init", "-q"]); git(root, ["add", "."]); git(root, ["commit", "-qm", "base"]);
+  git(root, ["init", "-q", "-b", "main"]); git(root, ["add", "."]); git(root, ["commit", "-qm", "base"]);
+  const baseCommit = git(root, ["rev-parse", "HEAD"]);
   put(root, "specs/audit-feature/spec.md", "# Spec\nQualified candidate\n");
   put(root, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\n");
   git(root, ["add", "specs/audit-feature/spec.md", ".claude/pipeline.yaml"]);
-  git(root, ["commit", "-qm", "candidate"]);
+  git(root, ["commit", "-qm", "work"]);
+  const work = git(root, ["rev-parse", "HEAD"]);
+  // The authored record is committed between the base and the reviewed candidate, as the batch producer reads it.
+  put(root, "evidence/dispatch-record-close-audit-review.json", JSON.stringify({
+    schema: "pipeline.dispatch-record.v3", taskId: "close-audit-review",
+    agentType: "default", model: "gpt-5.6-luna", effort: "medium",
+    rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+    dispatcher: "elephant", outcome: "completed", commits: [work],
+    candidateCommit: work, resultSha256: h("a"), log: [{ phase: "verify", toolUseCount: 1 }],
+    report: { text: "done", changedFiles: ["specs/audit-feature/spec.md"] },
+    criticRequired: { schema: "pipeline.critic-required-decision.v1",
+      trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2,
+        riskClass: "high", riskFlag: true,
+        diff: { mechanical: false, architecture: false, guardrails: true, security: false } },
+      appliedRow: "T1" },
+  }));
+  git(root, ["add", "evidence/dispatch-record-close-audit-review.json"]);
+  git(root, ["commit", "-qm", "persist authored dispatch record"]);
   const candidate = { commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) };
   const prd = readFileSync(join(root, "specs/audit-feature/prd.md")); const spec = readFileSync(join(root, "specs/audit-feature/spec.md")); const result = readFileSync(join(root, "specs/audit-feature/result.md"));
   const verify = { schema: "pipeline.verify-evidence.v0", commit: candidate.commit, tree: candidate.tree, candidate, exitCode: 0, selection: planVerifySelection({ mode: "candidate", candidateCommit: candidate.commit, registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }) };
@@ -53,31 +75,17 @@ function fixture(t) {
   put(root, "specs/audit-feature/lifecycle.json", JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: "audit-feature", rigor: 1 }, state: "completed", artifacts, candidate, supersedes: null }));
   const common = git(root, ["rev-parse", "--git-common-dir"]);
   const criticPacketId = "1".repeat(32);
-  const baseCommit = git(root, ["rev-parse", "HEAD^"]);
   const criticDiagnostic = { schema: "pipeline.verify-evidence.v0", commit: candidate.commit,
     tree: candidate.tree, candidate, exitCode: 0,
     selection: planVerifySelection({ mode: "critic", baseCommit, candidateCommit: candidate.commit,
-      changedPaths: [".claude/pipeline.yaml", "specs/audit-feature/spec.md"],
+      changedPaths: [".claude/pipeline.yaml", "evidence/dispatch-record-close-audit-review.json", "specs/audit-feature/spec.md"],
       registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1",
         baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }),
     steps: [{ name: "test", exitCode: 0 }] };
   put(root, "evidence/critic-diagnostic.json", JSON.stringify(criticDiagnostic));
-  put(root, "evidence/dispatch-record-close-audit-review.json", JSON.stringify({
-    schema: "pipeline.dispatch-record.v3", taskId: "close-audit-review",
-    agentType: "default", model: "gpt-5.6-luna", effort: "medium",
-    rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
-    dispatcher: "elephant", outcome: "completed", commits: [candidate.commit],
-    candidateCommit: candidate.commit, resultSha256: h("a"), log: [],
-    report: { text: "done", changedFiles: ["specs/audit-feature/spec.md"] },
-    criticRequired: { schema: "pipeline.critic-required-decision.v1",
-      trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2,
-        riskClass: "high", riskFlag: true,
-        diff: { mechanical: false, architecture: false, guardrails: true, security: false } },
-      appliedRow: "T1" },
-  }));
   const review = { preflightInput: { root, base: baseCommit,
     candidate: candidate.commit, specPath: "specs/audit-feature/spec.md",
-    guardrailPaths: [], evidencePaths: ["evidence/critic-diagnostic.json"],
+    guardrailPaths: [".claude/pipeline.yaml"], evidencePaths: ["evidence/critic-diagnostic.json"],
     priorCriticEvidencePath: null }, taskId: "close-audit-review",
     projectId: "fixture", sessionId: "close-review-1", packetId: criticPacketId,
     route: { routeId: "session-critic", runner: "codex",
@@ -86,6 +94,14 @@ function fixture(t) {
     verdict: { findings: [], deliberately_not_flagged: ["fixture"],
       trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence",
       briefing_violations: [], pass: true } };
+  const controlRoot = join(root, common, "agent-pipeline", "critic-packets");
+  mkdirSync(controlRoot, { recursive: true, mode: 0o700 });
+  chmodSync(join(root, common, "agent-pipeline"), 0o700);
+  chmodSync(controlRoot, 0o700);
+  const batch = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: {
+    taskId: "close-audit-review", baseCommit, candidateCommit: candidate.commit, logicalWorkIds: ["AC-1", "AC-2"],
+    specPath: "specs/audit-feature/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
+  review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
   admitSessionCriticReview(review);
   finalizeSessionCriticReview(review);
   const lifecycle = recordCriticVerifyLifecycle({ gitCommonDir: join(root, common),
