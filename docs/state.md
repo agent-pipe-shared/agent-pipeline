@@ -2,6 +2,7 @@
 
 > Current public repository state. Durable decisions remain in the ADR register.
 > Previous state text is preserved as a public projection in the archive below.
+> Calibration: [`project/pipeline.json`](../project/pipeline.json) names this file as the handover.
 
 **Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
 Read these three files first, in this order, before any other work:
