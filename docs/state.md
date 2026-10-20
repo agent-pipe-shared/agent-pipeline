@@ -109,7 +109,13 @@ blockers and majors into AC-123, AC-155, AC-207 and AC-264; D65 and D66 decide e
 calls; C15 and C16 collect the protected registration changes for the bundled sitting. Estimate
 (not measured): 5-8 session days to the content-final candidate.
 Closures: M0 (measurements) and W1 (AC-142B, AC-224, AC-155A, implementation complete at
-`c578670d7`, Critic batch and PO acceptance pending) are closed; K1 is in progress.
+`c578670d7`, Critic batch and PO acceptance pending) are closed; K1 is in progress, with six
+interim measurement entries (last: 'K1 measurement 6'). D70 (lost-binding recovery, built at
+`d2602f5cf`/`5e5c7d8f2`, implementation complete) and D71 (the per-user session-power address root
+past its 4096-slot bound: 3769 stale test slots moved aside, product fix in this candidate) are in
+`po-decisions-2026-10-18.md`. Next in K1: the D71 fix (test isolation of the address root; a repair
+verb for the bound), the archive-orphan route's binding release (RF2A, decides which authorization
+may use the lost-binding route), D70 (b) legacy bytes, the binding-suite rest, K1f, K1g, closure.
 D69 / ADR-0088 (test economy): fast gate plus fresh full run, quarantine with owner and expiry,
 retire on supersede, ratchet, runtime budget; rules 3 and 4 apply in this candidate, the Verify
 rebuild follows 0.7.0 (`backlog/items/2026-10-20-verify-test-economy-rebuild.md`).
