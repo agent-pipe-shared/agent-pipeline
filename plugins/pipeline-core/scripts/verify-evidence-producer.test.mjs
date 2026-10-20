@@ -836,7 +836,8 @@ test("the CLI accepts --commit and reports the named commit", async () => {
     const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
     const result = spawnSync(process.execPath, [script, "--root", root, "--mode", "critic", "--base", first, "--commit", older, "--out", "evidence/cli-older.json"], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
-    const output = JSON.parse(result.stdout);
+    // Single-line progress events precede the pretty-printed result, whose first line is a lone "{".
+    const output = JSON.parse(result.stdout.slice(result.stdout.search(/^\{$/mu)));
     assert.equal(output.status, "passed");
     assert.deepEqual(output.candidate, { commit: older, tree: olderTree });
     assert.equal(JSON.parse(readFileSync(join(root, "evidence", "cli-older.json"), "utf8")).commit, older);
