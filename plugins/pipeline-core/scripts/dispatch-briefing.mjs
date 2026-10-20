@@ -30,7 +30,7 @@
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -47,6 +47,8 @@ import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/prote
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+import { loadMapBundle } from "./module-inventory.mjs";
+import { owningModules } from "./architecture-boundary-check.mjs";
 
 export const DISPATCH_BINDING_SCHEMA = "pipeline.dispatch-briefing.binding.v1";
 export const DISPATCH_REFUSAL_SCHEMA = "pipeline.dispatch-briefing.refusal.v1";
@@ -326,6 +328,32 @@ export function assertBindingInvariants(binding) {
   if (!delivery.ok) refuse("DBG-BINDING-INVALID", `item delivery is invalid: ${delivery.code}`);
 }
 
+/**
+ * FB3-PF-54 (D56 (1)): the architecture map's facts for the touched paths, one line per owning
+ * module, so a briefing names the boundary instead of leaving it to whoever writes the context.
+ * Prose only: no parser reads these lines, and no map is never a refusal.
+ */
+export function architectureContextLines(root, paths, loadMap = loadMapBundle) {
+  if (!existsSync(resolve(root, "architecture/map"))) return ["- Architecture: this project has no architecture map (`architecture/map`)."];
+  const bundle = loadMap(root);
+  if (!bundle.ok) return [`- Architecture: the map does not load (${bundle.errors.length} error(s)); \`architecture-boundary-check.mjs --root <root>\` names them.`];
+  const byModule = new Map();
+  const unowned = [];
+  for (const path of paths) {
+    const owners = owningModules(path, bundle.modules);
+    if (owners.length !== 1) { unowned.push(path); continue; }
+    if (!byModule.has(owners[0].id)) byModule.set(owners[0].id, { module: owners[0], paths: [] });
+    byModule.get(owners[0].id).paths.push(path);
+  }
+  const lines = [...byModule.values()].sort((a, b) => a.module.id.localeCompare(b.module.id)).map(({ module, paths: owned }) => {
+    const deps = module.allowedDependencies.length ? module.allowedDependencies.map((id) => `\`${id}\``).join(", ") : "none";
+    const contracts = module.publicContracts.length ? `; public contracts ${module.publicContracts.slice(0, 8).map((p) => `\`${p}\``).join(", ")}${module.publicContracts.length > 8 ? ` and ${module.publicContracts.length - 8} more` : ""}` : "";
+    return `- Architecture, module \`${module.id}\` (${owned.map((p) => `\`${p}\``).join(", ")}): ${module.responsibility.trim().replace(/\.?$/u, ".")} Imports only within the module or from: ${deps}${contracts}.`;
+  });
+  if (unowned.length) lines.push(`- Architecture: no single module owns ${unowned.map((p) => `\`${p}\``).join(", ")}; the boundary check reports such a source file until the map assigns it.`);
+  return lines;
+}
+
 /** Build the binding, its block and the skeleton from parsed options. Throws BriefingRefusal. */
 export function generateDispatchBinding(options, deps = {}) {
   const git = deps.git ?? defaultGit;
@@ -539,7 +567,7 @@ export function generateDispatchBinding(options, deps = {}) {
     block, "", NATIVE_GOLDFISH_HOST_DIRECTIVE, "",
     `## Briefing ${dispatchId}: {{TITLE}}`, "",
     "### 1. Goal", "", "{{GOAL}}", "",
-    "### 2. Context files", "", "{{CONTEXT_FILES}}", "",
+    "### 2. Context files", "", ...architectureContextLines(root, allowedPaths, deps.loadMapBundle), "", "{{CONTEXT_FILES}}", "",
     "### 3. DoD checks", "", "{{DOD_CHECKS}}", "",
     "### 4. Forbidden", "", "{{FORBIDDEN}}", "",
     "### 5. Stop conditions", "", "{{STOP_CONDITIONS}}", "",

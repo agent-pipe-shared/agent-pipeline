@@ -1,0 +1,703 @@
+{
+  "schema": "pipeline.architecture-boundary-policy.v1",
+  "lineBound": 1000,
+  "excludedPaths": [
+    {
+      "pattern": "specs/**",
+      "reason": "feature package records (recorded evidence, design snapshots, sprint tooling); no product source"
+    },
+    {
+      "pattern": "backlog/evidence/**",
+      "reason": "recorded audit evidence; no product source"
+    }
+  ],
+  "exceptions": [
+    {
+      "rule": "over-line-bound",
+      "path": "harness/scripts/apply-pending-protected-edits.mjs",
+      "maxLines": 1690,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "harness/scripts/check-doc-contracts.test.mjs",
+      "maxLines": 1329,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "harness/scripts/guard-split-map.mjs",
+      "maxLines": 1001,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "harness/scripts/pipeline-state.test.mjs",
+      "maxLines": 5253,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "harness/scripts/validate-manifest.test.mjs",
+      "maxLines": 1776,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "harness/scripts/verify.mjs",
+      "maxLines": 1201,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "unowned-path",
+      "path": "install-agy.mjs",
+      "reason": "root installer entry point with no map module yet; mapping it is backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+      "maxLines": 1015,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+      "maxLines": 1468,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+      "maxLines": 1407,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/guard-devplan.test.mjs",
+      "maxLines": 1030,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "maxLines": 2101,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+      "maxLines": 2493,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
+      "maxLines": 1032,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/guard-git.mjs",
+      "maxLines": 1507,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/guard-git.test.mjs",
+      "maxLines": 1648,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "maxLines": 12344,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "maxLines": 2814,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/hooks/guard-push.test.mjs",
+      "maxLines": 2589,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/agy-central-snapshot.test.mjs",
+      "maxLines": 1054,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/backlog-state.mjs",
+      "maxLines": 1786,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/backlog-state.test.mjs",
+      "maxLines": 2112,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs",
+      "maxLines": 1177,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/codex-onboarding-runtime.test.mjs",
+      "maxLines": 1283,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "maxLines": 1491,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/continuity-state.test.mjs",
+      "maxLines": 1620,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "maxLines": 1061,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/design-consistency-check.test.mjs",
+      "maxLines": 1023,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/execution-lane-credential.mjs",
+      "maxLines": 1068,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/execution-lane-credential.test.mjs",
+      "maxLines": 1786,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/git-cmd.mjs",
+      "maxLines": 1463,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+      "maxLines": 1384,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/governance-event-store.mjs",
+      "maxLines": 1891,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/governance-event-store.test.mjs",
+      "maxLines": 1461,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+      "maxLines": 2070,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs",
+      "maxLines": 1821,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "maxLines": 1499,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "maxLines": 6804,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/human-guard-override.test.mjs",
+      "maxLines": 7282,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/interruption-receipts.test.mjs",
+      "maxLines": 1239,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs",
+      "maxLines": 1137,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "maxLines": 1434,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "maxLines": 1280,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/model-family-host-store.test.mjs",
+      "maxLines": 1102,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+      "maxLines": 1604,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+      "maxLines": 1047,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "maxLines": 12295,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "maxLines": 5351,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs",
+      "target": "harness/scripts/generate-agent-obligations.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs",
+      "target": "harness/scripts/pipeline-state.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs",
+      "target": "harness/scripts/check-doc-reader-binding.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs",
+      "target": "harness/scripts/doc-reader-terminal-binding.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/lib/pins/capability-inventory-checker-is-red-at-head.test.mjs",
+      "target": "harness/scripts/check-product-capability-inventory.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+      "maxLines": 1710,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/plan-spec-state-v2.test.mjs",
+      "maxLines": 1270,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/po-gate-authority.mjs",
+      "maxLines": 1032,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/lib/po-gate-authority.test.mjs",
+      "target": "harness/scripts/pipeline-state.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/po-gate-authority.test.mjs",
+      "maxLines": 1712,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/project-authority.mjs",
+      "maxLines": 1389,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs",
+      "maxLines": 1016,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "maxLines": 7807,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "maxLines": 10568,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/protected-test-paths.mjs",
+      "maxLines": 1108,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+      "maxLines": 1133,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+      "maxLines": 1295,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "maxLines": 1986,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "maxLines": 1390,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+      "maxLines": 3161,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs",
+      "maxLines": 1422,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "maxLines": 1651,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/slice-queue.mjs",
+      "maxLines": 1007,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "maxLines": 2367,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs",
+      "maxLines": 1938,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/lib/wsl-ipc-compatibility.mjs",
+      "maxLines": 1134,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+      "maxLines": 1260,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/check-backlog-state.mjs",
+      "maxLines": 1353,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/scripts/codex-advisory-bootstrap.test.mjs",
+      "target": "harness/scripts/security-readiness/tool-identity.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+      "maxLines": 2157,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs",
+      "maxLines": 3309,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/codex-critic-isolation.mjs",
+      "maxLines": 2577,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/codex-critic-isolation.test.mjs",
+      "maxLines": 1348,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/codex-host-repository-init.mjs",
+      "maxLines": 1246,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/codex-host-repository-init.test.mjs",
+      "maxLines": 1470,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs",
+      "maxLines": 1048,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/codex-sandbox-select.mjs",
+      "maxLines": 1143,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs",
+      "maxLines": 1111,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/scripts/document-hooks-manifest.test.mjs",
+      "target": "harness/scripts/validate-manifest.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/guard-human-override.test.mjs",
+      "maxLines": 1061,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/handover-rotate.test.mjs",
+      "maxLines": 1005,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/onboarding-init.mjs",
+      "maxLines": 1798,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+      "maxLines": 2342,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "maxLines": 2355,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs",
+      "maxLines": 2375,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "maxLines": 13810,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/pipeline-state.test.mjs",
+      "maxLines": 3044,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "maxLines": 2960,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+      "maxLines": 6108,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "maxLines": 1318,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs",
+      "maxLines": 1358,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs",
+      "maxLines": 1801,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "maxLines": 1159,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/push-prepare.test.mjs",
+      "maxLines": 1447,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs",
+      "target": "harness/scripts/check-doc-reader-binding.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/scratch-sweep.test.mjs",
+      "maxLines": 1171,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/security-scan.mjs",
+      "maxLines": 1189,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/security-scan.test.mjs",
+      "maxLines": 1977,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+      "maxLines": 3138,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+      "target": "harness/scripts/security-readiness/semgrep-readiness.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "forbidden-dependency",
+      "path": "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+      "target": "harness/scripts/security-readiness/tool-identity.mjs",
+      "reason": "a pipeline-core test drives a harness script, while the map admits only harness -> pipeline-core; backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/verify-journal.mjs",
+      "maxLines": 1368,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+      "maxLines": 2002,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "setup.mjs",
+      "maxLines": 1921,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "unowned-path",
+      "path": "setup.mjs",
+      "reason": "root installer entry point with no map module yet; mapping it is backlog (the-architecture-map-is-not-enforced)"
+    },
+    {
+      "rule": "over-line-bound",
+      "path": "setup.test.mjs",
+      "maxLines": 1402,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+    },
+    {
+      "rule": "unowned-path",
+      "path": "setup.test.mjs",
+      "reason": "root installer entry point with no map module yet; mapping it is backlog (the-architecture-map-is-not-enforced)"
+    }
+  ]
+}

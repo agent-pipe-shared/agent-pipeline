@@ -35,3 +35,23 @@ criterion.
 - A project without a map is reported `not-applicable`, never failed.
 - Later stage, not in this candidate: a dispatch route for cross-cutting quality or
   architecture work without a feature criterion.
+
+## Status (2026-10-20): first stage built, not accepted
+
+- `plugins/pipeline-core/scripts/architecture-boundary-check.mjs` walks `git ls-files` and applies
+  `unowned-path`, `ambiguous-ownership`, `forbidden-dependency` and `over-line-bound` (default
+  1000 lines). The bound, excluded trees and accepted exceptions live in
+  `architecture/boundary-policy.json`; a line-bound exception records `maxLines` and is a
+  ratchet, so a file that grows past it fails again. `--write-policy` writes a first policy that
+  accepts the current violations. The fitness evaluator, whose outcomes the rigor lifecycle binds
+  by digest, is unchanged.
+- The briefing skeleton (`dispatch-briefing.mjs`) names, under "Context files", the owning module
+  of the touched paths, its responsibility, its allowed dependencies and its public contracts.
+- Measured on this repository before any policy: 2630 source files, 910 violations (683
+  unowned, 674 of them under `specs/**` evidence; 215 over 1000 lines; 12 forbidden imports).
+  The committed policy excludes `specs/**` and `backlog/evidence/**` and accepts 115 entries:
+  101 line-bound ratchets, the root installers `install-agy.mjs`, `setup.mjs` and
+  `setup.test.mjs` with no map module yet, and 11 pipeline-core tests that import harness
+  scripts against the map's direction (harness -> pipeline-core only). Those 14 are follow-up
+  work for the map, not for the check.
+- Open: the suite registration and a Verify phase (ceremony C14).

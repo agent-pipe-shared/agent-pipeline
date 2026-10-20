@@ -236,6 +236,26 @@ test("the skeleton names the slice and write scope the item admission reads (PF-
   assert.deepEqual(named.writeScope, result.binding.allowedPaths);
 });
 
+test("the skeleton names the owning module, its allowed dependencies and contract for the touched paths (FB3-PF-54)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const without = runDispatchBriefing(argvOf(fx), depsOf(fx));
+  assert.equal(without.ok, true, JSON.stringify(without));
+  assert.match(without.skeleton, /### 2\. Context files\n\n- Architecture: this project has no architecture map/u);
+
+  const concept = (id, owned, deps, contracts) => `---\ntype: Governed Module\nid: ${id}\nresponsibility: Owns the ${id} code\nnonResponsibilities: []\nownedPaths:\n  - ${owned}\npublicContracts:${contracts.length ? `\n${contracts.map((c) => `  - ${c}`).join("\n")}` : " []"}\nallowedDependencies:${deps.length ? `\n${deps.map((d) => `  - ${d}`).join("\n")}` : " []"}\nauthorityEffects: []\nverificationEntryPoints: []\nadrReferences: []\n---\n`;
+  mkdirSync(join(fx.root, "architecture/map"), { recursive: true });
+  writeFileSync(join(fx.root, "architecture/map/index.md"), "# Map\n");
+  writeFileSync(join(fx.root, "architecture/map/x.md"), concept("x", "plugins/x/**", ["shared"], ["plugins/x/api.mjs"]));
+  writeFileSync(join(fx.root, "architecture/map/shared.md"), concept("shared", "shared/**", [], []));
+  const mapped = runDispatchBriefing(argvOf(fx, {}, ["--path", "tools/loose.mjs"]), depsOf(fx));
+  assert.equal(mapped.ok, true, JSON.stringify(mapped));
+  const field2 = mapped.skeleton.slice(mapped.skeleton.indexOf("### 2. Context files"), mapped.skeleton.indexOf("### 3. DoD checks"));
+  assert.match(field2, /- Architecture, module `x` \(`plugins\/x\/y\.mjs`, `plugins\/x\/y\.test\.mjs`\): Owns the x code\. Imports only within the module or from: `shared`; public contracts `plugins\/x\/api\.mjs`\./u);
+  assert.match(field2, /no single module owns `tools\/loose\.mjs`/u);
+  assert.ok(field2.includes("{{CONTEXT_FILES}}"), "the hand-authored context stays a placeholder");
+});
+
 test("a dispatch id that names a governed queue row must match its write scope, item and state (PF-47)", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();

@@ -179,7 +179,7 @@ export function loadMapBundle(rootDir = process.cwd(), schema = getModuleInvento
 /**
  * Matches a relative file path against a pattern like 'plugins/pipeline-core/**'
  */
-function pathMatchesPattern(relPath, pattern) {
+export function pathMatchesPattern(relPath, pattern) {
   const normalizedPath = relPath.replace(/\\/g, "/");
   const normalizedPattern = pattern.replace(/\\/g, "/");
 
