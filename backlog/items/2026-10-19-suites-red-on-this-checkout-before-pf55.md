@@ -10,7 +10,7 @@ sprint: none
 done_when: manual
 ---
 
-# Three suites red on this checkout before PF-55
+# Suites red on this checkout before PF-55
 
 ## Description
 
@@ -24,6 +24,9 @@ by it. All three look environmental, but none is classified yet.
 | `scripts/slice-queue.test.mjs` | SC15 | `validate` without `--queue` exits 3, not 2: the sandbox lies under this repository's `scratch/`, and this repository has an approved governed course, which the CLI resolves instead of reporting a usage error |
 | `lib/agy-session-dispatch.test.mjs` | "actual Agy S2 S4 S5 native callers …" | `MODEL-FAMILY-NATIVE-REQUEST-REFUSED` where the case expects `AGY-SESSION-FAMILY-RETURN-CONTRACT-UNQUALIFIED` |
 | `hooks/guard-dispatch-native-worker.test.mjs` | GDW01 | Red on both; not yet read in detail |
+| `lib/model-family-host-store.test.mjs` | MFHS002-MFHS008, MFHS023, MFHS028 | The same nine cases fail on `e6fec04a0` (a separate worktree, 2026-10-20) and on the FB3 correction tree; MFHS002 reports `domain-transition-partial-effect-retained` from an asynchronous launch |
+| `scripts/session-cleanup-binding.test.mjs` | 39 of 64 | Identical on `e6fec04a0` and on the FB3 correction tree (2026-10-20). Every failing case binds through the public `bindOnboardingSessionCleanup`, which since D48 refuses outside a session-power-controlled invocation (`continuity current invocation required before binding`); the fixtures call it from a plain test process |
+| `scripts/push-release-flow-docs-contract.test.mjs` | three cases | Identical on `e6fec04a0` and on the FB3 correction tree (2026-10-20) |
 
 Separately, `lib/native-goldfish-host-state.test.mjs` exceeds `run-quiet.mjs`'s 15-minute
 per-file timeout once NGHS37 is added. It is run with `scratch/run-long.mjs` (one hour).

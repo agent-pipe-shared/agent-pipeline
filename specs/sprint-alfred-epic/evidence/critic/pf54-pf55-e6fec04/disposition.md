@@ -19,7 +19,7 @@ finalizer receipt exists. The Critic was dispatched directly from
 
 | # | Severity | Disposition |
 |---|---|---|
-| F1 | major | Accepted. D52 (1)'s override and D52 (2)'s take-over route are built in this correction (D54 (2)). |
+| F1 | major | Accepted in part. D52 (1)'s late binding from the session's own identity is built (SAR05, and D54 (1) with SAR07). D52 (2) is built in this correction: every refusal from another session's binding names a runnable repair. D52 (1)'s override of a binding that another session holds is not built. Another Claude session's liveness cannot be observed, so the override could only rest on the caller's word, and that hands authority to another session. It goes to the PO as Q13. |
 | F2 | major | Accepted. A slice with an AGY reservation counts as started, so its cancel needs `--started`. |
 | F3 | major | Accepted as a lifecycle finding; no code can fix it. The PF-54 commits `cfcd01b6f` and `426e4afbe` were Elephant-built with no recorded EL-01 exception. Q11 now asks the PO to ratify them together with the D54 work. |
 | F4 | major | Accepted. A refusal after native preparation rolls back the native pending state and the reserved member, as it already rolls back the queue row. |

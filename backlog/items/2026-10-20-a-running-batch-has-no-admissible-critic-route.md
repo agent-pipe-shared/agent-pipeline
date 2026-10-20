@@ -34,6 +34,30 @@ artifact in the feature's genesis manifest. So course admission refuses
 `CCA-REVIEW-UNIT-REQUIRED` for every feature, not only for a running batch. A running feature
 cannot add it later, because the genesis manifest is fixed.
 
+Measured on 2026-10-20, read-only: two separate refusals.
+
+- `SCF-REVIEW-UNIT-REQUEST` comes from the registration request's schema:
+  `session-critic-finalizer.mjs` admits only `pipeline.critic-generic-batch-registration-request.v2`,
+  and `templates/prompts/critic-review.md` still documents `.v1`.
+- `CCA-REVIEW-UNIT-REQUIRED` comes from the manifest. The only production writer of
+  `specs/<feature>/lifecycle.json` is `registerFeaturePackage`
+  (`lib/feature-package-registration.mjs`), and it never adds the `design` entry for the review
+  unit. The topology admits a non-authority `design` artifact, but no route amends an existing
+  manifest.
+- The course's genesis base is the first review's base, not the commit that created the manifest
+  (`resolveRegisteredCriticCourseIdentity`). So a running feature with no retained Critic history
+  can still satisfy admission: commit the unit and its manifest entry, then review from that
+  commit. A feature that already has retained history keeps its genesis base, and only a change to
+  `lib/critic-course-admission.mjs` would help it.
+- None of these files is protected.
+
+Planned fix:
+
+1. `registerFeaturePackage` writes the review unit and its manifest entry for a new feature.
+2. A typed `register-feature-package.mjs --add-review-unit` route adds both to a running feature,
+   and names the commit that becomes the review base.
+3. The template names the `.v2` registration request.
+
 ## Acceptance
 
 - The review unit is created, or required with a named command, when a feature enters
