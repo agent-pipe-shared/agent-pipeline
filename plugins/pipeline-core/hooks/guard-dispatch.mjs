@@ -361,7 +361,7 @@ function briefingRouteWriteFault(fault, { admitted }) {
 /**
  * Records the route of each distinct slice the call admits, with origin "admission". Every slice is judged first
  * (nothing is written for a call any slice of which is refused); the writes then snapshot the prior bytes and restore
- * them if a later slice cannot be written. `{ ok: true, recorded }` or `{ ok: false, route }` (a typed
+ * them if a later slice cannot be written. `{ ok: true, recorded, undo }` or `{ ok: false, route }` (a typed
  * mismatch/invalid result, ready for briefingRouteRefusal). A slice already bound to exactly this text is left untouched.
  */
 export function recordAdmittedBriefingRoutes({ dispatches, root, record = recordDispatchBriefingRoute } = {}) {
@@ -401,7 +401,8 @@ export function recordAdmittedBriefingRoutes({ dispatches, root, record = record
         route: { status: "invalid", sliceId: entry.sliceId, path: shownRoutePath(entry.sliceId), reason: `the route record could not be written (${recorded.code})` } };
     }
   }
-  return { ok: true, recorded: writes.map((entry) => entry.sliceId) };
+  // `undo` restores the prior records, for a refusal of the same dispatch after they were written (Critic F4).
+  return { ok: true, recorded: writes.map((entry) => entry.sliceId), undo };
 }
 
 // FANOUT slice S7: the dispatch-time slice-scope check (design:
@@ -764,7 +765,8 @@ if (isDirectInvocation(import.meta.url)) {
         const written=governed.written,sliceId=parsed.binding.itemDelivery.sliceId;
         process.once("exit",(code)=>{
           if(code===0)return;
-          // A refusal after the native pending state was written keeps row and state together; both are released by one cancel.
+          // Nothing refuses once the native pending state is written (Critic F4); a non-zero exit after it is a crash,
+          // and then row and state stay together, released by one cancel.
           const rolled=nativePendingPrepared?{status:"refused",code:"native-pending-prepared"}:rollbackGovernedItemQueue(written);
           if(rolled.status==="refused")process.stderr.write(`WARNING (guard-dispatch): the queue row this refused dispatch prepared for ${sliceId} is kept (${rolled.code}); if it is not dispatched again, release it with: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>".\n`);
         });
@@ -867,6 +869,26 @@ if (isDirectInvocation(import.meta.url)) {
         process.exit(2);
       }
     }
+    // V-10: record the route digest of every Goldfish briefing this call admits (origin "admission"; the latest
+    // admission of a slice wins); a conflict inside the call was refused in the route check. Critic F4: it runs before
+    // the native host state, which is the last admission effect, so nothing refuses once a pending state and its
+    // registry member exist. A refusal of the native preparation restores the prior records, so a refused briefing
+    // leaves no record.
+    const admitted = recordAdmittedBriefingRoutes({
+      dispatches: evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy)).map(({ dispatch }) => ({ prompt: dispatch.prompt })),
+      root: routeRoot,
+    });
+    if (!admitted.ok && admitted.fault) {
+      // A record-write fault the precheck could not see (a transient write/readback error) arrives after the budget
+      // and Advisor bindings persisted, and no route rolls those back: refusing now would leave them behind, so the
+      // dispatch is admitted with a typed warning.
+      process.stderr.write(briefingRouteWriteFault(admitted.fault, { admitted: true }));
+    } else if (!admitted.ok) {
+      process.stderr.write(briefingRouteRefusal(admitted.route));
+      process.exit(2);
+    } else {
+      process.once("exit", (code) => { if (code !== 0) admitted.undo(); });
+    }
     const markedNative = dispatches.filter(carriesHostCommitBinding);
     if (markedNative.length > 0) {
       const nativeRunner = ["Task", "Agent"].includes(input?.tool_name) ? "claude"
@@ -911,21 +933,6 @@ if (isDirectInvocation(import.meta.url)) {
           process.stderr.write(`WARNING (guard-dispatch): native host-commit preparation failed (${prepared.code}); dispatch continues, the child must leave changes uncommitted, and no authorship record will be claimed.\n`);
         }
       }
-    }
-    // V-10, last step before admitting: record the route digest of every Goldfish briefing this call admits
-    // (origin "admission"; the latest admission of a slice wins). Every earlier refusal of this hook has already
-    // exited, so a refused briefing writes no record; a conflict inside the call was refused in the route check.
-    const admitted = recordAdmittedBriefingRoutes({
-      dispatches: evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy)).map(({ dispatch }) => ({ prompt: dispatch.prompt })),
-      root: routeRoot,
-    });
-    if (!admitted.ok && admitted.fault) {
-      // A record-write fault the precheck could not see (a transient write/readback error) arrives after the admission
-      // effects persisted: refusing now would leave them behind, so the dispatch is admitted with a typed warning.
-      process.stderr.write(briefingRouteWriteFault(admitted.fault, { admitted: true }));
-    } else if (!admitted.ok) {
-      process.stderr.write(briefingRouteRefusal(admitted.route));
-      process.exit(2);
     }
     process.exit(0);
   }

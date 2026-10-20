@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
-import { inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
+import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
 import { readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
 import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
 
@@ -226,7 +226,7 @@ function lockRefusal(error, root) {
 
 function markers(repository) {
   const dir = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned");
-  return existsSync(dir) ? readdirSync(dir).sort() : [];
+  return existsSync(dir) && statSync(dir).isDirectory() ? readdirSync(dir).sort() : [];
 }
 
 // `env` carries the session identity for the scratch binding; only the command line passes the process's own.
@@ -252,13 +252,19 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
   const before = new Set(markers(repository));
   // Independent of the registry, so a registry refusal below never leaves it unrepaired.
   const scratchBound = parsed.verb === "heal" ? bindScratch(root, scratch) : null;
+  let healed = null;
   try {
-    if (parsed.verb === "heal") retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, () => { entered.value = true; return null; }));
+    if (parsed.verb === "heal") healed = retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, (boundary) => { entered.value = true; return healSessionAuthorityDrift({ boundary }); }));
     else retryWhileSessionAuthorityLockHeld((entered) => { const moved = moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }); return moved; });
   } catch (error) {
-    return emit({ ...(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error) }), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
+    const heal = typeof error?.repair === "string" ? { repair: error.repair } : parsed.verb === "heal" ? { repair: sessionAuthorityRepairCommand(root, "inspect") } : {};
+    return emit({ ...(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error), ...heal }), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
   }
   const retained = markers(repository).filter((name) => !before.has(name));
+  // Critic F8: a registry that still does not read (a member in flight, or a heal that could not retain its marker)
+  // is not reported healed; inspect names what holds it.
+  if (healed?.status === "refused") return emit({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: `the registry still does not read after heal: ${healed.reason}`, retained,
+    ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { scratch }) }, 2);
   return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
 }
 

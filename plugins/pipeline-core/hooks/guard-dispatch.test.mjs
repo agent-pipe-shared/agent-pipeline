@@ -929,11 +929,22 @@ const CANDIDATE_WARNING = "WARNING (guard-dispatch): native host-commit preparat
 manualCheck("GD61 block  REGISTERED: an item-governed marked Claude dispatch with an explicit run_in_background: true passes the foreground check and stops at the candidate check", () => {
   const { root, parent } = itemBackgroundRepo();
   const guard = guardCopyWithHooks("registered", REGISTERED_HOOKS);
-  const { code, stderr } = runAtGuard(guard, markedGoldfishDispatch(root, "gd61", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
-  assert.ok(!stderr.includes(FOREGROUND_CODE), `a registered completion route must not refuse the background launch -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-  assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
-  assert.ok(stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-  assert.deepEqual(pendingNativeStates(root), []);
+  // Critic F4: an earlier admission's route record, which this briefing supersedes, is written over before the native
+  // preparation and restored byte for byte when that preparation refuses.
+  const routeFile = join(root, "evidence", `dispatch-route-${ITEM_BACKGROUND_SLICE}.json`);
+  const routeBefore = existsSync(routeFile) ? readFileSync(routeFile) : null;
+  const earlier = `${JSON.stringify({ schema: "pipeline.dispatch-briefing-route.v1", sliceId: ITEM_BACKGROUND_SLICE, briefingSha256: "0".repeat(64), origin: "admission" })}\n`;
+  mkdirSync(join(root, "evidence"), { recursive: true }); writeFileSync(routeFile, earlier);
+  try {
+    const { code, stderr } = runAtGuard(guard, markedGoldfishDispatch(root, "gd61", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
+    assert.ok(!stderr.includes(FOREGROUND_CODE), `a registered completion route must not refuse the background launch -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+    assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
+    assert.ok(stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+    assert.deepEqual(pendingNativeStates(root), []);
+    assert.equal(readFileSync(routeFile, "utf8"), earlier, "the refused dispatch leaves the earlier route record as it was");
+  } finally {
+    if (routeBefore === null) rmSync(routeFile, { force: true }); else writeFileSync(routeFile, routeBefore);
+  }
 });
 
 manualCheck("GD62 allow  REGISTERED: a marked Claude dispatch that is NOT item-governed no longer warns with the foreground code for an explicit run_in_background: true", () => {

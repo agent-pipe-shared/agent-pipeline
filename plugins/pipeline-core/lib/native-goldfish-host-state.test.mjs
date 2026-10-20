@@ -968,6 +968,9 @@ const cases = [
     assert.equal(pending.length,1,JSON.stringify(pending));writeFileSync(pending[0],`${readFileSync(pending[0],'utf8')} `);
     const refused=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));
     assert.equal(refused.status,'refused',JSON.stringify(refused));
+    // Critic F7: the refusal names the member in flight and the inspect that names its release.
+    assert.match(refused.repair??'',/native-goldfish's namespace changed outside the registry while \S+ \((armed|running)\) is in flight, so it is not healed/u,JSON.stringify(refused));
+    assert.match(refused.repair,/session-authority-repair\.mjs inspect --root /u);
     assert.equal(heals().every(name=>!JSON.parse(readFileSync(join(abandoned,name,'heal.json'),'utf8')).healed.some(row=>row.producerId==='native-goldfish')),true);
   })},
 

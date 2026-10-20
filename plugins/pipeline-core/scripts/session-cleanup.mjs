@@ -102,6 +102,8 @@ always wins and an invalid explicit value fails closed.
 `;
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(import.meta.url);
+// D52 (2): a refusal over another session's cleanup binding names the typed recovery that clears it.
+const recoveryRoute = (repo) => `; read the typed recovery with node ${SESSION_CLEANUP_SCRIPT} plan-recovery --repo ${repo} (attended routes: plan-human-recovery) and run the action it names`;
 const SESSION_POWER_SCRIPT = join(HERE, "session-power.mjs");
 const POWER_RESULT_KEYS = new Set(["schema", "operation", "sessionId", "status", "revision", "failureClass", "observedAt"]);
 
@@ -735,7 +737,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       if (activeDescriptors.length !== 0) {
         throw new WorktreeLifecycleError(
           "WT-SESSION-UNBOUND-DESCRIPTOR",
-          "an active cleanup descriptor exists outside a bindable continuity state",
+          `an active cleanup descriptor exists outside a bindable continuity state${recoveryRoute(repo)}`,
         );
       }
       output = {
@@ -746,13 +748,13 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
     } else if (binding.status === "closed-bound") {
       throw new WorktreeLifecycleError(
         "WT-SESSION-RECOVERY-REQUIRED",
-        "the closed cleanup binding must complete its typed recovery before a new session starts",
+        `the closed cleanup binding must complete its typed recovery before a new session starts${recoveryRoute(repo)}`,
       );
     } else if (binding.status === "bound") {
       if (flags.session && flags.session !== binding.sessionCleanup.sessionId) {
         throw new WorktreeLifecycleError(
           "WT-SESSION-BINDING",
-          "requested session ID conflicts with the persisted cleanup descriptor",
+          `requested session ID conflicts with the persisted cleanup descriptor ${binding.sessionCleanup.sessionId}; start without --session to resume that binding${recoveryRoute(repo)}`,
         );
       }
       // RF2B: never silently adopt a FOREIGN bound descriptor. When the bound
@@ -795,7 +797,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       if (activeDescriptors.length !== 0) {
         throw new WorktreeLifecycleError(
           "WT-SESSION-UNBOUND-DESCRIPTOR",
-          "an active cleanup descriptor exists without a continuity binding",
+          `an active cleanup descriptor exists without a continuity binding${recoveryRoute(repo)}`,
         );
       }
       const started = startDescriptor(repo, { sessionId: flags.session });
@@ -929,7 +931,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
               || observed.sessionCleanup.descriptorSha256 !== session.descriptorSha256) {
               throw new WorktreeLifecycleError(
                 "WT-SESSION-BINDING",
-                "cleanup descriptor does not match the persisted continuity binding",
+                `cleanup descriptor does not match the persisted continuity binding ${observed.sessionCleanup.sessionId}${recoveryRoute(repo)}`,
               );
             }
             cleanupBinding = observed;

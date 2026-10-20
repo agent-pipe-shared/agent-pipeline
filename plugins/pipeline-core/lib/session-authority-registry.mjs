@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes } from 'node:crypto';
 import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hostname } from 'node:os';
 import { canonical } from './po-approval-proof.mjs';
@@ -294,7 +294,7 @@ function rebindSourceUpdatedRegistry(repo,catalogue,aside,expected){
   try{ports=definitions.map(def=>({producerId:def[0],port:def[1][`create${def[2]}AuthorityProducerPort`]({repository:repo})}));}catch{ports=null;}
   // PF-55: a namespace that changed while the old version held it is healed exactly as at a boundary entry.
   if(!ports)return {healed:[]};
-  const read=portsFor(repo,ports),healed=healDrift(repo,stateRead(repo,read,{reconcile:false}));
+  const read=portsFor(repo,ports),healed=healDrift(repo,stateRead(repo,read,{reconcile:false}),null);
   stateRead(repo,read);
   return {healed};
 }
@@ -306,7 +306,8 @@ function rebindSourceUpdatedRegistry(repo,catalogue,aside,expected){
 // keeps the strict namespace-drift refusal, because its operation was admitted on the old
 // namespace. A producer whose reconcile throws is left for the operation's own read to report.
 const HEAL_IN_FLIGHT=new Set(['armed','running']);
-function healDrift(repo,state){
+// `cause` null: the caller already retains the prior registry (the source-update rebind), so no marker is written.
+function healDrift(repo,state,cause='a producer namespace changed outside the registry while none of its bound members was armed or running'){
   const plans=[];
   state.rows.forEach((row,i)=>{
     let current;
@@ -316,26 +317,54 @@ function healDrift(repo,state){
     const namespaces=[...new Set(current.filter(n=>!row.record.value.baseline.some(b=>equal(b,n))).map(n=>n.namespaceId))];
     plans.push({index:i,current,namespaces,prior:row.record.value});
   });
+  const healed=plans.map(plan=>({producerId:plan.prior.producerId,namespaces:plan.namespaces,prior:plan.prior}));
+  // Critic F8: the marker retaining every prior producer record is written first; if it cannot be written, nothing
+  // is healed and the operation's own read keeps the strict refusal.
+  if(plans.length&&cause!==null)try{writeHealMarker(repo,healed,cause);}catch(markerError){
+    const error=new Error('heal-marker-unwritable');error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';
+    error.reason=`heal-marker-unwritable (${String(markerError?.reason??markerError?.code??markerError?.message).slice(0,80)})`;
+    error.repair=`the heal retains every prior producer record under ${join(repo.commonDir,'agent-pipeline/session-authority-abandoned')} before it changes a baseline, and no baseline changed; once that is a writable directory, run node ${REPAIR_SCRIPT} heal --root ${repo.primaryRoot}`;
+    throw error;
+  }
   for(const plan of plans)saveProducer(repo,state,plan.index,{...state.rows[plan.index].record.value,baseline:plan.current,lastTransitionSha256:digest({healedBaseline:plan.current})});
   if(plans.length)refreshCertificates(repo,state);
-  return plans.map(plan=>({producerId:plan.prior.producerId,namespaces:plan.namespaces,prior:plan.prior}));
+  return healed;
+}
+/** Critic F7: the strict drift refusal (a bound member in flight) names those members and the repair, not only the
+ * producer. The reason stays `<producer>:namespace-drift`, which the repair's diagnosis reads. A producer whose own
+ * reconcile refuses its namespace gets the same repair, under its own code and reason. */
+function driftRepair(repo,producerId,members,refusal=null){
+  const inFlight=members.filter(m=>m.value.association.state==='bound'&&HEAL_IN_FLIGHT.has(m.value.phase)).map(m=>`${m.value.memberId} (${m.value.phase})`);
+  const held=inFlight.length?` while ${inFlight.join(', ')} ${inFlight.length===1?'is':'are'} in flight`:'';
+  const cause=refusal!==null?`${producerId}'s reconcile refuses its records (${refusal})${held}`
+    :`${producerId}'s namespace changed outside the registry${held?`${held}, so it is not healed`:', and no heal took it (a heal that cannot retain its marker heals nothing; heal reports why)'}`;
+  return `${cause}. Run node ${REPAIR_SCRIPT} inspect --root ${repo.primaryRoot}: it names the slice that holds each reservation and the command that releases it (cancel --started once its Goldfish no longer runs), then heal`;
+}
+function driftFault(repo,producerId,members){
+  const error=new Error(`${producerId}:namespace-drift`);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-CAS';error.reason=`${producerId}:namespace-drift`;
+  error.repair=driftRepair(repo,producerId,members);
+  throw error;
 }
 function writeHealMarker(repo,healed,cause){
   const dir=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-drift-heal`;
-  try{
-    privateDirectories(repo,`${dir}/marker`);
-    for(const row of healed)writeFileSync(safePath(repo,`${dir}/${row.producerId}.json`),canonical(row.prior),{mode:0o600,flag:'wx'});
-    writeFileSync(safePath(repo,`${dir}/heal.json`),canonical({schema:'pipeline.session-authority-drift-heal.v1',cause,healed:healed.map(row=>({producerId:row.producerId,namespaces:row.namespaces})),healedAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});
-  }catch{}
+  privateDirectories(repo,`${dir}/marker`);
+  for(const row of healed)writeFileSync(safePath(repo,`${dir}/${row.producerId}.json`),canonical(row.prior),{mode:0o600,flag:'wx'});
+  writeFileSync(safePath(repo,`${dir}/heal.json`),canonical({schema:'pipeline.session-authority-drift-heal.v1',cause,healed:healed.map(row=>({producerId:row.producerId,namespaces:row.namespaces})),healedAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});
 }
 function healDriftedCatalogue(repo){
   if(!existsSync(safePath(repo,cataloguePath)))return null;
   let state;
   try{state=stateRead(repo,portsFor(repo,definitions.map(def=>({producerId:def[0],port:def[1][`create${def[2]}AuthorityProducerPort`]({repository:repo})}))),{reconcile:false});}catch{return null;}
-  let healed;
-  try{healed=healDrift(repo,state);}catch{return null;}
-  if(healed.length)writeHealMarker(repo,healed,'a producer namespace changed outside the registry while none of its bound members was armed or running');
-  return healed;
+  try{return healDrift(repo,state);}catch{return null;}
+}
+/** The repair's heal verb: the heal every boundary runs, but a marker or save failure is thrown, not swallowed, and
+ * the registry is read back strictly afterwards (Critic F8). */
+export function healSessionAuthorityDrift({boundary:token}={}){
+  const repo=boundary(token);
+  if(!existsSync(safePath(repo,cataloguePath)))return freeze({status:'absent',healed:[]});
+  const state=stateRead(repo,portsFor(repo,definitions.map(def=>({producerId:def[0],port:def[1][`create${def[2]}AuthorityProducerPort`]({repository:repo})}))),{reconcile:false});
+  const healed=healDrift(repo,state).map(row=>({producerId:row.producerId,namespaces:row.namespaces}));
+  return freeze({...inspectSessionAuthorityRegistryRead({repository:repo}),healed});
 }
 function migrateSourceUpdatedCatalogue(repo){
   if(!existsSync(safePath(repo,cataloguePath)))return null;
@@ -354,7 +383,7 @@ function migrateSourceUpdatedCatalogue(repo){
   return {aside,mode};
 }
 function registryClosure(repo,state){const known=new Set([cataloguePath]);for(const row of state.rows){known.add(row.record.ref.path.slice(5));for(const m of row.members){known.add(m.ref.path.slice(5));if(m.release)known.add(m.release.ref.path.slice(5));}for(const c of row.certificates)known.add(c.ref.path.slice(5));}let count=0,total=0;function walk(path,depth){if(depth>6)fail('SDC-AUTHORITY-UNAVAILABLE','registry-depth-bound');const abs=safePath(repo,path);owned(lstatSync(abs),true,abs);for(const name of readdirSync(abs).sort()){const child=`${path}/${name}`,s=lstatSync(safePath(repo,child));if(++count>4096)fail('SDC-AUTHORITY-UNAVAILABLE','registry-entry-bound');if(s.isDirectory()){walk(child,depth+1);continue;}owned(s,false,process.platform==='win32'?safePath(repo,child):null);total+=s.size;if(total>16777216)fail('SDC-AUTHORITY-UNAVAILABLE','registry-total-bound');if(known.has(child))continue;if(child===`${ROOT}/registry.lock`){const active=boundaryContext.getStore();if(!active||!equal(active.repository,repo))fail('SDC-LOCK-HELD','registry-lock-held');continue;}const read=readRecord(repo,child);if(read.value.schema===schema('release')){const row=state.rows.find(r=>r.participant.producerId===read.value.producerId);const member=row?.members.find(m=>m.value.memberId===read.value.memberId&&m.value.memberGeneration===read.value.memberGeneration);if(!member||member.value.phase!=='terminal-observed'||child!==releasePath(member.value))fail('SDC-AUTHORITY-CAS','unindexed-release');validateRelease(read.value,repo,member.value,row.participant);if(read.value.memberPreimageSha256!==member.ref.sha256)fail('SDC-AUTHORITY-CAS','release-prefix-preimage');continue;}if(read.value.schema===schema('target-certificate')){const c=read.value,row=state.rows.find(r=>r.participant.producerId===c.producerId),current=row?.certificates.find(p=>equal(p.value.target,c.target));exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'historical-certificate');sameRepository(c,repo);target(c.target);generation(c.targetGeneration);if(!current||c.targetGeneration>=current.value.targetGeneration||child!==certificatePath(c.producerId,c.target,c.targetGeneration))fail('SDC-AUTHORITY-CAS','unindexed-certificate');const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGeneration,projectionSha256,...projected}=c;if(digest(projected)!==projectionSha256)fail('SDC-AUTHORITY-CAS','historical-certificate-digest');continue;}fail('SDC-AUTHORITY-UNAVAILABLE','unknown-registry-entry');}}walk(ROOT,0);}
-function stateRead(repo,ports,{reconcile=true}={}){const catalogue=readRecord(repo,cataloguePath);closedCatalogue(catalogue.value,repo,ports);const rows=ports.map((pair,i)=>{const entry=catalogue.value.producers[i];exact(entry,['producerId','producerRef','producerGeneration'],'producer-index');if(entry.producerId!==pair.participant.producerId)fail('SDC-AUTHORITY-CAS','producer-index-order');const record=readRef(repo,entry.producerRef);const p=record.value;exact(p,['schema','repositorySha256','producerId','generation','participantSetSha256','sourceSha256','baseline','members','targetCertificates','lastTransitionSha256'],'producer');sameRepository(p,repo);generation(p.generation);sha(p.lastTransitionSha256);if(p.schema!==schema('producer')||p.producerId!==entry.producerId||p.generation!==entry.producerGeneration||p.participantSetSha256!==catalogue.value.participantSetSha256||p.sourceSha256!==pair.participant.sourceSha256||entry.producerRef.path!==`.git/${producerPath(p.producerId)}`)fail('SDC-AUTHORITY-CAS','producer-source-binding');memberships(p.baseline,pair.participant);if(!Array.isArray(p.members)||!Array.isArray(p.targetCertificates)||p.members.length>4096||p.targetCertificates.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','producer-record-bound');const members=p.members.map(e=>{exact(e,['memberId','memberGeneration','memberRef'],'member-index');const loaded=readRef(repo,e.memberRef);const m=validateMember(loaded.value,repo,pair.participant);if(m.memberId!==e.memberId||m.memberGeneration!==e.memberGeneration||e.memberRef.path!==`.git/${memberPath(m)}`)fail('SDC-AUTHORITY-CAS','member-index-binding');const release=m.releaseRef?readRef(repo,m.releaseRef):null;if(release)validateRelease(release.value,repo,m,pair.participant);return {...loaded,release};});if(new Set(members.map(m=>`${m.value.memberId}/${m.value.memberGeneration}`)).size!==members.length)fail('SDC-AUTHORITY-CAS','duplicate-member');const certificates=p.targetCertificates.map(e=>{exact(e,['target','targetGeneration','certificateRef'],'certificate-index');target(e.target);generation(e.targetGeneration);const loaded=readRef(repo,e.certificateRef),c=loaded.value;exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'target-certificate');sameRepository(c,repo);if(c.schema!==schema('target-certificate')||c.producerId!==p.producerId||!equal(c.target,e.target)||c.targetGeneration!==e.targetGeneration||c.participantSetSha256!==p.participantSetSha256||c.sourceSha256!==p.sourceSha256||e.certificateRef.path!==`.git/${certificatePath(p.producerId,c.target,c.targetGeneration)}`)fail('SDC-AUTHORITY-CAS','certificate-binding');for(const refs of [c.memberRefs,c.releaseRefs]){if(!Array.isArray(refs))fail('SDC-AUTHORITY-CAS','certificate-refs');refs.forEach(ref);}sourceFacts(c.scopeFacts,pair.participant.namespaceIds);const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGen,projectionSha256,...projection}=c;if(c.projectionSha256!==digest(projection))fail('SDC-AUTHORITY-CAS','certificate-projection');return loaded;});const row={...pair,record,members,certificates};if(reconcile){const current=memberships(pair.port.reconcile({producerRecord:freeze(p),memberRecords:freeze(members.map(m=>m.value)),releaseRecords:freeze(members.filter(m=>m.release).map(m=>m.release.value))}),pair.participant);if(!equal(current,p.baseline))fail('SDC-AUTHORITY-CAS',`${p.producerId}:namespace-drift`);}return row;});const state={catalogue,rows};registryClosure(repo,state);return state;}
+function stateRead(repo,ports,{reconcile=true}={}){const catalogue=readRecord(repo,cataloguePath);closedCatalogue(catalogue.value,repo,ports);const rows=ports.map((pair,i)=>{const entry=catalogue.value.producers[i];exact(entry,['producerId','producerRef','producerGeneration'],'producer-index');if(entry.producerId!==pair.participant.producerId)fail('SDC-AUTHORITY-CAS','producer-index-order');const record=readRef(repo,entry.producerRef);const p=record.value;exact(p,['schema','repositorySha256','producerId','generation','participantSetSha256','sourceSha256','baseline','members','targetCertificates','lastTransitionSha256'],'producer');sameRepository(p,repo);generation(p.generation);sha(p.lastTransitionSha256);if(p.schema!==schema('producer')||p.producerId!==entry.producerId||p.generation!==entry.producerGeneration||p.participantSetSha256!==catalogue.value.participantSetSha256||p.sourceSha256!==pair.participant.sourceSha256||entry.producerRef.path!==`.git/${producerPath(p.producerId)}`)fail('SDC-AUTHORITY-CAS','producer-source-binding');memberships(p.baseline,pair.participant);if(!Array.isArray(p.members)||!Array.isArray(p.targetCertificates)||p.members.length>4096||p.targetCertificates.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','producer-record-bound');const members=p.members.map(e=>{exact(e,['memberId','memberGeneration','memberRef'],'member-index');const loaded=readRef(repo,e.memberRef);const m=validateMember(loaded.value,repo,pair.participant);if(m.memberId!==e.memberId||m.memberGeneration!==e.memberGeneration||e.memberRef.path!==`.git/${memberPath(m)}`)fail('SDC-AUTHORITY-CAS','member-index-binding');const release=m.releaseRef?readRef(repo,m.releaseRef):null;if(release)validateRelease(release.value,repo,m,pair.participant);return {...loaded,release};});if(new Set(members.map(m=>`${m.value.memberId}/${m.value.memberGeneration}`)).size!==members.length)fail('SDC-AUTHORITY-CAS','duplicate-member');const certificates=p.targetCertificates.map(e=>{exact(e,['target','targetGeneration','certificateRef'],'certificate-index');target(e.target);generation(e.targetGeneration);const loaded=readRef(repo,e.certificateRef),c=loaded.value;exact(c,['schema','repositorySha256','producerId','participantSetSha256','sourceSha256','target','targetGeneration','memberRefs','releaseRefs','scopeFacts','projectionSha256'],'target-certificate');sameRepository(c,repo);if(c.schema!==schema('target-certificate')||c.producerId!==p.producerId||!equal(c.target,e.target)||c.targetGeneration!==e.targetGeneration||c.participantSetSha256!==p.participantSetSha256||c.sourceSha256!==p.sourceSha256||e.certificateRef.path!==`.git/${certificatePath(p.producerId,c.target,c.targetGeneration)}`)fail('SDC-AUTHORITY-CAS','certificate-binding');for(const refs of [c.memberRefs,c.releaseRefs]){if(!Array.isArray(refs))fail('SDC-AUTHORITY-CAS','certificate-refs');refs.forEach(ref);}sourceFacts(c.scopeFacts,pair.participant.namespaceIds);const {schema:ignored,repositorySha256:ignoredRepo,targetGeneration:ignoredGen,projectionSha256,...projection}=c;if(c.projectionSha256!==digest(projection))fail('SDC-AUTHORITY-CAS','certificate-projection');return loaded;});const row={...pair,record,members,certificates};if(reconcile){let reconciled;try{reconciled=pair.port.reconcile({producerRecord:freeze(p),memberRecords:freeze(members.map(m=>m.value)),releaseRecords:freeze(members.filter(m=>m.release).map(m=>m.release.value))});}catch(error){if(error&&typeof error==='object'&&typeof error.repair!=='string')error.repair=driftRepair(repo,p.producerId,members,/drift/u.test(String(error.reason??''))?null:String(error.reason??error.message??'').slice(0,120));throw error;}const current=memberships(reconciled,pair.participant);if(!equal(current,p.baseline))driftFault(repo,p.producerId,members);}return row;});const state={catalogue,rows};registryClosure(repo,state);return state;}
 function saveProducer(repo,state,index,value){const row=state.rows[index];value.generation=generation(row.record.value.generation+1);row.record={value,ref:publish(repo,producerPath(value.producerId),value,row.record.ref)};const c={...state.catalogue.value,generation:generation(state.catalogue.value.generation+1),producers:state.catalogue.value.producers.map((e,i)=>i===index?{producerId:e.producerId,producerRef:row.record.ref,producerGeneration:value.generation}:e)};state.catalogue={value:c,ref:publish(repo,cataloguePath,c,state.catalogue.ref)};}
 function sortedRefs(values){const map=new Map(values.map(v=>[v.path,v]));if(map.size!==values.length)for(const v of values)if(!equal(map.get(v.path),v))fail('SDC-AUTHORITY-CAS','conflicting-references');return [...map.values()].sort((a,b)=>a.path.localeCompare(b.path));}
 function projection(row,t,participantSetSha256){const relevant=row.members.filter(m=>m.value.association.state==='unbound'||equal(m.value.association.target,t));const memberRefs=sortedRefs(relevant.filter(m=>m.value.phase!=='released').map(m=>m.ref));const releaseRefs=sortedRefs(relevant.filter(m=>m.release).map(m=>m.release.ref));const facts=relevant.flatMap(m=>m.value.sourceFacts);const lockFacts=row.record.value.baseline.flatMap(m=>m.sourceFacts).filter(f=>/lock/.test(f.namespaceId));for(const f of lockFacts)if(!facts.some(v=>equal(v,f)))facts.push(f);facts.sort((a,b)=>a.namespaceId.localeCompare(b.namespaceId)||a.pathSha256.localeCompare(b.pathSha256));return {target:t,producerId:row.participant.producerId,participantSetSha256,sourceSha256:row.participant.sourceSha256,memberRefs,releaseRefs,scopeFacts:facts};}

@@ -599,7 +599,7 @@ export function withSourceOwnedNativeConcurrentCommit({root,pendingSha256},callb
     if(!entry?.value.binding.itemDelivery)throw nativeManagedFault('native-concurrent-original-item-required');
     if(entry.value.baseline?.schema!==NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA)throw nativeManagedFault('native-concurrent-legacy-baseline-rebind-required');
     const operation=[...owner.operations.values()].find(row=>row.pendingSha256===pendingSha256),current=nativeManagedCurrentOwner(repository);
-    if(nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw nativeManagedFault('native-concurrent-original-owner');
+    if(nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw ownerFault('native-concurrent-original-owner',{repository,operation,current,sliceId:entry.value.delivery?.sliceId});
     const pending=effectiveNativePendingState(read,entry),authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:pending.binding.allowedPaths,baseCommit:pending.binding.candidateCommit,ownPendingSha256:pendingSha256,expectedRef:pending.baseline.nativeRef});
     try{return callback(authority);}finally{nativeConcurrentAuthorities.delete(authority);}
   });
@@ -827,7 +827,7 @@ export function completeNativeGoldfishAuthority({repository,terminalHandle}){
   if(checks.status!=='observed')return {...completed,checkStatus:checks};
   return withSessionAuthorityBoundary({repository},boundary=>{
     const current=nativeManagedCurrentOwner(repository);
-    if(nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association)||current.association.state!=='bound')throw nativeManagedFault('native-item-check-owner');
+    if(nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association)||current.association.state!=='bound')throw ownerFault('native-item-check-owner',{repository,operation,current,sliceId:pending.delivery?.sliceId});
     const evidence=inspectGovernedItemDeliveryChecks({root:repository.primaryRoot,handle:checks.handle,candidate:repository.candidate,itemDelivery:pending.binding.itemDelivery});
     writeExclusive(repository.commonDir,`authority-check-${terminal.pendingSha256}.json`,{schema:'pipeline.native-goldfish-item-check.v1',pendingSha256:terminal.pendingSha256,bindingSha256:operation.bindingSha256,evidence});
     const refreshed=refreshSourceOwnedDispatchAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});
@@ -1129,6 +1129,17 @@ export function staleApprovalRepair(code) {
     return `the ${code==='CVCT-PROFILE-STALE'?'PO profile':'project manifest or PRD'} changed after the plan approval, which binds it; submit the plan again (node ${STATE_SCRIPT} submit-plan --by <PO name> --profile <profile>) and have the PO approve it again, then retry`;
   return `the item course needs an eligible PO plan approval of the current PRD and spec; read node ${STATE_SCRIPT} inspect`;
 }
+/** D52 (2), Critic F1: an item operation that another session owns is refused naming that session and the route
+ * that frees its reservation. No session takes over another's operation (Q13). */
+const REPAIR_SCRIPT=fileURLToPath(new URL('../scripts/session-authority-repair.mjs',import.meta.url));
+function ownerFault(reason,{repository,operation,current,sliceId}) {
+  const fault=nativeManagedFault(reason);
+  if(!operation||!current||(current.association.state==='bound'&&nativeManagedDigest(current.association)===nativeManagedDigest(operation.association)))return fault;
+  const owner=operation.association.state==='bound'?`session ${operation.association.target.sessionId}`:'no bound session';
+  const here=current.association.state==='bound'?`this session (${current.association.target.sessionId})`:'this process, which has no bound session';
+  fault.repair=`the item operation belongs to ${owner}, not to ${here}. Finish it from that session if it still runs. If it no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${typeof sliceId==='string'?sliceId:'<slice>'} --started --reason "<why>", then dispatch the slice again from this session; node ${REPAIR_SCRIPT} inspect --root ${repository.primaryRoot} lists every reservation`;
+  return fault;
+}
 
 /** Critic F2: an AGY reservation that names the slice and is not released marks it started, as a native
  * pending state does. A never-created registry has released nothing, so every such reservation counts. */
@@ -1256,7 +1267,7 @@ export function amendNativeGoldfishItemWriteScope(input={}) {
       const entry=read.entries.find(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256===pendingSha256),operation=[...owner.operations.values()].find(row=>row.pendingSha256===pendingSha256);
       const current=nativeManagedCurrentOwner(repository);
       if(!entry?.value.binding.itemDelivery||!operation||!['armed','running'].includes(operation.phase)||current.association.state!=='bound'
-        ||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw nativeManagedFault('native-item-scope-owner');
+        ||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw ownerFault('native-item-scope-owner',{repository,operation:entry?.value.binding.itemDelivery&&['armed','running'].includes(operation?.phase)?operation:null,current,sliceId:entry?.value.delivery?.sliceId});
       const members=producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef})).filter(row=>row.record.bindingSha256===operation.bindingSha256);
       if(members.length!==1||!['armed','running'].includes(members[0].record.phase))throw nativeManagedFault('native-item-scope-released-or-foreign');
       const original=entry.value.binding.itemDelivery,checks=original.checks;
@@ -1309,7 +1320,7 @@ export function amendNativeGoldfishItemWriteScope(input={}) {
       finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
       return {status:'amended',code:'NGHS-ITEM-SCOPE-AMENDED',pendingSha256,revision,scopeRef,memberRef:operation.memberRef,allowedPaths,writeScope};
     });
-  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-SCOPE-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained'};}
+  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-SCOPE-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained',...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
 
 function nativeItemQualifications(read,pendingSha256) {
@@ -1328,7 +1339,7 @@ function nativeItemRecheckPlan({repository,boundary,pendingSha256}) {
   const operation=[...owner.operations.values()].find(row=>row.pendingSha256===pendingSha256);
   if(!pending?.value.binding.itemDelivery||!operation||operation.phase!=='terminal-observed')throw nativeManagedFault('native-item-not-delivered');
   const current=nativeManagedCurrentOwner(repository);
-  if(current.association.state!=='bound'||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw nativeManagedFault('native-item-recheck-owner');
+  if(current.association.state!=='bound'||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw ownerFault('native-item-recheck-owner',{repository,operation,current,sliceId:pending.value.delivery?.sliceId});
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
   const members=producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef})).filter(row=>row.record.bindingSha256===operation.bindingSha256);
   if(members.length!==1||members[0].record.phase!=='terminal-observed')throw nativeManagedFault('native-item-recheck-released-or-foreign');
@@ -1385,7 +1396,7 @@ export function requalifyNativeGoldfishItemDelivery(input={}) {
       return {status:evidence.verdict==='passed'?'requalified':'targeted-failed',code:evidence.verdict==='passed'?'NGHS-ITEM-REQUALIFIED':'NGHS-ITEM-REQUALIFICATION-FAILED',revision:after.revision,
         executedCheckIds:value.impactedCheckIds,reusedCheckIds:after.itemDelivery.checks.filter(check=>!value.impactedCheckIds.includes(check.id)).map(check=>check.id),checkRef:stored,memberRef:refreshed.memberRef,reservation:'retained'};
     });
-  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-REQUALIFICATION-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained'};}
+  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-REQUALIFICATION-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained',...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
 
 /** Elephant integration acknowledgement only after Source-bound targeted
@@ -1399,7 +1410,7 @@ export function integrateNativeGoldfishItemDelivery({root,pendingSha256}={}) {
       const operation=[...owner.operations.values()].find(row=>row.pendingSha256===pendingSha256);
       if(!entry?.value.delivery||!entry.value.binding.itemDelivery||!operation||operation.phase!=='terminal-observed')throw nativeManagedFault('native-item-not-delivered');
       const current=nativeManagedCurrentOwner(repository);
-      if(current.association.state!=='bound'||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw nativeManagedFault('native-item-integration-owner');
+      if(current.association.state!=='bound'||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw ownerFault('native-item-integration-owner',{repository,operation,current,sliceId:entry.value.delivery?.sliceId});
       const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
       const members=producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef})).filter(row=>row.record.bindingSha256===operation.bindingSha256);
       if(members.length!==1)throw nativeManagedFault('native-item-integration-member');
@@ -1429,7 +1440,7 @@ export function integrateNativeGoldfishItemDelivery({root,pendingSha256}={}) {
       const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,terminalHandle});
       return {status:'integrated',code:'NGHS-ITEM-INTEGRATED',releaseRef:released.releaseRef,memberRef:released.memberRef};
     });
-  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-INTEGRATION-UNAVAILABLE',reason:error.reason??error.message};}
+  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-INTEGRATION-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
 
 const itemReadinessHandles=new WeakMap();
@@ -1447,7 +1458,7 @@ export function observeGovernedItemIntegrationReadiness({root}={}) {
     const integrated=[...new Set([...native,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})])];
     const handle=Object.freeze({});itemReadinessHandles.set(handle,{queueSha256:nativeManagedDigest(governed.queue),integrated,observedAt:Date.now()});
     return {status:'observed',code:'SQ-ITEM-INTEGRATION-READBACK',handle,integrated:[...integrated],nativeRegistry};
-  }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',reason:error.reason??error.message};}
+  }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
 /** D40: an orchestrator-committed slice is integrated for dependency admission only on commit
  * evidence — a non-merge commit reachable from the candidate, strictly after the slice's base,
@@ -1571,7 +1582,7 @@ export function checkpointNativeGoldfishItemDelivery({root,pendingSha256,checkpo
     return withSessionAuthorityBoundary({repository},boundary=>{
       const read=nativeAuthorityScan(owner),pending=read.entries.find(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256===pendingSha256);
       const operation=[...owner.operations.values()].find(row=>row.pendingSha256===pendingSha256),current=nativeManagedCurrentOwner(repository);
-      if(!pending?.value.delivery||!operation||current.association.state!=='bound'||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw nativeManagedFault('native-item-checkpoint-owner');
+      if(!pending?.value.delivery||!operation||current.association.state!=='bound'||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw ownerFault('native-item-checkpoint-owner',{repository,operation:pending?.value.delivery?operation:null,current,sliceId:pending?.value.delivery?.sliceId});
       recoverNativeAuthorityOperation({repository,owner,operation,port,boundary});
       const revision=read.entries.filter(row=>row.relativePath.startsWith(`authority-checkpoint-${pendingSha256}-`)).length+1;
       if(revision>64)throw nativeManagedFault('native-item-checkpoint-limit');
@@ -1579,15 +1590,15 @@ export function checkpointNativeGoldfishItemDelivery({root,pendingSha256,checkpo
       const refreshed=refreshSourceOwnedDispatchAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef:operation.memberRef,operationHandle:operation.handle});operation.memberRef=refreshed.memberRef;
       return {status:'checkpointed',code:'NGHS-ITEM-CHECKPOINTED',revision,checkpointRef:stored,memberRef:operation.memberRef};
     });
-  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-CHECKPOINT-UNAVAILABLE',reason:error.reason??error.message};}
+  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-CHECKPOINT-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
 export function cancelNativeGoldfishItemDelivery({root,pendingSha256}={}) {
   try {
     const repository=inspectSignedDescriptorCustodyRepository(root),owner=nativeAuthorityOwner(repository);
     const read=nativeAuthorityScan(owner),pending=read.entries.find(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256===pendingSha256);
     const current=nativeManagedCurrentOwner(repository),operation=[...owner.operations.values()].find(row=>row.pendingSha256===pendingSha256);
-    if(!pending?.value.delivery||current.association.state!=='bound'||!operation||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw nativeManagedFault('native-item-cancel-owner');
+    if(!pending?.value.delivery||current.association.state!=='bound'||!operation||nativeManagedDigest(current.association)!==nativeManagedDigest(operation.association))throw ownerFault('native-item-cancel-owner',{repository,operation:pending?.value.delivery?operation:null,current,sliceId:pending?.value.delivery?.sliceId});
     return {status:'refused',code:'NGHS-ITEM-CANCELLATION-WITNESS-UNAVAILABLE',reservation:'retained',
       repair:'The native host must provide an authenticated opaque child-disposal witness resolving this pending hash and logical agent identity; parent-process exit or caller hook prose is insufficient.'};
-  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-CANCELLATION-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained'};}
+  }catch(error){return {status:'refused',code:error.code??'NGHS-ITEM-CANCELLATION-UNAVAILABLE',reason:error.reason??error.message,reservation:'retained',...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }

@@ -10,7 +10,7 @@ import { observeLinuxProcess } from "../lib/native-platform-process-observer.mjs
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { runSessionAuthorityRepair } from "./session-authority-repair.mjs";
-import { cancelUnstartedGovernedItemSlice, prepareGovernedItemQueue, prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
+import { cancelUnstartedGovernedItemSlice, checkpointNativeGoldfishItemDelivery, prepareGovernedItemQueue, prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
 import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
 import { run as runState } from "./pipeline-state.mjs";
 import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
@@ -80,6 +80,15 @@ const cases = [
     const drifted = found.registry.producers.find((row) => row.producerId === "onboarding-continuity");
     assert.equal(drifted.status, "drifted", JSON.stringify(found.registry)); assert.ok(drifted.drifted.includes("selected-state"));
     assert.ok(found.next.some((row) => / heal --root /u.test(row.command)), JSON.stringify(found.next));
+    // Critic F8: a heal whose marker cannot be written heals nothing; the prior baseline stays the record.
+    const abandoned = join(repository.commonDir, "agent-pipeline/session-authority-abandoned");
+    assert.equal(existsSync(abandoned), false); writeFileSync(abandoned, "not a directory\n");
+    const blocked = repair("heal", "--root", root);
+    assert.equal(blocked.code, 2, JSON.stringify(blocked.result)); assert.equal(blocked.result.status, "refused");
+    assert.match(blocked.result.repair, /session-authority-abandoned .*writable directory, run node \S+session-authority-repair\.mjs heal --root /u, JSON.stringify(blocked.result));
+    const still = repair("inspect", "--root", root).result.registry.producers.find((row) => row.producerId === "onboarding-continuity");
+    assert.equal(still.status, "drifted", JSON.stringify(still));
+    rmSync(abandoned);
     const healed = repair("heal", "--root", root);
     assert.equal(healed.code, 0, JSON.stringify(healed.result)); assert.equal(healed.result.status, "healed");
     assert.ok(healed.result.retained.some((name) => name.endsWith("-drift-heal")), JSON.stringify(healed.result.retained));
@@ -147,7 +156,23 @@ const cases = [
     const admitted = subject();
     assert.doesNotMatch(admitted.text, /State authority route unavailable/u, admitted.text);
     assert.match(admitted.text, /prepare-push-subject/u, "the route itself answered");
-    writeFileSync(join(repository.commonDir, "agent-pipeline/session-authority/producers/onboarding-continuity.json"), "{");
+    // Critic F5: a bound State member that is armed holds the route. The gate reads the raw records, so a member
+    // record named by the producer stands in for a State operation in flight.
+    const producerPath = join(repository.commonDir, "agent-pipeline/session-authority/producers/onboarding-continuity.json");
+    const producerBytes = readFileSync(producerPath), producer = JSON.parse(producerBytes);
+    const memberLocal = "agent-pipeline/session-authority/members/onboarding-continuity/fixture-in-flight.json";
+    mkdirSync(join(repository.commonDir, "agent-pipeline/session-authority/members/onboarding-continuity"), { recursive: true });
+    writeFileSync(join(repository.commonDir, memberLocal), JSON.stringify({ association: { state: "bound" }, phase: "armed" }));
+    writeFileSync(producerPath, JSON.stringify({ ...producer, members: [...producer.members, { memberRef: { path: `.git/${memberLocal}` } }] }));
+    const held = subject();
+    assert.equal(held.status, 2, held.text);
+    assert.match(held.text, /State authority route unavailable \(SDC-AUTHORITY-HELD: state-operation-in-flight\)/u, held.text);
+    assert.match(held.text, /Repair: node \S+session-authority-repair\.mjs inspect --root /u, held.text);
+    // Released, the same member no longer holds it.
+    writeFileSync(join(repository.commonDir, memberLocal), JSON.stringify({ association: { state: "bound" }, phase: "released" }));
+    assert.doesNotMatch(subject().text, /State authority route unavailable/u);
+    writeFileSync(producerPath, producerBytes); rmSync(join(repository.commonDir, memberLocal));
+    writeFileSync(producerPath, "{");
     const refused = subject();
     assert.equal(refused.status, 2);
     assert.match(refused.text, /State authority route unavailable \(SDC-AUTHORITY-UNAVAILABLE: state-producer-unreadable\)/u, refused.text);
@@ -248,6 +273,19 @@ const cases = [
     assert.equal(waitRun("wait", "--root", root, "--timeout", "0").result.code, "SAR-ARGS");
     rmSync(lockPath);
     assert.equal(waitRun("wait", "--root", root, "--timeout", "2").result.status, "lock-free");
+  }) },
+  { id: "SAR09", name: "an item operation another session owns is refused naming that session, the started cancel and inspect (D52 (2), Critic F1)", run: () => fixture(({ root }) => {
+    const { dispatch } = course(root);
+    const prepared = dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one");
+    assert.equal(prepared.ok, true, JSON.stringify(prepared));
+    // Outside the dispatching session's scope, as a later session or the PO's terminal is.
+    const refused = checkpointNativeGoldfishItemDelivery({ root, pendingSha256: prepared.sha256,
+      checkpoint: { schema: "pipeline.item-owned-checkpoint.v1", declaredPhase: "analysis", contextPaths: [], remainingClauses: [], summary: "fixture" } });
+    assert.equal(refused.status, "refused", JSON.stringify(refused));
+    assert.equal(refused.reason, "native-item-checkpoint-owner");
+    assert.match(refused.repair, /belongs to session \S+, not to this process, which has no bound session/u, refused.repair);
+    assert.match(refused.repair, /slice-queue\.mjs cancel ITEM-AC-1 --started --reason /u);
+    assert.match(refused.repair, /session-authority-repair\.mjs inspect --root /u);
   }) },
 ];
 

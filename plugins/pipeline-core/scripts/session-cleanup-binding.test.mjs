@@ -216,7 +216,10 @@ test("start binds once, resumes the exact descriptor and rotates only after clos
     assert.deepEqual(listActiveSessionDescriptors(root), [bound.sessionCleanup]);
     assert.throws(
       () => invoke(["start", "--repo", root, "--session", "session-binding-other"]),
-      (error) => error?.code === "WT-SESSION-BINDING",
+      // D52 (2): the refusal names the bound session and the typed recovery that clears it.
+      (error) => error?.code === "WT-SESSION-BINDING"
+        && error.message.includes(bound.sessionCleanup.sessionId)
+        && /session-cleanup\.mjs plan-recovery --repo /u.test(error.message),
     );
 
     const cleaned = invoke([
@@ -3117,5 +3120,19 @@ test("ordinary orphan release archives authenticated bytes before a new session 
     assert.equal(bound.status, "bound");
     assert.equal(bound.sessionCleanup.sessionId, next.output.sessionId);
     assert.deepEqual(listActiveSessionDescriptors(root), [bound.sessionCleanup]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("D52 (2): start with another session's id names the bound session and the typed recovery", () => {
+  const root = fixture("d52-repair");
+  try {
+    const bound = { sessionId: "session-bound-elsewhere", descriptorSha256: "a".repeat(64) };
+    assert.throws(
+      () => invoke(["start", "--repo", root, "--session", "session-binding-other"], {
+        readOnboardingSessionCleanupBindingFn() { return { status: "bound", sessionCleanup: bound, stateSha256: "b".repeat(64), revision: 1 }; },
+      }),
+      (error) => error?.code === "WT-SESSION-BINDING" && error.message.includes(bound.sessionId)
+        && /start without --session/u.test(error.message) && /session-cleanup\.mjs plan-recovery --repo /u.test(error.message),
+    );
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

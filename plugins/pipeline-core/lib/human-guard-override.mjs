@@ -6749,8 +6749,10 @@ export function createHumanGuardOverrideAuthorityProducerPort({repository: input
         const data = [...indexed.values()].find(row => row.bindingSha256 === member.bindingSha256);
         if (!data) {
           if (hgoAuthorityCurrentReservedPublication(port, member)) continue;
-          // Genuine legacy unbound arms remain held; they cannot be attributed or
-          // silently discharged by an observer, expiry, or process liveness.
+          // A genuine legacy unbound arm stays held while its capability is still armed at its path: it
+          // cannot be attributed, and no observer or process liveness discharges it. Only once that
+          // capability is no longer armed (consumed, swept, retired after expiry, or gone) is it
+          // discharged below, because it can never be consumed again (PF-55).
           if (member.association?.state !== "unbound" || member.phase === "released") hgoAuthorityFailure("hgo:member-without-source-index");
           // PF-55: the legacy binding digest includes the repository's HEAD, so after any commit it no
           // longer matches; the member's own source fact (path, bytes, size) still names its capability.
