@@ -142,3 +142,38 @@ never started. The dispatch stopped at its budget checkpoint after classifying:
   line 59. Under a world-writable TMPDIR the same call fails earlier with `domain-ancestor-unsafe`.
 - **Next:** K1b (power fixture: initialize the registry, small) and K1c (binding and recovery:
   settle the descriptor-tuple question first, then the fixtures), one at a time.
+
+### K1 measurement 2 (2026-10-20, dispatches ALF-K1B, ALF-K1C, ALF-K1C2)
+
+Interim entry, not a closure.
+
+- **K1b closed:** `ec0999ade`, session-cleanup-power 2/2.
+- **Tuple question settled without a product change:** `start` on the unbound branch refuses when any
+  active descriptor exists (`scripts/session-cleanup.mjs` ~796-802) and `startSessionDescriptor`
+  throws for an existing id, so a pre-created descriptor is never reused. The fixture therefore
+  creates descriptor and requester lazily at the `startSessionDescriptorFn` seam
+  (`createControlledMethodRuntimeFixture`) and runs the real bind inside that requester's context at
+  the `bindOnboardingSessionCleanupFn` seam. ALF-K1C stopped at its budget with a partial; ALF-K1C2
+  continued it (`9bf8a8619`).
+- **Second refusal found:** after the context and tuple checks pass, `continuityJoinActualBoundCleanupOwner`
+  (`lib/onboarding-continuity.mjs` ~9850) refuses a project whose State is not in the neutral layout
+  (`observeSessionCleanupState(...).neutral`). The fixture migrates a legacy root to neutral on the first
+  bound start unless the case pins the legacy layout.
+- **Counted (orchestrator, `node scratch/run-quiet.mjs`):** session-cleanup-binding 46/66 (HEAD 26/65; the
+  20 reds are a subset of the 39 HEAD reds, no regression; one new case pins the plain-process refusal);
+  session-cleanup-power 2/2; check-consumer-safe-paths 9/9. session-cleanup-recovery unchanged 33/39.
+- **Remaining binding reds, by cause:** (a) 7 legacy-layout cases (historic legacy binding recovery):
+  a bound bind cannot create a legacy binding; needs historic legacy binding bytes written by the fixture
+  as an artifact, or a product decision; (b) 10 cases fail 'continuity owning release failed'
+  (SDC-AUTHORITY-UNAVAILABLE) after the bind succeeds; hypothesis: release after descriptor retirement
+  no longer satisfies `continuityAuthorityCurrent` (~9515); (c) neutral coordinator-close release:
+  'continuity owner preparation refused'; (d) single-unbound-descriptor case still creates its
+  descriptor in a plain context; (e) ordinary orphan release: `onboarding-continuity:namespace-drift`.
+- **Product observation for an item:** the session-authority domain refuses any group- or
+  world-writable ancestor (`lib/session-authority-domain-owner.mjs` chain(), `mode & 0o022`), with no
+  exemption for a sticky root-owned `/tmp`; four suites (codex-critic-host, afk-transaction-host,
+  codex-critic-session-route, codex-design-advisor-host) fail in Verify with `domain-ancestor-unsafe`
+  because their fixtures sit under the ambient TMPDIR (K1d). A repository under `/tmp` or created
+  under umask 002 would be refused the same way; its repair text is unchecked.
+- **Next:** K1c3 ports the pair to session-cleanup-recovery; K1c4 diagnoses (b)-(e) and builds (a);
+  K1d measures the four ancestor suites under a private TMPDIR.
