@@ -85,8 +85,16 @@ it replaces `e6fec04a0`. The first signature was spent: push-prepare folded the 
 record above the checkpoint commit and reported ready for a HEAD without `Checkpoint-Intent`
 (backlog item `2026-10-20-a-checkpoint-fold-lands-above-the-checkpoint-commit.md`).
 Implementation complete, PO acceptance pending.
+**Goal since 2026-10-20 (PO):** a content-final local test candidate for 0.7.0, pushed to
+`feat/sprint-alfred` for the PO's acceptance tests; the release itself (main, release gates,
+version decision) is not part of it. The PO installed `0913fa941`. Route (D59): the ordinal-4
+Critic closes the running batch; a Full Verify (`--mode candidate`) in a fresh clone names every
+red suite; the known reds are fixed (doc contracts, the checkpoint fold, the guard-git test split);
+the delivery matrix credits earlier per-item Critics and counted Verify results; items with no
+review get a new batch. The 2026-10-20 remeasure (`8063c1ce6`): 7 at 25, 144 at 50, 23 at 75,
+index 52.30%.
 Open:
-- the PO installs the candidate and tests it locally; then T1 and T2;
+- T1 and T2;
 - the delivery matrix, remeasured after the PO installed the candidate;
 - after the local test: the ordinal-4 Critic and Full Verify (needs a clean tree, Q7).
   `check-doc-contracts.test.mjs` is red 73/76 already at HEAD (broken links from evidence under
