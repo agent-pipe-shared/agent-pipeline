@@ -133,11 +133,13 @@ export function startDescriptorWithBoundRequester(repoPath, options = {}) {
 // (`observeSessionCleanupState` / `readOnboardingSessionCleanupBinding`) then returns `bound` for that tuple. A plain
 // descriptor is started (a legacy root admits it); nothing is stubbed into a `bound` result, and the reader is asserted.
 // Returns the shape of the `start` output the cases read: `{ code: 0, output: { sessionId, descriptorSha256 } }`.
-export function writeHistoricLegacyBinding({ root, sessionId }) {
+// `ownerPid` is the plain descriptor's own owner option (a legacy-root descriptor admits `-1`, which reads as owner
+// `unavailable`: the state a crashed host leaves).
+export function writeHistoricLegacyBinding({ root, sessionId, ownerPid }) {
   const observed = observeSessionCleanupState(root);
   assert.equal(observed.neutral, false, "a historic legacy binding is written only into a legacy-layout State");
   assert.equal(observed.sessionCleanup, null, "the legacy State must be unbound before the historic binding is written");
-  const descriptor = startSessionDescriptor(root, { sessionId });
+  const descriptor = startSessionDescriptor(root, { sessionId, ...(ownerPid === undefined ? {} : { ownerPid }) });
   const sessionCleanup = { sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256 };
   const proposal = bindContinuitySessionCleanup(observed.state.continuity, {
     expectedRevision: observed.revision,
@@ -200,4 +202,35 @@ export function applyRecoveryInFreshProcess({ rootDir, expectedPlanSha256 }) {
     throw new Error("fresh-process recovery failed: " + JSON.stringify(parsed?.error ?? { status: run.status, stderr: String(run.stderr ?? "").slice(-600) }));
   }
   return parsed;
+}
+
+// Runs a module snippet in a node process of its own; the snippet prints one JSON line (the result, or { error }).
+function runJsonChild(source, label) {
+  const run = spawnSync(process.execPath, ["--input-type=module", "-e", source], { encoding: "utf8", shell: false });
+  const lines = String(run.stdout ?? "").trim().split("\n");
+  let parsed = null;
+  try { parsed = JSON.parse(lines[lines.length - 1]); } catch { parsed = null; }
+  if (parsed === null || parsed.error !== undefined) {
+    throw new Error(label + " failed: " + JSON.stringify(parsed?.error ?? { status: run.status, stderr: String(run.stderr ?? "").slice(-600) }));
+  }
+  return parsed;
+}
+
+const CHILD_CATCH = "} catch (error) {\n"
+  + "  console.log(JSON.stringify({ error: { code: error?.code ?? null, message: String(error?.message ?? error), repair: error?.repair ?? null } }));\n"
+  + "}\n";
+
+// A session-cleanup verb in a process of its own, as the PO's terminal reaches it: plain context, no requester, no
+// readiness consult. Returns { code, output } like `invokeCleanupCli`.
+export function sessionCleanupInFreshProcess(argv) {
+  const mainUrl = new URL("../scripts/session-cleanup.mjs", import.meta.url).href;
+  return runJsonChild("import { main } from " + JSON.stringify(mainUrl) + ";\n"
+    + "try {\n"
+    + "  let out = \"\";\n"
+    + "  const code = main(" + JSON.stringify(argv) + ", {}, {\n"
+    + "    requireProjectOnboardingReadyFn() { throw new Error(\"this verb must not consult onboarding readiness\"); },\n"
+    + "    writeFn(value) { out += value; },\n"
+    + "  });\n"
+    + "  console.log(JSON.stringify({ code, output: out === \"\" ? null : JSON.parse(out) }));\n"
+    + CHILD_CATCH, "session-cleanup in a fresh process");
 }

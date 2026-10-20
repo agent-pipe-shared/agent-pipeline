@@ -26,7 +26,6 @@ import {
   quarantineClosedPrivateCleanupReleaseReceipt,
   readOnboardingSessionCleanupBinding,
   recordClosedOnboardingSessionCleanupRelease,
-  releaseOnboardingSessionCleanup,
   previewOnboardingSessionCleanupRelease,
 } from "./onboarding-continuity.mjs";
 import {
@@ -74,7 +73,7 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-import { canonicalJson, digest, recoveryBinding, releaseLostSessionCleanupBinding } from "./session-cleanup-lost-binding.mjs";
+import { canonicalJson, digest, recoveryBinding, releaseArchivedOrphanBinding, releaseLostSessionCleanupBinding } from "./session-cleanup-lost-binding.mjs";
 
 function observeWriterIdentity(scriptPath, deps) {
   if (typeof deps.observeWriterIdentityFn === "function") {
@@ -1164,7 +1163,6 @@ export function applyOrphanDescriptorArchive({
 } = {}) {
   const readBinding = deps.readOnboardingSessionCleanupBindingFn ?? readOnboardingSessionCleanupBinding;
   const archive = deps.archiveOrphanSessionDescriptorFn ?? archiveOrphanSessionDescriptor;
-  const releaseBinding = deps.releaseOnboardingSessionCleanupFn ?? releaseOnboardingSessionCleanup;
   // Observe the binding BEFORE mutating so an unreadable State fails closed.
   readBinding({ rootDir });
   const archived = archive(rootDir, {
@@ -1180,12 +1178,9 @@ export function applyOrphanDescriptorArchive({
   if (binding.status === "bound"
     && binding.sessionCleanup?.sessionId === sessionId
     && binding.sessionCleanup?.descriptorSha256 === expectedDescriptorSha256) {
-    releaseBinding({
-      rootDir,
-      expectedStateSha256: binding.stateSha256,
-      expectedRevision: binding.revision,
-      sessionCleanup: binding.sessionCleanup,
-    });
+    if (deps.releaseOnboardingSessionCleanupFn) {
+      deps.releaseOnboardingSessionCleanupFn({ rootDir, expectedStateSha256: binding.stateSha256, expectedRevision: binding.revision, sessionCleanup: binding.sessionCleanup });
+    } else releaseArchivedOrphanBinding({ rootDir, archived, deps });
     bindingReleased = true;
   }
   return {

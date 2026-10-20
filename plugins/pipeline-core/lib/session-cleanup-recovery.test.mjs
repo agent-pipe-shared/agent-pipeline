@@ -66,9 +66,11 @@ import {
   legacyLayoutRoots,
   migrateToNeutral,
   rewriteAsLegacyDescriptor,
+  sessionCleanupInFreshProcess,
   startDescriptorWithBoundRequester,
   writeHistoricLegacyBinding,
 } from "./test-session-cleanup-requester-fixture.mjs";
+import { prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
 import { main as sessionCleanupMain } from "../scripts/session-cleanup.mjs";
 
@@ -748,9 +750,9 @@ test("RF2A two unavailable-owner descriptors: plan-recovery offers the archive a
 test("RF2A a bound unavailable-owner descriptor: plan-recovery and plan-human-recovery offer archive, apply archives it and releases the binding without readiness or a signature", () => {
   const root = fixture("rf2a-bound");
   try {
-    const started = invoke(["start", "--repo", root, "--session", "session-rf2a-bound"], {
-      startSessionDescriptorFn: (startPath, options) => startSessionDescriptor(startPath, { ...options, ownerPid: -1 }),
-    });
+    prepareSessionAuthorityRegistryFixture({ root, excludeFromStatus: true }); // the bound `start` used to initialise it
+    // The binding the way the historic legacy writer left it (a Source-owned bound `start` refuses an unavailable owner).
+    const started = writeHistoricLegacyBinding({ root, sessionId: "session-rf2a-bound", ownerPid: -1 });
     assert.equal(started.code, 0);
     const descriptor = { sessionId: started.output.sessionId, descriptorSha256: started.output.descriptorSha256 };
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "bound");
@@ -763,7 +765,8 @@ test("RF2A a bound unavailable-owner descriptor: plan-recovery and plan-human-re
     assert.equal(offered[0].sessionId, descriptor.sessionId);
     assert.equal(offered[0].descriptorSha256, descriptor.descriptorSha256);
     const bytes = readFileSync(loadSessionDescriptor(root, descriptor.sessionId).path);
-    const applied = invoke(rf2aArchiveArgv(root, descriptor), RF2A_NO_READINESS);
+    // A process of its own, as the PO's terminal reaches it: no requester context, no readiness consult, no signature.
+    const applied = sessionCleanupInFreshProcess(rf2aArchiveArgv(root, descriptor));
     assert.equal(applied.output.status, "archived");
     assert.equal(applied.output.bindingReleased, true);
     assert.deepEqual(readFileSync(rf2aArchivePath(root, descriptor.sessionId, descriptor.descriptorSha256)), bytes);
