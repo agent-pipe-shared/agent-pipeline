@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b300016c04aa21c9b76120384cef558f2f14ba34780d9e091cb1fca41ec839af"
+    "transitionHead": "0e45978c8dd6c2690d0bb7dba631f5105600cc38d1683f90a4a1dc3e76f70a1f"
   },
   "counts": {
-    "open": 263,
+    "open": 264,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -963,6 +963,16 @@
       "closureRepository": "self",
       "closureCommit": "afb2e3c0f11f7bb0f6af31bec94a376616d31cb4",
       "closureEvidence": "backlog/items/2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md"
+    },
+    {
+      "id": "pipeline.an-elephant-cannot-dispatch-a-small-fix-during-implementation",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "PO decision D60, 2026-10-20 (Q16): the fixes found while finishing the 0.7.0 Alfred test candidate had no admitted Goldfish route",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.an-expired-override-is-armed-instead-of-refused",

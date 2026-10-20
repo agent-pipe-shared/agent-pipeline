@@ -79,6 +79,7 @@
 | pipeline.agy-managed-copy-first-start-lacks-attestation | open | defect | pipeline | none | 2026-09-29 | — | — |
 | pipeline.all-three-runners-should-install-against-the-stable-branch | closed | requirement | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.an-elephant-cannot-dispatch-a-small-fix-during-implementation | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable | open | defect | pipeline | nightwing | 2026-08-28 | — | — |
@@ -949,7 +950,7 @@
 
 ## Counts
 
-- open: 263
+- open: 264
 - in_progress: 0
 - closed: 664
 - rejected: 3
