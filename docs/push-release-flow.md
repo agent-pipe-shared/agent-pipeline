@@ -122,11 +122,12 @@ manifest, which the plan approval binds: approve the plan again afterwards (PF-3
 **A tree dirty only with the Pipeline's own files** (the governed
 `specs/<feature>/slice-queue.json` a dispatch binding writes, the guard-override
 audit log a signed push writes) is named by every clean-tree refusal together with
-`node "${PIPELINE_PLUGIN_ROOT}/scripts/commit-pipeline-owned.mjs" --root <repo>`,
+`node "${PIPELINE_PLUGIN_ROOT}/scripts/commit-pipeline-owned.mjs" --root <repo> --agent`,
 which commits exactly those files and refuses if anything else is dirty
-(PF-31/PF-36/PF-40). An agent session adds `--agent`, which records the GIT-03
-provenance pair. A PO terminal commit omits it and carries no provenance
-trailers. The clean-tree checks themselves stay strict.
+(PF-31/PF-36/PF-40). The caller states who runs it: `--agent` (an agent session)
+records the GIT-03 provenance pair, `--human` (a PO terminal commit) carries no
+provenance trailers, and a call with neither is refused. The clean-tree checks
+themselves stay strict.
 
 **In `signature` mode a checkpoint also needs a commit-bound push signature**
 (PUSHSIG, `lib/checkpoint-push-approval.mjs`): the git pre-push hook refuses it

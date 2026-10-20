@@ -41,5 +41,5 @@ export function classifyDirtyTree(status) {
 export function pipelineOwnedRemedy(status, root) {
   const { owned, others } = classifyDirtyTree(status);
   if (!owned.length || others.length) return null;
-  return `only the Pipeline's own state files are uncommitted (${owned.join(", ")}); commit exactly them with: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} (an agent session adds --agent, which records the AI-Assisted provenance; a PO terminal commit omits it)`;
+  return `only the Pipeline's own state files are uncommitted (${owned.join(", ")}); commit exactly them with: node ${COMMIT_PIPELINE_OWNED_SCRIPT} --root ${root} --agent (an agent session: records the AI-Assisted provenance; a PO terminal commit uses --human instead)`;
 }

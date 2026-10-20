@@ -1433,15 +1433,15 @@ test("PF-36: commit-pipeline-owned commits exactly the Pipeline's own files and 
     writeFileSync(join(root, "specs/unit/slice-queue.json"), "{}\n");
     writeFileSync(join(root, "other.txt"), "x\n");
     const run = (...argv) => commitPipelineOwned(argv, { spawn: (command, args, options) => spawnSync(command, [args[0], args[1], ...config, ...args.slice(2)], options) });
-    const refused = run("--root", root);
+    const refused = run("--root", root, "--human");
     assert.equal(refused.code, "CPO-FOREIGN-CHANGES"); assert.deepEqual(refused.others, ["other.txt"]);
     rmSync(join(root, "other.txt"));
-    assert.equal(run("--root", root, "--dry-run").status, "dry-run");
-    const committed = run("--root", root);
+    assert.equal(run("--root", root, "--human", "--dry-run").status, "dry-run");
+    const committed = run("--root", root, "--human");
     assert.equal(committed.status, "committed", JSON.stringify(committed)); assert.deepEqual(committed.owned, ["specs/unit/slice-queue.json"]);
-    assert.equal(git("status", "--porcelain").stdout, ""); assert.doesNotMatch(git("log", "-1", "--format=%B").stdout, /AI-Assisted|Dispatch:/u, "F-C: no provenance without --agent");
-    assert.equal(run("--root", root).status, "nothing-to-commit"); writeFileSync(join(root, "specs/unit/slice-queue.json"), "{\"next\":1}\n");
+    assert.equal(git("status", "--porcelain").stdout, ""); assert.doesNotMatch(git("log", "-1", "--format=%B").stdout, /AI-Assisted|Dispatch:/u, "--human: no provenance trailers");
+    assert.equal(run("--root", root, "--agent").status, "nothing-to-commit"); writeFileSync(join(root, "specs/unit/slice-queue.json"), "{\"next\":1}\n");
     assert.equal(run("--root", root, "--agent").status, "committed"); assert.match(git("log", "-1", "--format=%B").stdout, /\n\nAI-Assisted: true\nDispatch: stage-0 \(elephant\)\n/u);
-    assert.equal(run().code, "CPO-ARGS"); assert.equal(run("--root", root, "--agent", "--agent").code, "CPO-ARGS", "a repeated flag is refused");
+    for (const argv of [[], ["--root", root], ["--root", root, "--agent", "--human"], ["--root", root, "--agent", "--agent"]]) assert.equal(run(...argv).code, "CPO-ARGS", `neither flag, both or a repeat is refused: ${argv.length}`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

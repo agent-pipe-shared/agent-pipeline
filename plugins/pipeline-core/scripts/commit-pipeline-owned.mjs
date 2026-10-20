@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 //
-// commit-pipeline-owned.mjs --root <root> [--agent] [--dry-run]
+// commit-pipeline-owned.mjs --root <root> (--agent | --human) [--dry-run]
 //
 // PF-31, PF-36, PF-40 (D56 (2)): commits exactly the Pipeline's own dirty state files (the governed slice
 // queue, the guard-override audit log) so the clean-tree checks of push-prepare, push-init and the PO
 // approval pass again. It refuses when anything else is dirty, naming those paths: it never commits, stashes
 // or discards a file the Pipeline does not own. Runs from the agent's shell and from the PO's terminal.
-// The caller states who runs it: `--agent` adds the GIT-03 provenance pair (`AI-Assisted: true`,
-// `Dispatch: stage-0 (elephant)`) for an agent session; without it the commit carries no provenance
-// trailers, as a PO's own terminal commit does (ordinal-2 Critic F-C). Nothing is defaulted from a guess.
+// The caller states who runs it, and exactly one of the two flags is required: `--agent` adds the GIT-03
+// provenance pair (`AI-Assisted: true`, `Dispatch: stage-0 (elephant)`) for an agent session; `--human`
+// commits without provenance trailers, as a PO's own terminal commit does. A call naming neither is refused,
+// so an agent that drops the flag gets a refusal, not an unmarked commit. Nothing is defaulted from a guess.
 //
 // Prints one JSON result. Exit 0: committed | nothing-to-commit | dry-run. Exit 2: refused.
 import { spawnSync } from "node:child_process";
@@ -31,14 +32,16 @@ export function commitPipelineOwnedMessage({ agent }) {
 }
 
 function parse(argv) {
-  const flags = { dryRun: false, agent: false };
+  const usage = "usage: commit-pipeline-owned.mjs --root <root> (--agent | --human) [--dry-run]";
+  const flags = { dryRun: false, agent: undefined };
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--dry-run" && !flags.dryRun) { flags.dryRun = true; continue; }
-    if (argv[index] === "--agent" && !flags.agent) { flags.agent = true; continue; }
+    if ((argv[index] === "--agent" || argv[index] === "--human") && flags.agent === undefined) { flags.agent = argv[index] === "--agent"; continue; }
     if (argv[index] === "--root" && flags.root === undefined && typeof argv[index + 1] === "string" && !argv[index + 1].startsWith("--")) { flags.root = argv[index + 1]; index += 1; continue; }
-    return { error: "usage: commit-pipeline-owned.mjs --root <root> [--agent] [--dry-run]" };
+    return { error: usage };
   }
-  return flags.root === undefined ? { error: "--root <root> is required" } : flags;
+  if (flags.root === undefined) return { error: "--root <root> is required" };
+  return flags.agent === undefined ? { error: `state who runs it: --agent (an agent session) or --human (a PO terminal commit); ${usage}` } : flags;
 }
 
 export function commitPipelineOwned(argv, { spawn = spawnSync } = {}) {
