@@ -119,3 +119,22 @@ Added acceptance (0.7.0, minor; toil, PO 2026-10-18):
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Observed 2026-10-20: Codex WSL greenfield, second run (major)
+
+Source: PO-supplied forensic analysis of a Codex greenfield run on WSL
+(`scratch/pipeline-analyse-greenfield_codex2_20261020.md`), installed `pipeline-core`
+`0.7.0+codex.20261020064459.a8ddf85`, chat approval mode. The run never reached the first
+implementation dispatch. The PO puts the report's blockers and majors into the next candidate (D64).
+
+- After the restart the session asked the PO for the Git author again, although it was answered
+  before the restart, and the manual intake capture lost the author arguments while language and
+  profile survived. Submission and presentation actors were then asked one by one.
+
+Added acceptance (0.7.0, major, D64):
+
+- Every onboarding answer, the Git author included, survives the restart in one typed intake
+  record that is checked for completeness before the restart is offered; the next session asks for
+  none of them again.
+- The actor attribution that submission and presentation need is asked once, bundled with the
+  other required answers where the policy allows; no name is taken from Git as PO authority.

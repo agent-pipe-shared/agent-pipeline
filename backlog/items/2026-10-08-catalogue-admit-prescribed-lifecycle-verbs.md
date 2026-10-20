@@ -40,3 +40,29 @@ Owner: pipeline; due 2026-10-31.
 - **Rationale:** decision AO: automatable admin step.
 - **Assignment (if accepted):** post-0.7.0 automation lane unless pulled in.
 - **Date:** 2026-10-08
+
+## Observed 2026-10-20: Codex WSL greenfield, second run (blocker)
+
+Source: PO-supplied forensic analysis of a Codex greenfield run on WSL
+(`scratch/pipeline-analyse-greenfield_codex2_20261020.md`), installed `pipeline-core`
+`0.7.0+codex.20261020064459.a8ddf85`, chat approval mode. The run never reached the first
+implementation dispatch. The PO puts the report's blockers and majors into the next candidate (D64).
+
+- Prescribed preparation before implementation was refused as opaque execution, so the PO had to
+  grant four chat one-time overrides: the route selection `model-role-dispatch-select.mjs`, the
+  initial and the final design-review receipt producer, and the delta receipt (the last one still
+  unanswered at the stop). The architecture baseline diagnosis, `pipeline-state.mjs --help` and the
+  optional model-role bootstrap readback (`GUARD-DEVPLAN-SHELL`) were refused the same way, and
+  `approve-plan` rendered with an absolute node executable was refused while the plain `node`
+  spelling passed.
+
+Added acceptance (0.7.0, blocker, D64):
+
+- Every fixed installed entry point that the Pipeline prescribes before the first implementation
+  dispatch (route selection, design-review receipt production, architecture materialization and
+  baseline diagnosis, feature-package registration, the help and readback forms it documents) is
+  admitted in the lifecycle state that prescribes it, in the closed argument forms it documents and
+  in the spelling its own next-action rendering emits, absolute node path included.
+- One integration test runs with the real guards from a fresh repository to the first
+  implementation dispatch (route selection, review receipt, architecture materialization,
+  registration) and needs zero human guard overrides.

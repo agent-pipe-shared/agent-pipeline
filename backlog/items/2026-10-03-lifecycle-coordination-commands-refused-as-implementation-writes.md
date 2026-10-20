@@ -64,3 +64,22 @@ block of a design source with `parseArchitectureDesign`) was refused as
 `opaque-script-execution`; only a human override was offered. Deterministic self-checks of
 design sources before `submit-plan` are therefore impossible for the agent. Guard path:
 `guard-devplan` via `guard-lifecycle-ready`.
+
+## Observed 2026-10-20: Codex WSL greenfield, second run (major)
+
+Source: PO-supplied forensic analysis of a Codex greenfield run on WSL
+(`scratch/pipeline-analyse-greenfield_codex2_20261020.md`), installed `pipeline-core`
+`0.7.0+codex.20261020064459.a8ddf85`, chat approval mode. The run never reached the first
+implementation dispatch. The PO puts the report's blockers and majors into the next candidate (D64).
+
+- Unstaging generated Codex files was refused as a working-tree write
+  (`HGO-NARROWER-WRITER-REQUIRED`). The returned audit verification ran and reported `valid`, and the
+  identical unstage was refused again, a loop with no progress. Only a narrow commit with explicit
+  admitted paths moved on.
+
+Added acceptance (0.7.0, major, D64):
+
+- Index changes, working-tree changes and pure observations are classified separately, so an
+  unstage of Pipeline-generated files is not a working-tree write.
+- Every recovery a refusal names is tested as a state machine: run the proposed action, retry the
+  original action, and show progress; a recovery whose retry meets the same refusal fails the test.
