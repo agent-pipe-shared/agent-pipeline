@@ -655,7 +655,7 @@ try {
       hardenWindowsPrivateDirectoryFn() { return { status: "insecure", reason: "private path DACL grants a non-owner principal" }; },
     }), /^Error: project authority adoption archive is unsafe$/);
   });
-  // D56 (2), ordinal-2 Critic F-B: the guard-override ledger leaves the tracked tree.
+  // D56 (2): the ledger helper places the guard-override ledger outside the tracked tree.
   ok("the guard-override ledger lives under the common Git directory, leaves the tree clean and is shared by a worktree", () => {
     const base = realpathSync(root()); git(base, ["init", "-q"]);
     git(base, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-q", "-m", "base"]);
@@ -663,6 +663,7 @@ try {
     assert.equal(ledger.path, join(base, ".git", "agent-pipeline", "guard-override.log.jsonl"));
     assert.equal(ledger.label, `<git-common-dir>/${GUARD_OVERRIDE_LEDGER}`);
     assert.equal(appendGuardOverrideLedgerEntry(ledger, { rule: "GG-01", token: "t1" }), true);
+    if (process.platform !== "win32") assert.equal(lstatSync(ledger.path).mode & 0o777, 0o600, "a new ledger file is owner-only");
     assert.equal(git(base, ["status", "--porcelain", "--untracked-files=all"]), "", "an override entry no longer dirties the tree");
     const worktree = join(base, "wt");
     git(base, ["worktree", "add", "-q", "--detach", worktree]);
