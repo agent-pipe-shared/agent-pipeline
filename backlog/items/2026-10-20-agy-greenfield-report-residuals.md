@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.agy-greenfield-report-residuals
-type: improvement
+type: defect
 owner: pipeline
 status: open
 created: 2026-10-20

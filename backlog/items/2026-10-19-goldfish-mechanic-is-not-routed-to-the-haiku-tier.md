@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.goldfish-mechanic-is-not-routed-to-the-haiku-tier
-type: improvement
+type: defect
 owner: pipeline
 status: open
 created: 2026-10-19

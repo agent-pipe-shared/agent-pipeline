@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.large-files-are-too-complex-for-agents-to-change-safely
-type: improvement
+type: requirement
 owner: pipeline
 status: open
 created: 2026-10-19

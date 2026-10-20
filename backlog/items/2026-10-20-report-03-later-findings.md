@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.report-03-later-findings
-type: improvement
+type: defect
 owner: pipeline
 status: open
 created: 2026-10-20

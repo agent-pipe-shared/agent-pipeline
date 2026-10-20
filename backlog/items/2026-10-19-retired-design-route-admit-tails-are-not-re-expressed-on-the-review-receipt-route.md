@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.retired-design-route-admit-tails-are-not-re-expressed-on-the-review-receipt-route
-type: improvement
+type: defect
 owner: pipeline
 status: open
 created: 2026-10-19

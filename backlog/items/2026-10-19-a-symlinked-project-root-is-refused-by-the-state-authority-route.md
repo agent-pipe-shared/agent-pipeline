@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.a-symlinked-project-root-is-refused-by-the-state-authority-route
-type: improvement
+type: defect
 owner: pipeline
 status: open
 created: 2026-10-19
