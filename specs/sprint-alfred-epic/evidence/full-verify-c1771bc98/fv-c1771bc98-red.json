@@ -1,0 +1,840 @@
+{
+ "exitCode": 1,
+ "total": 1057,
+ "stepKeys": [
+  "name",
+  "exitCode",
+  "durationMs",
+  "reused"
+ ],
+ "red": [
+  {
+   "name": "control-placement-tests",
+   "exitCode": 1,
+   "durationMs": 80,
+   "reused": false
+  },
+  {
+   "name": "interruption-receipts-tests",
+   "exitCode": 1,
+   "durationMs": 8792,
+   "reused": false
+  },
+  {
+   "name": "codex-critic-host-tests",
+   "exitCode": 1,
+   "durationMs": 143729,
+   "reused": false
+  },
+  {
+   "name": "model-role-host-store-tests",
+   "exitCode": 1,
+   "durationMs": 373,
+   "reused": false
+  },
+  {
+   "name": "agy-final-return-tests",
+   "exitCode": 1,
+   "durationMs": 5910,
+   "reused": false
+  },
+  {
+   "name": "wsl-ipc-compatibility-tests",
+   "exitCode": 1,
+   "durationMs": 2379,
+   "reused": false
+  },
+  {
+   "name": "session-cleanup-power-tests",
+   "exitCode": 1,
+   "durationMs": 4893,
+   "reused": false
+  },
+  {
+   "name": "session-cleanup-binding-tests",
+   "exitCode": 1,
+   "durationMs": 17217,
+   "reused": false
+  },
+  {
+   "name": "guard-apply-patch-tests",
+   "exitCode": 1,
+   "durationMs": 216016,
+   "reused": false
+  },
+  {
+   "name": "guard-testpath-tests",
+   "exitCode": 1,
+   "durationMs": 26426,
+   "reused": false
+  },
+  {
+   "name": "guard-devplan-tests",
+   "exitCode": 1,
+   "durationMs": 50273,
+   "reused": false
+  },
+  {
+   "name": "lifecycle-denial-loop-guard-tests",
+   "exitCode": 1,
+   "durationMs": 7791,
+   "reused": false
+  },
+  {
+   "name": "pipeline-state-rebind-runner-tests",
+   "exitCode": 1,
+   "durationMs": 9335,
+   "reused": false
+  },
+  {
+   "name": "codex-pretool-guard-tests",
+   "exitCode": 1,
+   "durationMs": 375597,
+   "reused": false
+  },
+  {
+   "name": "codex-session-start-hint-tests",
+   "exitCode": 1,
+   "durationMs": 5246,
+   "reused": false
+  },
+  {
+   "name": "guard-push-architecture-tests",
+   "exitCode": 1,
+   "durationMs": 1223,
+   "reused": false
+  },
+  {
+   "name": "slice-queue-cli-tests",
+   "exitCode": 1,
+   "durationMs": 23099,
+   "reused": false
+  },
+  {
+   "name": "stop-fanout-tests",
+   "exitCode": 1,
+   "durationMs": 22808,
+   "reused": false
+  },
+  {
+   "name": "runner-profile-migration-v3-tests",
+   "exitCode": 1,
+   "durationMs": 224768,
+   "reused": false
+  },
+  {
+   "name": "project-onboarding-v3-tests",
+   "exitCode": 1,
+   "durationMs": 861855,
+   "reused": false
+  },
+  {
+   "name": "onboarding-continuity-tests",
+   "exitCode": 1,
+   "durationMs": 15714339,
+   "reused": false
+  },
+  {
+   "name": "project-onboarding-e2e-tests",
+   "exitCode": 1,
+   "durationMs": 142112,
+   "reused": false
+  },
+  {
+   "name": "project-authority-tests",
+   "exitCode": 1,
+   "durationMs": 78942,
+   "reused": false
+  },
+  {
+   "name": "gate-strength-guard-tests",
+   "exitCode": 1,
+   "durationMs": 246494,
+   "reused": false
+  },
+  {
+   "name": "notebook-write-coverage-tests",
+   "exitCode": 1,
+   "durationMs": 10579,
+   "reused": false
+  },
+  {
+   "name": "guard-dispatch-tests",
+   "exitCode": 1,
+   "durationMs": 44319,
+   "reused": false
+  },
+  {
+   "name": "spec-readiness-host-tests",
+   "exitCode": 1,
+   "durationMs": 635,
+   "reused": false
+  },
+  {
+   "name": "codex-design-readiness-host-tests",
+   "exitCode": 1,
+   "durationMs": 59915,
+   "reused": false
+  },
+  {
+   "name": "codex-host-output-custody-tests",
+   "exitCode": 1,
+   "durationMs": 5103,
+   "reused": false
+  },
+  {
+   "name": "pipeline-start-v3-tests",
+   "exitCode": 1,
+   "durationMs": 1180,
+   "reused": false
+  },
+  {
+   "name": "commit-message-policy-tests",
+   "exitCode": 1,
+   "durationMs": 143,
+   "reused": false
+  },
+  {
+   "name": "dispatch-policy-tests",
+   "exitCode": 1,
+   "durationMs": 2321,
+   "reused": false
+  },
+  {
+   "name": "threat-model-approval-request-tests",
+   "exitCode": 1,
+   "durationMs": 635,
+   "reused": false
+  },
+  {
+   "name": "guard-gate-strength-ledger-tests",
+   "exitCode": 1,
+   "durationMs": 1008,
+   "reused": false
+  },
+  {
+   "name": "spec-retention-check",
+   "exitCode": 2,
+   "durationMs": 71,
+   "reused": false
+  },
+  {
+   "name": "product-capability-inventory-tests",
+   "exitCode": 1,
+   "durationMs": 63005,
+   "reused": false
+  },
+  {
+   "name": "pipeline-state-late-verify-tests",
+   "exitCode": 1,
+   "durationMs": 713,
+   "reused": false
+  },
+  {
+   "name": "doc-contract-tests",
+   "exitCode": 1,
+   "durationMs": 53374,
+   "reused": false
+  },
+  {
+   "name": "doc-contract-check",
+   "exitCode": 2,
+   "durationMs": 12844,
+   "reused": false
+  },
+  {
+   "name": "language-canon-tests",
+   "exitCode": 1,
+   "durationMs": 118,
+   "reused": false
+  },
+  {
+   "name": "license-contract-check",
+   "exitCode": 1,
+   "durationMs": 319,
+   "reused": false
+  },
+  {
+   "name": "no-autoupdate-key-tests",
+   "exitCode": 1,
+   "durationMs": 95,
+   "reused": false
+  },
+  {
+   "name": "phase3-sdlc-coherence-tests",
+   "exitCode": 1,
+   "durationMs": 94,
+   "reused": false
+  },
+  {
+   "name": "session-critic-finalizer-tests",
+   "exitCode": 1,
+   "durationMs": 38926,
+   "reused": false
+  },
+  {
+   "name": "windows-private-state-tests",
+   "exitCode": 1,
+   "durationMs": 112,
+   "reused": false
+  },
+  {
+   "name": "governance-action-artifact-tests",
+   "exitCode": 1,
+   "durationMs": 177,
+   "reused": false
+  },
+  {
+   "name": "local-worker-supervisor-cli-tests",
+   "exitCode": 1,
+   "durationMs": 68691,
+   "reused": false
+  },
+  {
+   "name": "nova-critic-lineage-tests",
+   "exitCode": 1,
+   "durationMs": 467,
+   "reused": false
+  },
+  {
+   "name": "nova-verify-journal-tests",
+   "exitCode": 1,
+   "durationMs": 70148,
+   "reused": false
+  },
+  {
+   "name": "verify-case-completion-registry-tests",
+   "exitCode": 1,
+   "durationMs": 9601,
+   "reused": false
+  },
+  {
+   "name": "verify-case-completion-check",
+   "exitCode": 2,
+   "durationMs": 1694,
+   "reused": false
+  },
+  {
+   "name": "afk-transaction-host-tests",
+   "exitCode": 1,
+   "durationMs": 5247,
+   "reused": false
+  },
+  {
+   "name": "afk-claude-host-tests",
+   "exitCode": 1,
+   "durationMs": 1281,
+   "reused": false
+  },
+  {
+   "name": "codex-critic-packet-host-tests",
+   "exitCode": 1,
+   "durationMs": 656,
+   "reused": false
+  },
+  {
+   "name": "guard-human-override-tests",
+   "exitCode": 1,
+   "durationMs": 9740,
+   "reused": false
+  },
+  {
+   "name": "human-guard-override-capability-scan-tests",
+   "exitCode": 1,
+   "durationMs": 2111,
+   "reused": false
+  },
+  {
+   "name": "pipeline-state-external-push-ledger-tests",
+   "exitCode": 1,
+   "durationMs": 1348,
+   "reused": false
+  },
+  {
+   "name": "critical-action-approval-request-tests",
+   "exitCode": 1,
+   "durationMs": 75,
+   "reused": false
+  },
+  {
+   "name": "runner-contracts.schema-tests",
+   "exitCode": 1,
+   "durationMs": 94,
+   "reused": false
+  },
+  {
+   "name": "gitleaks-tests",
+   "exitCode": 1,
+   "durationMs": 463,
+   "reused": false
+  },
+  {
+   "name": "verify-suite-registration-tests",
+   "exitCode": 1,
+   "durationMs": 286,
+   "reused": false
+  },
+  {
+   "name": "verify-suite-registration-check",
+   "exitCode": 2,
+   "durationMs": 101,
+   "reused": false
+  },
+  {
+   "name": "afk-activation-tests",
+   "exitCode": 1,
+   "durationMs": 548,
+   "reused": false
+  },
+  {
+   "name": "codex-isolated-critic-protected-preimage-tests",
+   "exitCode": 1,
+   "durationMs": 77,
+   "reused": false
+  },
+  {
+   "name": "antigravity-pretool-guard-tests",
+   "exitCode": 2,
+   "durationMs": 188878,
+   "reused": false
+  },
+  {
+   "name": "verify-evidence-producer-tests",
+   "exitCode": 1,
+   "durationMs": 35955,
+   "reused": false
+  },
+  {
+   "name": "guard-maintenance-window-kernel-closure-tests",
+   "exitCode": 1,
+   "durationMs": 1009,
+   "reused": false
+  },
+  {
+   "name": "session-cleanup-recovery-tests",
+   "exitCode": 1,
+   "durationMs": 13725,
+   "reused": false
+  },
+  {
+   "name": "dispatch-authorship-verify-tests",
+   "exitCode": 1,
+   "durationMs": 2773,
+   "reused": false
+  },
+  {
+   "name": "push-release-flow-docs-contract-tests",
+   "exitCode": 1,
+   "durationMs": 1046,
+   "reused": false
+  },
+  {
+   "name": "dispatch-budget-binding-tests",
+   "exitCode": 1,
+   "durationMs": 150,
+   "reused": false
+  },
+  {
+   "name": "wire-dispatch-budget-hook-tests",
+   "exitCode": 1,
+   "durationMs": 154,
+   "reused": false
+  },
+  {
+   "name": "pipeline-start-preflight-pre-push-observation-tests",
+   "exitCode": 1,
+   "durationMs": 116200,
+   "reused": false
+  },
+  {
+   "name": "commit-msg-hook-install-tests",
+   "exitCode": 1,
+   "durationMs": 175159,
+   "reused": false
+  },
+  {
+   "name": "check-critic-skip-coverage-tests",
+   "exitCode": 1,
+   "durationMs": 2917,
+   "reused": false
+  },
+  {
+   "name": "critic-skip-coverage-check",
+   "exitCode": 2,
+   "durationMs": 620,
+   "reused": false
+  },
+  {
+   "name": "measure-tofu-push-e2e-tests",
+   "exitCode": 1,
+   "durationMs": 27760,
+   "reused": false
+  },
+  {
+   "name": "suite-registration-check",
+   "exitCode": 1,
+   "durationMs": 105,
+   "reused": false
+  },
+  {
+   "name": "dispatch-record-strip-for-critic-tests",
+   "exitCode": 1,
+   "durationMs": 91,
+   "reused": false
+  },
+  {
+   "name": "codex-advisor-execution-tests",
+   "exitCode": 1,
+   "durationMs": 77959,
+   "reused": false
+  },
+  {
+   "name": "design-workflow-package-v2-tests",
+   "exitCode": 1,
+   "durationMs": 16208925,
+   "reused": false
+  },
+  {
+   "name": "architecture-baseline-tests",
+   "exitCode": 1,
+   "durationMs": 2910,
+   "reused": false
+  },
+  {
+   "name": "architecture-effective-decisions-tests",
+   "exitCode": 1,
+   "durationMs": 1049,
+   "reused": false
+  },
+  {
+   "name": "rigor-floor-tests",
+   "exitCode": 1,
+   "durationMs": 287,
+   "reused": false
+  },
+  {
+   "name": "agy-session-authority-tests",
+   "exitCode": 1,
+   "durationMs": 623,
+   "reused": false
+  },
+  {
+   "name": "agy-session-dispatch-tests",
+   "exitCode": 1,
+   "durationMs": 16072903,
+   "reused": false
+  },
+  {
+   "name": "portable-agy-authorship-export-tests",
+   "exitCode": 1,
+   "durationMs": 1334,
+   "reused": false
+  },
+  {
+   "name": "goldfish-antigravity-live-host-tests",
+   "exitCode": 1,
+   "durationMs": 1088,
+   "reused": false
+  },
+  {
+   "name": "architecture-decision-continuity-tests",
+   "exitCode": 1,
+   "durationMs": 612,
+   "reused": false
+  },
+  {
+   "name": "design-advisory-admission-cli-tests",
+   "exitCode": 1,
+   "durationMs": 191,
+   "reused": false
+  },
+  {
+   "name": "verify-suite-append-history-check",
+   "exitCode": 1,
+   "durationMs": 628,
+   "reused": false
+  },
+  {
+   "name": "codex-critic-session-route-tests",
+   "exitCode": 1,
+   "durationMs": 56421,
+   "reused": false
+  },
+  {
+   "name": "native-goldfish-host-state-tests",
+   "exitCode": 1,
+   "durationMs": 17956747,
+   "reused": false
+  },
+  {
+   "name": "native-goldfish-host-return-tests",
+   "exitCode": 1,
+   "durationMs": 125,
+   "reused": false
+  },
+  {
+   "name": "native-goldfish-host-finalizer-tests",
+   "exitCode": 1,
+   "durationMs": 15960953,
+   "reused": false
+  },
+  {
+   "name": "antigravity-topology-refresh-host-tests",
+   "exitCode": 1,
+   "durationMs": 1706,
+   "reused": false
+  },
+  {
+   "name": "hook-governance-scope-tests",
+   "exitCode": 1,
+   "durationMs": 35540,
+   "reused": false
+  },
+  {
+   "name": "project-reset-git-hooks-tests",
+   "exitCode": 1,
+   "durationMs": 15889021,
+   "reused": false
+  },
+  {
+   "name": "project-uninstall-tests",
+   "exitCode": 1,
+   "durationMs": 45995,
+   "reused": false
+  },
+  {
+   "name": "security-scanner-diagnostics-tests",
+   "exitCode": 1,
+   "durationMs": 1600,
+   "reused": false
+  },
+  {
+   "name": "codex-design-advisor-host-tests",
+   "exitCode": 1,
+   "durationMs": 53289,
+   "reused": false
+  },
+  {
+   "name": "commit-msg-hook-signed-integration-tests",
+   "exitCode": 1,
+   "durationMs": 12848,
+   "reused": false
+  },
+  {
+   "name": "guard-dispatch-native-worker-tests",
+   "exitCode": 1,
+   "durationMs": 2483,
+   "reused": false
+  },
+  {
+   "name": "guard-git-signed-integration-tests",
+   "exitCode": 1,
+   "durationMs": 4229,
+   "reused": false
+  },
+  {
+   "name": "model-family-execution-tests",
+   "exitCode": 1,
+   "durationMs": 599,
+   "reused": false
+  },
+  {
+   "name": "model-family-host-store-tests",
+   "exitCode": 1,
+   "durationMs": 17763769,
+   "reused": false
+  },
+  {
+   "name": "model-family-invocation-tests",
+   "exitCode": 1,
+   "durationMs": 16601840,
+   "reused": false
+  },
+  {
+   "name": "model-family-main-prelaunch-tests",
+   "exitCode": 1,
+   "durationMs": 65624,
+   "reused": false
+  },
+  {
+   "name": "model-family-runtime-host-tests",
+   "exitCode": 1,
+   "durationMs": 578,
+   "reused": false
+  },
+  {
+   "name": "native-goldfish-host-state-regression-tests",
+   "exitCode": 1,
+   "durationMs": 1841,
+   "reused": false
+  },
+  {
+   "name": "model-family-approval-request-tests",
+   "exitCode": 1,
+   "durationMs": 1535,
+   "reused": false
+  },
+  {
+   "name": "design-workflow-package-builder-tests",
+   "exitCode": 1,
+   "durationMs": 142939,
+   "reused": false
+  },
+  {
+   "name": "design-course-session-tests",
+   "exitCode": 1,
+   "durationMs": 427,
+   "reused": false
+  },
+  {
+   "name": "guard-dispatch-budget-checkpoint-tests",
+   "exitCode": 1,
+   "durationMs": 39005,
+   "reused": false
+  },
+  {
+   "name": "pipeline-state-push-anchor-tests",
+   "exitCode": 1,
+   "durationMs": 2075,
+   "reused": false
+  },
+  {
+   "name": "design-approval-command-admission-tests",
+   "exitCode": 1,
+   "durationMs": 1193,
+   "reused": false
+  },
+  {
+   "name": "design-workflow-package-route-tests",
+   "exitCode": 1,
+   "durationMs": 1141,
+   "reused": false
+  },
+  {
+   "name": "pipeline-start-preflight-enforcement-tests",
+   "exitCode": 1,
+   "durationMs": 1696,
+   "reused": false
+  },
+  {
+   "name": "r7-3-bound-paths-tests",
+   "exitCode": 1,
+   "durationMs": 2723,
+   "reused": false
+  },
+  {
+   "name": "security-scan-snapshot-tests",
+   "exitCode": 1,
+   "durationMs": 1312,
+   "reused": false
+  },
+  {
+   "name": "architecture-entry-required-source-tests",
+   "exitCode": 1,
+   "durationMs": 980,
+   "reused": false
+  },
+  {
+   "name": "architecture-prospective-companion-tests",
+   "exitCode": 1,
+   "durationMs": 144714,
+   "reused": false
+  },
+  {
+   "name": "signing-disclosure-sweep-tests",
+   "exitCode": 1,
+   "durationMs": 509102,
+   "reused": false
+  },
+  {
+   "name": "scratch-package-staging-tests",
+   "exitCode": 1,
+   "durationMs": 166,
+   "reused": false
+  },
+  {
+   "name": "pin-approval-bound-design-package-lives-in-an-ignored-directory-tests",
+   "exitCode": 1,
+   "durationMs": 2094,
+   "reused": false
+  },
+  {
+   "name": "pin-claude-session-start-emits-codex-transcript-recovery-hint-tests",
+   "exitCode": 1,
+   "durationMs": 24494,
+   "reused": false
+  },
+  {
+   "name": "pin-draft-phase-guard-blocks-mandatory-bootstrap-preflight-tests",
+   "exitCode": 1,
+   "durationMs": 1444,
+   "reused": false
+  },
+  {
+   "name": "pin-model-role-bootstrap-is-always-unavailable-on-native-windows-tests",
+   "exitCode": 1,
+   "durationMs": 23965,
+   "reused": false
+  },
+  {
+   "name": "pin-no-uninstall-path-for-a-repository-that-once-opted-in-tests",
+   "exitCode": 1,
+   "durationMs": 128079,
+   "reused": false
+  },
+  {
+   "name": "pin-verify-on-a-wsl-mnt-drive-checkout-hides-its-reason-tests",
+   "exitCode": 1,
+   "durationMs": 966,
+   "reused": false
+  },
+  {
+   "name": "pin-windows-greenfield-scratch-write-denied-tests",
+   "exitCode": 1,
+   "durationMs": 7414,
+   "reused": false
+  },
+  {
+   "name": "pin-worktrees-share-onboarding-private-state-with-root-bound-intake-tests",
+   "exitCode": 1,
+   "durationMs": 25076,
+   "reused": false
+  },
+  {
+   "name": "pin-orphan-descriptor-recovery-never-offers-the-running-session-tests",
+   "exitCode": 1,
+   "durationMs": 3409,
+   "reused": false
+  },
+  {
+   "name": "pin-configure-verify-names-the-unmet-approval-condition-tests",
+   "exitCode": 1,
+   "durationMs": 17412,
+   "reused": false
+  },
+  {
+   "name": "session-authority-repair-tests",
+   "exitCode": 1,
+   "durationMs": 132333,
+   "reused": false
+  },
+  {
+   "name": "scoped-verify-registration-tests",
+   "exitCode": 1,
+   "durationMs": 460,
+   "reused": false
+  },
+  {
+   "name": "toolchain-preflight-tests",
+   "exitCode": 1,
+   "durationMs": 17933,
+   "reused": false
+  },
+  {
+   "name": "security-scan",
+   "exitCode": 2,
+   "durationMs": 60831,
+   "reused": false
+  }
+ ]
+}
