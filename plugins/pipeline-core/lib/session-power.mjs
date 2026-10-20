@@ -328,7 +328,7 @@ function strictAddressChain(target,{privateLeaf=false}={}){
   }
   return rows;
 }
-function addressRootRecord(repo,repositoryFingerprint){return {schema:ADDRESS_ROOT_SCHEMA,repositoryFingerprint,primaryRoot:repo.primaryRoot,commonDir:repo.commonDir};}
+function addressRootRecord(repo,repositoryFingerprint){return {schema:ADDRESS_ROOT_SCHEMA,repositoryFingerprint,primaryRoot:repo.primaryRoot,commonDir:repo.commonDir};} export function addressNamespaceRefusalMessage({count,foreign}){const cli=authorityFileURLToPath(new URL('../scripts/session-power-address-repair.mjs',import.meta.url)),over=count>4096;return 'unknown fixed address namespace: '+(over?count+' entries exceed the 4096 bound. ':'')+(foreign?'a name that is not a 16-hex repository slot is present'+(over?' too. ':'. '):'')+'Repair route (moves slots of absent repositories aside through a plan and a readback, deletes nothing): run `node '+cli+' plan`'+(over?', then `node '+cli+' apply --plan-sha256 <digest from the plan>`':'; it lists any foreign entry, which is reported and never moved')+'.';} // D71/D72: the refusal names its repair verb
 function addressDirectory(repo,repositoryFingerprint){
   const home=userInfo().homedir;strictAddressChain(home);
   const directory=join(home,'.apsp',repositoryFingerprint.slice(0,16));
@@ -363,7 +363,7 @@ function prepareAddressRoot(repo,repositoryFingerprint){
     const parent=dirname(target),before=strictAddressChain(parent,{privateLeaf:parent!==home});
     if(target===directory){
       const names=readdirSync(parent).sort();
-      if(names.length>4096||names.some(name=>!/^[a-f0-9]{16}$/.test(name)))fail('SP-ADDRESS','unknown fixed address namespace');
+      const foreign=names.some(name=>!/^[a-f0-9]{16}$/.test(name));if(names.length>4096||foreign)fail('SP-ADDRESS',addressNamespaceRefusalMessage({count:names.length,foreign}));
       for(const name of names){const slot=join(parent,name);strictAddressChain(slot,{privateLeaf:true});const anchor=addressRead(join(slot,'anchor.json'));
         if(!exactKeys(anchor.value,new Set(['schema','repositoryFingerprint','primaryRoot','commonDir']))||anchor.value.schema!==ADDRESS_ROOT_SCHEMA||!digest(anchor.value.repositoryFingerprint)||anchor.value.repositoryFingerprint.slice(0,16)!==name||!isAbsolute(anchor.value.primaryRoot)||!isAbsolute(anchor.value.commonDir))fail('SP-ADDRESS','foreign fixed address slot');}
       if(authorityDigest(names)!==authorityDigest(readdirSync(parent).sort()))fail('SP-ADDRESS','fixed address namespace changed');
