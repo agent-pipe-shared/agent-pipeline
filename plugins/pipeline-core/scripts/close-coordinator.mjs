@@ -480,6 +480,7 @@ async function transitionPlan(values) {
   }
   let boundEvidenceSha256 = null;
   let audit = null;
+  let courseAuthorship = null;
   if (values.phase === "checkpointed") {
     const feature = activeFeature(snapshot.state);
     if (feature.id !== stored.coordinator.featureId) fail("CLOSE-FEATURE", "checkpoint feature drifted");
@@ -489,7 +490,7 @@ async function transitionPlan(values) {
     const observed = authorityFromState(root, snapshot, { requireResult: true });
     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
-    assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined });
+    courseAuthorship = assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined });
     if (values.auditRequest !== undefined) {
       const request = auditRequest(root, values.auditRequest);
       if (!SHA256.test(values.criticVerifyLifecycle ?? "") || values.criticVerifyLifecycle !== request.value.criticVerifyLifecycleId) {
@@ -697,7 +698,10 @@ async function transitionPlan(values) {
     advance,
   };
   const digest = planDigest(payload);
-  return { ...payload, planSha256: digest, nextAction: action("apply-transition", { ...values, root }, digest) };
+  // D55 Q1: the course's authorship classification is reported beside the plan, outside its digest. It names the
+  // `unrecorded` slices the gate does not refuse, so the close states them instead of passing them silently.
+  return { ...payload, planSha256: digest, ...(courseAuthorship ? { courseAuthorship } : {}),
+    nextAction: action("apply-transition", { ...values, root }, digest) };
 }
 
 function applyStart(values, suppliedDigest) {

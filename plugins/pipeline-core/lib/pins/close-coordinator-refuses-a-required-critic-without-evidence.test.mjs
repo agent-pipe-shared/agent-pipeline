@@ -268,4 +268,9 @@ test("(g) a slice whose commit carries no Dispatch trailer is not commit-recorde
   const planned = repo.planPrepared();
   assert.equal(planned.status, 0, JSON.stringify(planned.body));
   assert.equal(planned.body.phase, "feature-close-prepared");
+  // Ordinal-2 Critic F-D: the plan states the slice as unrecorded instead of passing it silently, and the report
+  // stays outside the plan digest, so applying the plan is unchanged.
+  assert.deepEqual(planned.body.courseAuthorship,
+    { schema: "pipeline.close-course-authorship.v1", dispatchRecord: [], orchestratorCommit: [], unrecorded: ["TASK-BG"] });
+  assert.equal(invokeAction(planned.body.nextAction).body.status, "applied");
 });

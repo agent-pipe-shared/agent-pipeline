@@ -48,7 +48,9 @@ its `Dispatch: <slice> (goldfish)` commit, with no dispatch record (a
 background Goldfish), is accepted only on the audit route: the planner refuses
 `CLOSE-AUTHORSHIP-COMMIT-ONLY` until `--audit-request` and
 `--critic-verify-lifecycle` bind a passing Verify and a Critic review to the
-candidate.
+candidate. The plan's `courseAuthorship` names each slice's record:
+`dispatchRecord`, `orchestratorCommit`, or `unrecorded`. An `unrecorded` slice
+has no record of either kind. Report it to the PO before applying.
 
 The returned action has this shape (the Continuity flag is mandatory whenever
 it is present in the returned argv):

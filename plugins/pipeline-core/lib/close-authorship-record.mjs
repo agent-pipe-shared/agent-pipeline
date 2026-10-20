@@ -14,7 +14,7 @@
  *     `ready` attempt superseded by an integrated same-item dependent; such a slice rides along as
  *     work delivered by the dependent's commit;
  *   - `unrecorded`: neither. Not gated here (a held, deferred or not yet delivered slice has
- *     nothing behind it either); the close reports it.
+ *     nothing behind it either); the close reports it in the transition plan's `courseAuthorship`.
  * The orchestrator's per-commit counted runs are not persisted anywhere, so the close cannot read
  * them. Its persisted equivalent is the candidate-bound Verify and Critic receipt of the audit
  * route, which the coordinator therefore requires once any slice is `orchestratorCommit`.
