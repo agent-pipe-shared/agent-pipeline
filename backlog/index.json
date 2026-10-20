@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d343e2f8cc55e25e74c7d4d5fd223073745423ab98dccb8ff8f0767f166679b4"
+    "transitionHead": "fbdf90791457755cd7362eefc259348be548154144db429b74145bcce91c0091"
   },
   "counts": {
-    "open": 256,
+    "open": 260,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -2863,6 +2863,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.correction-review-bindings-are-built-by-hand",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "Ordinal-2 delta Critic of e6fec04a0..f62b5143a, 2026-10-20: the first dispatch stopped at the reference boundary because its briefing called the correction input bindings not applicable although the range added a retained Critic result",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock",
       "status": "closed",
       "type": "defect",
@@ -4388,6 +4398,16 @@
       "closureRepository": "self",
       "closureCommit": "794fa61970ebaac3eb5969a4b38b67134dd98c65",
       "closureEvidence": "backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md"
+    },
+    {
+      "id": "pipeline.gg20-refuses-reading-the-hooks-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "Elephant observation, 2026-10-20: `git config --get core.hooksPath` was refused with GG-20 while checking which commit-msg hook a PO terminal commit meets",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec",
@@ -10783,6 +10803,16 @@
       "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md"
     },
     {
+      "id": "pipeline.the-opus-critic-admission-needs-a-word-the-template-does-not-carry",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "Ordinal-2 Critic dispatch, 2026-10-20: a template-faithful fill was refused with DISPATCH-OPUS-NO-BATCH-RATIONALE",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers",
       "status": "closed",
       "type": "requirement",
@@ -10850,6 +10880,16 @@
       "closureRepository": "self",
       "closureCommit": "794817658047d852c44917e8ac60aa372ec31862",
       "closureEvidence": "backlog/evidence/2026-09-07-codex-preflight-stdin-lifecycle.md"
+    },
+    {
+      "id": "pipeline.the-stage-0-verifier-bound-is-not-the-stage-0-criterion",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-20",
+      "source": "Ordinal-2 delta Critic of e6fec04a0..f62b5143a, finding F-A (major), 2026-10-20",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.the-t1-fallback-waits-for-failure-codes-the-route-collapses",

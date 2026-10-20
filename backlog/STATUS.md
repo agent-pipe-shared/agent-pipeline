@@ -227,6 +227,7 @@
 | pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path | closed | defect | pipeline | nova | 2026-08-28 | — | — |
 | pipeline.correction-critic-reuses-the-full-review-context | open | workflow-improvement | pipeline | none | 2026-10-12 | — | — |
+| pipeline.correction-review-bindings-are-built-by-hand | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock | closed | defect | pipeline | nova-b | 2026-09-12 | 2026-09-30 | — |
 | pipeline.critic-and-verify-cadence-may-be-too-fine-grained | closed | workflow-improvement | pipeline | alfred | 2026-08-24 | 2026-08-31 | — |
 | pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard | open | defect | pipeline | alfred | 2026-10-05 | — | — |
@@ -349,6 +350,7 @@
 | pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | closed | defect | pipeline | nova | 2026-08-27 | — | — |
 | pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit | closed | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — GG-22's disallowed-path check reads `git diff --cached`, the shared index, rather than the paths the blocked commit actually names. Under parallel dispatch that makes an unrelated agent's staged work block a correct ledger commit, with a denial text that names neither the real cause nor a route forward. |
 | pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt | closed | defect | pipeline | nova | 2026-08-29 | — | — |
+| pipeline.gg20-refuses-reading-the-hooks-path | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- T1 Critic closing round for NVA-B-GG22FIX-2 (F2, minor): normalizePathspecLexically() drops empty path segments, so a trailing-slash directory pathspec token (backlog/items/) normalizes to backlog/items, which then fails the backlog/items/ prefix check and is classed disallowed -- a legitimate git commit -F <msg> -- backlog/items/ is now blocked while GG-22 debt is outstanding. Fail-closed direction (a false block, not a false admission), so this is NOT a security regression, but it does regress the deadlock fix's own intent for the directory form of a pathspec. |
 | pipeline.gg22-pathspec-fix-lacks-permanent-test | closed | defect | pipeline | nova-b | 2026-09-06 | 2026-10-06 | Nova B — NVA-B-GG22FIX-1 (commit fe2d7afe) fixed the GG-22 shared-index deadlock, but plugins/pipeline-core/hooks/guard-git.test.mjs is TP-1 protected with no in-session override route, so the dispatch could not add a permanent regression test there. The fix was proven RED-then-GREEN via an ephemeral scratch/ reproduction script instead, which is not committed and does not guard against a future regression of this exact scoping logic. |
 | pipeline.gh-commands-blocked-before-binding-though-design-phase-requests-a-repo | open | defect | pipeline | none | 2026-10-18 | — | — |
@@ -846,11 +848,13 @@
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
+| pipeline.the-opus-critic-admission-needs-a-word-the-template-does-not-carry | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | — | 2026-08-27 | — | — |
 | pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.the-sandbox-preflight-app-server-handshake-is-a-race | closed | defect | pipeline | nova-b | 2026-09-06 | — | — |
+| pipeline.the-stage-0-verifier-bound-is-not-the-stage-0-criterion | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.the-t1-fallback-waits-for-failure-codes-the-route-collapses | open | defect | pipeline | none | 2026-09-06 | — | — |
 | pipeline.the-two-suite-registration-checkers-disagree | closed | defect | pipeline | — | 2026-08-27 | — | — |
 | pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim | closed | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused. |
@@ -942,7 +946,7 @@
 
 ## Counts
 
-- open: 256
+- open: 260
 - in_progress: 0
 - closed: 664
 - rejected: 3
