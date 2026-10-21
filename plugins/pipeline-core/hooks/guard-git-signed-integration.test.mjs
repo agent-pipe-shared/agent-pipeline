@@ -32,7 +32,10 @@ function fixture() {
     schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [],
     trustAnchors: [{ keyReference: "fixture-key", publicKeySha256: sha(publicKey) }],
   }));
-  git(root, ["add", "subject.txt", "project/critical-human-proof.json"]);
+  // QG-04 (808a0b047; c972bc580 is the sibling fix): the product builds its isolated verification checkout under
+  // <root>/scratch, which the real repository ignores; an unignored one makes applyToMain end in QUALITY-PACKAGE-BASE-DRIFT.
+  writeFileSync(join(root, ".gitignore"), "scratch/\n");
+  git(root, ["add", ".gitignore", "subject.txt", "project/critical-human-proof.json"]);
   git(root, ["commit", "-qm", "base"]);
   const worktree = join(FIXTURE_TMP, `guard-integration-wt-${process.pid}-${Date.now()}`);
   git(root, ["worktree", "add", "-q", "-b", "integration", worktree, "HEAD"]);
