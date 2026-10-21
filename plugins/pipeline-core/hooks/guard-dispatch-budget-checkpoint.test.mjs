@@ -27,6 +27,7 @@ import {
   decideDispatchBudgetCall,
   dispatchCheckpointDecision,
   dispatchCheckpointThreshold,
+  describeGrantRecord,
   dispatchGrantHeadroom,
   effectiveDispatchWorkingCap,
   validateGrantRecord,
@@ -204,6 +205,27 @@ register("GDBC06", "core: a grant raises the working cap, never beyond maxTurns 
   assert.equal(decideDispatchBudgetCall({ maxTurns: 80, baseCalls: 20, currentCount: 20, isClosingAct: false, grantedCalls: -1 }).decision, "invalid-input");
 });
 
+// describeGrantRecord pins, run from GDBC07 (the corpus size is itself pinned, so no new case).
+function assertDescribeGrantRecord(second) {
+  const last = second.record.grants[1];
+  assert.deepEqual(describeGrantRecord(second.record, "ag1"), {
+    ok: true,
+    totalExtra: 12,
+    digest: second.record.digest,
+    count: 2,
+    last: { seq: 2, extra: 7, reason: "again", grantedAt: "2026-10-05T11:00:00.000Z", digest: last.digest },
+  });
+  assert.equal(second.record.digest, last.digest, "the summary digest is the chain head");
+  const tampered = JSON.parse(JSON.stringify(second.record));
+  tampered.grants[0].extra = 40; tampered.totalExtra = 47;
+  assert.deepEqual(describeGrantRecord(tampered, "ag1"), validateGrantRecord(tampered, "ag1"));
+  assert.equal(describeGrantRecord(tampered, "ag1").code, "grant-entry-digest-mismatch");
+  const empty = JSON.parse(JSON.stringify(second.record)); empty.grants = [];
+  assert.equal(describeGrantRecord(empty, "ag1").code, "grant-record-empty");
+  assert.equal(describeGrantRecord(second.record, "other").code, "grant-record-agent-mismatch");
+  assert.equal(describeGrantRecord(null, "ag1").code, "grant-record-shape");
+}
+
 register("GDBC07", "core: grant records reject malformed, oversized, tampered and duplicate-digest histories", () => {
   const first = appendGrant({ agentId: "ag1", extra: 5, reason: "continue", grantedAt: "2026-10-05T10:00:00.000Z" });
   assert.equal(first.ok, true);
@@ -212,6 +234,7 @@ register("GDBC07", "core: grant records reject malformed, oversized, tampered an
   assert.equal(second.record.totalExtra, 12);
   assert.deepEqual(second.record.grants[0], first.record.grants[0], "append-only: the earlier entry is unchanged");
   assert.deepEqual(validateGrantRecord(second.record, "ag1"), { ok: true, totalExtra: 12 });
+  assertDescribeGrantRecord(second);
   const clone = () => JSON.parse(JSON.stringify(second.record));
   assert.equal(validateGrantRecord(second.record, "other").code, "grant-record-agent-mismatch");
   assert.equal(validateGrantRecord({ ...clone(), surplus: 1 }, "ag1").code, "grant-record-shape");

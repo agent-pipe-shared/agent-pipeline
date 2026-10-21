@@ -212,6 +212,25 @@ export function validateGrantRecord(record, expectedAgentId) {
 }
 
 /**
+ * Display summary of a grant record for the budget hook. Built on
+ * `validateGrantRecord`: an invalid record yields exactly that refusal; a valid one
+ * yields the total, the chain head digest, the entry count and the last entry
+ * (`reason` as stored; labelling is the hook layer's job).
+ */
+export function describeGrantRecord(record, agentId) {
+  const checked = validateGrantRecord(record, agentId);
+  if (!checked.ok) return checked;
+  const entry = record.grants[record.grants.length - 1];
+  return {
+    ok: true,
+    totalExtra: checked.totalExtra,
+    digest: record.digest,
+    count: record.grants.length,
+    last: { seq: entry.seq, extra: entry.extra, reason: entry.reason, grantedAt: entry.grantedAt, digest: entry.digest },
+  };
+}
+
+/**
  * Append-only extension of a grant history. Returns `{ ok: true, record }` with a
  * fresh record whose earlier entries are byte-for-byte unchanged, or
  * `{ ok: false, code }` (invalid arguments, a malformed existing record, or a
