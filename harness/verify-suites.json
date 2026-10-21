@@ -3574,6 +3574,66 @@
       "file": "plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs",
       "invariantPinned": "Map ownership, forbidden dependencies and the line bound are checked against the architecture map and its boundary policy, with ratchet exceptions and typed exit codes",
       "nonOverlapNote": "Unique test suite for architecture-boundary-check.mjs (FB3-PF-54 first stage)"
+    },
+    {
+      "name": "pin-antigravity-global-refresh-recovers-and-installs-a-runner-view-tests",
+      "file": "plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs"
+    },
+    {
+      "name": "pin-antigravity-refresh-validates-the-source-before-retiring-the-managed-copy-tests",
+      "file": "plugins/pipeline-core/lib/pins/antigravity-refresh-validates-the-source-before-retiring-the-managed-copy.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/antigravity-refresh-validates-the-source-before-retiring-the-managed-copy.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/antigravity-refresh-validates-the-source-before-retiring-the-managed-copy.test.mjs"
+    },
+    {
+      "name": "pin-consumer-approved-plan-reaches-the-first-item-host-commit-tests",
+      "file": "plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs"
+    },
+    {
+      "name": "pin-consumer-spec-criterion-binds-the-first-item-delivery-tests",
+      "file": "plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs"
+    },
+    {
+      "name": "pin-design-package-parent-metadata-false-drift-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-package-parent-metadata-false-drift.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-package-parent-metadata-false-drift.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-package-parent-metadata-false-drift.test.mjs"
+    },
+    {
+      "name": "pin-gg11-admits-env-templates-and-test-fixtures-tests",
+      "file": "plugins/pipeline-core/lib/pins/gg11-admits-env-templates-and-test-fixtures.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/gg11-admits-env-templates-and-test-fixtures.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/gg11-admits-env-templates-and-test-fixtures.test.mjs"
+    },
+    {
+      "name": "pin-resume-hint-inspect-is-admitted-in-every-lifecycle-state-tests",
+      "file": "plugins/pipeline-core/lib/pins/resume-hint-inspect-is-admitted-in-every-lifecycle-state.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/resume-hint-inspect-is-admitted-in-every-lifecycle-state.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/resume-hint-inspect-is-admitted-in-every-lifecycle-state.test.mjs"
+    },
+    {
+      "name": "session-cleanup-lost-binding-tests",
+      "file": "plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs",
+      "invariantPinned": "A lost or archived session-cleanup binding is released only on proven loss or a proven archive of that exact descriptor, with no live owner",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs"
+    },
+    {
+      "name": "session-power-address-repair-tests",
+      "file": "plugins/pipeline-core/lib/session-power-address-repair.test.mjs",
+      "invariantPinned": "The session address root past its bound is repaired by a planned, read-back move of dead-repository entries aside, never by deletion (D71)",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/session-power-address-repair.mjs"
+    },
+    {
+      "name": "guard-dispatch-budget-grant-notice-tests",
+      "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs",
+      "invariantPinned": "A recorded dispatch-budget grant is announced to the agent with its state and continuation, from the counter state the hook holds (D75 B)",
+      "nonOverlapNote": "Unique test suite for the grant notice path of hooks/guard-dispatch-budget.mjs"
     }
   ]
 }
