@@ -16,7 +16,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
+import { NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "./native-goldfish-host-return.mjs";
 import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
 
 export const BRIEFING_PACKAGE_SCHEMA = "pipeline.dispatch-briefing-package.v1";
@@ -165,6 +165,23 @@ export function verifyGeneratedBriefing(text) {
   if (split === null) return { ok: false, code: "DBG-GENERATED-MARKER-MISSING" };
   if (sha256(split.body) !== split.digest) return { ok: false, code: "DBG-GENERATED-DIGEST-MISMATCH" };
   return { ok: true, code: "DBG-GENERATED-VERIFIED" };
+}
+
+/**
+ * The dispatch hook's D78 rule, runner-neutral: a briefing carrying the generator marker must verify,
+ * and a governed item briefing (a native binding with itemDelivery) must carry the marker. Returns null
+ * when the prompt is admitted, else `{ code, message }` whose message names the generator command.
+ */
+export function generatedBriefingAdmission(prompt, generatorCommand = "node <plugin-root>/scripts/dispatch-briefing.mjs") {
+  if (typeof prompt !== "string") return null;
+  const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run \`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\`, and dispatch that file's text unchanged`;
+  if (prompt.includes("<!-- pipeline-briefing-generator:")) {
+    const verified = verifyGeneratedBriefing(prompt);
+    return verified.ok ? null : { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
+  }
+  const parsed = parseNativeGoldfishBriefing(prompt);
+  if (!parsed.ok || parsed.binding.itemDelivery === undefined) return null;
+  return { code: "DBG-GENERATED-BRIEFING-REQUIRED", message: `a governed Goldfish item briefing must come from the briefing generator, not be assembled by hand; ${repair}` };
 }
 
 /** Renders the full briefing; `generated` is the binding builder's result for this package. */

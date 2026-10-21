@@ -83,12 +83,14 @@ import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
 import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
 import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
 import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 
 const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
+const BRIEFING_GENERATOR_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-briefing.mjs", import.meta.url));
 // D52 (2): a session-authority refusal without a repair of its own names the general repair, which reports
 // the cause and the exact command that clears it.
 const sessionAuthorityRepair = (code, root) => typeof code === "string" && code.startsWith("SDC-")
@@ -750,6 +752,12 @@ if (isDirectInvocation(import.meta.url)) {
     }
   }
   const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
+  // D78: a governed Goldfish briefing should be the unedited generator output. QG-06 warn state: reason transition
+  // to generated briefings, owner PO, expires with 0.7.1 (PO 2026-10-21); then this becomes the refusal.
+  for (const { dispatch } of productive) {
+    const finding = generatedBriefingAdmission(dispatch.prompt, `node ${BRIEFING_GENERATOR_SCRIPT}`);
+    if (finding) process.stderr.write(`WARNING (guard-dispatch): ${finding.code}: ${finding.message}\n`);
+  }
   let itemGovernanceRequired = false;
   // Once a native pending state names the queue row, a later refusal keeps the row with it.
   let nativePendingPrepared = false;

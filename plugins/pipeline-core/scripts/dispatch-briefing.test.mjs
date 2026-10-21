@@ -571,6 +571,21 @@ test("an Evidence cell without a backlog item names the repair", async () => {
   assert.match(result.message, /repair: /u);
 });
 
+test("the dispatch admission (D78) admits a generated briefing and refuses an edited or hand-assembled item briefing", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { generatedBriefingAdmission } = await buildLib();
+  const { fx, argv } = packageFixture();
+  const { text } = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(generatedBriefingAdmission(text), null);
+  const edited = generatedBriefingAdmission(text.replace("Fixture goal text.", "Fixture goal text!"), "node gen.mjs");
+  assert.equal(edited.code, "DBG-GENERATED-DIGEST-MISMATCH");
+  assert.match(edited.message, /repair: .*node gen\.mjs build --package/u);
+  const skeleton = runDispatchBriefing(argvOf(fx), depsOf(fx)).skeleton;
+  assert.equal(parseNativeGoldfishBriefing(skeleton).ok, true);
+  assert.equal(generatedBriefingAdmission(skeleton).code, "DBG-GENERATED-BRIEFING-REQUIRED");
+  assert.equal(generatedBriefingAdmission("A plain research prompt with no binding."), null);
+});
+
 test("init-dispatch-record prints a valid opening v4 record whose digests come from the generated briefing (AC-163)", async () => {
   const { runDispatchBriefing } = await lib();
   const { runInitDispatchRecord } = await import("./init-dispatch-record.mjs");
