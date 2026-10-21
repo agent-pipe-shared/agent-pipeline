@@ -3,9 +3,16 @@
 // Exercises the real review-economy / critic-course-admission functions; no mocks.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { preflightCriticDispatch } from "../../scripts/critic-dispatch-preflight.mjs";
+import { run as runState } from "../../scripts/pipeline-state.mjs";
+import { produceCriticDiagnostic } from "../critic-diagnostic-producer.mjs";
+import { validateFeaturePackage } from "../feature-package-topology.mjs";
 import { admitReviewAttempt, CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../review-economy.mjs";
 import { deriveCriticCourseAdmission, CriticCourseAdmissionError } from "../critic-course-admission.mjs";
 
@@ -107,4 +114,90 @@ test("AC3 coordinator next-action text offers the Critic dispatch only with the 
   assert.match(src, /follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate/u);
   assert.match(src, /one full review plus at most three correction-diff reviews per declared batch/u);
   assert.match(src, /Elephant self-verification or an explicit PO decision/u);
+});
+
+// AC-142 chain: the refusal and the sanctioned route are tested apart elsewhere; this drives one valid pre-rule feature through both.
+test("AC4 a valid pre-rule feature goes from CCA-REVIEW-UNIT-REQUIRED through --add-review-unit to an admitted Critic dispatch", () => {
+  const root = mkdtempSync(join(tmpdir(), "critic-route-chain-"));
+  const git = (...args) => {
+    const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+    assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+    return String(r.stdout).trim();
+  };
+  const commit = (message) => {
+    git("add", ".");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message);
+    return git("rev-parse", "HEAD");
+  };
+  const sha = (rel) => createHash("sha256").update(readFileSync(join(root, rel))).digest("hex");
+  try {
+    const featureId = "pre-rule-feature";
+    const dir = `specs/${featureId}`;
+    const [prd, spec, acceptance, result, ev1, ev2] = ["prd.md", "spec.md", "acceptance.md", "result.md", "evidence/seed-one.txt", "evidence/seed-two.txt"].map((n) => `${dir}/${n}`);
+    const manifestPath = `${dir}/lifecycle.json`;
+    const unitPath = `${dir}/design/critic-review-unit.json`;
+    mkdirSync(join(root, dir, "evidence"), { recursive: true });
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    mkdirSync(join(root, "governance", "guidelines"), { recursive: true });
+    mkdirSync(join(root, "governance", "policies"), { recursive: true });
+    git("init", "-q");
+    // The pipeline State the route reads is local authority, never part of the committed package.
+    appendFileSync(join(root, ".git", "info", "exclude"), "project/\n.claude/pipeline-state.json\n");
+    const guardrails = [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"];
+    writeFileSync(join(root, guardrails[0]), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
+    writeFileSync(join(root, guardrails[1]), "Review changed code.\n");
+    writeFileSync(join(root, guardrails[2]), "- verify\n");
+    const bodies = { [prd]: "# PRD\n", [spec]: "# Pre-rule feature\nAC-1: behavior boundary\n", [acceptance]: "Acceptance points at the Spec.\n", [result]: "Status record.\n", [ev1]: "seed one\n", [ev2]: "seed two\n" };
+    for (const [path, body] of Object.entries(bodies)) writeFileSync(join(root, path), body);
+    const entry = (cls, path, authority, mutability, retention) => ({ class: cls, path, sha256: sha(path), authority, mutability, retention });
+    const manifest = {
+      schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "implementing", candidate: null, supersedes: null,
+      artifacts: [entry("prd", prd, true, "mutable", "active"), entry("spec", spec, true, "mutable", "active"), entry("acceptance", acceptance, false, "immutable", "active"), entry("result", result, false, "immutable", "active"), entry("candidate-evidence", ev1, false, "immutable", "retain"), entry("candidate-evidence", ev2, false, "immutable", "retain")],
+    };
+    writeFileSync(join(root, manifestPath), `${JSON.stringify(manifest)}\n`);
+    assert.equal(validateFeaturePackage(root, manifestPath).ok, true, "SETUP the genesis manifest is a valid feature package");
+    const genesis = commit("pre-rule genesis manifest without a review unit");
+    const cycle = (tag, body) => {
+      writeFileSync(join(root, spec), `${bodies[spec]}${body}\n`);
+      const current = JSON.parse(readFileSync(join(root, manifestPath), "utf8"));
+      current.artifacts.find((a) => a.path === spec).sha256 = sha(spec);
+      writeFileSync(join(root, manifestPath), `${JSON.stringify(current)}\n`);
+      const candidate = commit(`${tag} candidate`);
+      const diagnosticPath = `${dir}/evidence/${tag}-diagnostic.json`, logPath = `${dir}/evidence/${tag}-targeted.log`;
+      mkdirSync(join(root, "evidence"));
+      const diagnostic = produceCriticDiagnostic({ root, candidate, specPath: spec, guardrailPaths: guardrails, command: [process.execPath, "-e", "process.exit(0)"], logPath: `evidence/${tag}-targeted.log` });
+      writeFileSync(join(root, logPath), readFileSync(join(root, `evidence/${tag}-targeted.log`)));
+      diagnostic.targeted.log.path = logPath;
+      rmSync(join(root, "evidence"), { recursive: true, force: true });
+      writeFileSync(join(root, diagnosticPath), JSON.stringify(diagnostic));
+      const next = JSON.parse(readFileSync(join(root, manifestPath), "utf8"));
+      for (const path of [diagnosticPath, logPath]) next.artifacts.push(entry("candidate-evidence", path, false, "immutable", "retain"));
+      writeFileSync(join(root, manifestPath), `${JSON.stringify(next)}\n`);
+      return { candidate, diagnosticPath, registrationCommit: commit(`${tag} register candidate-bound diagnostics`) };
+    };
+    const request = (base, round) => ({ root, base, candidate: round.candidate, specPath: spec, guardrailPaths: [], evidencePaths: [round.diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId, registrationCommit: round.registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } });
+
+    const refused = preflightCriticDispatch(request(genesis, cycle("first", "changed once")));
+    assert.equal(refused.status, "refused", JSON.stringify(refused));
+    assert.equal(refused.code, "CCA-REVIEW-UNIT-REQUIRED");
+    assert.equal(refused.dispatch.packetCreated, false);
+
+    // The sanctioned route the refusal names, run through the shipped scripts.
+    assert.equal(runState(["set-feature", "--id", featureId, "--plan-path", spec], { dir: root, now: () => "2026-10-21T10:00:00.000Z" }), 0, "SETUP set-feature through the public State verb");
+    const registrar = fileURLToPath(new URL("../../scripts/register-feature-package.mjs", import.meta.url));
+    const routed = spawnSync(process.execPath, [registrar, "--root", root, "--add-review-unit"], { cwd: root, encoding: "utf8", timeout: 50000 });
+    assert.equal(routed.status, 0, `${routed.stdout}${routed.stderr}`);
+    const added = JSON.parse(String(routed.stdout).trim().split(/\r?\n/u).at(-1));
+    assert.equal(added.status, "review-unit-added", routed.stdout);
+    assert.deepEqual(added.commitPaths, [manifestPath, unitPath]);
+    const unitBase = commit("add the Critic review unit");
+    assert.equal(git("status", "--porcelain", "--untracked-files=all", "--", manifestPath, unitPath), "", "both printed paths are committed");
+
+    // The unit commit is the earliest usable base; the next candidate is admitted from it.
+    const admitted = preflightCriticDispatch(request(unitBase, cycle("second", "changed twice")));
+    assert.equal(admitted.status, "packet-ready", JSON.stringify(admitted));
+    assert.equal(admitted.coordinatorOnly.courseAdmission.featureId, featureId);
+    assert.equal(admitted.coordinatorOnly.courseAdmission.round, 1);
+    assert.equal(admitted.dispatch.childCreated, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
