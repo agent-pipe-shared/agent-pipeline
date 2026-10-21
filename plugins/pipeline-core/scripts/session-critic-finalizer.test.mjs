@@ -485,11 +485,22 @@ test("review action construction cannot occur before identical consume readback"
   } finally { cleanup(fx); }
 });
 
-test("findings emit REVIEW_FINDINGS and a root-authored record keeps its real empty-tree range", () => {
+// A root-authored candidate has an empty-tree base, which is a bare tree OID with no commit: it cannot hold the
+// review-unit declaration the generic Critic batch reads at its base (critic-generic-batch.mjs reviewUnitSource;
+// skills/critic-review/SKILL.md: "the Coordinator commits the meaningful review-unit declaration at the batch base").
+// 096033a2f recorded this; d02409a8a made the generic batch the product contract. This case pins that contract.
+test("a root-authored candidate keeps its empty-tree base but cannot register a generic batch review unit", () => {
   const fx = fixture({ rootCandidate: true });
   try {
-    const finding = { gap: "missing edge", risk: "failure", severity: "minor", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
     assert.equal(fx.base, git(fx.root, ["hash-object", "-t", "tree", "--stdin"], { input: "" }));
+    assert.throws(() => batchFor(fx), (error) => error.code === "CGB-REFERENCE");
+  } finally { cleanup(fx); }
+});
+
+test("findings emit REVIEW_FINDINGS", () => {
+  const fx = fixture();
+  try {
+    const finding = { gap: "missing edge", risk: "failure", severity: "minor", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
     const request = preadmitted(fx, {
       packetId: "4".repeat(32),
       verdict: verdict({ findings: [finding], pass: false }),
