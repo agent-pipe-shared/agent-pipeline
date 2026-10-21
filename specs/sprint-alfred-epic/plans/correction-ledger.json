@@ -60,8 +60,8 @@
     {
       "id": "K6",
       "title": "dispatch authorship and Critic coverage (regression after d02409a8a)",
-      "status": "open",
-      "next": "after W1; bisect d02409a8a..HEAD first"
+      "status": "in-progress",
+      "next": "D77 empty-log rule on the write path (ALF-K6-EL1-WRITE-PATH, with its fixture family), then the remaining K6 reds by cause (scratch/verify-reds-classified-2026-10-21.md)"
     },
     {
       "id": "K7",
@@ -97,7 +97,7 @@
       "id": "K13",
       "title": "D61 content scope: the 2026-10-20 content clauses still open (scope pass), as parallel item packages",
       "status": "in-progress",
-      "next": "seven read-only readers re-verify the 76 clauses at HEAD (scratch/content-verify/); then disjoint unprotected packages fan out, protected parts go to the bundled signature sitting"
+      "next": "wave A delivered except A1/A2 (signature sitting); wave B: AC-142 chain, AC-126 RED mirror, AC-158 due dates, AC-163 scaffolders, AC-118, AC-186 after a recon; then the held packages (AC-152, AC-140/245, AC-203/224 pins)"
     }
   ]
 }
