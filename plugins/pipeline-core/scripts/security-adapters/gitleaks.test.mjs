@@ -71,7 +71,7 @@ test("CAPABILITY_CONTRACT_V2.exitCodeMapping transcribes the real exit-code cont
 });
 
 test("CAPABILITY_CONTRACT_V2.timeoutContract matches run()'s real default and mechanism", () => {
-  assert.equal(CAPABILITY_CONTRACT_V2.timeoutContract.defaultMs, 60000);
+  assert.equal(CAPABILITY_CONTRACT_V2.timeoutContract.defaultMs, 300000, "PO 2026-10-21: a full candidate-tree scan needs more than 60 s");
   assert.equal(CAPABILITY_CONTRACT_V2.timeoutContract.cancellable, true);
   assert.match(CAPABILITY_CONTRACT_V2.timeoutContract.mechanism, /spawnSync/);
 });

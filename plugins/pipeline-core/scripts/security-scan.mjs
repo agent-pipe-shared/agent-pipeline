@@ -131,7 +131,7 @@ import {
 import { buildCapabilityPlan } from "../lib/security-capability-plan-builder.mjs";
 import { resolveApplicableControls } from "../lib/security-policy-resolver.mjs";
 
-const DEFAULT_TIMEOUT_MS = 60000;
+const DEFAULT_TIMEOUT_MS = 300000; // PO 2026-10-21: a full candidate-tree gitleaks scan exceeded 60 s under Verify
 const PREFLIGHT_TIMEOUT_MS = 5000;
 const DEFAULT_BLOCK_ON = ["critical", "high"];
 const DEFAULT_GOVERNANCE_POLICIES_PATH = "governance/examples/policies";

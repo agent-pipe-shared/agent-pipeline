@@ -384,7 +384,7 @@ function cleanupTmp(tmpDir) {
  * "binary" (see security-scan.test.mjs) while production always uses the real spawnSync
  * with explicit `shell: false` (a real gitleaks binary never needs a shell).
  */
-export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutMs = 60000, env = process.env }) {
+export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutMs = 300000, env = process.env }) {
   const resolved = config.binaryPath ? { installed: true, path: config.binaryPath } : resolveBinary(env);
   if (!resolved.installed) {
     return { status: "SKIPPED", classification: "binary_missing", findings: [], raw: null, reason: resolved.reason };
@@ -573,7 +573,7 @@ export const CAPABILITY_CONTRACT_V2 = Object.freeze({
     nonzero: "scanner_error (ERROR) -- genuine crash, never findings",
   }),
   timeoutContract: Object.freeze({
-    defaultMs: 60000,
+    defaultMs: 300000,
     cancellable: true,
     mechanism: "node:child_process spawnSync timeout option (SIGTERM on expiry)",
   }),
