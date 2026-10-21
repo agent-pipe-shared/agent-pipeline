@@ -405,3 +405,168 @@ test("the command line prints a typed refusal as JSON and exits 2", () => {
   assert.equal(out.ok, false);
   assert.equal(out.code, "DBG-FLAG-UNKNOWN");
 });
+
+// --- `build`: the complete briefing from a closed package (PO decision D78) ---
+
+const buildLib = () => import("../lib/dispatch-briefing-build.mjs");
+
+function packageFixture(over = {}, { calibration = true } = {}) {
+  const fx = makeFixture();
+  const put = (rel, text) => {
+    mkdirSync(dirname(join(fx.root, rel)), { recursive: true });
+    writeFileSync(join(fx.root, rel), text);
+  };
+  put(PATH_A, "export const y = 1;\n");
+  put(CHECK, "// fixture check\n");
+  if (calibration) put("project/pipeline.json", JSON.stringify({ project: "fixture-project", handover: "docs/state.md", verify: "node verify.mjs" }));
+  const pkg = {
+    id: "ALF-T1", item: "sample-slug", agentType: "goldfish-implementor", modelId: "claude-sonnet-5-5",
+    modelWhy: "role default", check: CHECK, paths: [PATH_A], spec: fx.specRel,
+    title: "Fixture title", ac: "AC-2", goal: "Fixture goal text.",
+    context: ["`plugins/x/y.mjs` — the module."],
+    targeted: [`\`node --test ${CHECK}\` (green)`],
+    forbidden: ["Fixture forbidden rule."], stops: ["Fixture stop rule."],
+    ...over,
+  };
+  for (const key of Object.keys(pkg)) if (pkg[key] === undefined) delete pkg[key];
+  put("scratch/pkg.json", JSON.stringify(pkg));
+  return { fx, pkg, argv: ["build", "--root", fx.root, "--package", "scratch/pkg.json"] };
+}
+
+test("build renders the complete briefing: the binding parses back, the fields match the package, the marker verifies", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { verifyGeneratedBriefing } = await buildLib();
+  const { fx, pkg, argv } = packageFixture();
+  const result = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.schema, "pipeline.dispatch-briefing.build.v1");
+  assert.equal(result.dispatchId, "ALF-T1");
+  assert.equal(result.path, null);
+  assert.equal(result.sha256, sha(Buffer.from(result.text)));
+  const parsed = parseNativeGoldfishBriefing(result.text);
+  assert.equal(parsed.ok, true, parsed.code);
+  assert.equal(parsed.binding.dispatchId, "ALF-T1");
+  assert.deepEqual(parsed.binding.allowedPaths, [CHECK, PATH_A].sort());
+  assert.equal(result.text.split(NATIVE_GOLDFISH_HOST_DIRECTIVE).length, 2);
+  for (const heading of ["### 1. Goal", "### 2. Context files", "### 3. DoD checks", "### 4. Forbidden", "### 5. Stop conditions", "### 6. Dispatch metadata"]) {
+    assert.equal(result.text.split(heading).length, 2, heading);
+  }
+  for (const text of [pkg.title, pkg.goal, ...pkg.context, ...pkg.targeted, ...pkg.forbidden, ...pkg.stops, pkg.modelWhy]) {
+    assert.ok(result.text.includes(text), text);
+  }
+  assert.ok(result.text.includes("Calibration file: `project/pipeline.json` (project `fixture-project`, handover `docs/state.md`)"));
+  assert.ok(result.text.includes("`node verify.mjs`; not yours to run"));
+  assert.doesNotMatch(result.text, /\{\{[A-Z_]+\}\}/u);
+  assert.deepEqual(verifyGeneratedBriefing(result.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+});
+
+test("a one-byte edit or a removed marker fails the generated-briefing verification", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { verifyGeneratedBriefing } = await buildLib();
+  const { fx, argv } = packageFixture();
+  const { text } = runDispatchBriefing(argv, depsOf(fx));
+  const edited = text.replace("Fixture goal text.", "Fixture goal text!");
+  assert.notEqual(edited, text);
+  assert.equal(verifyGeneratedBriefing(edited).code, "DBG-GENERATED-DIGEST-MISMATCH");
+  const unmarked = text.split("\n").filter((line) => !line.startsWith("<!-- pipeline-briefing-generator:")).join("\n");
+  assert.equal(verifyGeneratedBriefing(unmarked).code, "DBG-GENERATED-MARKER-MISSING");
+  assert.equal(verifyGeneratedBriefing(`${text}${text}`).code, "DBG-GENERATED-MARKER-MISSING");
+});
+
+test("build refuses a named path that does not exist unless the package declares it new", async () => {
+  const { runDispatchBriefing } = await lib();
+  const missing = packageFixture({ paths: [PATH_A, "plugins/x/new.mjs"] });
+  const refused = runDispatchBriefing(missing.argv, depsOf(missing.fx));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "DBG-PACKAGE-PATH-MISSING");
+  assert.match(refused.message, /plugins\/x\/new\.mjs.*repair: /u);
+  const declared = packageFixture({ paths: [PATH_A, "plugins/x/new.mjs"], newFiles: ["plugins/x/new.mjs"] });
+  assert.equal(runDispatchBriefing(declared.argv, depsOf(declared.fx)).ok, true);
+});
+
+test("build refuses an unknown package key and a missing required field, each naming its repair", async () => {
+  const { runDispatchBriefing } = await lib();
+  const unknown = packageFixture({ cluster: "K13" });
+  const refusedKey = runDispatchBriefing(unknown.argv, depsOf(unknown.fx));
+  assert.equal(refusedKey.code, "DBG-PACKAGE-KEY-UNKNOWN");
+  assert.match(refusedKey.message, /cluster.*repair: /u);
+  const noGoal = packageFixture({ goal: undefined });
+  const refusedField = runDispatchBriefing(noGoal.argv, depsOf(noGoal.fx));
+  assert.equal(refusedField.code, "DBG-PACKAGE-FIELD-MISSING");
+  assert.match(refusedField.message, /"goal".*repair: /u);
+});
+
+test("build refuses a repository without a calibration and names how to calibrate", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture({}, { calibration: false });
+  const result = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "DBG-PACKAGE-CALIBRATION-UNRESOLVED");
+  assert.match(result.message, /repair: run the Pipeline onboarding/u);
+});
+
+test("build --out writes the verified briefing under scratch/ and refuses any other target", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { verifyGeneratedBriefing } = await buildLib();
+  const { fx, argv } = packageFixture();
+  const result = runDispatchBriefing([...argv, "--out", "scratch/briefing-ALF-T1.md"], depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.path, "scratch/briefing-ALF-T1.md");
+  assert.equal(result.text, undefined);
+  const written = readFileSync(join(fx.root, "scratch/briefing-ALF-T1.md"), "utf8");
+  assert.equal(sha(Buffer.from(written)), result.sha256);
+  assert.equal(verifyGeneratedBriefing(written).ok, true);
+  const outside = runDispatchBriefing([...argv, "--out", "docs/briefing.md"], depsOf(fx));
+  assert.equal(outside.code, "DBG-PATH-INVALID");
+});
+
+test("the generated briefing prescribes the test-first order in one dispatch (AC-186, PO 2026-10-21)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const { text } = runDispatchBriefing(argv, depsOf(fx));
+  const first = text.indexOf("record them RED against the original code, before your first production edit");
+  const second = text.indexOf("2. Implement.");
+  const third = text.indexOf("3. Run exactly those cases GREEN");
+  assert.ok(first > 0 && first < second && second < third, "the three steps appear in order");
+  assert.match(text, /never from the code you are about to write/u);
+  assert.match(text, /changed after step 2 only with a written justification/u);
+  assert.doesNotMatch(text, /separate test-author dispatch/u);
+});
+
+test("an estimate above the tier cap binds the deep tier; above the deep cap it needs a grant rationale", async () => {
+  const { runDispatchBriefing } = await lib();
+  const base = packageFixture();
+  const cap = budgetOf(runDispatchBriefing(argvOf(base.fx), depsOf(base.fx)).skeleton);
+  const raised = packageFixture({ estimatedToolCalls: cap + 1 });
+  const raisedResult = runDispatchBriefing(raised.argv, depsOf(raised.fx));
+  assert.equal(raisedResult.ok, true, JSON.stringify(raisedResult));
+  assert.equal(parseNativeGoldfishBriefing(raisedResult.text).binding.agentType, "goldfish-deep");
+  assert.ok(raisedResult.warnings.some((entry) => entry.code === "DBG-PACKAGE-TIER-RAISED"));
+  const tooMany = packageFixture({ estimatedToolCalls: 100000 });
+  const refused = runDispatchBriefing(tooMany.argv, depsOf(tooMany.fx));
+  assert.equal(refused.code, "DBG-PACKAGE-BUDGET-EXCEEDED");
+  assert.match(refused.message, /repair: /u);
+  const granted = packageFixture({ estimatedToolCalls: 100000, budgetRationale: "one test-first cycle over three modules" });
+  const grantedResult = runDispatchBriefing(granted.argv, depsOf(granted.fx));
+  assert.equal(grantedResult.ok, true, JSON.stringify(grantedResult));
+  assert.match(grantedResult.text, /Budget grant expected at the 80 % checkpoint: one test-first cycle over three modules/u);
+});
+
+test("an Evidence cell without a backlog item names the repair", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const rel = "specs/feat-x/spec-noitem.md";
+  writeFileSync(join(fx.root, rel), [
+    "# Fixture spec without an item in the Evidence cell",
+    "",
+    "## Acceptance criteria",
+    "",
+    "| # | Criterion | Evidence |",
+    "| --- | --- | --- |",
+    "| AC-9 | Original Alfred item sample-slug is delivered as its own original acceptance states, on the integrated candidate | evidence/private.json |",
+    "",
+  ].join("\n"));
+  const result = runDispatchBriefing(argvOf(fx, { "--spec": rel }), depsOf(fx));
+  assert.equal(result.code, "DBG-ITEM-EVIDENCE-MISSING");
+  assert.match(result.message, /repair: /u);
+});

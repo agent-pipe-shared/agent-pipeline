@@ -25,12 +25,14 @@
  *                                    compound `AC-E<epic>-<story>-<nn>`, found in the Markdown
  *                                    shapes below, item id `<feature>.<slug>`, no backlog item)
  *
- * The generator calls no model, writes no file and runs no mutating git command. Judgment
- * fields (goal, context, DoD, forbidden, stop) stay hand-authored from the template.
+ * The generator calls no model and runs no mutating git command. `binding` writes no file and
+ * leaves the judgment fields (goal, context, DoD, forbidden, stop) as template placeholders;
+ * `build` (PO decision D78) fills them from a closed package through
+ * lib/dispatch-briefing-build.mjs and writes at most the one `--out` file under scratch/.
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -40,6 +42,16 @@ import {
   validateItemDeliveryBriefing,
 } from "../lib/native-goldfish-host-return.mjs";
 import { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } from "../lib/agent-model-registry.mjs";
+import {
+  BRIEFING_BUILD_SCHEMA,
+  BriefingPackageRefusal,
+  assertPackagePathsExist,
+  budgetDecision,
+  renderGoldfishBriefing,
+  resolveBriefingCalibration,
+  skeletonToolBudget,
+  validateBriefingPackage,
+} from "../lib/dispatch-briefing-build.mjs";
 import { CRITERION_ID_SOURCE, isCriterionId, parseAcceptedCriticCriterion } from "../lib/critic-accepted-contract.mjs";
 import { dispatchBudgetLineForRole, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
 import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
@@ -100,7 +112,7 @@ function validRepoPath(value) {
 /** Strict flag parse: unknown, repeated and valueless flags are refusals, never ignored. */
 export function parseBindingArgv(argv) {
   if (!Array.isArray(argv) || argv[0] !== "binding") {
-    refuse("DBG-SUBCOMMAND", `the only subcommand is "binding"; got ${JSON.stringify(argv?.[0] ?? null)}`);
+    refuse("DBG-SUBCOMMAND", `the subcommands are "binding" and "build"; got ${JSON.stringify(argv?.[0] ?? null)}`);
   }
   const values = { paths: [] };
   for (let index = 1; index < argv.length; index++) {
@@ -428,7 +440,7 @@ export function generateDispatchBinding(options, deps = {}) {
     };
     requireAcceptedCriterion(specBytes, specPath, locator, `${idCell.value} of item ${item}`);
     const itemPath = /backlog\/items\/[A-Za-z0-9][A-Za-z0-9._-]*\.md/u.exec(evidenceCell.value)?.[0];
-    if (!itemPath) refuse("DBG-ITEM-EVIDENCE-MISSING", `the Evidence cell of ${idCell.value} names no backlog/items/*.md file (item ${item})`);
+    if (!itemPath) refuse("DBG-ITEM-EVIDENCE-MISSING", `the Evidence cell of ${idCell.value} names no backlog/items/*.md file (item ${item}); repair: put the item's backlog/items/<file>.md path in that row's Evidence cell, or file the item first (backlog/README.md) and name it there`);
     const itemBytes = readRepoFile(root, itemPath);
     if (!itemBytes) refuse("DBG-ITEM-UNREADABLE", `backlog item ${itemPath} named by ${idCell.value} is not a readable regular file`);
     const declaredId = parseAgentFrontmatter(itemBytes.toString("utf8")).id;
@@ -587,12 +599,72 @@ export function generateDispatchBinding(options, deps = {}) {
   return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding, skeleton, warnings };
 }
 
+const BUILD_FLAGS = Object.freeze({ "--root": "root", "--package": "package", "--out": "out" });
+
+/** `build --package <repo-relative json> [--out scratch/<file>.md] [--root <dir>]`; the same strict flag rules as `binding`. */
+export function parseBuildArgv(argv) {
+  const values = {};
+  for (let index = 1; index < argv.length; index++) {
+    const token = argv[index];
+    if (typeof token !== "string" || !Object.hasOwn(BUILD_FLAGS, token)) refuse("DBG-FLAG-UNKNOWN", `unknown build argument ${JSON.stringify(token)}; build takes --package, --out and --root`);
+    const value = argv[index + 1];
+    if (typeof value !== "string" || value === "" || value.startsWith("--")) refuse("DBG-FLAG-VALUE", `flag ${token} needs a value`);
+    index++;
+    const key = BUILD_FLAGS[token];
+    if (Object.hasOwn(values, key)) refuse("DBG-FLAG-REPEATED", `flag ${token} may be given once`);
+    values[key] = value;
+  }
+  if (values.package === undefined) refuse("DBG-FLAG-MISSING", "required flag --package is missing; repair: name the package JSON file, repository-relative");
+  if (!validRepoPath(values.package)) refuse("DBG-PATH-INVALID", `package path ${JSON.stringify(values.package)} must be repository-relative without .., ., .git or backslash segments`);
+  if (values.out !== undefined && (!validRepoPath(values.out) || !values.out.startsWith("scratch/") || !values.out.endsWith(".md"))) {
+    refuse("DBG-PATH-INVALID", `--out ${JSON.stringify(values.out)} must be a repository-relative scratch/<name>.md path; repair: write the briefing under scratch/`);
+  }
+  return values;
+}
+
+/** Renders the complete briefing of one closed package (PO decision D78); writes only the --out file. */
+export function buildDispatchBriefing(options, deps = {}) {
+  let root;
+  try { root = realpathSync(resolve(options.root ?? process.cwd())); } catch { refuse("DBG-ROOT-UNREADABLE", "--root cannot be resolved to a directory"); }
+  const bytes = readRepoFile(root, options.package);
+  if (!bytes) refuse("DBG-PACKAGE-UNREADABLE", `package ${options.package} is not a readable regular file under --root; repair: write the package there`);
+  let pkg;
+  try { pkg = JSON.parse(bytes.toString("utf8")); } catch { refuse("DBG-PACKAGE-UNREADABLE", `package ${options.package} is not valid JSON; repair: fix its JSON`); }
+  validateBriefingPackage(pkg);
+  assertPackagePathsExist(root, pkg, deps.pathExists);
+  const calibration = resolveBriefingCalibration(root, deps.calibration);
+  const bind = (agentType) => generateDispatchBinding({
+    root, dispatchId: pkg.id, item: pkg.item, agentType, modelId: pkg.modelId,
+    check: pkg.check, paths: [...pkg.paths], spec: pkg.spec, criterion: pkg.criterion,
+  }, deps);
+  // Test-first budget (PO 2026-10-21): an estimate above the tier cap moves the dispatch to the deep tier.
+  let generated = bind(pkg.agentType);
+  const budget = skeletonToolBudget(generated.skeleton);
+  let deep = null;
+  if (pkg.estimatedToolCalls !== undefined && budget !== null && pkg.estimatedToolCalls > budget && pkg.agentType !== "goldfish-deep") deep = bind("goldfish-deep");
+  const decision = budgetDecision(pkg, budget, deep === null ? null : skeletonToolBudget(deep.skeleton));
+  if (decision.raised) {
+    generated = { ...deep, warnings: [...deep.warnings, { code: "DBG-PACKAGE-TIER-RAISED", message: `estimatedToolCalls ${pkg.estimatedToolCalls} exceeds the ${pkg.agentType} cap ${budget}; bound to goldfish-deep` }] };
+  }
+  const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision);
+  if (options.out !== undefined) {
+    const target = resolve(root, options.out);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, rendered.text, "utf8");
+  }
+  return {
+    schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
+    sha256: rendered.sha256, warnings: generated.warnings, ...(options.out === undefined ? { text: rendered.text } : {}),
+  };
+}
+
 /** Argv in, result object out; never throws for a refusal. */
 export function runDispatchBriefing(argv, deps = {}) {
   try {
+    if (Array.isArray(argv) && argv[0] === "build") return buildDispatchBriefing(parseBuildArgv(argv), deps);
     return generateDispatchBinding(parseBindingArgv(argv), deps);
   } catch (error) {
-    const code = error instanceof BriefingRefusal ? error.code : "DBG-INTERNAL";
+    const code = error instanceof BriefingRefusal || error instanceof BriefingPackageRefusal ? error.code : "DBG-INTERNAL";
     return { schema: DISPATCH_REFUSAL_SCHEMA, ok: false, code, message: String(error?.message ?? error) };
   }
 }
