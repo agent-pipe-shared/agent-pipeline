@@ -35,6 +35,7 @@ import { observeGovernanceScope, governanceScopeFailureDiagnostic, governanceSco
 import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedTopology } from "../lib/antigravity-topology-refresh-host.mjs";
 import { readAntigravityPhysicalJson } from "../lib/antigravity-plugin-topology.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { observeNodeSandboxProbe } from "../lib/node-sandbox-probe.mjs";
 import { observeAgyStartHint } from "../lib/agy-start-hint.mjs";
 import {
   evaluateSelfApplicationAttestation,
@@ -2247,13 +2248,10 @@ export async function observeAgyStartHintField({
  * not become async to carry an observation only the process entry needs.
  */
 export function main(options = {}) {
-  const environmentReadiness = options?.environmentReadiness;
-  const agyStartHint = options?.agyStartHint;
-  // HOOKREFRESH (Rulings 67, 69, 70): both are optional plain values from the async process entry. With
-  // neither set this is exactly the zero-argument call it always was, and `main` stays synchronous
-  // because a plain-value seam attaches synchronously.
-  const role = options?.role;
-  const modelRoleBootstrap = options?.modelRoleBootstrap;
+  // HOOKREFRESH (Rulings 67, 69, 70): role and modelRoleBootstrap are optional plain values from the async
+  // process entry. With neither set this is exactly the zero-argument call it always was, and `main` stays
+  // synchronous because a plain-value seam attaches synchronously.
+  const { environmentReadiness, agyStartHint, role, modelRoleBootstrap } = options ?? {};
   const result = observePipelineStartPreflight({
     ...(role === undefined ? {} : { role }),
     ...(modelRoleBootstrap === undefined ? {} : { runModelRoleBootstrapFn: () => modelRoleBootstrap }),
@@ -2262,6 +2260,7 @@ export function main(options = {}) {
     ...result,
     ...(environmentReadiness === undefined ? {} : { environmentReadiness }),
     ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
+    ...(options?.nodeSandbox === undefined ? {} : { nodeSandbox: options.nodeSandbox }),
   };
   process.stdout.write(`${JSON.stringify(envelope)}\n`);
   if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
@@ -2306,6 +2305,7 @@ async function runEntry(argv = process.argv.slice(2)) {
   return main({
     environmentReadiness,
     agyStartHint,
+    nodeSandbox: observeNodeSandboxProbe(),
     ...(role === undefined ? {} : { role }),
     ...(modelRoleBootstrap === undefined ? {} : { modelRoleBootstrap }),
   });

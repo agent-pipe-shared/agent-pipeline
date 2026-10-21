@@ -29,6 +29,11 @@ artifact; the immediate PreTool check consumes it, rechecks those bindings,
 and rejects replay, expiry, candidate movement, packet staleness, mutation,
 and partial or reordered mixed arrays.
 
+A Goldfish makes no parallel file writes in one turn until the hook race is
+fixed: state this in every Goldfish briefing built for this route, and have the
+Goldfish issue its `write_to_file` and Edit calls one at a time, each after the
+previous result.
+
 For a rejection, keep the reported code distinct. Correct the closed request
 or recreate a fresh preparation only for an unlaunched batch. Never invent a
 packet, erase an artifact, retry a launched job, or treat preparation as model

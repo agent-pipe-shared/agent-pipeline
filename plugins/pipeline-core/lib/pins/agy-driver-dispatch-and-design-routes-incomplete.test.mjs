@@ -187,3 +187,28 @@ test("F7: every Dispatch trailer example in the agent obligations is admitted an
   for (const value of examples) assert.deepEqual(malformed(value), [], `documented example is rejected: Dispatch: ${value}`);
   assert.equal(malformed("bogus (nobody)").length, 1, "control: a bogus trailer value is reported as malformed");
 });
+
+test("AC-108: the AGY Goldfish dispatch reference forbids parallel file writes in one turn until the hook race is fixed", () => {
+  const text = readFileSync(join(REPO, "plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md"), "utf8").replace(/\s+/gu, " ");
+  assert.match(text, /A Goldfish makes no parallel file writes in one turn until the hook race is fixed/u);
+});
+
+test("AC-108: the start preflight reports a sandbox-unreachable node with a typed code and the one-time remedy, and unknown is never ready", async () => {
+  const { observeNodeSandboxProbe } = await import(
+    pathToFileURL(join(REPO, "plugins/pipeline-core/lib/node-sandbox-probe.mjs")).href);
+  const ok = { status: 0, stdout: "v22.0.0\n" };
+  const manager = observeNodeSandboxProbe({ execPath: "/home/u/.local/share/fnm/node-versions/v22/installation/bin/node", spawn: () => ok });
+  assert.equal(manager.status, "version-manager-path");
+  assert.equal(manager.code, "NODE-SANDBOX-UNREACHABLE");
+  assert.equal(typeof manager.remedy, "string");
+  assert.equal(manager.ready, false);
+  const win = observeNodeSandboxProbe({ execPath: "C:\\Users\\u\\AppData\\Local\\fnm_multishells\\1\\node.exe", spawn: () => ok });
+  assert.equal(win.status, "version-manager-path");
+  const stable = observeNodeSandboxProbe({ execPath: "/usr/bin/node", spawn: () => ok });
+  assert.equal(stable.status, "stable-path");
+  assert.equal(stable.ready, true);
+  const unknown = observeNodeSandboxProbe({ execPath: "/usr/bin/node", spawn: () => ({ status: null, error: new Error("ETIMEDOUT") }) });
+  assert.equal(unknown.status, "unknown");
+  assert.equal(unknown.ready, false);
+  assert.equal(observeNodeSandboxProbe({ execPath: "", spawn: () => ok }).status, "unknown");
+});
