@@ -526,8 +526,9 @@ test("AFR18 a store write without a sealed root is a typed refusal and a foreign
     assert.equal(git(sub, "rev-parse", "HEAD"), commit);
     assert.equal(git(sub, "rev-parse", "--show-prefix"), "sub/");
     assert.equal(git(root, "rev-parse", "--show-prefix"), "");
+    // PF-55 / D52 (2) (e64562c6a): a dirty baseline names its paths; headMatches true + no dirty path proves the refusal is only the top-level comparison.
     assert.deepEqual(captureAgyHostCommitBaseline({ root: sub, candidateCommit: commit, resultPath }),
-      { ok: false, code: "AGY-HOST-BASELINE-DIRTY" });
+      { ok: false, code: "AGY-HOST-BASELINE-DIRTY", headMatches: true, dirtyPaths: [] });
     assert.deepEqual(observeAgyHostHead({ baseline: ok.baseline }), { ok: true, code: "AGY-HOST-HEAD-UNCHANGED" });
     assert.deepEqual(observeAgyHostHead({ baseline: { ...ok.baseline, root: sub } }),
       { ok: false, code: "AGY-HOST-HEAD-DRIFT" });
@@ -553,7 +554,7 @@ test("AFR18 a store write without a sealed root is a typed refusal and a foreign
     const own = captureAgyHostCommitBaseline({ root: nestedRoot, candidateCommit: nestedCommit, resultPath });
     assert.equal(own.ok, true, JSON.stringify(own));
     assert.deepEqual(captureAgyHostCommitBaseline({ root: nestedRoot, candidateCommit: commit, resultPath }),
-      { ok: false, code: "AGY-HOST-BASELINE-DIRTY" });
+      { ok: false, code: "AGY-HOST-BASELINE-DIRTY", headMatches: false, dirtyPaths: [] });
     assert.deepEqual(observeAgyHostHead({ baseline: { ...own.baseline, candidateCommit: commit } }),
       { ok: false, code: "AGY-HOST-HEAD-DRIFT" });
   } finally { rmSync(parent, { recursive: true, force: true }); }
