@@ -538,3 +538,26 @@ Status: **partly closed.** Implementation complete; the Critic batch and PO acce
   - The five binding reds -> K1D (D73 A, B probe, E).
 - **Agent todos:** a SIGKILLed Verify leaves `<home>/.pv/r*` behind (no stale sweep yet); two
   leftover measurement directories `<home>/.pv??????` from the first short-path attempt.
+
+### K1D measurement 1: D73 A (2026-10-21, slices ALF-K1D-A-RETIRED-RELEASE 1-3)
+
+- The three A cases fail with `SDC-AUTHORITY-UNAVAILABLE` 'continuity owning release failed'
+  (`lib/onboarding-continuity.mjs` ~9601) after the descriptor was retired. Both `cleanup` and
+  `release-binding` reach the library's `releaseOnboardingSessionCleanup`, so the fix is in the library.
+- Admitting `release` in the library's retired-owner route is not enough. The registry has its own
+  retired gate (`retiredRegistryAdmission`, `lib/session-authority-registry.mjs` ~1248). It admits a
+  write of a retired owner only inside a registry-side scope, opened by exported routes that nothing
+  called yet: `advanceSourceOwnedRetiredSessionAuthorityMember`,
+  `releaseSourceOwnedRetiredSessionAuthorityMember`, `inspectSourceOwnedRetiredSessionAuthorityMember`.
+  The registry needs no change.
+- The first registry call in `continuityAuthorityFinish` runs with the operation in phase `armed`.
+  The retired advance admits only `terminal-observed` and refuses it ('retired-only-terminal-advance').
+  On the live path that call is a no-op CAS (registry ~412: it returns without writing when the
+  observed operation equals the member).
+- **Elephant decision (within D73 A; named for the D65 security read):** in the retired release path
+  only, that pre-writer CAS uses the retired inspect route instead of the retired advance.
+  `inspectSourceOwnedSessionAuthorityMember` (~418) makes the same checks (member handle, expected
+  ref, operation handle, binding, not released). It is strictly stronger: any mismatch is refused
+  where the advance would try a transition, and it re-reads the member inside the descriptor lock.
+  The second call (~9531, phase `terminal-observed`) uses the retired advance. The outer release
+  stays on its measured route. The live path is unchanged.
