@@ -382,16 +382,15 @@ register("GDBC11", "hook: a grant lets the same agent state continue where an un
 
 register("GDBC12", "hook: the granted cap is bounded by maxTurns - 1 including the closing allowance", () => {
   const root = activeRoot("bound");
-  seed(root, { agentId: "b1", count: 0 });
+  seed(root, { agentId: "b1", baseCalls: 50, count: 0 });
   const grant = (extra) => grantDispatchBudget(["--agent-id", "b1", "--extra", String(extra), "--reason", "bounded", "--root", root]);
-  assert.equal(grant(40).status, "granted");
   const over = grant(40);
   assert.deepEqual([over.status, over.code], ["refused", "grant-exceeds-headroom"]);
-  const last = grant(14);
+  const last = grant(24);
   assert.equal(last.status, "granted");
   assert.equal(last.result.workingCapAfter, 74);
-  assert.equal(grant(1).code, "grant-exceeds-headroom");
-  seed(root, { agentId: "b1", count: 73 });
+  assert.equal(grant(1).code, "grant-already-recorded", "one grant per continuation");
+  seed(root, { agentId: "b1", baseCalls: 50, count: 73 });
   assert.equal(read(root, "b1").status, 0, "call 74 is the last working call");
   const past = read(root, "b1");
   assert.equal(past.status, 2, "call 75 is denied");
@@ -459,11 +458,12 @@ register("GDBC15", "grant script: refuses malformed arguments, an unknown agent 
   assert.equal(viaCli.status, 0, viaCli.stderr);
   const printed = JSON.parse(viaCli.stdout);
   assert.deepEqual([printed.schema, printed.status, printed.agentId, printed.totalExtra], ["pipeline.dispatch-budget-grant-result.v1", "granted", "s1", 5]);
-  const second = grantDispatchBudget(["--extra", "3", ...base]);
-  assert.equal(second.result.totalExtra, 8, "the history appends");
   const file = join(budgetDir(root), "grants", "s1.json");
   const kept = readFileSync(file, "utf8");
-  const broken = JSON.parse(kept); broken.grants[1].reason = "edited";
+  const second = grantDispatchBudget(["--extra", "3", ...base]);
+  assert.equal(second.code, "grant-already-recorded", "one grant per continuation");
+  assert.equal(readFileSync(file, "utf8"), kept, "the refused second grant leaves the record byte-identical");
+  const broken = JSON.parse(kept); broken.grants[0].reason = "edited";
   writeFileSync(file, `${JSON.stringify(broken)}\n`);
   assert.equal(grantDispatchBudget(["--extra", "1", ...base]).code, "grant-entry-digest-mismatch", "an unverifiable record is never extended");
   const refusedCli = spawnSync(process.execPath, [GRANT_SCRIPT, "--agent-id", "s1", "--extra", "0", "--reason", "x"], { cwd: root, encoding: "utf8", timeout: 60000 });

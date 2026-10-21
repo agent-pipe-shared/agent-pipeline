@@ -15,7 +15,8 @@
  * definition's `maxTurns`. A dispatched agent can never reach this script or the
  * grant store: the same guard refuses any non-orchestrator call that names them.
  * The script only grants for an agent whose counter already exists (a typo'd id
- * grants nothing) and refuses past the agent's headroom.
+ * grants nothing), refuses past the agent's headroom, and refuses a second
+ * grant for the same agent (one grant per continuation, D75 B).
  *
  * Exit 0 + one JSON object on stdout when granted; exit 2 + one
  * `DISPATCH-BUDGET-GRANT-REFUSED: <code>: <message>` line on stderr otherwise.
@@ -112,19 +113,20 @@ export function grantDispatchBudget(argv, dependencies = {}) {
     const tierCap = dispatchWorkingCap(counter.maxTurns);
     const headroom = tierCap === null || counter.workingCap > tierCap ? 0 : dispatchGrantHeadroom(counter.baseCalls, counter.maxTurns);
     const grantFile = join(budgetDir, "grants", `${args.agentId}.json`);
-    let existing = null;
-    let alreadyGranted = 0;
+    // D75 B: one grant per continuation. A record that does not verify is still refused as unverifiable (and left untouched);
+    // a verified record means the one grant is already spent, so the next step is a successor slice.
+    const alreadyGranted = 0;
     if (existsSync(grantFile)) {
-      existing = readJson(grantFile, "grant-record");
+      const existing = readJson(grantFile, "grant-record");
       const checked = validateGrantRecord(existing, args.agentId);
       if (!checked.ok) throw new Refusal(checked.code, "the existing grant record does not verify; it is left untouched");
-      alreadyGranted = checked.totalExtra;
+      throw new Refusal("grant-already-recorded", `a budget grant is already recorded for this agent (${checked.totalExtra} extra call(s)); one grant per continuation, so nothing was recorded. Next step: dispatch a successor slice from the agent's continuation card instead of granting again`);
     }
-    if (alreadyGranted + args.extra > headroom) {
-      throw new Refusal("grant-exceeds-headroom", `${args.extra} more call(s) would exceed this agent's headroom (headroom ${headroom}, already granted ${alreadyGranted}; working cap plus closing allowance must stay below maxTurns ${counter.maxTurns})`);
+    if (args.extra > headroom) {
+      throw new Refusal("grant-exceeds-headroom", `${args.extra} more call(s) would exceed this agent's headroom (headroom ${headroom}; working cap plus closing allowance must stay below maxTurns ${counter.maxTurns})`);
     }
     const grantedAt = (dependencies.nowFn ?? (() => new Date().toISOString()))();
-    const appended = appendGrant({ record: existing, agentId: args.agentId, extra: args.extra, reason: args.reason, grantedAt });
+    const appended = appendGrant({ record: null, agentId: args.agentId, extra: args.extra, reason: args.reason, grantedAt });
     if (!appended.ok) throw new Refusal(appended.code, "the grant arguments or existing record were refused by policy");
     mkdirSync(dirname(grantFile), { recursive: true, mode: 0o700 });
     const temporary = `${grantFile}.${process.pid}-${randomUUID()}.tmp`;
