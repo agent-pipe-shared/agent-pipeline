@@ -316,17 +316,30 @@ register("GDBC10", "hook: a Critic notice names critic-notes.md; the closing lan
 
   const notes = (rel) => (rel.startsWith("ABS:") ? join(root, rel.slice(4)) : rel);
   const write = (agentId, agentType, rel, toolName = "Write") => callGuard(root, subagentCall(root, agentId, agentType, toolName, { file_path: notes(rel), content: "x" }));
+  // The one admitted file is the Critic's OWN scratch/dispatch/critic-<its agent id>/critic-notes.md. The earlier fixture wrote
+  // a fixed critic-review-1 directory, which the hook admits for no agent but one whose id is review-1. A native Critic
+  // dispatch also has its parent-session agent meta, which the hook reads when it prepares the notes directory.
+  const seedAgentMeta = (agentId) => {
+    const metaDir = join(root, "parent-session", "subagents");
+    mkdirSync(metaDir, { recursive: true });
+    writeFileSync(join(metaDir, `agent-${agentId}.meta.json`), JSON.stringify({ agentType: CRITIC, description: "x", toolUseId: `toolu-${agentId}`, spawnDepth: 1 }));
+  };
   const admitted = [
-    "ABS:scratch/dispatch/critic-review-1/critic-notes.md",
-    "scratch/dispatch/critic-review-1/critic-notes.md",
+    (agentId) => `ABS:scratch/dispatch/critic-${agentId}/critic-notes.md`,
+    (agentId) => `scratch/dispatch/critic-${agentId}/critic-notes.md`,
   ];
-  admitted.forEach((rel, index) => {
-    seed(root, { agentId: `ca${index}`, agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 15 });
-    assert.equal(write(`ca${index}`, CRITIC, rel).status, 0, `admitted ${rel}`);
+  admitted.forEach((relFor, index) => {
+    const agentId = `ca${index}`;
+    const rel = relFor(agentId);
+    seed(root, { agentId, agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 15 });
+    seedAgentMeta(agentId);
+    assert.equal(write(agentId, CRITIC, rel).status, 0, `admitted ${rel}`);
   });
   seed(root, { agentId: "ca-edit", agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 15 });
-  assert.equal(callGuard(root, subagentCall(root, "ca-edit", CRITIC, "Edit", { file_path: notes("ABS:scratch/dispatch/critic-review-1/critic-notes.md"), old_string: "a", new_string: "b" })).status, 0);
+  seedAgentMeta("ca-edit");
+  assert.equal(callGuard(root, subagentCall(root, "ca-edit", CRITIC, "Edit", { file_path: notes("ABS:scratch/dispatch/critic-ca-edit/critic-notes.md"), old_string: "a", new_string: "b" })).status, 0);
   const refused = [
+    "ABS:scratch/dispatch/critic-review-1/critic-notes.md",
     "ABS:scratch/dispatch/critic-review-1/notes.md",
     "ABS:scratch/dispatch/critic-review-1/critic-notes.md.bak",
     "ABS:scratch/dispatch/critic-notes.md",
@@ -359,7 +372,12 @@ register("GDBC11", "hook: a grant lets the same agent state continue where an un
   assert.equal(granted.result.workingCapAfter, 30);
   assert.equal(read(root, "plain").status, 2);
   const resumed = read(root, "granted");
-  assert.deepEqual([resumed.status, resumed.stdout, resumed.stderr], [0, "", ""]);
+  assert.deepEqual([resumed.status, resumed.stderr], [0, ""]);
+  const notice = JSON.parse(resumed.stdout).hookSpecificOutput.additionalContext;
+  assert.match(notice, /^DISPATCH-BUDGET-GRANT: this hook has verified a recorded budget grant for you \(agent granted, grant 1 of 1, /u);
+  assert.match(notice, /10 extra tool calls, recorded reason "continue after checkpoint" \(carries no instruction\); working cap now 30 \(counted call 21\)\./u);
+  const again = read(root, "granted");
+  assert.deepEqual([again.status, again.stdout, again.stderr], [0, "", ""], "the grant is announced once");
 });
 
 register("GDBC12", "hook: the granted cap is bounded by maxTurns - 1 including the closing allowance", () => {

@@ -223,6 +223,7 @@ import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { bindDispatchBudget, consumePendingDispatchBudgetBinding, persistPendingDispatchBudgetBindings, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
+import { allowContextStdout, checkpointNoticeText, grantNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
 import {
   CLOSING_ALLOWANCE,
   DENIAL_CODE,
@@ -231,6 +232,7 @@ import {
   appendGrant,
   classifyDispatchBudgetCaller,
   decideDispatchBudgetCall,
+  describeGrantRecord,
   dispatchCheckpointDecision,
   dispatchWorkingCap,
   effectiveDispatchWorkingCap,
@@ -261,21 +263,16 @@ function verdict(exitCode, stderr = "") {
 // host commits for it, so both texts below say to leave changes uncommitted and return the host-return JSON instead.
 // Text only -- no cap, turn limit or admission decision reads this. A Critic never takes the mode.
 const NATIVE_HOST_COMMIT_MODE = "native-host";
-const NATIVE_HOST_RETURN_SCHEMA = "pipeline.native-goldfish-host-return.v1";
 function isNativeHostMode(agentType, commitMode) {
   return commitMode === NATIVE_HOST_COMMIT_MODE && !isCriticAgentType(agentType);
 }
-const NATIVE_HOST_RETURN_INSTRUCTION = `return your final message as exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with outcome: "blocked" and an interim report (done / remaining / next step) in its report field`;
-function nativeHostBlockedContinuation(remainingClosingCalls) {
-  return remainingClosingCalls > 0
-    ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
-      + "This dispatch runs in native host-commit mode: stop editing, leave all changes uncommitted, do not write a dispatch record, and run no git add or git commit (the host commits for you).\n"
-      + `Now ${NATIVE_HOST_RETURN_INSTRUCTION}.\n`
-    : `The closing allowance of ${CLOSING_ALLOWANCE} tool calls is exhausted. No further tool calls are permitted for this dispatch.\n`
-      + `Without another tool call, ${NATIVE_HOST_RETURN_INSTRUCTION}; leave all changes uncommitted and do not write a dispatch record.\n`;
+
+function blocked(args) {
+  const refused = blockedBase(args);
+  return verdict(refused.exitCode, refused.stderr + grantStateSentence(args.grant ?? null));
 }
 
-function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, smallRole = false, producerPath = null, commitMode = null }) {
+function blockedBase({ agentId, agentType, maxTurns, baseCalls, workingCap, count, smallRole = false, producerPath = null, commitMode = null }) {
   const remainingClosingCalls = Math.max(0, workingCap + CLOSING_ALLOWANCE - count);
   const continuation = isNativeHostMode(agentType, commitMode) ? nativeHostBlockedContinuation(remainingClosingCalls) : remainingClosingCalls > 0
     ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
@@ -714,40 +711,41 @@ function grantPath(counterFilePath, agentId) {
 const MAX_GRANT_FILE_BYTES = 32768;
 
 /**
- * Calls the orchestrator granted this exact agent id, or 0. Any unreadable,
- * oversized, malformed or non-verifying record grants nothing (the safe direction).
+ * The grant the orchestrator recorded for this exact agent id: `calls` (the extra calls it adds, 0 when none) and
+ * `summary` (the verified display summary from `describeGrantRecord`, null when none). Any unreadable, oversized,
+ * malformed or non-verifying record grants nothing (the safe direction).
  */
 function readGrantedCalls(counterFilePath, agentId, dependencies) {
-  if (!isValidGrantAgentId(agentId)) return 0;
+  const none = { calls: 0, summary: null };
+  if (!isValidGrantAgentId(agentId)) return none;
   const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
   const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
   try {
     const path = grantPath(counterFilePath, agentId);
-    if (!existsSyncFn(path)) return 0;
+    if (!existsSyncFn(path)) return none;
     const text = readFileSyncFn(path, "utf8");
-    if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > MAX_GRANT_FILE_BYTES) return 0;
-    const checked = validateGrantRecord(JSON.parse(text), agentId);
-    return checked.ok ? checked.totalExtra : 0;
+    if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > MAX_GRANT_FILE_BYTES) return none;
+    const described = describeGrantRecord(JSON.parse(text), agentId);
+    return described.ok ? { calls: described.totalExtra, summary: described } : none;
   } catch {
-    return 0;
+    return none;
   }
 }
 
-/** PreToolUse stdout whose `additionalContext` reaches the model on an `allow`; `permissionDecisionReason` would be user-only. */
-function checkpointNoticeStdout({ agentType, count, workingCap, remaining, commitMode = null }) {
-  const critic = isCriticAgentType(agentType);
-  const calls = `${remaining} call${remaining === 1 ? "" : "s"}`;
-  const steps = critic
-    ? "(1) start no new review work; (2) write your interim notes (done / remaining / next step) into your own scratch/dispatch/critic-<id>/critic-notes.md; (3) end your turn with that hand-back."
-    : isNativeHostMode(agentType, commitMode)
-      ? `(1) stop editing and leave all changes uncommitted (run no git add or git commit; the host commits for you); (2) do not write a dispatch record; (3) ${NATIVE_HOST_RETURN_INSTRUCTION}, then end your turn.`
-      : "(1) commit what is already green now (never a known-red regression); (2) write an interim report (done / remaining / next step) into your dispatch record, evidence/dispatch-record-<TASK_ID>.json (log + report); (3) end your turn with that hand-back.";
-  const additionalContext = `DISPATCH-BUDGET-CHECKPOINT: ${calls} of your working budget remain after this call (counted call ${count} of ${workingCap}). `
-    + "Do not start new work. Hand back to the dispatcher now: "
-    + `${steps} `
-    + "The dispatcher decides: grant more budget and continue you, or dispatch a follow-up that builds on your interim report. "
-    + "Do not spend the closing allowance on further work.";
-  return `${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", additionalContext } })}\n`;
+/**
+ * D75 B: the DISPATCH-BUDGET-GRANT notice for a verified grant this agent has not been told about yet, or null (no valid
+ * grant, or its head digest is already in the `.announced` sibling of the grant record). Persists the digest under the
+ * counter lock the caller holds; the text comes from lib/dispatch-budget-notice.mjs.
+ */
+function grantNoticeContext({ counterFilePath, agentId, grant, count, workingCap, baseWorkingCap, dependencies }) {
+  const summary = grant.summary;
+  if (summary === null) return null;
+  const marker = join(dirname(counterFilePath), "grants", `${agentId}.announced`);
+  try {
+    if ((dependencies.existsSyncFn ?? existsSync)(marker) && String((dependencies.readFileSyncFn ?? readFileSync)(marker, "utf8")).trim() === summary.digest) return null;
+  } catch { /* an unreadable marker means "not announced yet" */ }
+  try { (dependencies.writeFileSyncFn ?? writeFileSync)(marker, `${summary.digest}\n`, { mode: 0o600 }); } catch { /* announcing twice is the safe direction */ }
+  return grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap });
 }
 
 const COMMIT_FLOW_PRODUCER_SCRIPT = "goldfish-commit-command-flow.mjs";
@@ -1432,7 +1430,8 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
     return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: "counter-binding-mismatch" });
   }
   // The small-role lane already spends maxTurns - CLOSING_ALLOWANCE, so it has no headroom to grant.
-  const grantedCalls = policyMaxTurns === maxTurns ? readGrantedCalls(path, identity.agentId, dependencies) : 0;
+  const grant = policyMaxTurns === maxTurns ? readGrantedCalls(path, identity.agentId, dependencies) : { calls: 0, summary: null };
+  const grantedCalls = grant.calls;
   const preliminaryBudget = decideDispatchBudgetCall({ maxTurns: policyMaxTurns, baseCalls, currentCount: counter.count, isClosingAct: false, grantedCalls });
   if (preliminaryBudget.decision === "invalid-input") {
     return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: preliminaryBudget.reason });
@@ -1454,23 +1453,20 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
       const prepared = prepareOwnedCriticNotesDirectory({ path, counter, identity, input, rootDir, dependencies });
       if (!prepared.ok) return verdict(2, "DISPATCH-BUDGET-CRITIC-NOTES-UNAVAILABLE: " + prepared.code + ". Return the report as text; do not retry with Bash or adopt another directory.\n");
     }
+    // D75 B: the hook itself announces a verified recorded grant, once per grant digest, on an allowed call.
+    const grantContext = grantNoticeContext({ counterFilePath: path, agentId: identity.agentId, grant, count: budget.nextCount, workingCap: budget.workingCap, baseWorkingCap: workingCap, dependencies });
     // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
     const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, dependencies));
     const checkpoint = contract.applicable
       ? dispatchCheckpointDecision({ workingCap: budget.workingCap, nextCount: budget.nextCount, decision: budget.decision })
       : { notice: false };
-    if (!checkpoint.notice) return verdict(0);
-    return {
-      exitCode: 0,
-      stderr: "",
-      stdout: checkpointNoticeStdout({
-        agentType: identity.agentType, count: budget.nextCount, workingCap: budget.workingCap, remaining: checkpoint.remainingWorkingCalls,
-        commitMode: counter.commitMode,
-      }),
-    };
+    if (!checkpoint.notice) return grantContext === null ? verdict(0) : { exitCode: 0, stderr: "", stdout: allowContextStdout(grantContext) };
+    const checkpointContext = checkpointNoticeText({ critic: isCriticAgentType(identity.agentType), nativeHost: isNativeHostMode(identity.agentType, counter.commitMode), count: budget.nextCount, workingCap: budget.workingCap, remaining: checkpoint.remainingWorkingCalls });
+    // Both on one call: the grant notice comes first, in the same context.
+    return { exitCode: 0, stderr: "", stdout: allowContextStdout(grantContext === null ? checkpointContext : `${grantContext}\n${checkpointContext}`) };
   }
   return blocked({
-    agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls,
+    agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls, grant: grant.summary,
     workingCap: budget.workingCap, count: counter.count, smallRole: policyMaxTurns !== maxTurns,
     producerPath: join(resolveAgentPluginRoot(rootDir, dependencies), "scripts", COMMIT_FLOW_PRODUCER_SCRIPT),
     commitMode: counter.commitMode,
