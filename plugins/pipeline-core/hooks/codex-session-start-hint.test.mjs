@@ -91,7 +91,9 @@ cases.push({ id: "SSH003", name: "direct SessionStart payload and native cwd ide
   const originalWrite = process.stdout.write;
   process.stdout.write = (chunk) => { stdout += chunk; return true; };
   try {
-    main({ projectDir: root });
+    // A signal-less entry reports "unavailable for this runner" (session-start-runner-identity SSRI003), so this
+    // Codex payload test declares its runner.
+    main({ projectDir: root, runner: "codex" });
   } finally {
     process.stdout.write = originalWrite;
   }
@@ -102,7 +104,7 @@ cases.push({ id: "SSH003", name: "direct SessionStart payload and native cwd ide
 
   const fresh = mkdtempSync(join(tmpdir(), "codex-session-start-native-cwd-"));
   try {
-    const governedRootPayload = mainPayload({ projectDir: root });
+    const governedRootPayload = mainPayload({ projectDir: root, runner: "codex" });
     assert.equal(governedRootPayload.systemMessage, governed.message);
     assert.equal(governedRootPayload.hookSpecificOutput.additionalContext, governed.context);
 
