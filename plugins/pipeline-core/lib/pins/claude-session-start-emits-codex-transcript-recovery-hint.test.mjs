@@ -47,8 +47,8 @@ function runHook(cwd, args, input) {
 }
 
 /** The args the shipped Claude wiring passes after the script path. */
-function configuredClaudeArgs(matcher = "startup|resume|clear") {
-  const entries = hooksJson.hooks.SessionStart.filter((row) => row.matcher === matcher)
+function configuredClaudeArgs(matcher = "startup|resume|clear", wiring = hooksJson) {
+  const entries = wiring.hooks.SessionStart.filter((row) => row.matcher === matcher)
     .flatMap((row) => row.hooks).filter((row) => row.command.includes("codex-session-start-hint.mjs"));
   assert.equal(entries.length, 1, "exactly one shared hint entry in the Claude matcher");
   const tail = entries[0].command.split("codex-session-start-hint.mjs\"")[1];
@@ -59,6 +59,21 @@ const OTHER_RUNNER = /codex|antigravity|gemini|\$CODEX_HOME|~\/\.codex|runner-tr
 
 test("A1 wiring: the Claude SessionStart hint entry declares the claude runner explicitly", () => {
   assert.deepEqual(configuredClaudeArgs(), ["--runner", "claude"]);
+});
+
+test("A1a RED mirror: a pre-fix copy of the hint entry without --runner claude fails the A1 predicate", () => {
+  // In-memory only: the pre-fix wiring is rebuilt by stripping the runner argument from a copy of the shipped entry.
+  const preFix = structuredClone(hooksJson);
+  for (const row of preFix.hooks.SessionStart.filter((r) => r.matcher === "startup|resume|clear")) {
+    for (const hook of row.hooks) {
+      if (hook.command.includes("codex-session-start-hint.mjs")) hook.command = hook.command.replace(" --runner claude", "");
+    }
+  }
+  assert.deepEqual(configuredClaudeArgs("startup|resume|clear", preFix), []);
+  assert.throws(
+    () => assert.deepEqual(configuredClaudeArgs("startup|resume|clear", preFix), ["--runner", "claude"]),
+    assert.AssertionError,
+  );
 });
 
 test("A1b wiring: the compact matcher does not carry the hint script (no second runner-blind path)", () => {
@@ -122,7 +137,14 @@ test("A6 positive control: the Codex runner still gets the Codex-scoped list (th
   const context = output.hookSpecificOutput.additionalContext;
   assert.match(context, /--runner codex --exclude-session "codex-current"/u);
   assert.match(context, OTHER_RUNNER, "the detector used in A2-A5 recognises the Codex hint");
-  assert.match(context, /[A-Za-z]:[\\/]/u, "the drive-letter path detector used in A3 recognises the embedded host path");
+  const embeddedSpellings = [dir, dir.replaceAll("\\", "/"), JSON.stringify(dir).slice(1, -1)];
+  assert.ok(
+    embeddedSpellings.some((form) => context.includes(form)),
+    "the Codex context embeds the fixture directory in a spelling the A3 path detectors check",
+  );
+  if (process.platform === "win32") {
+    assert.match(context, /[A-Za-z]:[\\/]/u, "the drive-letter path detector used in A3 recognises the embedded host path");
+  }
 });
 
 test("A7 optional (not enrolled) folder: the Claude output also names no other runner", () => {
