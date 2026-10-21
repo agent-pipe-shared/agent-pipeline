@@ -337,7 +337,7 @@ test("v4 authored records preserve required-pending and reject non-authoring out
     schema: "pipeline.dispatch-record.v4", taskId: "DOD-V4-REQUIRED", agentType: "goldfish-implementor",
     model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
     candidateCommit: sha, resultSha256: createHash("sha256").update(report.text, "utf8").digest("hex"), outcome: "completed",
-    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" }, commits: [sha], log: [], report,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" }, commits: [sha], log: [{ phase: "verify", toolUseCount: 1 }], report,
     criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" },
   };
   const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V4-REQUIRED (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
@@ -360,7 +360,7 @@ test("v4 authored records preserve required-pending and reject non-authoring out
     ...authored, taskId: "DOD-V4-UNDELIVERED", outcome: "completed-no-delivery",
     outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
     observationIdentity: { dispatchId: "dispatch-1", attemptId: "attempt-1" },
-    resultSha256: null, commits: [], report: null,
+    resultSha256: null, commits: [], log: [], report: null,
   };
   writeRecord("DOD-V4-UNDELIVERED", undelivered);
   const undeliveredDeps = commit({ message: "feat(x): done\n\nDispatch: DOD-V4-UNDELIVERED (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
@@ -378,7 +378,7 @@ test("v4 authored Antigravity record cannot mint PASS from Claude frontmatter or
     dispatcher: "Elephant", candidateCommit: sha,
     resultSha256: createHash("sha256").update(report.text, "utf8").digest("hex"),
     outcome: "completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
-    commits: [sha], log: [], report, criticSkip: skip(),
+    commits: [sha], log: [{ phase: "verify", toolUseCount: 1 }], report, criticSkip: skip(),
   };
   writeRecord("DOD-V4-AGY", authored);
   const deps = commit({
@@ -432,7 +432,7 @@ test("native Claude/Codex authored records require exact host-observation marker
       rulesetSha: "0.7.0+local", dispatcher: "Elephant", candidateCommit: sha,
       resultSha256: createHash("sha256").update(report.text, "utf8").digest("hex"),
       outcome: "completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
-      commits: [sha], log: [], report, criticSkip: skip(),
+      commits: [sha], log: [{ phase: "verify", toolUseCount: 1 }], report, criticSkip: skip(),
     };
     writeRecord(taskId, authored);
     const marker = `Native-Host-Observed: v1 (${runner})`;
