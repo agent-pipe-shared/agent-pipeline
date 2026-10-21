@@ -109,8 +109,10 @@ blockers and majors into AC-123, AC-155, AC-207 and AC-264; D65 and D66 decide e
 calls; C15 and C16 collect the protected registration changes for the bundled sitting. Estimate
 (not measured): 5-8 session days to the content-final candidate.
 Closures: M0 (measurements) and W1 (AC-142B, AC-224, AC-155A, implementation complete at
-`c578670d7`, Critic batch and PO acceptance pending) are closed; K1 is in progress, with six
-interim measurement entries (last: 'K1 measurement 6'). D70 (lost-binding recovery, built at
+`c578670d7`, Critic batch and PO acceptance pending) are closed; K1 is partly closed (2026-10-21,
+'K1 closure': implementation complete, Critic batch and PO acceptance pending; recovery 39/39,
+binding 61/66; the rest, binding A/B/E and GDW01, is the decision cluster K1D awaiting the PO; the
+model-family cases joined the D66 row); K1h with K10 is in progress. D70 (lost-binding recovery, built at
 `d2602f5cf`/`5e5c7d8f2`, implementation complete) and D71 (the per-user session-power address root
 past its 4096-slot bound: 3769 stale test slots moved aside, product fix in this candidate) are in
 `po-decisions-2026-10-18.md`. D72 settles both open K1 calls: the address root stays at the OS home

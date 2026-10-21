@@ -32,7 +32,7 @@ real defect green.
 | K8 | Guard hook suites that crash or time out | guard-apply-patch, guard-devplan, guard-gate-strength (TP-6), notebook-write-coverage (TP-10), antigravity-pretool-guard, lifecycle-denial-loop RC04C001, codex-session-start-hint SSH003 | whole-file failure after 30-95 s | AC-195 / AC-247 area; TP-6/TP-10 to the bundled ceremony if the test must change |
 | K9 | Remaining single suites | control-placement, agy-final-return AFR18, slice-queue-cli SC15, pipeline-state-rebind-runner (2), codex-host-output-custody (9), pipeline-state-late-verify, local-worker-supervisor-cli (9), nova-verify-journal (3), afk-claude-host, afk-activation, runner-contracts.schema (mechanic.claude tuple), gitleaks near-miss, security-scan + security-scan-snapshot (2), pipeline-start-preflight-pre-push-observation, wire-dispatch-budget-hook (7), guard-dispatch-budget-checkpoint GDBC10, pipeline-state-push-anchor (3), design-approval-command-admission, design-advisory-admission-cli (2), r7-3-bound-paths, agy-session-authority (2), goldfish-antigravity-live-host, pipeline-start-preflight-enforcement (2), the Windows and WSL pins, pin-no-uninstall, pin-worktrees (AC-274), pin-draft-phase (AC-167), pin-claude-session-start | mixed | per suite, by area |
 | K10 | Green alone, red only in Verify | wsl-ipc-compatibility, stop-fanout, runner-profile-migration-v3, project-authority, guard-dispatch, dispatch-policy, governance-action-artifact, dispatch-budget-binding, dispatch-record-strip-for-critic, security-scanner-diagnostics, architecture-prospective-companion, session-authority-repair; scratch-package-staging needs Verify's FD3 | Verify-only cause (load, shared state, case completion) | measured with K1h |
-| — | Typed pending by D66 | MFHS002-008, MFHS023, MFHS028, MFI012, MFI013, MFMP003, CADH001, readiness-host case | assertions unchanged, counted pending | AC-212 |
+| — | Typed pending by D66 | MFHS002-008, MFHS023, MFHS028, MFI012, MFI013, MFMP003, CADH001, readiness-host case; from K1: CCH136, CCH137, codex-critic-session-route, MFE018 | assertions unchanged, counted pending | AC-212 |
 
 ## Order
 
@@ -402,3 +402,40 @@ Interim entry.
     step that the owning release and RF2A's `releaseArchivedOrphanBinding` perform.
 - **Next:** C and D (implementor, precise recipes), then A with the retirement risk measured first, then B
   and E.
+
+### K1 closure (2026-10-21, partly closed with a named rest)
+
+Status: **partly closed.** Implementation complete for everything below; the D65/D72 security reads
+are in the Critic batch, and PO acceptance is pending. The named rest moves to the decision cluster
+K1D (ledger), which waits for the PO.
+
+- **Delivered (commits):** K1R address-root repair `33fcdf82d` (D71/D72; C15 drop-in and C16 row
+  collected); D70 (b) historic legacy binding `edb60e98c`; RF2A archive release `4467aa5b0` (D72);
+  native-goldfish host state `16677e01d`; design-workflow builder `314cd6bb8`; AFK requests beside the
+  ledger root `c8c4fb947`; AFK projection-writer precheck `41ba365df`; apply-recovery bind seam and
+  composite cases on the historic binding `70957cf27`; lost-binding release without a registry (D44)
+  `64bdfd697`; AC-203 own-session pin on the D46 split `177401a89`. Earlier K1 commits are in
+  measurements 1-8.
+- **Counted green runs (`scratch/run-quiet.mjs`, private TMPDIR, no concurrent dispatch):**
+  session-cleanup-recovery 39/39; session-cleanup-lost-binding 7/7 (needs C16); session-power-address-
+  repair 17/17 (needs C16); session-cleanup-power 2/2; orphan-descriptor-recovery pin 7/7;
+  native-goldfish-host-state-regression 3/3; design-workflow-package-builder 3/3;
+  afk-transaction-host 3/3; afk-claude-host 10/10; afk-activation 13/13; consumer-safe paths 9/9;
+  architecture check only its two known entries.
+- **Still red, and where it went:**
+  - session-cleanup-binding 61/66 (was 49/66 at the K1 handover). The five reds are K1D: A (3 cases,
+    the `cleanup`/`release-binding` owning release cannot read the requester context after the
+    descriptor retires; close-block uses these verbs, so likely a real 0.7.0 defect), B (1, a leftover
+    authority journal fails its repository binding at `continuityAuthoritySnapshot` ~9291), E (1, the
+    ordinary orphan release leaves the registry member armed). PO decision with Elephant
+    recommendations on the PO list.
+  - guard-dispatch-native-worker GDW01 (3/4): K1D, a Codex `spawn_agent` governed item dispatch has
+    no session-owner route (measurement 8); interim file `scratch/k1fg4-gdw-interim.test.mjs`.
+  - Model-family group to the D66 typed-pending package (step 6 of the K1 order): codex-critic-host
+    CCH136 and CCH137, codex-critic-session-route (4/5), codex-design-advisor-host CADH001, and
+    model-family-execution MFE018 (18/19, re-measured 2026-10-21). CCH136 and CADH001 were already
+    bound to E24; the others join the D66 row of the cluster table. Not re-measured except MFE018.
+- **Process notes:** no `dispatch-record-write.mjs` records exist for the K1 dispatches (orchestrator
+  commits carry the `Dispatch:` and `Commit-Act: orchestrator` trailers); several deep dispatches stopped
+  at their budget and were continued from saved interim files under `scratch/`.
+- **Next:** K1h with K10 (hang group and Verify-only reds); K1D when the PO decides.
