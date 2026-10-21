@@ -213,6 +213,7 @@ test("immutable authored Agy v4 record can be resolved by the same independently
   const taskId = "UNDELIVERED";
   const authored = v4(taskId, { runner: "antigravity", model: "gemini-3.8-flash-high",
     effort: "high", outcome: "completed", candidateCommit: SHA,
+    log: [{ phase: "verify", toolUseCount: 1 }],
     resultSha256: sha256("Implemented approved change."), commits: [SHA],
     report: { text: "Implemented approved change.", changedFiles: ["src.txt"] },
     outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
@@ -701,6 +702,7 @@ test("review admission still rejects malformed corpus evidence while another rec
 test("signed recovery index retires exactly two source-bound zero-commit v3 rows without covering authored reviews", () => {
   const files = abandonedRecoveryFiles();
   const authored = v4("AUTHORED", { outcome: "completed", resultSha256: sha256("Complete."), commits: [SHA],
+    log: [{ phase: "verify", toolUseCount: 1 }],
     report: { text: "Complete.", changedFiles: [] },
     outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
     criticRequired: required() });

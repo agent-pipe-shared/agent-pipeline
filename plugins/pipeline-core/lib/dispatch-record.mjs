@@ -162,7 +162,9 @@ function validateRecord(record, { legacy, v3 = false }) {
   if (isTerminalOutcome(record.outcome) && record.resultSha256 === null && !undeliveredV4) fail("record-result", "terminal dispatch record requires resultSha256");
   if (!Array.isArray(record.log) || record.log.length > 2048) fail("record-log", "log must be a bounded array");
   // completed-undelivered is a host observation of a worker that returned nothing: no report, no worker activity to log.
-  if (!legacy && isTerminalOutcome(record.outcome) && !undeliveredV4 && record.log.length === 0) fail("record-log", "terminal dispatch record requires at least one log entry");
+  // D77 (K6, AC-163): the read validator refuses an empty terminal log only for v4. Committed v3 history with an empty
+  // log stays readable; a NEW terminal v3 record is refused at write (assertTerminalLogForWrite).
+  if (!legacy && !v3 && isTerminalOutcome(record.outcome) && !undeliveredV4 && record.log.length === 0) fail("record-log", TERMINAL_LOG_REPAIR);
   record.log.forEach((entry, index) => {
     exactKeys(entry, ["phase", "toolUseCount", "note"], `log[${index}]`, ["phase", "toolUseCount"]);
     nonempty(entry.phase, `log[${index}].phase`);
@@ -254,6 +256,17 @@ function validateRecord(record, { legacy, v3 = false }) {
     }
   }
   return structuredClone(record);
+}
+
+const TERMINAL_LOG_REPAIR = "terminal dispatch record requires at least one log entry; append the mandatory phase entries (phase and toolUseCount) to the record's log before the terminal write";
+
+/**
+ * Write-path half of AC-163 (D77): a NEW terminal v3 or v4 record must carry at least one log entry. The
+ * completed-undelivered v4 observation is exempt exactly as at read. Call with an already validated record.
+ */
+export function assertTerminalLogForWrite(record) {
+  const undelivered = record.schema === DISPATCH_RECORD_SCHEMA && record.outcomeClassification?.kind === "completed-undelivered";
+  if (isTerminalOutcome(record.outcome) && !undelivered && record.log.length === 0) fail("record-log", TERMINAL_LOG_REPAIR);
 }
 
 export function validateDispatchRecord(record) {

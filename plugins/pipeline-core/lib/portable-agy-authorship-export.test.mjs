@@ -152,7 +152,7 @@ test("PAE05 a committed v4 record uses only its exact signed export in a fresh c
     rulesetSha: exportRecord.subject.routePolicySha256, dispatcher: "Elephant", candidateCommit: commit,
     resultSha256: sha(report.text), outcome: "completed",
     outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
-    commits: [commit], log: [], report,
+    commits: [commit], log: [{ phase: "verify", toolUseCount: 1 }], report,
     criticRequired: { schema: CRITIC_REQUIRED_SCHEMA,
       trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 2, riskClass: "low", riskFlag: true,
         diff: { mechanical: false, architecture: false, guardrails: false, security: false } },

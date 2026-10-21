@@ -6,7 +6,7 @@ import { closeSync, constants, existsSync, fstatSync, fsyncSync, linkSync, lstat
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
+import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
@@ -177,6 +177,8 @@ export function writeHostObservedNativeGoldfishDispatchRecord({ repoRoot, target
 function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
   { hostObservedAgy = false, hostObservedNativeGoldfish = false } = {}) {
   const record = validateDispatchRecord(inputRecord);
+  // D77 (K6, AC-163): the empty-log refusal for a NEW terminal v3/v4 record lives here; committed v3 history stays readable.
+  assertTerminalLogForWrite(record);
   const modelCheck = compareRecordedModel(record);
   if (record.schema === DISPATCH_RECORD_SCHEMA && !isTerminalOutcome(record.outcome)) {
     if (hostObservedAgy || hostObservedNativeGoldfish) fail("attempt-host-route", "terminal host route cannot publish an opening");
