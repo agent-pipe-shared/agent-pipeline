@@ -320,7 +320,7 @@ test("installCommand carries the installer's own documented --install verb, an a
   withFreshRepo("install-command", (dir) => {
     const result = observePrePushHookInstallation({ rootDir: dir });
     assert.equal(result.installCommand.kind, "command");
-    assert.equal(result.installCommand.executable, "node");
+    assert.equal(result.installCommand.executable, process.execPath, "an absolute executable, as the Windows relative-action pin requires");
     assert.deepEqual(result.installCommand.argv.slice(1), ["--install"]);
     assert.ok(existsSync(result.installCommand.argv[0]), "argv[0] must be the real installer script on disk");
     assert.match(result.installCommand.argv[0], /pre-push-hook-install\.mjs$/);
