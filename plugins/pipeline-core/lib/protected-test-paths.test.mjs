@@ -84,6 +84,41 @@ test("mutating git apply cannot masquerade as a scratch-only write", () => {
   assert.deepEqual(extractShellWriteTargets({ command: "git apply --check -- scratch/change.diff", root: "/repo" }), []);
 });
 
+// pipeline.codex-signed-candidate-worktree-admission, acceptance clause 'the exact strict read-only preflight must also be
+// admitted without admitting an actual patch write, mixed commands, an unsafe path, or ambiguous arguments'.
+// Delivered in d02409a8a (readOnlyGitApplyCheckArguments); pinned here for the strict spellings and every listed refusal.
+test("the strict read-only git apply --check preflight is admitted; a write, a mixed command, an unsafe path or an ambiguous argument is not", () => {
+  for (const command of [
+    "git apply --check --whitespace=error scratch/change.patch",
+    "git apply --check --whitespace error scratch/change.patch",
+    "git apply --check --whitespace=error-all -- scratch/change.diff",
+    "git -C other apply --check --whitespace=error scratch/change.patch",
+    "git --no-pager -C other apply --check scratch/change.patch",
+  ]) {
+    assert.deepEqual(extractShellWriteTargets({ command, root: "/repo" }), [], command);
+  }
+  for (const command of [
+    "git apply --check --whitespace=bogus scratch/change.patch",
+    "git apply --check --whitespace scratch/change.patch",
+    "git apply --whitespace=error --check scratch/change.patch",
+    "git apply --check --index scratch/change.patch",
+    "git apply --check --directory=src scratch/change.patch",
+    "git apply --check --reject scratch/change.patch",
+    "git apply --check scratch/change.txt",
+    "git apply --check ../outside.patch",
+    "git apply --check",
+    "git apply --check -",
+    "git -C .. apply --check scratch/change.patch",
+    "git -C other -C other apply --check scratch/change.patch",
+    "git -c core.hooksPath=x apply --check scratch/change.patch",
+    "git apply --check scratch/change.patch && git apply scratch/change.patch",
+    "git apply --check scratch/change.patch; git apply scratch/change.patch",
+  ]) {
+    assert.throws(() => extractShellWriteTargets({ command, root: "/repo" }),
+      /mutating git apply has unbound patch targets/u, command);
+  }
+});
+
 test("NVA-B8: Git revision-only working-tree verbs never invent a path from a commit or ref", () => {
   for (const command of [
     "git revert --no-edit d2b1dbfc",

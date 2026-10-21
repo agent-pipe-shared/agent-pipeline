@@ -74,3 +74,4 @@ an actual patch write, mixed commands, an unsafe path, or ambiguous arguments.
 - **Decision:** accepted by the PO on 2026-10-11.
 - **Assignment:** Alfred, next local candidate.
 - **Tracking:** item source created; official ledger registration and candidate-bound closure remain pending. No completion is claimed.
+- **Coverage read 2026-10-21:** the strict read-only preflight half (`git apply --check` admitted without admitting a patch write) is delivered since `d02409a8a` (`readOnlyGitApplyCheckArguments`, `lib/protected-test-paths.mjs`) and pinned by `lib/protected-test-paths.test.mjs`. Still open: the exact-Worktree admission of the signed quality-package materializer (`hooks/codex-pretool-guard.mjs` binds Root to the session's `input.cwd`; protected hook, signed ceremony, Codex-host proof). The item has no AC row in `specs/sprint-alfred-epic/spec.md`.
