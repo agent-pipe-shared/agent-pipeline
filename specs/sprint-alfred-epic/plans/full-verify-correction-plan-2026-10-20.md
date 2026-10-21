@@ -637,6 +637,22 @@ Status: **partly closed.** Implementation complete; the Critic batch and PO acce
   file whose bytes hash to the name; any other unknown entry stays refused. The catch in
   `continuityAuthorityExecute` and 'continuity owning bind failed after reservation' carry the inner
   reason and a runnable repair (D74).
+- **Slice ALF-K1D-E-ORPHAN-MEMBER-STEP4 (checkpoint stop after reading, nothing built, cancelled
+  `--started`):** measured by code reading: `releaseOnboardingSessionCleanupInternal` is a no-op on the
+  orphan route (a discarded design State reads `sessionCleanup` null with `orphanBinding` set, so it
+  returns released/mutated false), so the member-first boundary must delete the binding directly under
+  the State lock taken inside the boundary (`acquireLock` on the State lock with the orphan-release token,
+  State CAS against `plan.stateAfterSha256`, binding CAS against `plan.binding.sha256`,
+  `deletePrivateCleanupBinding`). Structure: `execute()` keeps receipt + descriptor retirement and returns
+  'receipt-committed'; a new exported `finishOrphanSessionCleanupBindingRelease({plan, deps})` runs the
+  member step with that delete as its callback and then the final read-back; the apply calls it after
+  `releaseLock` for `ready` plans and discard-feature after `writeState`. The orphan archive id is the
+  receipt byte digest (`archiveObservedPrivateCleanupReleaseReceipt` ~2046), so the name-hash admission
+  fits. Split: E5a wiring + snapshot admission + D74 message, E5b the crash-recovery case.
+- **Process finding (never-fully-blocking):** a Goldfish could not revert its own edit of
+  `scripts/pipeline-state.mjs` by `git restore` (guard-lifecycle-ready `PB-SANCTIONED-WRITER`, no
+  override route), and `scratch/interim-save.mjs` has no reset verb; the Edit tool works. Briefings
+  name Edit as the revert route for that file.
 - **D75 B finding:** a continuation sent as a chat message after a recorded budget grant was refused
   by the agent as an unauthenticated mid-task amendment, which its briefing's stop rule requires. The
   D75 B build therefore needs an authenticated continuation: the agent must be able to verify the grant
