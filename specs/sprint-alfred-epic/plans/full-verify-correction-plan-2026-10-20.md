@@ -539,6 +539,26 @@ Status: **partly closed.** Implementation complete; the Critic batch and PO acce
 - **Agent todos:** a SIGKILLed Verify leaves `<home>/.pv/r*` behind (no stale sweep yet); two
   leftover measurement directories `<home>/.pv??????` from the first short-path attempt.
 
+### Backlog closure check for M0, W1, K1, K1h (2026-10-21, PO rule: a closure also closes its items)
+
+- **Result:** no backlog item is closed. None of these clusters delivered a whole item; each
+  delivered a part of an item whose other acceptance is still open, so closing would claim more
+  than was delivered.
+- AC-224 (`parallel-work-in-one-checkout-is-unsafe`): W1 delivered the `--commit` evidence route
+  (PF-57 (2)). Open: failure modes 1-3 (counter lock, record collision, transient not-ready), the
+  parallel registry pin (the K12 lock race shows it is not yet met), and the AGY worktree block
+  (post-0.7.0 unless pulled in).
+- AC-142 (`critic-round-cap-and-delta-scope-are-not-enforced`): W1 delivered the repair text and
+  the skill's arguments gate (PF-34, PF-57 (1)). Open: the CCA019+ pin for a pre-rule feature
+  (C15/C16); the round-cap, delta-range and close-feature blocks are not re-checked here.
+- AC-155 (`design-phase-runs-critic-advisor-and-readiness-instead-of-one-review`): W1 delivered
+  only the D64 receipt provenance part.
+- AC-203 (`host-crash-during-verify-...`): K1 and K1h delivered most of it; the rest is K1D.
+- M0 is a measurement and delivers no item.
+- **Next:** the item is closed in the closure of the cluster that delivers its last acceptance
+  point (AC-203 with K1D). A per-item delivery audit of every Alfred AC row runs as a read-only
+  fan-out before the Critic batch, and closes what it finds fully delivered.
+
 ### K1D measurement 1: D73 A (2026-10-21, slices ALF-K1D-A-RETIRED-RELEASE 1-3)
 
 - The three A cases fail with `SDC-AUTHORITY-UNAVAILABLE` 'continuity owning release failed'
