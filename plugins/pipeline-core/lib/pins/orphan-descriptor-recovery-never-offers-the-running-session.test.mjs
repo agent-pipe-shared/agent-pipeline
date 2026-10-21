@@ -108,10 +108,14 @@ test("AC-203 own session (a): plan-human-recovery and plan-recovery never offer 
   const offered = human.candidates.filter((candidate) => candidate.id === "archive-orphan-descriptor").map((candidate) => candidate.sessionId);
   assert.deepEqual(offered, [foreign.sessionId], "only the foreign descriptor is offered, never the running session's own");
 
+  // Later contract (PO decision D46 / PF-50): the typed plan skips every hook-shaped claude-<id> anchor, so it is
+  // `not-needed`; a real orphan is routed through plan-human-recovery above. AC-203 holds: never names the own id.
   const plan = planSessionCleanupRecovery({ rootDir: root, requesterSessionId: OWN_ID });
-  assert.deepEqual((plan.archiveOrphan?.candidates ?? []).map((candidate) => candidate.sessionId), [foreign.sessionId]);
+  assert.equal(plan.status, "not-needed");
+  assert.ok(!(plan.archiveOrphan?.candidates ?? []).map((candidate) => candidate.sessionId).includes(own.sessionId));
   const viaCli = run(["plan-recovery", "--repo", root], OWN_ENV);
-  assert.deepEqual((viaCli.archiveOrphan?.candidates ?? []).map((candidate) => candidate.sessionId), [foreign.sessionId]);
+  assert.equal(viaCli.status, "not-needed");
+  assert.ok(!(viaCli.archiveOrphan?.candidates ?? []).map((candidate) => candidate.sessionId).includes(own.sessionId));
 
   assert.deepEqual(readFileSync(own.path), own.bytes, "planning never touches the own descriptor");
 }));
