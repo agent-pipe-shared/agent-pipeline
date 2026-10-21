@@ -41,6 +41,7 @@ import {
 } from "../lib/human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
+import { PTY_HOST_LIMIT, runMainUnderPty } from "../lib/test-hgo-cli-pty-fixture.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(HERE, "..");
@@ -250,7 +251,7 @@ test("authorize-by-signature reaches authorizeHumanGuardOverrideBySignature() an
     ], captured);
     assert.equal(status, 0, captured.stderr);
     const value = JSON.parse(captured.stdout);
-    assert.equal(value.schema, "pipeline.human-guard-override-capability.v3");
+    assert.equal(value.schema, "pipeline.human-guard-override-capability.v4"); // d02409a8a: a native Write/Edit request is v5, its plan v4 and its capability v4
     assert.equal(value.status, "armed");
     assert.equal(value.planSha256, planSha256);
     assert.equal(value.requestSha256, requestSha256);
@@ -279,7 +280,7 @@ test("plan prints a candidate-drift advisory on stderr without altering the plan
     const status = main(["plan", "--repo", root, "--request-sha256", recorded.requestSha256], captured);
     assert.equal(status, 0, captured.stderr);
     const value = JSON.parse(captured.stdout);
-    assert.equal(value.schema, "pipeline.human-guard-override-plan.v3");
+    assert.equal(value.schema, "pipeline.human-guard-override-plan.v4"); // d02409a8a: native Write/Edit requests plan as v4
     assert.match(captured.stderr, /^ADVISORY: this ceremony's signature will bind to the exact repository HEAD/);
     assert.ok(captured.stderr.includes(value.repository.head), "advisory should name the exact bound HEAD");
     assert.match(captured.stderr, /HGO-CANDIDATE-DRIFT/);
@@ -812,7 +813,9 @@ test("prepare-for-signature validates its flag set like the sibling plan/prepare
   assert.match(captured.stderr, /HGO-USAGE/u);
 });
 
-test("prepare-for-signature emits no ceremony material for a recoverable torn audit and repair-audit requires typed attended readback", () => {
+// E16: repair-audit confirms on the real fd 0, so the two repair-audit CLI cases below run main() under a real pty
+// (lib/test-hgo-cli-pty-fixture.mjs); PTY_HOST_LIMIT is the typed host-limit skip.
+test("prepare-for-signature emits no ceremony material for a recoverable torn audit and repair-audit requires typed attended readback", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
@@ -846,26 +849,17 @@ test("prepare-for-signature emits no ceremony material for a recoverable torn au
     assert.match(unattended.stderr, /HGO-AUDIT-REPAIR-NOT-ATTENDED/u);
 
     const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
-    const mismatchedIo = io();
-    assert.equal(main([
-      "repair-audit", "--repo", root, "--preimage-sha256", state.repairPreimageSha256, "--activate",
-    ], mismatchedIo, {
-      dependencies: { isattyFn: () => true, readLineFn: () => "approve" },
-    }), 2);
+    const repairArgv = ["repair-audit", "--repo", root, "--preimage-sha256", state.repairPreimageSha256, "--activate"];
+    const mismatchedIo = runMainUnderPty(repairArgv, "approve");
+    assert.equal(mismatchedIo.status, 2, mismatchedIo.stderr);
     assert.equal(mismatchedIo.stdout, "");
     assert.match(mismatchedIo.stderr, /HGO-AUDIT-REPAIR-CONFIRMATION-MISMATCH/u);
     assert.equal(inspectHumanGuardOverrideAudit({ rootDir: root }).repairPreimageSha256, state.repairPreimageSha256);
 
-    const repairedIo = io();
-    assert.equal(main([
-      "repair-audit", "--repo", root, "--preimage-sha256", state.repairPreimageSha256, "--activate",
-    ], repairedIo, {
-      dependencies: { isattyFn: () => true, readLineFn: (prompt) => {
-        assert.match(prompt, new RegExp(`Repair preimage: ${state.repairPreimageSha256}`, "u"));
-        assert.match(prompt, new RegExp(`Confirmation: ${challenge}`, "u"));
-        return challenge;
-      } },
-    }), 0, repairedIo.stderr);
+    const repairedIo = runMainUnderPty(repairArgv, challenge);
+    assert.equal(repairedIo.status, 0, repairedIo.stderr);
+    assert.match(repairedIo.tty, new RegExp(`Repair preimage: ${state.repairPreimageSha256}`, "u"));
+    assert.match(repairedIo.tty, new RegExp(`Confirmation: ${challenge}`, "u"));
     assert.equal(JSON.parse(repairedIo.stdout).status, "repaired");
 
     const headPath = join(base, "audit.head.json");
@@ -935,7 +929,7 @@ test("repair-audit requires the exact flag set and explicit activation", () => {
 //       emits an absolute one today (lib :2441); that gap belongs to the fix slice (see the
 //       renderer pins in lib/human-guard-override.test.mjs, assumption R6).
 // ---------------------------------------------------------------------------------
-test("repair-audit prints the typed audit-lock recovery on stderr, from the same helper as the shared renderer (T90-T2 RED pin)", () => {
+test("repair-audit prints the typed audit-lock recovery on stderr, from the same helper as the shared renderer (T90-T2 RED pin)", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   try {
     const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
@@ -959,16 +953,11 @@ test("repair-audit prints the typed audit-lock recovery on stderr, from the same
     const refusal = new HumanGuardOverrideError("HGO-AUDIT-LOCK-AMBIGUOUS", message);
     refusal.recovery = { files: [lock], command: `rm -- '${lock}'` };
 
-    const captured = io();
-    assert.equal(main([
+    // E16: the child throws the same refusal from afterTemporarySyncFn; the confirmation is typed on a real pty.
+    const captured = runMainUnderPty([
       "repair-audit", "--repo", root, "--preimage-sha256", state.repairPreimageSha256, "--activate",
-    ], captured, {
-      dependencies: {
-        isattyFn: () => true,
-        readLineFn: () => challenge,
-        afterTemporarySyncFn() { throw refusal; },
-      },
-    }), 2, captured.stderr);
+    ], challenge, { lock, message });
+    assert.equal(captured.status, 2, captured.stderr);
     assert.equal(captured.stdout, "");
     assert.ok(captured.stderr.startsWith(`HGO-AUDIT-LOCK-AMBIGUOUS: ${message}\n`),
       `C1: stderr must keep the code and message as its first line, but it is ${JSON.stringify(captured.stderr)}`);
