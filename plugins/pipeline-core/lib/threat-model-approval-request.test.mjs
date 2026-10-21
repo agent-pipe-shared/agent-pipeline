@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
 import { createThreatModelApprovalRequest, verifyThreatModelApprovalRequest } from "./threat-model-approval-request.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
@@ -36,12 +39,21 @@ assert.deepEqual(parseGateArgs(["verify-all", "--repo-root", "/repo", "--directo
 assert.ok(parseGateArgs(["approve", "--repo-root", "/repo", "--directory", "/human-po"]).error);
 assert.ok(parseGateArgs(["prepare-all", "--repo-root", "/repo", "--directory", "/human-po", "--feature-id", "cyb-4"]).error);
 assert.ok(parseHumanArgs(["approve", "--directory", "relative"]).error);
-const external = mkdtempSync(join(tmpdir(), "po-human-approval-")); const nominalRepo = mkdtempSync(join(tmpdir(), "po-human-repo-"));
-// PO-KEYDIR-01: `resolveGitCommonDir()` returns null for `nominalRepo` (a plain
-// mkdtempSync temp dir, never `git init`-ed), so po-human-approval.mjs falls back to
-// `repository` (== nominalRepo) as the fingerprint's gitCommonDir input, exactly
-// mirroring lines 559-582 of scripts/po-human-approval.mjs.
-const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: nominalRepo, primaryRoot: nominalRepo }).slice(0, 12);
+const external = mkdtempSync(join(tmpdir(), "po-human-approval-")); const fixtureHome = mkdtempSync(join(tmpdir(), "po-human-home-"));
+// QG-04 (d02409a8a): the ceremony verbs (setup/approve/...) open with inspectSignedDescriptorCustodyRepository, so the repo must
+// be a real contained checkout (cf. scripts/po-human-approval.test.mjs initFixtureGitRepository); it lives under scratch/, not /tmp
+// (domain-ancestor-unsafe). The machine-wide plane that `setup --directory` writes is redirected to fixtureHome.
+const scratchBase = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "scratch"); mkdirSync(scratchBase, { recursive: true });
+const nominalRepo = realpathSync(mkdtempSync(join(scratchBase, "po-human-repo-")));
+const fixtureGit = (...args) => {
+  const r = spawnSync("git", ["-c", `core.hooksPath=${GIT_NULL_DEVICE}`, "-c", "commit.gpgSign=false", "-C", nominalRepo, ...args], { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(nominalRepo), GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.invalid", GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.invalid" } });
+  assert.equal(r.status, 0, r.stderr);
+};
+fixtureGit("init", "-q"); fixtureGit("commit", "-q", "--allow-empty", "--no-verify", "-m", "fixture: initial commit");
+// Pairing gate (assertPoKeyPairing): `openssl pkey -in <key> -pubout` must print the stored public key.
+const pairingDeps = { homedirFn: () => fixtureHome, spawn: () => ({ status: 0, stdout: publicKey }) };
+// PO-KEYDIR-01: with a real checkout `resolveGitCommonDir()` returns <repo>/.git, which is the fingerprint's gitCommonDir input.
+const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: realpathSync(join(nominalRepo, ".git")), primaryRoot: nominalRepo }).slice(0, 12);
 const cyb4Suffix = `-${repositoryFingerprint}`;
 const cyb5Suffix = `-${repositoryFingerprint}-cyb-5`;
 writeFileSync(join(external, "request.json"), JSON.stringify({ ok: true, value: request })); writeFileSync(join(external, "authority.json"), JSON.stringify(trustPolicy)); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
@@ -64,6 +76,7 @@ assert.equal(runApprovalGate(["verify", "--repo-root", nominalRepo, "--directory
 assert.throws(() => runHumanApproval(["verify", "--repo-root", nominalRepo, "--directory", external], { observeCandidate: () => ({ ...candidate, commit: "f".repeat(40) }) }), /current clean candidate/u);
 const keyDirectory = mkdtempSync(join(tmpdir(), "po-human-key-"));
 const setup = runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", keyDirectory, "--human-name", "Test Operator"], {
+  homedirFn: () => fixtureHome,
   spawn: (_executable, args) => {
     const output = args[args.indexOf("-out") + 1];
     writeFileSync(output, args.includes("-pubout") ? publicKey : "encrypted-private-key-placeholder");
@@ -73,10 +86,10 @@ const setup = runHumanApproval(["setup", "--repo-root", nominalRepo, "--director
 assert.equal(setup.code, "PO-HUMAN-AUTHORITY-READY");
 assert.equal(JSON.parse(readFileSync(join(keyDirectory, "trust-policy.json"), "utf8")).publicKeySha256, trustPolicy.publicKeySha256);
 const recoveryDirectory = mkdtempSync(join(tmpdir(), "po-human-recovery-")); writeFileSync(join(recoveryDirectory, "po-private.pem"), "encrypted-private-key-placeholder"); writeFileSync(join(recoveryDirectory, "po-public.pem"), publicKey);
-const recovered = runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", recoveryDirectory, "--human-name", "Test Operator"]);
+const recovered = runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", recoveryDirectory, "--human-name", "Test Operator"], pairingDeps);
 assert.equal(recovered.recovered, true);
 assert.equal(JSON.parse(readFileSync(join(recoveryDirectory, "trust-policy.json"), "utf8")).publicKeySha256, trustPolicy.publicKeySha256);
-assert.equal(runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", recoveryDirectory]).recovered, false);
+assert.equal(runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", recoveryDirectory], pairingDeps).recovered, false);
 // FIXTURE-2: creating a brand-new key with no authority record yet to read a name from
 // is refused, and the message names --human-name rather than reading as a generic usage
 // error.
@@ -89,7 +102,7 @@ const legacyDirectory = mkdtempSync(join(tmpdir(), "po-human-legacy-"));
 writeFileSync(join(legacyDirectory, "po-private.pem"), "encrypted-private-key-placeholder");
 writeFileSync(join(legacyDirectory, "po-public.pem"), publicKey);
 writeFileSync(join(legacyDirectory, "trust-policy.json"), JSON.stringify(trustPolicy));
-assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", legacyDirectory]), /predates/u);
+assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", legacyDirectory], pairingDeps), /predates/u);
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", `${nominalRepo}/po`]), /outside the repository/u);
 mkdirSync(join(nominalRepo, "inside")); const linkedDirectory = join(external, "linked-po"); symlinkSync(join(nominalRepo, "inside"), linkedDirectory, "dir");
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", linkedDirectory]), /outside the repository/u);
@@ -110,4 +123,5 @@ assert.equal(JSON.parse(readFileSync(join(external, `proof${cyb4Suffix}.json`), 
 writeFileSync(join(external, `request${cyb5Suffix}.json`), JSON.stringify({ ok: true, value: request }));
 assert.equal(runHumanApproval(["approve-all", "--repo-root", nominalRepo, "--directory", external], { readConfirmation: () => "approve", spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-APPROVE-ALL-READY");
 assert.equal(JSON.parse(readFileSync(join(external, `proof${cyb5Suffix}.json`), "utf8")).intentSha256, request.approvalIntent.sha256);
+rmSync(nominalRepo, { recursive: true, force: true }); rmSync(fixtureHome, { recursive: true, force: true });
 console.log("39 threat-model approval request checks passed");

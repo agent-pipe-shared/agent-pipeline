@@ -67,7 +67,9 @@ const cases = [
   }) },
   { id: 'DAGA007', name: 'reject missing duplicate blank oversize and flag-form attribution', run: () => fixture(({ root }) => {
     for (const base of [present(receipt1), approve(request)]) {
-      admission([base[0], ...base.slice(3)], root, false);
+      // E16: signature-mode approve-plan is offered without --by (sanctioned-args-scripts.mjs); only present-plan still requires it.
+      admission([base[0], ...base.slice(3)], root, base[0] === 'approve-plan');
+      admission([base[0], '--by', ...base.slice(3)], root, false);
       admission([...base, '--by', 'Second reviewer'], root, false);
       for (const by of ['', '   ', 'x'.repeat(501), 'é'.repeat(251), '--review-receipt']) {
         const args = [...base]; args[2] = by; admission(args, root, false);
