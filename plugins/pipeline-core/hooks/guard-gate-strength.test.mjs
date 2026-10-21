@@ -43,7 +43,6 @@ import {
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import {
   HGO_SIGNATURE_REASON,
-  authorizeHumanGuardOverride,
   authorizeHumanGuardOverrideBySignature,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
@@ -487,30 +486,14 @@ try {
     return `${rule.id}: ${rule.reason}`;
   }
 
-  /** Exactly the chain a human clears in `chat` mode: denial -> plan -> prepare -> authorize --activate. */
-  function armByChat(root, toolInput, denialReason, { toolName = "Edit" } = {}) {
-    const denials = [{ guard: "guard-gate-strength.mjs", reason: denialReason }];
-    const shared = { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath: OVERRIDE_SCRIPT };
-    const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials });
-    assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
-    const { requestSha256 } = recorded;
-    const planned = planHumanGuardOverride({ ...shared, requestSha256 });
-    const reason = "briefed test-change task";
-    const prepared = prepareHumanGuardOverrideAuthorization({
-      ...shared, requestSha256, planSha256: planned.planSha256, reason,
-    });
-    const armed = authorizeHumanGuardOverride({
-      ...shared,
-      requestSha256,
-      planSha256: planned.planSha256,
-      selectionSha256: prepared.selectionSha256,
-      reason,
-      reasonSha256: prepared.reasonSha256,
-      activate: true,
-      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
-    });
-    assert.equal(armed.status, "armed", `chat arming failed: ${JSON.stringify(armed)}`);
-    return { planSha256: planned.planSha256, requestSha256 };
+  // E16 (elephant-decisions-2026-10-19): the chat arming ceremony reads the real fd 0 and cannot be driven from a test, so the
+  // cases that claim what happens AFTER arming (admission, single use, GS-6 never lifted) arm through the signature route with
+  // an ephemeral Ed25519 key; GST22 proves admission does not depend on the route or the committed mode.
+  const ARM_PAIR = keyPair();
+  const ARM_KEY_REFERENCE = "gst-hgo-arm";
+  function armForAdmission(root, toolInput, denialReason, opts = {}) {
+    return armBySignature(root, toolInput, denialReason, { ...opts, pair: ARM_PAIR, keyReference: ARM_KEY_REFERENCE,
+      trustPolicy: { keyReference: ARM_KEY_REFERENCE, publicKeySha256: ARM_PAIR.publicKeySha256 } });
   }
 
   /**
@@ -519,7 +502,7 @@ try {
    * -> authorize-by-signature. No in-session `activate` step exists for this path;
    * presence of a verified signature IS the authorization.
    */
-  function armBySignature(root, toolInput, denialReason, { toolName = "Edit", pair, keyReference } = {}) {
+  function armBySignature(root, toolInput, denialReason, { toolName = "Edit", pair, keyReference, trustPolicy = null } = {}) {
     const denials = [{ guard: "guard-gate-strength.mjs", reason: denialReason }];
     const shared = { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath: OVERRIDE_SCRIPT };
     const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials });
@@ -547,7 +530,7 @@ try {
       signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), pair.privateKey).toString("base64"),
     };
     const armed = authorizeHumanGuardOverrideBySignature({
-      ...shared, requestSha256, planSha256: planned.planSha256, proof,
+      ...shared, requestSha256, planSha256: planned.planSha256, proof, ...(trustPolicy ? { trustPolicy } : {}),
     });
     assert.equal(armed.status, "armed", `signature arming failed: ${JSON.stringify(armed)}`);
     return { planSha256: planned.planSha256, requestSha256 };
@@ -564,11 +547,11 @@ try {
     return { base, declaredRoot, targetFile: join(declaredRoot, "hooks", "some-guard.mjs") };
   }
 
-  check("GST21 a chat-armed capability admits the exact bound edit to a GS-1..GS-5/GS-7 path", () => {
+  check("GST21 an armed capability admits the exact bound edit to a GS-1..GS-5/GS-7 path", () => {
     const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
     const root = governedGit({ mode: "chat" });
     assert.equal(ask(root, rule.path).blocked, true, "precondition: refused while unarmed");
-    armByChat(root, { file_path: rule.path }, denialFor(rule));
+    armForAdmission(root, { file_path: rule.path }, denialFor(rule));
     const { blocked, stderr } = ask(root, rule.path);
     assert.equal(blocked, false, `armed capability did not admit the edit:\n${stderr}`);
     assert.match(stderr, /\[pipeline-human-override\] guard-gate-strength GS-4: exact one-time capability consumed/u);
@@ -635,7 +618,7 @@ try {
     const ruleA = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
     const ruleB = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-3");
     const root = governedGit({ mode: "chat" });
-    armByChat(root, { file_path: ruleA.path }, denialFor(ruleA));
+    armForAdmission(root, { file_path: ruleA.path }, denialFor(ruleA));
     const { blocked, stderr } = ask(root, ruleB.path);
     assert.equal(blocked, true, "a capability bound elsewhere admitted this edit");
     assert.match(stderr, new RegExp(`Rule ID: ${ruleB.id}\\b`, "u"));
@@ -645,7 +628,7 @@ try {
   check("GST26 the capability is single-use: the same edit is refused again", () => {
     const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
     const root = governedGit({ mode: "chat" });
-    armByChat(root, { file_path: rule.path }, denialFor(rule));
+    armForAdmission(root, { file_path: rule.path }, denialFor(rule));
     assert.equal(ask(root, rule.path).blocked, false, "precondition: first use is admitted");
     const { blocked, stderr } = ask(root, rule.path);
     assert.equal(blocked, true, "a consumed capability was accepted a second time");
@@ -664,7 +647,7 @@ try {
     assert.equal(before.blocked, true);
     assert.match(before.stderr, /Rule ID: GS-6\b/u, "precondition: the declared root is not classified GS-6");
 
-    armByChat(base, { file_path: targetFile }, denialFor(LIVE_PLUGIN_RULE));
+    armForAdmission(base, { file_path: targetFile }, denialFor(LIVE_PLUGIN_RULE));
 
     const { blocked, stderr } = ask(base, targetFile, { CLAUDE_PLUGIN_ROOT: declaredRoot });
     assert.equal(blocked, true, "GS-6 was lifted by an armed HGO capability");
@@ -793,9 +776,11 @@ try {
     const specifiers = new Set();
     const staticRe = /\bfrom\s+["'](\.\.?\/[^"']+)["']/gu;
     const dynamicRe = /\bimport\(\s*["'](\.\.?\/[^"']+)["']\s*\)/gu;
+    // QG-04: doc comments may quote an import line (lib/architecture-entry-readiness.mjs does); only real code is followed.
+    const code = source.split("\n").filter((line) => !/^\s*(?:\/\/|\/\*|\*)/u.test(line)).join("\n");
     for (const re of [staticRe, dynamicRe]) {
       let match;
-      while ((match = re.exec(source)) !== null) specifiers.add(match[1]);
+      while ((match = re.exec(code)) !== null) specifiers.add(match[1]);
     }
     return [...specifiers];
   }
