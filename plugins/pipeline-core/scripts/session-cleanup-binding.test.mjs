@@ -49,6 +49,7 @@ import {
   legacyLayoutRoots,
   migrateToNeutral,
   rewriteAsLegacyDescriptor,
+  startDescriptorWithBoundRequester,
   writeHistoricLegacyBinding,
 } from "../lib/test-session-cleanup-requester-fixture.mjs";
 import {
@@ -1660,7 +1661,7 @@ test("a single unbound descriptor requires an activated digest-bound rebind", ()
   const root = neutralFixture("orphan-rebind");
   const statePath = join(root, "project", "pipeline-state.json");
   try {
-    const orphan = startSessionDescriptor(root, { sessionId: "session-binding-orphan-rebind" });
+    const orphan = startDescriptorWithBoundRequester(root, { sessionId: "session-binding-orphan-rebind" });
     const plan = invoke(["plan-recovery", "--repo", root]).output;
     assert.equal(plan.status, "ready");
     assert.equal(plan.recovery, "bind-orphan");
@@ -1925,7 +1926,7 @@ test("unknown descriptor loss requires an exact activated PO recovery plan", () 
 test("lost binding plus an exact retirable orphan set converges in one confirmed composite recovery", () => {
   const root = fixture("lost-binding-with-orphans");
   try {
-    const bound = invoke(["start", "--repo", root, "--session", "session-binding-lost"]);
+    const bound = writeHistoricLegacyBinding({ root, sessionId: "session-binding-lost" });
     const lost = loadSessionDescriptor(root, bound.output.sessionId, {
       expectedDescriptorSha256: bound.output.descriptorSha256,
     });
@@ -2054,7 +2055,7 @@ test("composite recovery resumes exactly after a crash between descriptor retire
 test("composite recovery recognizes an exact post-release crash without replaying State mutation", () => {
   const root = fixture("composite-release-crash");
   try {
-    const bound = invoke(["start", "--repo", root, "--session", "session-binding-crash-release"]);
+    const bound = writeHistoricLegacyBinding({ root, sessionId: "session-binding-crash-release" });
     unlinkSync(loadSessionDescriptor(root, bound.output.sessionId, {
       expectedDescriptorSha256: bound.output.descriptorSha256,
     }).path);
@@ -2095,7 +2096,7 @@ test("composite recovery recognizes an exact post-release crash without replayin
 test("composite recovery rejects arbitrary same-shape State bytes after a post-release crash", () => {
   const root = fixture("composite-release-postimage-drift");
   try {
-    const bound = invoke(["start", "--repo", root, "--session", "session-binding-postimage-drift"]);
+    const bound = writeHistoricLegacyBinding({ root, sessionId: "session-binding-postimage-drift" });
     unlinkSync(loadSessionDescriptor(root, bound.output.sessionId, {
       expectedDescriptorSha256: bound.output.descriptorSha256,
     }).path);
@@ -2177,7 +2178,7 @@ test("composite recovery rejects State and orphan-set drift before any planned r
   for (const drift of ["state", "orphan-set"]) {
     const root = fixture(`composite-${drift}-drift`);
     try {
-      const bound = invoke(["start", "--repo", root, "--session", `session-binding-${drift}`]);
+      const bound = writeHistoricLegacyBinding({ root, sessionId: `session-binding-${drift}` });
       unlinkSync(loadSessionDescriptor(root, bound.output.sessionId, {
         expectedDescriptorSha256: bound.output.descriptorSha256,
       }).path);

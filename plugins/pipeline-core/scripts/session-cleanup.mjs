@@ -614,9 +614,14 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
         "kickoff-promotion cleanup recovery does not emit a session-cleanup recovery action",
       );
     }
+    // Only the injected bind seam is forwarded: the recovery code branches on the presence of
+    // `deps.releaseOnboardingSessionCleanupFn`, so forwarding the whole dependency set would change its path.
+    const recoveryDeps = dependencies.bindOnboardingSessionCleanupFn
+      ? { bindOnboardingSessionCleanupFn: dependencies.bindOnboardingSessionCleanupFn }
+      : {};
     if (eventOutPath === null) {
       output = promotionRecovery.status === "not-applicable"
-        ? applySessionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true })
+        ? applySessionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true, deps: recoveryDeps })
         : applyOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true });
     } else {
       const event = prepareRecoveryAction({ repo, planSha256, eventOutPath, dependencies });
@@ -625,6 +630,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
         rootDir: repo,
         expectedPlanSha256: planSha256,
         activate: flags.activate === true,
+        deps: recoveryDeps,
       });
       if (sourceResult.status === "recovered" && sourceResult.mutated === false) {
         output = {
