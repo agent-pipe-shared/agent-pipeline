@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { compareEffectiveArchitectureDecisions, inspectEffectiveArchitectureDecisions } from "./architecture-effective-decisions.mjs";
+import { compareEffectiveArchitectureDecisions, inspectEffectiveArchitectureDecisions, inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
 import { runArchitectureEffectiveCli } from "../scripts/architecture-effective-decisions.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -25,7 +25,15 @@ function decision(root, stem, { status = "accepted", scope = "project", body = "
   writeFileSync(join(dir, `${stem}.json`), `${JSON.stringify(record)}\n`);
   return record;
 }
-const inspect = (root) => inspectEffectiveArchitectureDecisions({ rootDir: root, area: "pipeline-core", now: "2026-09-25T12:00:00.000Z" });
+const NOW = "2026-09-25T12:00:00.000Z";
+// Structural view only. Production adds the retained-aggregate adoption filter on top: a bare ADR plus sidecar
+// is advisory `decision-adoption-unverified`, never effective (see the adoption test below).
+const structural = (root, area = "pipeline-core") => {
+  const { purpose, ...view } = inspectArchitectureDecisionAuthoringSources({ rootDir: root, area, now: NOW });
+  assert.equal(purpose, "structural-authoring-only");
+  return view;
+};
+const inspect = (root) => structural(root);
 function map(root, ids = ["pipeline-core", "harness"]) {
   const dir = join(root, "architecture", "map");
   mkdirSync(dir, { recursive: true });
@@ -45,6 +53,16 @@ adrReferences: []
 ---
 # ${id}\n`);
 }
+
+test("a structurally valid but unadopted decision is advisory decision-adoption-unverified, never effective", (t) => {
+  const root = fixture(t);
+  decision(root, "ADR-1");
+  const result = inspectEffectiveArchitectureDecisions({ rootDir: root, area: "pipeline-core", now: NOW });
+  assert.equal(result.status, "advisory");
+  assert.equal(result.code, "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING");
+  assert.deepEqual(result.decisions, []);
+  assert.deepEqual(result.findings, [{ code: "decision-adoption-unverified", path: "docs/adr/ADR-1.md" }]);
+});
 
 test("AC19 source precondition: two isolated reads of the same validated decision set agree", (t) => {
   const root = fixture(t);
@@ -147,8 +165,7 @@ test("accepted v2 module applicability is effective only for its explicit, valid
   decision(root, "ADR-other-module", { scope: "module", moduleIds: ["harness"] });
   decision(root, "ADR-proposed", { status: "proposed", scope: "module", moduleIds: ["pipeline-core"] });
   const core = inspect(root);
-  const harness = inspectEffectiveArchitectureDecisions({ rootDir: root, area: "harness",
-    now: "2026-09-25T12:00:00.000Z" });
+  const harness = structural(root, "harness");
   assert.equal(core.status, "ready");
   assert.deepEqual(core.decisions.map(({ id }) => id), ["ADR-module", "ADR-project"]);
   assert.deepEqual(core.decisions[0], { id: "ADR-module", digest: sha("# Governing decision\n"),
@@ -157,8 +174,7 @@ test("accepted v2 module applicability is effective only for its explicit, valid
   assert.equal(core.findings.some(({ code }) => code === "module-applicability-awaiting-approval"), false);
   assert.notEqual(core.projectionSha256, harness.projectionSha256);
   assert.equal(compareEffectiveArchitectureDecisions(core, inspect(root)).code, "ARCH-DECISION-PARITY-MATCH");
-  const allAreas = inspectEffectiveArchitectureDecisions({ rootDir: root, area: "project",
-    now: "2026-09-25T12:00:00.000Z" });
+  const allAreas = structural(root, "project");
   assert.equal(allAreas.status, "ready");
   assert.deepEqual(allAreas.decisions.map(({ id }) => id), ["ADR-project"]);
   assert.equal(allAreas.findings.some(({ code }) => code === "module-area-unresolved"), false);
@@ -186,7 +202,10 @@ test("the task-path CLI resolves one map owner before selecting module decisions
   const selected = runArchitectureEffectiveCli(["--root", root, "--path", "pipeline-core/new-feature.mjs"]);
   assert.equal(selected.exitCode, 0);
   assert.equal(selected.output.area, "pipeline-core");
-  assert.deepEqual(selected.output.decisions.map(({ id }) => id), ["ADR-module"]);
+  // Production CLI: no retained approved aggregate lists ADR-module, so it is not effective; the structural view still selects it.
+  assert.deepEqual(selected.output.decisions, []);
+  assert.deepEqual(selected.output.findings, [{ code: "decision-adoption-unverified", path: "docs/adr/ADR-module.md" }]);
+  assert.deepEqual(structural(root, selected.output.area).decisions.map(({ id }) => id), ["ADR-module"]);
   assert.equal(selected.output.findings.some(({ code }) => code === "module-applicability-awaiting-approval"), false);
   assert.equal(runArchitectureEffectiveCli(["--root", root, "--path", "unowned/file.mjs"]).output.code,
     "TASK-MODULE-UNRESOLVED");
