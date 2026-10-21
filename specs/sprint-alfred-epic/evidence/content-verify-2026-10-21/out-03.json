@@ -1,0 +1,234 @@
+[
+  {
+    "ac": "AC-108",
+    "itemId": "agy-driver-dispatch-and-design-routes-incomplete",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Preflight reports whether the resolved node runs inside the runner's default sandbox and names the one-time remedy.",
+        "status": "content",
+        "evidence": "git grep for fnm, exit 127, node-in-sandbox in plugins/pipeline-core/scripts, lib and hooks finds nothing; pipeline-start-preflight.mjs only mentions 'sandbox' in a comment (line 790). No pin case covers it (lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs has lock freshness F3, F2, F4, F7 only).",
+        "work": "Add a node-reachable-inside-sandbox probe to the preflight result with a typed code and a one-time remedy text (move/allow node outside a version-manager path, or configure the runner sandbox) plus a pin case with an injected probe seam. Size M.",
+        "files": [
+          "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs"
+        ],
+        "protected": [],
+        "test": "plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs (or the existing AGY pin plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs, already registered in harness/verify-suites.json)"
+      },
+      {
+        "clause": "The AGY Goldfish agent template forbids parallel file writes in one turn until the hook race is fixed.",
+        "status": "content",
+        "evidence": "git grep for parallel, write_to_file, write_file, one turn in plugins/pipeline-core/agents, antigravity-native-dispatch.md, antigravity-native-dispatch-prepare.mjs, antigravity-slicing-hint.mjs and the coordinator returns nothing. The AGY native-dispatch reference and the shared agents/goldfish-*.md carry no such prohibition.",
+        "work": "Add one prohibition sentence (no parallel write_to_file / Edit calls in one turn) to the AGY Goldfish dispatch text: the shared agents/goldfish-implementor.md, goldfish-deep.md and goldfish-mechanic.md, or better the AGY-only reference skills/pipeline-start/references/antigravity-native-dispatch.md that the prepare step briefs from; add a text pin case. The exact AGY template file was not located with certainty; the Goldfish must confirm which file the AGY prepare step actually emits to invoke_subagent. Size S.",
+        "files": [
+          "plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md",
+          "plugins/pipeline-core/agents/goldfish-implementor.md",
+          "plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs"
+        ],
+        "protected": [],
+        "test": "plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs"
+      },
+      {
+        "clause": "The main agent can update the calibrated handover (docs/state.md) in every phase through an admitted route.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs case 'P3 backlog/, docs/ and scratch/ writes are admitted in every lifecycle state (invalid-observation and ready)' loops every STATES entry for Write and Edit on docs/*.md under the real evaluateLifecycleReadyGuard. Caveat: it uses docs/alf-c-p19-02.md, not literally docs/state.md, and runner claude; the AGY pretool path is not separately pinned for docs/. Optional S hardening only.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      }
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-126",
+    "itemId": "claude-session-start-emits-codex-transcript-recovery-hint",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Acceptance (Proposal): a test asserts the Claude SessionStart output never names another runner; hint is runner-derived, no absolute host paths.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs cases A1 (wiring declares --runner claude), A2 x3 (real CLI, startup/resume/clear, no other runner), A3 (no absolute paths), A5 (missing/unknown runner arg never falls back to Codex, includes args []), A6 positive control; registered in harness/verify-suites.json line 2505.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "RED mirror: a scratch copy of the pre-fix wiring (hint entry without --runner) fails the Claude predicate while the real one passes.",
+        "status": "content",
+        "evidence": "No mirror case exists in the pin. A5 with args [] shows the post-fix hook fails closed but does not prove the old wiring would fail the A1/A2 predicate. The pin is already registered in harness/verify-suites.json (line 2505), so no protected registration is needed. Not in the item's Acceptance text; low priority, can be dropped if PO accepts A5.",
+        "work": "Add one case that builds a copy of the hooks.json entry without '--runner claude' (args []), asserts configuredClaudeArgs-style predicate A1 fails for it while the real wiring passes. Pure test addition. Size S.",
+        "files": [
+          "plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs"
+        ],
+        "protected": [],
+        "test": "plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs"
+      }
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-147",
+    "itemId": "declared-system-skill-read-requires-human-override",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Unlisted sibling skill files, lookalike paths, transcript files and traversal/tilde spellings are refused (catalog binding).",
+        "status": "po-decision",
+        "evidence": "Item Triage 2026-10-17: deferred past the 0.7.0 candidate with AC-209 by PO decision of 2026-10-16; AC-147 not counted against the candidate. Pin cases A2a-unlisted, A2a-transcript, A2b, A3, A4 in plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs remain skip: NATIVE_HOLD (A1, A2a, A2b-roots pass). Work stays L (catalog-bound read authority in sessionReadScopeRoots / passive-read-policy plus a catalog producer).",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Replaced or drifting catalog/file identities invalidate the read authority (A3).",
+        "status": "po-decision",
+        "evidence": "Same PO deferral (2026-10-16); pin case A3 is skipped with 'no catalog-bound authority seam exists in sessionReadScopeRoots'. Part of the L work above.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      }
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-168",
+    "itemId": "elephant-main-context-spent-on-wake-ups-and-inline-reads",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "A repeatable measurement tool exists in the repository.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/scripts/elephant-context-measure.mjs (exports CAUSES, classifyTranscript, compareMeasurements), exercised by the pin.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "One enforcement-layer measure per cause (wake-up replies, inline reads, Explore/Plan refusal, guard false positives, hand-written briefings), each with a before/after measurement.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/lib/pins/elephant-main-context-spent-on-wake-ups-and-inline-reads.test.mjs: 'the pin covers exactly the causes the measurement tool reports', one case per cause key (role measure with telemetry check in both role copies, own share falls over a synthetic before/after pair), 'delegationCost' case, and 'role section is the same in both copies and states the PO target'. Registered in harness/verify-suites.json line 2721. The measures live in the role copies (roles/elephant.md and plugins/pipeline-core/roles/elephant.md section 'Main-context economy'), not as new hooks; the first-round hint of five hook measures is not what the acceptance text requires. Caveat: before/after is synthetic transcripts, not a live session measurement; whether the PO accepts that is a po-decision, not code work. Counted GREEN not verified by this reader.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      }
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-197",
+    "itemId": "guard-suite-fails-60-tests-on-native-windows",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Keep a recorded baseline count so a later change can be attributed.",
+        "status": "done",
+        "evidence": "specs/sprint-alfred-epic/evidence/counted-runs-2026-10-19/guard-lifecycle-ready-red-classification.md line 3-5 already records host (WSL Linux), candidate sha 51d7637e6 and the runner summary (tests 391, pass 362, fail 26, skipped 3). The hinted extra line is not needed unless the PO wants a post-fix count.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Proposal 1 (missed by hint): bring the stale fixtures in line with the current activation model (groups A, B, C: 7 cases; D to I need PO intent decisions first).",
+        "status": "content",
+        "evidence": "git log --since=2026-10-19 on plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs is empty; the classification doc lists A (cases at lines 267, 289, 353: deny() defaults to partial and the bounded re-read calls the fn twice), B (5125, 10808), C (3910, 3952: new subcommand materialize-existing-trust-anchor missing from the test's list). The test file is not on the protected list. D to I (19 cases) are test-seam, behaviour-change or undiagnosed and need a PO decision before assertions change.",
+        "work": "Pass a non-partial status in cases A and B, add materialize-existing-trust-anchor to the subcommand list and argument table in case C; re-run the file and update the classification doc with the new count. Size S-M (about 40 to 80 lines). Groups D to I excluded.",
+        "files": [
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+          "specs/sprint-alfred-epic/evidence/counted-runs-2026-10-19/guard-lifecycle-ready-red-classification.md"
+        ],
+        "protected": [],
+        "test": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+      }
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-224",
+    "itemId": "parallel-work-in-one-checkout-is-unsafe",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Liveness readback for open dispatch records before admitting a second writer (round 3b).",
+        "status": "po-decision",
+        "evidence": "plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs lines 522-523: 'DEFERRED, out of scope of this item's functional delivery (PO decision item): the liveness readback for open dispatch records'. No code or case exists; no item acceptance text requires it (it is a Fix direction). Needs an explicit PO scope decision.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "D62: verify-evidence-producer produces Critic evidence for a named earlier commit in a temporary worktree; the preflight accepts that evidence for that commit.",
+        "status": "done",
+        "evidence": "Commit 65452bd6f feat(verify): produce Critic evidence for a named earlier commit; plugins/pipeline-core/scripts/verify-evidence-producer.mjs --commit (produceVerifyEvidenceForCommit, temp worktree under the git common dir, removed on success and failure). Tests in plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs: VEP-COMMIT-NOT-LOCAL, VEP-COMMIT-INVALID, VEP-COMMIT-MODE, 'the CLI accepts --commit and reports the named commit'. Preflight acceptance rests on the evidence being bound to commit and tree; no dedicated critic-dispatch-preflight.test.mjs case for an older-commit record was found (grep). Treat the preflight acceptance as covered only by binding, not by an explicit case.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "D62 pin: the producer runs for an older commit while the checkout has uncommitted changes, and the checkout's bytes are unchanged afterwards.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs has checkoutBytes()/snapshot helpers (lines ~719-733) used by the named-commit cases (dirty checkout, bytes compared). Not re-run by this reader; counted GREEN not verified. The item text says the pin may live in lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs, which has no such case; the producer test file carries it.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "D62: the session-authority registry stays readable with no orphaned lock after a Critic and a Goldfish dispatch ran in parallel; a pin or a recorded live run shows it.",
+        "status": "content",
+        "evidence": "No case in lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs or the producer test for registry state after parallel dispatch (grep 'orphan' empty). Neighbouring registry work is in flight (commits 4fb40e587, 4467aa5b0, d2602f5cf; working tree has untracked lib/session-authority-orphan-member-step.mjs), but none pins the parallel Critic plus Goldfish case.",
+        "work": "Add a pin that runs a Critic-side registry read and a Goldfish-side bind in parallel (two real processes against one fixture root) and asserts lock absent, read readable afterwards; or record a live run in evidence. Size M. Coordinate with the in-flight D73 E session-authority slices to avoid overlapping edits.",
+        "files": [
+          "plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs"
+        ],
+        "protected": [],
+        "test": "plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs"
+      },
+      {
+        "clause": "Added acceptance (post-0.7.0): AGY native dispatch prepares disjoint packages for parallel execution in isolated worktrees under the single-committer rule.",
+        "status": "po-decision",
+        "evidence": "Item text: 'post-0.7.0 unless the PO pulls it in'; antigravity-native-dispatch-prepare.mjs has no worktree mode (item re-check 2026-10-18).",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      }
+    ],
+    "changedSince20": "65452bd6f (feat(verify): produce Critic evidence for a named earlier commit) delivered the D62 --commit hint; the liveness readback and the registry-after-parallel pin were not delivered."
+  },
+  {
+    "ac": "AC-253",
+    "itemId": "session-readiness-drops-to-partial-after-bootstrap-ready",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Typed reason for the transition to partial.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs per-cause cases (line ~195 onward): 'preflight result carries a typed session-readiness reason' (PORG-NOT-READY + lifecycleStatus, session-probe-failed otherwise). Registered in harness/verify-suites.json line 3189.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Parallel read-only calls see one consistent readiness snapshot.",
+        "status": "done",
+        "evidence": "Same pin, case 'AC6: real parallel read-only preflight processes over the same probe state all see one consistent readiness snapshot'; AC1 to AC5 cover the preflight emitting inspect --intent session and fail-closed. The measured concurrent cleanup_recovery_observation_unavailable cause is covered by the separate FLAP fix (plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs, design-advisor-provenance.flap3.test.mjs); the pin header names it as not covered here. Counted GREEN not verified by this reader.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      }
+    ],
+    "changedSince20": ""
+  }
+]

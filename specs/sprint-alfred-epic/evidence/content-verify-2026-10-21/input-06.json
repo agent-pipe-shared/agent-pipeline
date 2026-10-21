@@ -1,0 +1,103 @@
+[
+  {
+    "ac": "AC-115",
+    "itemId": "approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+    "file": "backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md",
+    "contentHints": [
+      {
+        "clause": "Added acceptance A: a devplan-lane pin drives the onboarding plan's exact materialize-architecture action (admitted) and the dead --input spelling is refused with a hint naming the bare form.",
+        "work": "Add pin cases for the devplan shell lane (lib/guard/sanctioned-args-scripts.mjs, guard-devplan.mjs): bare materialize-architecture admitted, '--input scratch/x.json' refused with typed hint. Likely a guard-devplan*.test.mjs case (protected) or the AC-115 pin file; source fix only if the hint is missing. Size S-M.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-devplan.mjs (only if hint missing)",
+          "guard-devplan*.test.mjs (if the pin lands there)",
+          "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs (only if hint missing)"
+        ]
+      },
+      {
+        "clause": "Added acceptance B: an opaque 'perl <scratch script>' and other interpreters are no wider in devplan than 'node <scratch script>'.",
+        "work": "Replace the todo with a real case: drive the devplan lane with perl/python/ruby <scratch script> and assert the same verdict as node <scratch script>; fix the lane if wider. Target the devplan lane test (guard-devplan*.test.mjs, protected) or the AC-115 pin file. Size S (test) to M (if lane code must change).",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-devplan.mjs (if lane widened)",
+          "guard-devplan*.test.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-134",
+    "itemId": "codex-readiness-private-receipt-omits-output-custody",
+    "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+    "contentHints": [
+      {
+        "clause": "Receipt reader rejects a stat-declared oversize file before allocation and reads with an actual 524,288-byte cap plus one byte, with FD/path identity checks.",
+        "work": "Add a stat-oversize case and a concurrent-growth cap+1 case to plugins/pipeline-core/lib/codex-design-readiness-host-store.test.mjs. Linux-only, so it is skipped on Windows. Size S to M.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-158",
+    "itemId": "design-workflow-package-v2-readiness-fixture-fails-on-windows",
+    "file": "backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+    "contentHints": [
+      {
+        "clause": "The HOST-LIMITATION skip carries a current due date or is replaced.",
+        "work": "Renew the due date or replace the skip in design-workflow-package-v2.test.mjs (2 skip lines), or make the host store accept win32 paths; size S. No protected path.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-179",
+    "itemId": "git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+    "file": "backlog/items/2026-10-04-git-hook-runtime-snapshots-go-stale-after-plugin-changes.md",
+    "contentHints": [
+      {
+        "clause": "Snapshot bound to installed plugin identity with typed HOOK-SNAPSHOT-STALE diagnostic in preflight and commit refusal, plus refresh in the install flow.",
+        "work": "unverified; installer scripts commit-msg-hook-install.mjs / pre-commit-hook-install.mjs, size M",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs (cp-source clause)"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-206",
+    "itemId": "kernel-closure-check-masks-violations-after-the-first",
+    "file": "backlog/items/2026-10-05-kernel-closure-check-masks-violations-after-the-first.md",
+    "contentHints": [
+      {
+        "clause": "A red ratchet blocks the candidate stamp.",
+        "work": "Locate the candidate-stamp command, make it fail when the closure check is red, add a test in the stamp's existing test file. Size M. Likely touches protected scripts/pipeline-state.mjs or harness/scripts/verify.mjs.",
+        "protected": [
+          "scripts/pipeline-state.mjs",
+          "harness/scripts/verify.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-241",
+    "itemId": "readiness-input-omits-current-advisor-observation",
+    "file": "backlog/items/2026-09-28-readiness-input-omits-current-advisor-observation.md",
+    "contentHints": [
+      {
+        "clause": "Replace the three typed skips with counted GREEN cases (substituted receipt, wrong candidate/question, drift, oversized, alias, missing context).",
+        "work": "Locate the readiness advisor-observation test file (search git ls-files for readiness-advisor / supplemental) and replace the three skips with real cases. Size S-M. Check whether the file is in harness/verify-suites.json.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-270",
+    "itemId": "windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+    "file": "backlog/items/2026-10-05-windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.md",
+    "contentHints": [
+      {
+        "clause": "Remaining fixtures moved off os.tmpdir.",
+        "work": "Pin P4 only shows that one existing suite adopts the helper; whether the other v3 onboarding fixtures still use os.tmpdir() was not enumerated. Only needed if the native Windows run still shows DACL failures. Files: fixture helpers in the failing suites. Size M, test carried by the same pin file P4.",
+        "protected": []
+      }
+    ]
+  }
+]

@@ -1,0 +1,108 @@
+[
+  {
+    "ac": "AC-110", "itemId": "agy-imported-plugin-snapshot-shadows-registered-plugin", "read": true,
+    "clauses": [
+      {"clause": "Preflight turns a stale/duplicate/foreign-wired Antigravity topology into a refresh-required result with a host-boundary action, and a differing lock version into its own reason.",
+       "status": "done",
+       "evidence": "lib/pins/agy-imported-plugin-snapshot-shadows-registered-plugin.test.mjs P5 'preflight reports a stale managed snapshot as a host-boundary refresh action' (status antigravity-topology-refresh-required, nextAction executionBoundary host, requiresConfirmation) and P5 lock-version-mismatch (antigravity-lock-version-mismatch, code in scripts/pipeline-start-preflight.mjs:546); scripts/antigravity-topology-integration.test.mjs. The literal names IPA-AGY-* and status plugin-refresh-required were replaced by typed ATR-* reasons and status antigravity-topology-refresh-required; P6 asserts no IPA-AGY code (a naming deviation from the item text, recorded in the pin, not missing behaviour)."},
+      {"clause": "Remediation runs through agy lifecycle commands in order, preserves foreign entries, reads back, is idempotent and stops on a partial failure.",
+       "status": "done",
+       "evidence": "same pin file P4 cases (lifecycle order, hand-wired hooks, workspace never retires global without approval, CLI failure mid-lifecycle) and P6 verdict cases; implementation lib/antigravity-plugin-topology.mjs, install-agy.mjs refreshAntigravityInstallation / refreshAntigravityGlobalFromRunnerView; lib/pins/antigravity-refresh-validates-the-source-before-retiring-the-managed-copy.test.mjs."},
+      {"clause": "install-agy.mjs prints the exact remediation plan and asks for confirmation (--yes only for the developer refresh), and offers a --refresh developer entry that replaces the bare rsync with sync plus remediation plus readback.",
+       "status": "content",
+       "work": "install-agy.mjs has no --refresh/--yes flag (argv handling is --help only, line ~530) and only the interactive scope prompt; add --refresh (and --yes for it) that runs the existing refreshAntigravityInstallation, prints the plan (kept source, uninstalled copies, preserved foreign entries) before applying, and a fake-agy test for the preview text and the flag. Size M.",
+       "files": ["plugins/pipeline-core/install-agy.mjs", "plugins/pipeline-core/install-agy.test.mjs"],
+       "protected": [],
+       "test": "plugins/pipeline-core/install-agy.test.mjs"},
+      {"clause": "SETUP.md step 0, GEMINI.md, docs/runner-support.md and local-plugin-attestation.md describe agy's managed plugin directory and import manifest, the single-source rule, the refresh command, the restart-plus-lock proof, and that agy plugin list / plugins.json are not proof of what is loaded.",
+       "status": "content",
+       "work": "git grep finds none of managed copy / import_manifest / single-source in the four docs (SETUP.md section at line 611 describes only the workspace plugins.json binding). Write the four doc passages after the --refresh command exists, and add a doc-pin case. Size M.",
+       "files": ["SETUP.md", "GEMINI.md", "docs/runner-support.md", "plugins/pipeline-core/skills/pipeline-start/references/local-plugin-attestation.md"],
+       "protected": [],
+       "test": "plugins/pipeline-core/lib/pins/agy-imported-plugin-snapshot-shadows-registered-plugin.test.mjs (add a text-pin case; no doc-pin test exists)"}
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-127", "itemId": "claude-windows-greenfield-lifecycle-not-walkable", "read": true,
+    "clauses": [
+      {"clause": "V-9 --answers-file route, V-12 language asked once, V-13 state.md projection re-rendered.",
+       "status": "done",
+       "evidence": "lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs header 'V-9/V-12/V-13 covered' plus scripts/project-onboarding-v3-argv-closure.test.mjs R5-8..R5-11 (30 KB answers file)."},
+      {"clause": "V-10 dispatch guard binds the digest to the briefing actually sent, with producers at role-dispatch-preflight (direct) and guard admission (native Claude, Codex spawn_agent, Antigravity Subagents, static Workflow).",
+       "status": "done",
+       "evidence": "commits 9fb514786, 1db508959, a2d61489c, 04db66267, 3ed911a79; pin header 'V-10 wiring, exact state' in lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs."},
+      {"clause": "V-10 typed gaps: Critic and unrelated-role dispatches unrecorded (critic-review.md has no Slice line), dynamically built Workflow script has no admission point, Codex/Antigravity registration of guard-dispatch.",
+       "status": "po-decision",
+       "evidence": "Acceptance says 'fixed or explicitly dispositioned'; the pin header lines 32-34 already disposition all three as typed gaps (open, owner Coordinator, due 2026-10-31) and plugins/pipeline-core/hooks/hooks.json matches Task|Agent|Workflow only. Whether the Critic route record must be built for AC-127 is a PO call; if required it is M: add a slice/route line to templates/prompts/critic-review.md and record in lib/dispatch-briefing-route-record.mjs / hooks/guard-dispatch.mjs (hooks/hooks.json registration is protected, Codex/Antigravity registration likely lives in hooks/codex-hooks.json and the plugin-root hooks.json)."},
+      {"clause": "Claude/Windows greenfield run reaches implementation and push within the two-approval happy path; the PO's 'CAS missing' failure is located.",
+       "status": "native-host",
+       "host": "Claude on native Windows (live interactive session)",
+       "evidence": "pin header: 'two-approval happy path -- native: pending'."}
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-148", "itemId": "denial-names-a-diagnosis-it-refuses", "read": true,
+    "clauses": [
+      {"clause": "Every recovery verb a design-advisory denial names is admitted by the shell lane in the state that produced the denial, pinned per denial code.",
+       "status": "done",
+       "evidence": "lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs (CODES x VERBS, asserts isSanctionedLifecycleCommand and devPlanShellRefusalHit === null)."},
+      {"clause": "An approved feature whose approval cannot be re-verified degrades to advisory instead of locking all execution (PO decision BI).",
+       "status": "po-decision",
+       "evidence": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md row BI: amended the same evening, the blanket inventory/downgrade was rejected as too broad in favour of per-toil-row design (toil-resolution-2026-10-08.md). The item's own Required behaviour is the first clause (allowlist per denial code); the BI sentence is 'more generally' and no AC text requires it. Ask the PO to record it as out of AC scope; if wanted it is M in guard-devplan.mjs / lib/guard/devplan-shell-lane.mjs (both protected) plus a case in the pin file."}
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-171", "itemId": "existing-signing-key-reuse-deadlocks-onboarding", "read": true,
+    "clauses": [
+      {"clause": "Tests for replay, path aliases, Windows spelling and wrong-key refusal, plus attended first-anchor recovery.",
+       "status": "done",
+       "evidence": "lib/pins/existing-signing-key-reuse-deadlocks-onboarding.test.mjs: A1/A2 reuse, A3 aliases and Windows spellings (+ symlink alias), A4 replay idempotent, A5 foreign key and unpaired private key refused, A6 attended recovery plan-digest bound with unattested audit; commit 5908b6134 (2026-10-14, PO-KEY-PAIR-MISMATCH) and scripts/po-human-approval-key-pairing.test.mjs. The tests live in the pin file, not onboarding-init.test.mjs. Commit notes 'batch security Critic pending'."}
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-201", "itemId": "hgo-patch-preflight-before-signature", "read": true,
+    "clauses": [
+      {"clause": "A malformed hunk is rejected by a read-only applicability check before a human signature is requested; signed once against the frozen preimage; changed preimage needs a fresh signature; failed attempt claims no edit.",
+       "status": "evidence",
+       "evidence": "Code exists: lib/human-guard-override.mjs convertPatchEnvelopeToUnifiedDiff (line 3535), HGO-PATCH-PREFLIGHT / HGO-PATCH-UNSUPPORTED / HGO-PATCH-LEGACY, prepareHumanGuardOverrideForSignature. Tests: lib/pins/hgo-patch-preflight-before-signature.test.mjs (points 1-4, stored-patch, converter cases; commit b664c310a 2026-10-16). Only a counted GREEN is missing; the test titles still carry stale '(needs protected patch P21-07C/D)' labels that should be dropped once GREEN."},
+      {"clause": "Native EOF marker grammar (Update/rename termination admitted; orphan, duplicate, Add/Delete, nonterminal markers and unknown headers refused) in guard-apply-patch.mjs.",
+       "status": "done",
+       "evidence": "hooks/guard-apply-patch.mjs lines 122-149; hooks/guard-apply-patch.test.mjs EOF01 and following cases (lines 664-780)."},
+      {"clause": "A validation-only git apply --check --reverse is recognised as read-only without admitting mutation.",
+       "status": "content",
+       "work": "readOnlyGitApplyCheckArguments accepts only --check [--whitespace] [--]; --reverse/-R after --check is rejected (the test at protected-test-paths.test.mjs:69-85 treats 'git apply --reverse' as mutating). Add an optional single --reverse/-R after --check in the parser (used by lib/guard/shell-grammar.mjs line 1149) and keep 'git apply --reverse' without --check, --cached and --apply refused; add admit and still-refused cases. Size S.",
+       "files": [],
+       "protected": ["plugins/pipeline-core/lib/protected-test-paths.mjs (readOnlyGitApplyCheckArguments, listed once in protected-baseline.json; treat as protected)", "plugins/pipeline-core/lib/protected-test-paths.test.mjs", "plugins/pipeline-core/lib/guard/shell-grammar.mjs (only if its own check needs the same change)"],
+       "test": "plugins/pipeline-core/lib/protected-test-paths.test.mjs"}
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-226", "itemId": "pipeline-hooks-act-in-repositories-that-never-opted-in", "read": true,
+    "clauses": [
+      {"clause": "Docs state the contract (global install is inert outside opted-in repositories, except destructive git protection) in SETUP.md and docs/runner-support.md (proposal 8).",
+       "status": "content",
+       "work": "git grep for inert/ungoverned/opted in finds nothing in SETUP.md (only an unrelated line 359) or docs/runner-support.md; add one short paragraph to each stating the contract and the two exceptions (destructive git union, opt-in hint), and a text-pin case. Size S.",
+       "files": ["SETUP.md", "docs/runner-support.md"],
+       "protected": [],
+       "test": "plugins/pipeline-core/lib/pins/pipeline-hooks-act-in-repositories-that-never-opted-in.test.mjs (currently no doc assertion)"}
+    ],
+    "changedSince20": "Behaviour is delivered (d67981f46, 03ef96053, f3f98d75c 2026-10-19 non-git inert case); only the docs clause is open."
+  },
+  {
+    "ac": "AC-256", "itemId": "sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows", "read": true,
+    "clauses": [
+      {"clause": "The signing spawn never starts a program from the working directory: explicit cwd outside every repository, NoDefaultCurrentDirectoryInExePath on win32, and openssl resolved to an absolute path outside every repository; readiness probe follows the same rule.",
+       "status": "done",
+       "evidence": "scripts/po-human-approval.mjs resolveOpensslExecutable (line 1193) and spawnOpenssl (line 1214, env NoDefaultCurrentDirectoryInExePath at 1217, absolute path only); probe uses the same spawn helper; header comment 1148-1156. Residual risk (key directory as cwd) is the recorded PO decision R."},
+      {"clause": "A regression test with a decoy openssl in the working directory that must never start.",
+       "status": "done",
+       "evidence": "scripts/po-human-approval-openssl-path.test.mjs 'a decoy openssl in the child working directory is never started by the real spawn' (with positive control) and the resolver cases; the file is already referenced in harness/verify-suites.json (4 matches), so no new registration."}
+    ],
+    "changedSince20": ""
+  }
+]

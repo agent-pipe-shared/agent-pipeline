@@ -1,0 +1,124 @@
+[
+  {
+    "ac": "AC-110",
+    "itemId": "agy-imported-plugin-snapshot-shadows-registered-plugin",
+    "file": "backlog/items/2026-09-28-agy-imported-plugin-snapshot-shadows-registered-plugin.md",
+    "contentHints": [
+      {
+        "clause": "Preflight yields plugin-refresh-required with IPA-AGY-STALE-MANAGED-COPY / DUPLICATE-SOURCE / FOREIGN-HOOK-WIRING.",
+        "work": "Wire the topology observer verdicts into the preflight with the three reason codes; test in the preflight test file. Size M.",
+        "protected": []
+      },
+      {
+        "clause": "install-agy.mjs remediates through agy lifecycle commands with preview, idempotence and readback; developer refresh replaces the bare rsync.",
+        "work": "Verify install-agy.mjs for plan preview, agy plugin uninstall ordering, readback and --refresh; add what is missing with fake-agy tests in install-agy.test.mjs. Size L.",
+        "protected": []
+      },
+      {
+        "clause": "SETUP.md, GEMINI.md, docs/runner-support.md and local-plugin-attestation.md describe the managed directory, single-source rule, refresh command and restart-plus-lock proof.",
+        "work": "Edit four docs; a doc-pin test if the repo has one. Size M.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-127",
+    "itemId": "claude-windows-greenfield-lifecycle-not-walkable",
+    "file": "backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+    "contentHints": [
+      {
+        "clause": "V-10 typed gaps: Critic and unrelated-role dispatches unrecorded; dynamically built Workflow script has no admission point; Codex/Antigravity registration of guard-dispatch",
+        "work": "Record the Critic dispatch route (critic-review.md carries no Slice line) and the Codex/Antigravity registration: hooks/guard-dispatch.mjs, lib/dispatch-briefing-route-record.mjs, test in claude-windows-greenfield-lifecycle-not-walkable.test.mjs; size M. Whether this is required for AC-127 or only dispositioned is a PO call (acceptance says 'fixed or explicitly dispositioned').",
+        "protected": [
+          "plugins/pipeline-core/hooks/hooks.json (registration for Codex/Antigravity)"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-148",
+    "itemId": "denial-names-a-diagnosis-it-refuses",
+    "file": "backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md",
+    "contentHints": [
+      {
+        "clause": "An approved feature whose approval cannot be re-verified degrades to advisory instead of locking all execution (PO decision BI).",
+        "work": "Either record this clause as out of AC scope (PO decision) or add a degrade path in guard-devplan / lib/guard devplan-shell-lane and a case in the pin file. Size M.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-devplan.mjs",
+          "plugins/pipeline-core/lib/guard/*.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-171",
+    "itemId": "existing-signing-key-reuse-deadlocks-onboarding",
+    "file": "backlog/items/2026-09-29-existing-signing-key-reuse-deadlocks-onboarding.md",
+    "contentHints": [
+      {
+        "clause": "Tests for replay, path aliases and wrong-key refusal.",
+        "work": "Add replay, path-alias and wrong-key refusal cases to scripts/onboarding-init.test.mjs. Size M.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-201",
+    "itemId": "hgo-patch-preflight-before-signature",
+    "file": "backlog/items/2026-09-27-hgo-patch-preflight-before-signature.md",
+    "contentHints": [
+      {
+        "clause": "A malformed hunk is rejected by a read-only applicability check before a human signature is requested.",
+        "work": "Implement the preflight check and un-pend the point-1 test; size M, test file as named above.",
+        "protected": []
+      },
+      {
+        "clause": "The native EOF marker grammar (Update/rename termination admitted; orphan, duplicate, Add/Delete, nonterminal markers and unknown headers still refused) is admitted by guard-apply-patch.mjs.",
+        "work": "Add EOF-marker admission and refusal cases to guard-apply-patch.mjs and a test next to it. Size M.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-apply-patch.mjs or lib/guard/*.mjs if it lives there",
+          "its guard test files if matching the protected patterns"
+        ]
+      },
+      {
+        "clause": "A validation-only git apply --check --reverse is recognised as read-only without admitting mutation.",
+        "work": "Add a classifier case and test. Size S.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-git.mjs",
+          "guard-git*.test.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-226",
+    "itemId": "pipeline-hooks-act-in-repositories-that-never-opted-in",
+    "file": "backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+    "contentHints": [
+      {
+        "clause": "Docs state the contract in SETUP.md and docs/runner-support.md (proposal 8)",
+        "work": "Verify/add a short paragraph in SETUP.md and docs/runner-support.md. Size S.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-256",
+    "itemId": "sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+    "file": "backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md",
+    "contentHints": [
+      {
+        "clause": "The signing spawn sets an explicit cwd outside every repository and neutralizes working-directory lookup on win32 (or resolves openssl by a PATH lookup excluding cwd); readiness probe follows the same rule.",
+        "work": "Confirm in plugins/pipeline-core/scripts/po-human-approval.mjs command() (~line 794) and the readiness probe; if absent, S-M change plus decoy test in the existing po-human-approval test file. Touches po-human-approval.mjs (check protected-baseline membership; it is not on the listed baseline).",
+        "protected": []
+      },
+      {
+        "clause": "A regression test with a decoy openssl in the working directory that must never start.",
+        "work": "Add a decoy-executable test to the po-human-approval test file, size S; a new test file would need a harness/verify-suites.json (protected) registration.",
+        "protected": [
+          "harness/verify-suites.json (only if a new test file)"
+        ]
+      }
+    ]
+  }
+]

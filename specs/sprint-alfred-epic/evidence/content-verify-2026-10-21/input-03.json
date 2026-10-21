@@ -1,0 +1,121 @@
+[
+  {
+    "ac": "AC-108",
+    "itemId": "agy-driver-dispatch-and-design-routes-incomplete",
+    "file": "backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+    "contentHints": [
+      {
+        "clause": "Preflight reports whether the resolved node runs inside the runner's default sandbox and names the one-time remedy.",
+        "work": "Add a node-in-sandbox probe and typed remedy to plugins/pipeline-core/scripts/pipeline-start-preflight.mjs; test in its existing preflight test file. Size M.",
+        "protected": []
+      },
+      {
+        "clause": "The AGY Goldfish agent template forbids parallel file writes in one turn until the hook race is fixed.",
+        "work": "Add the prohibition to the AGY goldfish agent template and a text pin in its existing test. Size S.",
+        "protected": []
+      },
+      {
+        "clause": "The main agent can update the calibrated handover (docs/state.md) in every phase through an admitted route.",
+        "work": "Add a lifecycle-readiness test that an EL-01-admitted docs/ write is accepted in every phase; fix guard-lifecycle-ready.mjs if refused. Size M.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-126",
+    "itemId": "claude-session-start-emits-codex-transcript-recovery-hint",
+    "file": "backlog/items/2026-10-03-claude-session-start-emits-codex-transcript-recovery-hint.md",
+    "contentHints": [
+      {
+        "clause": "A RED mirror: a scratch copy of the pre-fix wiring (hint entry without --runner) fails the Claude predicate while the real one passes",
+        "work": "Add one RED case to claude-session-start-emits-codex-transcript-recovery-hint.test.mjs building the old args [] and asserting the A1/A2 predicate fails; size S. If the pin is not listed in harness/verify-suites.json, a protected registration is needed.",
+        "protected": [
+          "harness/verify-suites.json (only if the pin is unregistered)"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-147",
+    "itemId": "declared-system-skill-read-requires-human-override",
+    "file": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+    "contentHints": [
+      {
+        "clause": "Unlisted sibling skill files, lookalike paths, transcript files and traversal/tilde spellings are refused (catalog binding).",
+        "work": "Catalog-bound read authority in sessionReadScopeRoots / passive-read-policy plus a catalog producer; target test = the same pin file (unskip). Size L. Deferred past 0.7.0 by PO decision 2026-10-16 (see item Triage 2026-10-17); not counted against the candidate.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "plugins/pipeline-core/lib/guard/*.mjs"
+        ]
+      },
+      {
+        "clause": "Replaced or drifting catalog/file identities invalidate the read authority (A3).",
+        "work": "Identity digest check in the new read-scope seam; same pin file; size M, part of the L work above.",
+        "protected": [
+          "plugins/pipeline-core/lib/guard/*.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-168",
+    "itemId": "elephant-main-context-spent-on-wake-ups-and-inline-reads",
+    "file": "backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md",
+    "contentHints": [
+      {
+        "clause": "One enforcement-layer measure per cause (wake-up replies, inline reads, Explore/Plan refusal, guard false positives, hand-written briefings).",
+        "work": "Up to five separate measures across hooks/templates, each with a test; scope needs a PO/Elephant split by cause. Size L in total.",
+        "protected": [
+          "likely hooks/hooks.json and guard files for wake-up and false-positive causes"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-197",
+    "itemId": "guard-suite-fails-60-tests-on-native-windows",
+    "file": "backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md",
+    "contentHints": [
+      {
+        "clause": "Keep a recorded baseline count so a later change can be attributed.",
+        "work": "Doc-only: add one baseline line (final pass/skip/fail count, host, sha) to specs/sprint-alfred-epic/evidence/counted-runs-2026-10-19/guard-lifecycle-ready-red-classification.md. Size S.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-224",
+    "itemId": "parallel-work-in-one-checkout-is-unsafe",
+    "file": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+    "contentHints": [
+      {
+        "clause": "Liveness readback for open dispatch records before admitting a second writer (round 3b)",
+        "work": "New liveness readback (pid/heartbeat) checked by the dispatch guard; guard-dispatch*.mjs and dispatch-record lib, test in the parallel-work pin. Size M. Needs PO decision whether it is in scope.",
+        "protected": [
+          "plugins/pipeline-core/lib/guard/*.mjs (if guard code changes)"
+        ]
+      },
+      {
+        "clause": "D62: verify-evidence-producer produces Critic evidence for a named earlier commit in a temporary worktree; preflight accepts it; pin with dirty checkout leaves bytes unchanged",
+        "work": "Add a --commit option building a temporary worktree, run, remove; adjust critic-dispatch-preflight to accept it; new pin in lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs. Size M-L. Requires a new Verify registration only if a new test file is added.",
+        "protected": [
+          "harness/verify-suites.json (only if a new test file)"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-253",
+    "itemId": "session-readiness-drops-to-partial-after-bootstrap-ready",
+    "file": "backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md",
+    "contentHints": [
+      {
+        "clause": "Typed reason for the transition to partial, and parallel read-only calls see one consistent readiness snapshot.",
+        "work": "Add a test that concurrent readiness evaluations return one snapshot; likely plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs, size S-M. Not fully searched (read budget); may be dropped if PO accepts the retry as sufficient.",
+        "protected": []
+      }
+    ]
+  }
+]

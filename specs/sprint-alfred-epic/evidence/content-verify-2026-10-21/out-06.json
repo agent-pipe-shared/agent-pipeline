@@ -1,0 +1,87 @@
+[
+  {"ac": "AC-115", "itemId": "approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes", "read": true,
+   "clauses": [
+     {"clause": "A pin drives the devplan lane with the onboarding plan's exact materialize-architecture action and proves it is admitted.", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs case DMP001 (commit 6a84c5a20)"},
+     {"clause": "The dead --input spelling is refused with a typed hint naming the bare form.", "status": "content",
+      "work": "DMP002 only asserts a block/fault, not a hint. No hint text names the bare 'materialize-architecture' form anywhere in lib/guard or the hooks (the only mention is the args check at sanctioned-args-scripts.mjs:399). Add a typed hint to the refusal for 'materialize-architecture' with extra args, and assert the hint text in DMP002. Size S.",
+      "files": ["plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs"],
+      "protected": ["plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs", "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs"],
+      "test": "plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs"},
+     {"clause": "An opaque 'perl <scratch script>' and other interpreters are no wider in devplan than 'node <scratch script>'.", "status": "content",
+      "work": "Still the 'todo' case in the pin. opaqueScriptExecutionCandidate() (lib/guard/devplan-shell-lane.mjs:173) classifies only node, python/python3 and bash/sh/dash/zsh, so perl, ruby, php, pwsh and similar return null and the lane admits them. Add those interpreters (script operand or -e style inline code mapped to the opaque-execution candidate), then drop the 'todo' mode on the perl case and add ruby and one more. Size S-M (about 30 lines of lane code plus about 20 lines of test).",
+      "files": ["plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs"],
+      "protected": ["plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs"],
+      "test": "plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs"}
+   ],
+   "changedSince20": "No commit after 2026-10-20 touches the devplan lane or the pin; the pin (6a84c5a20) predates it."},
+  {"ac": "AC-134", "itemId": "codex-readiness-private-receipt-omits-output-custody", "read": true,
+   "clauses": [
+     {"clause": "Receipt reader rejects a stat-declared oversize file before allocation and reads with an actual 524,288-byte cap plus one byte, with FD/path identity checks.", "status": "content",
+      "work": "Source is built (codex-design-readiness-host-store.mjs:25 stat size > 524288n, :33 Buffer.alloc(524289), :40 length > 524288 returns null) but the test file has six tests and no oversize or concurrent-growth case. Add a stat-oversize case (file of 524289 bytes refused) and a cap+1 growth case (file grown between stat and read); Linux-only, skip on win32. Size S-M.",
+      "files": ["plugins/pipeline-core/lib/codex-design-readiness-host-store.test.mjs"],
+      "protected": [],
+      "test": "plugins/pipeline-core/lib/codex-design-readiness-host-store.test.mjs"}
+   ],
+   "changedSince20": "No commit after 2026-10-20 delivered the hint (314cd6bb8 only relaunches the readiness host inside the store repository)."},
+  {"ac": "AC-158", "itemId": "design-workflow-package-v2-readiness-fixture-fails-on-windows", "read": true,
+   "clauses": [
+     {"clause": "The HOST-LIMITATION skip carries a current due date or is replaced.", "status": "content",
+      "work": "design-workflow-package-v2.test.mjs lines 39 and 171 still skip on win32 with 'due 2026-10-19', now past (today 2026-10-21), and the backlog item itself says due 2026-10-20. Renew both due dates (and record the new date in the backlog item), or make the host store accept win32 paths. Size S.",
+      "files": ["plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs", "backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md"],
+      "protected": [],
+      "test": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs"}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-179", "itemId": "git-hook-runtime-snapshots-go-stale-after-plugin-changes", "read": true,
+   "clauses": [
+     {"clause": "Snapshot bound to installed plugin identity, with typed HOOK-SNAPSHOT-STALE diagnostic in preflight and in the commit refusal naming one refresh command.", "status": "done",
+      "evidence": "lib/hook-currentness.mjs (HOOK_SNAPSHOT_STALE_CODE, renderSnapshotStaleCheck, assessHookCurrentness); scripts/pipeline-start-preflight.mjs:679 and :1885; pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs cases P1, P2 (commit refusal) and the installed-hook and preflight cases"},
+     {"clause": "Refresh of snapshots in the sanctioned install/refresh flow.", "status": "done",
+      "evidence": "scripts/refresh-mandatory-hooks.mjs with scripts/refresh-mandatory-hooks.test.mjs; it is the one refresh command named in the diagnostic. I did not trace whether the plugin install flow itself calls it (budget)."},
+     {"clause": "cp/mv/install source clause (guard-lifecycle-ready, po-commands).", "status": "done",
+      "evidence": "lib/guard/po-commands.mjs, commits b58dda23c, 6940723ae, a35506ef0; pin cases P3 and the CORR-A, A3 and A4 groups"}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-206", "itemId": "kernel-closure-check-masks-violations-after-the-first", "read": true,
+   "clauses": [
+     {"clause": "The closure check reports ALL violations per run, not only the first.", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs (injected PIN-MULTI expects 4 violations; real GMWKC08/GMWKC09), registered in harness/verify-suites.json at line 2907"},
+     {"clause": "A red ratchet blocks the candidate stamp.", "status": "content",
+      "work": "The pin proves only that the closure test exits non-zero as a CLI. plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs itself has no entry in harness/verify-suites.json (no match), so verify, and any stamp that depends on a green verify, never runs it; the pin runs it only inside its own suite. Register the closure test as a verify suite and add a pin case that the suite is registered. I could not locate a separate stamp command that reads the closure result, so the blocking path is verify, not a stamp change. Size S.",
+      "files": ["plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs"],
+      "protected": ["harness/verify-suites.json"],
+      "test": "plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs"}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-241", "itemId": "readiness-input-omits-current-advisor-observation", "read": true,
+   "clauses": [
+     {"clause": "Refusal of substituted receipt/route, wrong candidate/question, context drift, oversized data, aliases, duplicate key and missing context.", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs cases 'point 2' (wrong commit/tree/question, substituted route and receipt), 'point 3' (drift, forged copies), 'point 5' (oversize 65537, nlink alias, duplicate key, missing, path escape)"},
+     {"clause": "Bootstrap-to-host-to-fresh-verifier delivery with private custody (managed child, fresh verifier).", "status": "content",
+      "work": "Pin line 134 is an empty skipped stub (HOST_LIMIT, due 2026-10-19, now past). This host is Linux/WSL, so a real case can run: drive the linux private readiness store and managed host process with a synthetic managed child and a fresh verifier. Size M.",
+      "files": ["plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs"],
+      "protected": [],
+      "test": "plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs"},
+     {"clause": "Answered observation (private course/disposition) is distinct from a no-child unavailable observation.", "status": "content",
+      "work": "Pin line 135 is an empty skipped stub. Add a case with a private answered course and a no-child unavailable record and assert the two observations differ. Size S-M.",
+      "files": ["plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs"],
+      "protected": [],
+      "test": "plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs"},
+     {"clause": "Drift after the actual turn refuses publication and the private readiness record.", "status": "content",
+      "work": "Pin line 136 is an empty skipped stub. Add a case that changes the route or receipt after the host turn and asserts publication and the private record are refused. Size S-M; can share the managed-host fixture of the first stub.",
+      "files": ["plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs"],
+      "protected": [],
+      "test": "plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs"}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-270", "itemId": "windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures", "read": true,
+   "clauses": [
+     {"clause": "Helper privateTempRoot/privateMkdtemp exists, is rated secure by the unchanged assurance, and one existing suite adopts it.", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/test-private-tmp.mjs and pins/windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.test.mjs (P2, P3 and the P4 adoption check)"},
+     {"clause": "Remaining v3 onboarding fixtures moved off os.tmpdir().", "status": "native-host",
+      "host": "native Windows",
+      "evidence": "Not enumerated: my directory-wide search was refused and my budget ran out. The item's own verification is the v3 suite failure count on native Windows, which no Linux or WSL run can measure. If that run still shows DACL failures, move the fixtures of the failing suites onto privateMkdtemp (size M, test carried by the same pin file)."}
+   ],
+   "changedSince20": ""}
+]

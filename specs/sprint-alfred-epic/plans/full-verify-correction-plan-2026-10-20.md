@@ -678,3 +678,34 @@ Status: **partly closed.** Implementation complete; the Critic batch and PO acce
   D75 B build therefore needs an authenticated continuation: the agent must be able to verify the grant
   itself (for example, the hook's own message names the recorded grant and its digest), not take it
   from the orchestrator's text.
+
+### K13 measurement 1: content clauses re-verified at HEAD (2026-10-21)
+
+- **Method:** seven read-only readers re-read the 50 items that held the 76 content clauses of the
+  2026-10-20 scope verification, against each item's acceptance and the tree at `af9c00bcb`
+  (evidence: `specs/sprint-alfred-epic/evidence/content-verify-2026-10-21/`). No test was run, so
+  `done` means code plus a named test, not a counted GREEN.
+- **Result:** 45 content clauses, 61 done, 5 evidence, 8 po-decision, 6 native-host. Fully done
+  by code and test (counted GREEN still owed): AC-104, AC-113, AC-160, AC-167, AC-168, AC-171,
+  AC-174, AC-179, AC-216, AC-238, AC-253, AC-256, AC-258.
+- **Protection correction:** `lib/protected-test-paths.mjs`, `hooks/guard-lifecycle-ready.test.mjs`
+  and `hooks/guard-command-grammar.mjs` are not in `protected-baseline.json` (only the hook
+  sources, `lib/guard/*.mjs` and the guard-testpath/git/protected-test-paths/gate-strength/devplan
+  tests are), so AC-102, AC-181, AC-197, AC-201 and AC-207 are Goldfish work up to a named
+  protected seam.
+- **Wave A (disjoint, shared tree per D76):** A1 guard grammar (AC-102, AC-197 groups A-C); A2
+  protected-test-paths classifier (AC-181, AC-201, AC-207); A3 AGY install and opt-in docs
+  (AC-110, AC-226); A4 start preflight (AC-108, AC-117; no agent-definition edit, which would lock
+  that agent until install); A5 readiness and advisor-observation pins (AC-130, AC-134, AC-241);
+  A6 Codex advisor answered route (AC-135).
+- **Wave B:** AC-186 test-author route; AC-142 chained pin, AC-126 RED mirror, AC-158 skip date;
+  AC-163 record skeletons (new files need registration); AC-118 reader binding.
+- **Held:** AC-152 (touches `lib/onboarding-continuity.mjs`, after E5A2); AC-140, AC-245
+  (`scripts/pipeline-state.mjs`, after E5A2 and K11 S4); AC-203 and AC-224 pins (after K1D);
+  AC-115, AC-206 (protected only: signature sitting).
+- **PO list:** AC-249 (the closed diagnostics schema needs new fields), AC-187 (template-only pin
+  or a brief producer), AC-147 and the AC-224 liveness/AGY clauses (deferred past 0.7.0), AC-127
+  V-10 gap disposition, AC-148 BI advisory clause, AC-197 groups D-I.
+- **Dispatch records (Elephant decision):** this sprint keeps the orchestrator commit trailers
+  (`Dispatch:` plus `Commit-Act: orchestrator`) as the record for host-committed Goldfish and does
+  not write `dispatch-record-write.mjs` records; the gap is named for the Critic batch.

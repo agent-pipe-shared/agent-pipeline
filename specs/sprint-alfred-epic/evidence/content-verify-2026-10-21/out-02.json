@@ -1,0 +1,86 @@
+[
+  {"ac": "AC-104", "itemId": "advisor-provenance-ancestor-check-fails-on-any-sibling-write", "read": true,
+   "clauses": [
+     {"clause": "Ancestor identity is narrowed to dev/ino/mode plus realpath, isDirectory and not-symlink (mtimeNs/size/nlink dropped for ancestors).", "status": "done",
+      "evidence": "Code: parentIdentity() in plugins/pipeline-core/lib/design-advisor-provenance.mjs (dev/ino/mode only; realpath/isDirectory/not-symlink kept at the re-check loop). Tests: plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs (sibling churn at ~line 102 expects no failure; replaced ancestor at ~lines 158 and 171 expects DAP-PHYSICAL-PARENT-DRIFT) plus design-advisor-provenance.flap3.test.mjs for the retry. The hinted test file design-advisor-provenance.test.mjs is the wrong carrier: the cases already live in the pin."},
+     {"clause": "Keep the original cause as a non-authoritative cause field instead of discarding it at design-workflow-package-v2.mjs:142 (Proposal, separate sub-item; not an Acceptance section).", "status": "po-decision",
+      "evidence": "Backlog item has no Acceptance section; Proposal says the predicate change needs a PO decision and a security Critic, and the cause field is 'separately'. Not verified in the tree (no call spent); Triage fields are empty."}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-125", "itemId": "claude-greenfield-seeds-unselected-codex-targets", "read": true,
+   "clauses": [
+     {"clause": "Only the enrolling runner is enabled and no native Codex targets are seeded or reported as drift (claude, codex, antigravity).", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs cases (a) per runner, (b), (c), (d) x2."},
+     {"clause": "Verification across supported host platforms (win32, posix path/restart-barrier shapes).", "status": "native-host",
+      "evidence": "The planner has no injectable platform value: project-onboarding-v3.mjs reads process.platform directly (lines ~592, 712-719, 729) and fakeDeps carries none. A plan-level platform loop is therefore not possible without a production seam; win32 and darwin shapes need real hosts. The restart barrier is only built for runner codex (restartAction, line ~3133) and is not asserted by the pin.",
+      "host": "native Windows (win32) and macOS (darwin) hosts; Linux/WSL is the current run host"}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-142", "itemId": "critic-round-cap-and-delta-scope-are-not-enforced", "read": true,
+   "clauses": [
+     {"clause": "A typed route exists for a running feature whose genesis predates the review-unit rule (register-feature-package.mjs --add-review-unit), once only, manifest otherwise unchanged.", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs case (g) PF-34 (review-unit-added, already-present, FPR-ARGS)."},
+     {"clause": "CCA-REVIEW-UNIT-REQUIRED names the route.", "status": "done",
+      "evidence": "Commit db930a359 (after 2026-10-20); plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs ~lines 218-225 assert the repair text; message at critic-course-admission.mjs line 39."},
+     {"clause": "A new feature gets its review unit at registration.", "status": "done",
+      "evidence": "consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs lines ~251-262 (unit committed from the registration commit, read back by the Critic's reader)."},
+     {"clause": "critic-review skill asks for Spec path and diff range, or sends the caller to the preflight, before any dispatch.", "status": "done",
+      "evidence": "Commit db930a359 (skills/critic-review/SKILL.md). No dedicated test of the SKILL.md text was found; the behaviour is prose in the skill."},
+     {"clause": "One pin drives a pre-rule feature through the route to an admitted Critic dispatch (packet-ready).", "status": "content",
+      "work": "Add one case that starts from a genesis manifest without the review-unit artifact, asserts preflightCriticDispatch refuses CCA-REVIEW-UNIT-REQUIRED, runs register-feature-package.mjs --add-review-unit, commits both printed paths, then asserts the preflight returns packet-ready. Today the refusal (critic-dispatch-preflight.test.mjs) and the route (pin case g) are tested separately and never chained. Size M.",
+      "files": ["plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs"],
+      "protected": ["harness/verify-suites.json only if a new test file is created instead of extending the existing one"],
+      "test": "plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs"},
+     {"clause": "Added acceptance 2026-10-18: close-feature refuses while a required Critic has no evidence; counts only the closing feature's own course; a pin drives it.", "status": "done",
+      "evidence": "Commit d621b2871 (hold the feature close while its course lacks required Critic evidence); plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs."},
+     {"clause": "Original acceptance: round number per package, refuse a third Critic dispatch with a typed code, follow-up must bind base to the previous reviewed commit, role contract text 'delta Critic only, at most one'.", "status": "evidence",
+      "evidence": "Not individually verified (budget). critic-course-admission.mjs carries round and correctionCommits accounting (critic-dispatch-preflight.test.mjs asserts round 1, correctionCommits 0) and critic-course-admission.test.mjs exists. A Goldfish should first re-read the acceptance against that test before writing anything."}
+   ],
+   "changedSince20": "db930a359 delivered the CCA-REVIEW-UNIT-REQUIRED repair text and the critic-review skill argument gate; d621b2871 (2026-10-18/19) delivered the close-feature hold. The --add-review-unit route was already pinned."},
+  {"ac": "AC-167", "itemId": "draft-phase-guard-blocks-mandatory-bootstrap-preflight", "read": true,
+   "clauses": [
+     {"clause": "The skill's literal ${PIPELINE_PLUGIN_ROOT} spelling is admitted (bound to this plugin when the variable is visible, refused for another root).", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs points 4, 4b and the closed-admission control."},
+     {"clause": "SKILL.md documents handling of the hook-provisioning-required preflight status.", "status": "done",
+      "evidence": "plugins/pipeline-core/skills/pipeline-start/SKILL.md lines 34-38; pin point 6 asserts it."},
+     {"clause": "A draft-phase fixture runs the bootstrap sequence (preflight, onboarding inspect, governance bootstrap, state inspect) with zero overrides and zero lifecycle-verdict consultations; hook-provisioning actions are executable in draft.", "status": "done",
+      "evidence": "Same pin: point 3 (full sequence), point 2, points 5 and 5b."}
+   ],
+   "changedSince20": "None found in git log since 2026-10-20 for this item; the pin's ALF-C-P8-02B additions were already in the tree."},
+  {"ac": "AC-187", "itemId": "goldfish-test-briefs-lack-targeted-and-quick-command-routes", "read": true,
+   "clauses": [
+     {"clause": "Template text carries targeted, quick and final-Verify routes in order, with no fabricated quick command; both template copies byte-identical.", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs P1-P6 and the RED mirror."},
+     {"clause": "Consumer coverage: an emitted-brief consumer exercises the routes.", "status": "po-decision",
+      "evidence": "No production code emits Goldfish briefs: 'Targeted checks' / TARGETED_CHECK_COMMANDS occur only in plugins/pipeline-core/templates/prompts/goldfish-task.md and the pin. Nothing exists to test. PO decision needed: accept the template-only pin as the contract, or open a separate item for a brief producer. The original item body is unresolved in portable-original-requirements.json (no public association), so the clause cannot be read from source."}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-216", "itemId": "no-uninstall-path-for-a-repository-that-once-opted-in", "read": true,
+   "clauses": [
+     {"clause": "Per-runner fixtures (Claude, Codex, antigravity).", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs line ~256 loop over [claude],[codex],[antigravity]."},
+     {"clause": "--archive variant.", "status": "done",
+      "evidence": "Same loop (private archive assertions, lines ~272-275) and project-uninstall.test.mjs archive cases (AC216-B4)."},
+     {"clause": "B2 test: after the plugin copy a hook was installed from is deleted, owned hooks still run (fail-safe policy decided).", "status": "done",
+      "evidence": "Pin case 'B2: after the plugin copy a hook was installed from is deleted...' (line ~320), which uses the content-addressed runtime snapshot policy."},
+     {"clause": "SETUP.md section 'Uninstalling from a repository'.", "status": "done",
+      "evidence": "SETUP.md line 357; pin case at line ~286 checks it against the real CLI verbs, flags and codes."},
+     {"clause": "Item stays open pending combined candidate and runner acceptance (native runner cache pruning unmeasured).", "status": "native-host",
+      "evidence": "Triage text: actual runner cache pruning remains unverified.", "host": "installed Claude, Codex and agy runners with real plugin-cache pruning"}
+   ],
+   "changedSince20": "None found; the B2 test and SETUP.md section were already in the tree (the first-round hint is stale)."},
+  {"ac": "AC-249", "itemId": "security-scanner-failure-provenance", "read": true,
+   "clauses": [
+     {"clause": "Completed, missing, refused and timed-out cases stay distinguishable; retention never converts a failure to PASS; bounded sanitized diagnostic with executable/rules/candidate digests, exit/signal/elapsed, explicit unknowns.", "status": "done",
+      "evidence": "plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs P1-P4 plus RED mutants; plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs. Linux-only publisher cases are skipped on win32 by design (K7)."},
+     {"clause": "Oct 10 suffix: authentic rule, candidate, location and sanitized KeyR evidence retained before any repair or suppression; unavailable capability stays unavailable.", "status": "content",
+      "work": "The diagnostic record has rules and candidate digests but no rule id, finding location or sanitized finding-evidence field (rg for ruleId/location/finding in security-scanner-diagnostics.mjs found nothing). Add a bounded, sanitized per-finding projection (rule id, file:line location, redacted key evidence) to the closed diagnostic-only schema and its builder, with a pin case using synthetic scanner output; keep verdict independence and the unavailable behaviour. The suffix body itself is private and was not readable here (only its meaning sentence in portable-original-requirements.json lines ~1966-1976), so the Elephant must confirm the exact fields against it first. The schema is a closed ADR-bound contract (docs/adr/draft-scanner-diagnostic-sidecar.md), so a schema change may need a PO decision. Size M, unverified.",
+      "files": ["plugins/pipeline-core/lib/security-scanner-diagnostics.mjs", "plugins/pipeline-core/schemas/pipeline.security-scanner-diagnostics.v1.json", "schemas/pipeline.security-scanner-diagnostics.v1.json", "plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs"],
+      "protected": [],
+      "test": "plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs"},
+     {"clause": "Inventory of real project push/security prerequisites and genuine native scanner acceptance, reported separately from the synthetic fixtures.", "status": "native-host",
+      "evidence": "The pin states everything is synthetic and no native Semgrep runs; the backlog item says native acceptance is pending.",
+      "host": "a real consumer project with native Semgrep installed (Linux/WSL)"}
+   ],
+   "changedSince20": ""}
+]

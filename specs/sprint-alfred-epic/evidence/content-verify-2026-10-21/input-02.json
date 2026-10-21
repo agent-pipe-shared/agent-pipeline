@@ -1,0 +1,104 @@
+[
+  {
+    "ac": "AC-104",
+    "itemId": "advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+    "file": "backlog/items/2026-10-05-advisor-provenance-ancestor-check-fails-on-any-sibling-write.md",
+    "contentHints": [
+      {
+        "clause": "Ancestor identity is narrowed to dev/ino/mode plus realpath, isDirectory and not-symlink (mtimeNs/size/nlink dropped for ancestors).",
+        "work": "Add two cases to plugins/pipeline-core/lib/design-advisor-provenance.test.mjs: sibling write in an ancestor is tolerated, replaced ancestor (ino/mode change) fails closed. Size S.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-125",
+    "itemId": "claude-greenfield-seeds-unselected-codex-targets",
+    "file": "backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+    "contentHints": [
+      {
+        "clause": "Verification across supported host platforms (win32, posix path/restart-barrier shapes), beyond the runner dimension",
+        "work": "Add a platform loop (win32/linux/darwin via the fakeDeps platform value) to the existing pin test; touches only claude-greenfield-seeds-unselected-codex-targets.test.mjs; size S. Confirm first that the planner reads a platform value at all, otherwise this clause is not testable at plan level and becomes native-host.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-142",
+    "itemId": "critic-round-cap-and-delta-scope-are-not-enforced",
+    "file": "backlog/items/2026-10-07-critic-round-cap-and-delta-scope-are-not-enforced.md",
+    "contentHints": [
+      {
+        "clause": "A running feature whose genesis predates the review-unit rule has a typed route to add its review unit (or a course-free batch Critic route); CCA-REVIEW-UNIT-REQUIRED names it; new features get the unit at registration; critic-review skill asks for Spec path and diff range first; a pin drives a pre-rule feature to an admitted dispatch (D62).",
+        "work": "Add typed amend route (register-feature-package.mjs, PO-signed if manifest authority) or a batch Critic route; update critic-course-admission.mjs message; register path adds unit; plugins/pipeline-core/skills/critic-review/SKILL.md argument check; pin in critic-dispatch-preflight.test.mjs or the AC-142 pin. Size L.",
+        "protected": [
+          "possibly plugins/pipeline-core/lib/protected-baseline.mjs if the manifest-authority route touches signed files"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-167",
+    "itemId": "draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+    "file": "backlog/items/2026-10-03-draft-phase-guard-blocks-mandatory-bootstrap-preflight.md",
+    "contentHints": [
+      {
+        "clause": "The skill's literal ${PIPELINE_PLUGIN_ROOT} spelling is admitted (or the skill prescribes an admitted spelling).",
+        "work": "Either resolve/admit the variable spelling in the guard or change plugins/pipeline-core/skills/pipeline-start/SKILL.md to an admitted spelling; pin in guard-lifecycle-ready.test.mjs or a new pin under lib/pins. Size S to M.",
+        "protected": [
+          "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "new pin test needs harness/verify-suites.json registration"
+        ]
+      },
+      {
+        "clause": "SKILL.md documents handling of the hook-provisioning-required preflight status.",
+        "work": "One paragraph in plugins/pipeline-core/skills/pipeline-start/SKILL.md. Size S.",
+        "protected": []
+      },
+      {
+        "clause": "A draft-phase fixture runs the bootstrap sequence to a ready confirmation without an override.",
+        "work": "One regression test in hooks/guard-lifecycle-ready.test.mjs (or a new pin) running preflight, onboarding inspect, governance bootstrap, state inspect in draft. Size M.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs (if the test exposes a gap)"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-187",
+    "itemId": "goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+    "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+    "contentHints": [
+      {
+        "clause": "Consumer coverage: an emitted-brief consumer exercises the routes (the pin itself states 'no production code emits briefs', so only template text is pinned).",
+        "work": "Establish whether any producer emits Goldfish briefs now; if yes add a case in the pin file (S-M), if no state the clause as not applicable or PO decision. Size S-M.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-216",
+    "itemId": "no-uninstall-path-for-a-repository-that-once-opted-in",
+    "file": "backlog/items/2026-09-28-no-uninstall-path-for-a-repository-that-once-opted-in.md",
+    "contentHints": [
+      {
+        "clause": "Per-runner fixtures (Claude, Codex, agy), B2 policy test (remove the plugin dir the impl was baked against: fail safe or re-point), --archive variant, and SETUP.md section 'Uninstalling from a repository'.",
+        "work": "Add B2 fail-safe test and --archive case to the existing pin file; add SETUP.md 'Uninstalling from a repository' section if absent; per-runner fixtures if not already parameterised. Size M. B2 may need a PO policy decision first.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-249",
+    "itemId": "security-scanner-failure-provenance",
+    "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+    "contentHints": [
+      {
+        "clause": "Added (Oct 10 suffix, not visible to me in full): inventory of real project push/security prerequisites and authentic rule/candidate/location/sanitized KeyR evidence before repair/suppression; unavailable capability stays unavailable.",
+        "work": "Read the suffix in the original item, then decide. If unmet: extend the pin or lib/security-scanner-diagnostics.test.mjs. Size M. Unverified.",
+        "protected": []
+      }
+    ]
+  }
+]

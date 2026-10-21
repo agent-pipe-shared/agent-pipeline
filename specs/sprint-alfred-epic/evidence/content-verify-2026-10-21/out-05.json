@@ -1,0 +1,74 @@
+[
+  {"ac": "AC-113", "itemId": "approval-bound-design-package-lives-in-an-ignored-directory", "read": true,
+   "clauses": [
+     {"clause": "present-plan / approval refuses (fail closed) when a bound path is git-ignored (Proposal 2).", "status": "done",
+      "evidence": "77bd8dad8 (createDesignWorkflowPackageApprovalRequest refuses DWP-BOUND-PATH-IGNORED/UNTRACKED/MODIFIED); 991cb703f and 9cfa75e0b (design course and package builder refuse an ignored path); 288bfd279 pins present-plan refusing DCC-PATH-IGNORED in plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs (three refusal cases plus the tracked-package case).",
+      "work": "", "files": [], "protected": [], "test": ""},
+     {"clause": "Proposals 1, 3, 4: tracked evidence home, ADR-0063 sharpened, block-close check of digest-bound paths.", "status": "done",
+      "evidence": "b7fb2e8b6 and 56fd7ed36 (tracked evidence prefix, package lands in a tracked path); docs/adr/0063-repository-directory-contract.md amendment 2026-10-15 'machine-regenerated means regenerable from tracked inputs'; 377417425 (bound-path status at block close), 605defa6c (bound-path lister).",
+      "work": "", "files": [], "protected": [], "test": ""}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-130", "itemId": "codex-advisor-shared-namespace-rejects-fresh-repository-identity", "read": true,
+   "clauses": [
+     {"clause": "Readiness store creation directly on a fresh owner-private 0700 shared parent (no chmod to 0755) is not covered (follow-up recorded by 76beed502; optional, not in the written acceptance).", "status": "content",
+      "evidence": "76beed502 changed the first case of codex-design-readiness-host-store.shared-parent.test.mjs to assert the 0700 mint and then chmod to 0755 before creating the store; its message records direct creation on the 0700 parent as a follow-up. No other case in the file (6 cases) creates the store on the fresh 0700 parent.",
+      "work": "Add one case: sharedFixture, readLocalRepositoryFingerprint (sanctioned mint), assert mode(shared)==0o700, createCodexDesignReadinessHostStore without chmod, assert success, shared stays 0700 and the private descendants stay 0700. Size S.",
+      "files": ["plugins/pipeline-core/lib/codex-design-readiness-host-store.shared-parent.test.mjs"], "protected": [],
+      "test": "plugins/pipeline-core/lib/codex-design-readiness-host-store.shared-parent.test.mjs"}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-152", "itemId": "design-generator-repeats-large-source-material", "read": true,
+   "clauses": [
+     {"clause": "Routine inspect/pendingAsks responses compact after an ask was shown, full ask retrievable (Proposal, stored duplication).", "status": "content",
+      "evidence": "The pin case '[pendingAsks compaction]' in lib/pins/design-generator-repeats-large-source-material.test.mjs (line 232) only checks inspect on a fixture whose own comment says pendingAsks is absent, so it does not exercise a populated ask. withPendingAsksSurfacedOnNextAction (lib/project-onboarding-v3.mjs ~line 7003) re-emits every full pending ask on every inspect; no 'already shown' state or compact form exists in the tree (no commit since 2026-10-18 touches it except 38e1758a4, which covers only the verbatim-copy half).",
+      "work": "Track that an ask was shown (a digest or shown marker in the intake checkpoint or the ask record), return a compact ask (id, field, digest, retrieval hint) on later inspect calls, keep the full ask retrievable by an explicit read/verbose option; add a pin case with a populated pendingAsks asserting second-inspect compaction and full retrieval. Size M.",
+      "files": ["plugins/pipeline-core/lib/project-onboarding-v3.mjs", "plugins/pipeline-core/lib/onboarding-continuity.mjs", "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs"],
+      "protected": [], "test": "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs"},
+     {"clause": "Generated PRD/spec drafts must not say 'do not hand-edit' while the reference requires elaboration before binding (Observed PF-06).", "status": "content",
+      "evidence": "intakeStagingGeneratedBanner in lib/onboarding-continuity.mjs (lines 6960-6969) still emits 'Regenerate via intake-generate-apply if the checkpoint changes; do not hand-edit'. The item's 2026-10-18 note says this contradiction remains open. Note: onboarding-continuity.mjs has uncommitted edits by another agent in this checkout, and onboarding-continuity.test.mjs (~line 3917) and measure-*.mjs scripts match the legacy banner text 'this staging file is NOT yet bound as project authority', which must stay.",
+      "work": "Reword the banner to say elaborate the draft before bootstrap-bind-apply and that regeneration overwrites edits; keep the legacy marker text intact; add a pin case asserting the generated header has no 'do not hand-edit' and names elaboration. Size S.",
+      "files": ["plugins/pipeline-core/lib/onboarding-continuity.mjs", "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs"],
+      "protected": [], "test": "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs"}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-174", "itemId": "foreign-worktree-closes-the-implementation-gate", "read": true,
+   "clauses": [
+     {"clause": "Reader (design-workflow-package-v2.mjs) keeps the underlying error code instead of a catch-all collapse.", "status": "done",
+      "evidence": "4076e2900 and d412a84b2: design-workflow-package-v2.mjs lines 174-177 keep any DWP2-* message as the code, raise DWP2-ENVIRONMENT-UNAVAILABLE with cause foreign-worktree, and record cause git-unavailable (a closed enum in codex-advisor-binding-diagnostic.mjs line 23) instead of the generic advisor-binding-source-provenance. Pin lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs cases 'AC1 reader' (3 cases) and 'AC2 reader'. The 'RED today' label on the third AC1 case is stale text and its assertion is satisfied by the code (a counted GREEN of the pin file is still advisable).",
+      "work": "", "files": [], "protected": [], "test": ""},
+     {"clause": "Typed environment condition, named diagnosis admitted, reopen-design only for verified drift, ADR-0085 C2 re-read removal.", "status": "done",
+      "evidence": "Pin cases AC2 topology, AC3 named diagnosis (3b1c2e269), AC4 reopen-design (0462d3f4c, 384e73527), AC5 DWP2-LEGACY-APPROVED-REREAD; the WSL /mnt worktree fixture is a skipped host-limitation case (owner Coordinator, PO decision K7).",
+      "work": "", "files": [], "protected": [], "test": ""}
+   ],
+   "changedSince20": ""},
+  {"ac": "AC-203", "itemId": "host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear", "read": true,
+   "clauses": [
+     {"clause": "Recovery route for a descriptor/binding lost after a host crash (D70 triage: recovery context for a lost or retired descriptor's binding).", "status": "done",
+      "evidence": "2026-10-21 commits d2602f5cf (session-cleanup-lost-binding.mjs and its test), 5e5c7d8f2 (wired into release-lost-binding and the composite recovery, apply run in a fresh process), 4467aa5b0, 64bdfd697, 70957cf27, 177401a89. Pin lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs points 1-4 cover archive, signed-route refusal, plan-human-recovery offer and ready-with-warning. Reported suite state at 5e5c7d8f2: recovery 37/39, lost-binding 4/4 (two recovery cases were already red; not re-measured here).",
+      "work": "", "files": [], "protected": [], "test": ""},
+     {"clause": "Kill Verify mid-run and confirm readiness stays ready (live crash simulation).", "status": "content",
+      "evidence": "The pin file simulates the foreign unavailable-owner descriptor (points 4 and 4-real-readiness) but never spawns and kills a verify stand-in; there is no kill or crash case in it.",
+      "work": "Optional: add a case that spawns a stand-in child holding a descriptor, kills it, then runs the real readiness evaluation and asserts ready plus the typed warning with descriptor bytes untouched. Size S. verify.mjs need not change.",
+      "files": ["plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs"],
+      "protected": [], "test": "plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs"}
+   ],
+   "changedSince20": "d2602f5cf, 5e5c7d8f2, 4467aa5b0, 64bdfd697, 70957cf27 and 177401a89 (all 2026-10-21) delivered the lost-binding recovery route behind the D70 triage; the live-kill hint itself is not delivered."},
+  {"ac": "AC-238", "itemId": "push-classifier-misses-nested-quotes-and-redirect-before-push", "read": true,
+   "clauses": [
+     {"clause": "A redirect between git and push (git 2>&1 push origin main) is classified a push.", "status": "done",
+      "evidence": "4838c0efc, plugins/pipeline-core/lib/git-cmd.test.mjs lines 1380-1383 pin 'git 2>&1 push', 'git >out push', 'git <in push' and 'git 2>&1 --config-env=x=y push' as pushes (file reported 477/477 in the commit). The nested-quote substitution shapes are pinned in the same table block (lines 1384-1390).",
+      "work": "", "files": [], "protected": [], "test": ""},
+     {"clause": "The two accepted false positives (git diff with a substituted merge-base; heredoc commit message in a quoted substitution containing a boundary git word) are pinned as documented accepted behaviour.", "status": "done",
+      "evidence": "4838c0efc, git-cmd.test.mjs lines 1394-1395, both labelled 'ACCEPTED false positive'.",
+      "work": "", "files": [], "protected": [], "test": ""}
+   ],
+   "changedSince20": "4838c0efc (2026-10-20, test(git-cmd): pin redirect-before-push and the accepted false positives) delivered both hints."},
+  {"ac": "AC-258", "itemId": "signature-ceremony-requires-operator-work-and-breaks", "read": true,
+   "clauses": [
+     {"clause": "A PO-signed configuration override is a durable layer later migrations respect, or the route is refused up front.", "status": "done",
+      "evidence": "0ee5b8d69 (2026-10-17): human-guard-override.mjs refuses a signed override of pipeline.user.yaml with HGO-NONOVERRIDABLE-USER-CONFIG, alone or in a multi-path command, and names the human-edit alternative. Tested in lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs (case at line 200 and the mirror-proof case at line 204; the case titles still carry a stale 'RED / needs protected patch' label, so a counted GREEN of that pin file is advisable). Related acceptance points (unborn HEAD, one-call preparation, paste-safe command) have cases at lines 79-118 and 29df88cad.",
+      "work": "", "files": [], "protected": [], "test": ""}
+   ],
+   "changedSince20": ""}
+]

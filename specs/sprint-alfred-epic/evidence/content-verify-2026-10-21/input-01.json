@@ -1,0 +1,160 @@
+[
+  {
+    "ac": "AC-102",
+    "itemId": "advertised-git-to-head-pipeline-is-refused",
+    "file": "backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+    "contentHints": [
+      {
+        "clause": "PF-17 shapes are admitted in draft/approved: git -C <repo> show HEAD:<path> --format= -- | head -n 3.",
+        "work": "Add admit case(s) for git -C <in-root repo> show HEAD:<path> --format= -- | head -n 3; if refused, widen the git-to-head grammar in plugins/pipeline-core/hooks/guard-command-grammar.mjs (git -C and trailing -- operands). Test in guard-lifecycle-ready.test.mjs. Size M.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs (only if added there; no protected-test name match, but the hook is protected)"
+        ]
+      },
+      {
+        "clause": "PF-17: rg -o --no-filename, rg -c <pattern> <file> and ls -la <path> inside the project are admitted; the refusal names the triggering flag/operator.",
+        "work": "Add admit tests for rg -c, rg -o --no-filename and ls -la <in-root path>; widen guard-command-grammar.mjs if refused; make GUARD-OPERATOR-UNAPPROVED / GUARD-READ-COMMAND-UNSUPPORTED name the offending token. Size M.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "plugins/pipeline-core/hooks/guard-command-grammar.mjs is not on the protected list but is read by the protected hook"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-118",
+    "itemId": "bounded-reader-terminal-binding",
+    "file": "backlog/items/2026-09-27-bounded-reader-terminal-binding.md",
+    "contentHints": [
+      {
+        "clause": "The current Alfred course binds its actual four reports and final correction without a fabricated fresh Reader verdict (real-course binding record).",
+        "work": "Author the real-course terminal record (4 reports, reviewed commits, 30 finding dispositions from scratch/alfred-reader-finding-reconciliation.md, report-bound adjudication form for the 7 phase-two challenges, resolution commits) and a test that the checker accepts it. Touches the reader-binding record under docs/ or evidence, check-doc-reader-binding.mjs, and the pin file. Size M-L; owner acceptance of unresolved/partial findings is a PO decision.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-140",
+    "itemId": "configure-verify-output-lacks-a-walkable-commit-route",
+    "file": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+    "contentHints": [
+      {
+        "clause": "Every refusal carries a one-line repair clause (case A assertion /repair/ at :296).",
+        "work": "Add a repair clause per typed code to the refusal at pipeline-state.mjs ~10678 (and the lifecycle/twins refusals at ~10662/~10672). Test: configure-verify-names-the-unmet-approval-condition.test.mjs (already red/asserting). Size S. Needs the signed package, not a plain edit.",
+        "protected": [
+          "plugins/pipeline-core/scripts/pipeline-state.mjs"
+        ]
+      },
+      {
+        "clause": "A non-private State file is reported as CVCT-FILE, not the generic CVCT-APPROVAL-UNAVAILABLE.",
+        "work": "Rethrow/return the typed CVCT-FILE (and CVCT-PATH/CVCT-CAS) from the bare catch in observeCurrentPlanApprovalForCalibration. Test: configure-verify-names-the-unmet-approval-condition.test.mjs case 'state-file-not-private' (POSIX only; its Windows form is native-host other). Size S.",
+        "protected": [
+          "plugins/pipeline-core/scripts/pipeline-state.mjs"
+        ]
+      },
+      {
+        "clause": "The distinct-codes case: the unmet conditions are pairwise distinguishable.",
+        "work": "No separate code; follows from the CVCT-FILE and repair work. Size S.",
+        "protected": [
+          "plugins/pipeline-core/scripts/pipeline-state.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-163",
+    "itemId": "dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+    "file": "backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md",
+    "contentHints": [
+      {
+        "clause": "A dispatch record can be started from a generated, valid skeleton with digests pre-filled; the agent fills judgment fields only.",
+        "work": "New scaffolder script (e.g. plugins/pipeline-core/scripts/init-dispatch-record.mjs) emitting a schema-valid skeleton (bundleSha256, criteria[], outcomeClassification, criticRequired.appliedRow pre-filled where derivable) plus its test, validated against the existing dispatch-record validator; wire into templates/prompts/goldfish-task.md field 6. Size M.",
+        "protected": [
+          "new test file needs a protected registration in harness/verify-suites.json"
+        ]
+      },
+      {
+        "clause": "A design review can be started from a generated, valid skeleton with digests pre-filled.",
+        "work": "New scaffolder script for the design review with the same pattern and its own test file; update the design-review course docs. Size M.",
+        "protected": [
+          "new test file needs a protected registration in harness/verify-suites.json"
+        ]
+      },
+      {
+        "clause": "Proposal: measure why entries are skipped and fold log appends into existing writes.",
+        "work": "Measurement note plus a template/role wording change (templates/prompts/goldfish-task.md, roles/goldfish.md section 6). Size S.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-186",
+    "itemId": "goldfish-bugfix-module-conflicts-with-qg-04",
+    "file": "backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md",
+    "contentHints": [
+      {
+        "clause": "Added acceptance (2026-10-17): for a product item the delivery route dispatches criterion-bound tests through a separate test-author dispatch before or independent of the implementing owner, and the owner may not modify them.",
+        "work": "Delivery-route producer must emit a test-author dispatch when the consumer config declares a test-author route, with write scopes limited to test paths; the implementer dispatch excludes them. Files: consumer item-delivery producer in plugins/pipeline-core/lib (not located), its test file. Size M-L; needs a design check against consumer-spec-criterion-binds-the-first-item-delivery pin.",
+        "protected": [
+          "possibly scripts/pipeline-state.mjs and guard files if the dispatch write scope is enforced there"
+        ]
+      },
+      {
+        "clause": "Added acceptance: the generated item briefing never assigns test ownership to the implementer.",
+        "work": "Add a case asserting the generated briefing text carries no implementer test ownership; target test: plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs plus the producer fix. Size S-M.",
+        "protected": []
+      },
+      {
+        "clause": "Added acceptance: a pin proves a consumer item course with a declared test-author route produces two dispatches with disjoint test and implementation write scopes.",
+        "work": "New pin case (same pin file or a new file; a new file needs a verify-suites.json registration). Size M.",
+        "protected": [
+          "harness/verify-suites.json (only if a new test file is added)"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-208",
+    "itemId": "lifecycle-inspect-omits-current-plan-spec-digests",
+    "file": "backlog/items/2026-09-28-lifecycle-inspect-omits-current-plan-spec-digests.md",
+    "contentHints": [
+      {
+        "clause": "Inspect observes the actual submitted Plan/Spec bytes before deriving status and recovery action.",
+        "work": "Integrate the two-file correction into scripts/pipeline-state.mjs and its lifecycle lib, with regressions. Size M.",
+        "protected": [
+          "scripts/pipeline-state.mjs",
+          "harness/scripts/pipeline-state.test.mjs"
+        ]
+      },
+      {
+        "clause": "Changed PRD and changed Spec each report digest drift with the sanctioned recovery; missing or unreadable source is not promoted to current.",
+        "work": "Regression cases in the pipeline-state inspect tests. Size S to M.",
+        "protected": [
+          "harness/scripts/pipeline-state.test.mjs"
+        ]
+      },
+      {
+        "clause": "An unchanged valid submission keeps its lifecycle result; inspect stays read-only.",
+        "work": "Add both cases to the same test file. Size S.",
+        "protected": [
+          "harness/scripts/pipeline-state.test.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-247",
+    "itemId": "scratch-must-remain-writable-across-lifecycle-states",
+    "file": "backlog/items/2026-09-27-scratch-must-remain-writable-across-lifecycle-states.md",
+    "contentHints": [
+      {
+        "clause": "Same distinction holds for apply_patch and for admitted shell preparation lanes.",
+        "work": "Add apply_patch-shaped inputs (inert scratch snapshot admitted, real surface refused) to the pin or to hooks/guard-lifecycle-ready.test.mjs (protected-test-path match). Size S-M. Check first whether guard-testpath tests already cover apply_patch.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-testpath*.test.mjs (if the case goes there)"
+        ]
+      }
+    ]
+  }
+]

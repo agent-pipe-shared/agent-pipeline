@@ -1,0 +1,238 @@
+[
+  {
+    "ac": "AC-117",
+    "itemId": "bootstrap-should-refresh-hooks-when-the-plugin-updated",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "A stale or missing mandatory hook makes the Elephant preflight non-ready with one refresh action, and the bootstrap confirmation line is withheld until the readback is current.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/lib/pins/bootstrap-should-refresh-hooks-when-the-plugin-updated.test.mjs (P1/P2 cases, RED P1/P2 mutants, P6 'withholds the confirmation until ready'); plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs line 171. The 'refusal' is the non-ready preflight plus the pipeline-start SKILL.md rule (P6 static pin), not a separate confirmation-line validator; no such validator exists in lib/scripts/hooks (git grep 'confirmation line' finds none).",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": "plugins/pipeline-core/lib/pins/bootstrap-should-refresh-hooks-when-the-plugin-updated.test.mjs"
+      },
+      {
+        "clause": "The preflight runs the model-role bootstrap itself and every ready envelope carries modelRoleBootstrap (unavailable legal, absent not).",
+        "status": "done",
+        "evidence": "AC-117 pin case 'P4: every ready envelope carries modelRoleBootstrap' and 'RED P4'; pipeline-start-preflight-enforcement.test.mjs 'ENFORCEMENT: every ready envelope carries modelRoleBootstrap' (all roles), read-only and run-once assertions.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Preflight 2 todo injection-seam cases (preflight 77/79): agy start hint appears / is absent in preflight output.",
+        "status": "content",
+        "evidence": "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs lines 2370 and 2374 are still t.todo. The seam now exists: pipeline-start-preflight.mjs line 2228 exports observeAgyStartHintField({ observeHint = ... }) and line 2303 calls it. Not part of the item's own acceptance (agy hint, AM-W slice); only the 4d5bd1af1 commit message names it.",
+        "work": "Replace the two t.todo bodies with real cases that call observeAgyStartHintField (or the preflight) with an injected observeHint: governed workspace with differing loaded agy plugin root -> hint field present; managed copy or ungoverned workspace -> no hint and output otherwise identical. Size S.",
+        "files": ["plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs"],
+        "protected": [],
+        "test": "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs"
+      }
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-135",
+    "itemId": "codex-wsl-required-advisor-has-no-completable-route",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Unavailable receipts and trails state what was actually attempted; denied export causes no model call, no alternate egress, no false receipt; skill, route module and bridge agree on the WSL deferred matrix.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs: 'resolves to the typed unavailable route', 'bridge returns a typed honest unavailable result ... never launches', 'CLI bridge outcomes are typed no-child receipts', 'a denied host export is not silently retried', 'skill, route module and bridge agree', RED mirror.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Answered receipts bind candidate, route, question/evidence digests, observed host result and answer digest; missing execution cannot be answered (productive answered route).",
+        "status": "content",
+        "evidence": "Productive answered route still absent: the admitted-callback path still returns code ordinary-consult-host-callback-unavailable in plugins/pipeline-core/scripts/advisory-host-bridge.mjs line 828 and lib/design-advisory-coordinator.mjs line 305. The 'missing execution cannot be answered' half is pinned (adapter returning status answered is not run on WSL). The rest is prepared only in scratch/ (codex-advisor-*.md designs), not in the tree. No commit after 2026-10-20 touches it.",
+        "work": "Sealed admission recheck before turn/start, registered Advisor process namespace, custody observation, v3 durable record, private store and transaction wiring across codex-host-advisor-route.mjs, advisory-host-bridge.mjs, design-advisory-coordinator.mjs (and -v2), plus answered-receipt cases in the AC-135 pin. Size L. Likely post-0.7.0 PO scope call: the honest unavailable outcome already satisfies the no-deadlock requirement.",
+        "files": [
+          "plugins/pipeline-core/scripts/codex-host-advisor-route.mjs",
+          "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+          "plugins/pipeline-core/lib/design-advisory-coordinator.mjs",
+          "plugins/pipeline-core/lib/design-advisory-coordinator-v2.mjs",
+          "plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs"
+        ],
+        "protected": [],
+        "test": "plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs"
+      }
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-160",
+    "itemId": "disjoint-signed-hgo-actions-invalidate-one-another",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Native Edit/Write/apply_patch actions bind sorted targets to physical identity and exact preimages; an unrelated authorized edit between arming and consumption does not force a new signature; target, ancestry, policy, plugin, state, tool-input, expiry, replay and audit drift fail closed; Bash and plugin install keep strict whole-repo binding.",
+        "status": "done",
+        "evidence": "Code: commit 348b421f3 (bind apply_patch overrides to native target preimages) plus NATIVE_PLAN_SCHEMA v4 and nativeTargets in plugins/pipeline-core/lib/human-guard-override.mjs. Tests: plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs (commit a9aeb9d63, 32cd213b7), per tool: three signed disjoint actions delivered sequentially, unrelated edit, byte/absence/ancestry, symlink, expiry/denial-set/tool-input, HEAD/tree, policy, plugin, lifecycle state, replay, audit drift; plus 'Bash: whole-repository binding' and 'plugin installation' cases. Registered in harness/verify-suites.json line 3387. A counted GREEN was not checked by me.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": "plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs"
+      },
+      {
+        "clause": "Until a safe contract exists, the signing preparer discloses that legacy dirty-worktree actions are serially dependent.",
+        "status": "done",
+        "evidence": "human-guard-override.mjs line 5458 emits 'legacy whole-worktree binding: sign and deliver serially ...' for non-native plans; test 'AC-160 serial-dependence disclosure: status-bound Bash signing preparation discloses it, a native Write does not' in human-guard-override-disjoint.test.mjs.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      }
+    ],
+    "changedSince20": "Fully delivered before 2026-10-20 by 348b421f3, a9aeb9d63 and 32cd213b7 (the hint's 'logic may be missing' is stale); no commit after 2026-10-20 was needed."
+  },
+  {
+    "ac": "AC-181",
+    "itemId": "git-stash-list-classified-as-working-tree-write",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "git stash list and git stash show [<n>] are read-only; every mutating stash form stays in the write lane.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/lib/protected-test-paths.mjs lines 936-942 (closed stash readers skipped); pin plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs ('AC-181 positive: ... parsed, read-only, names no write target') and plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Related symptom (observed 2026-10-03 and 2026-10-18): sed -i / sed -i -e '<expr>' <file> reports the sed expression instead of the real target as the written File:.",
+        "status": "content",
+        "evidence": "Still open. protected-test-paths.mjs line 929 detects sed -i, but line 463 writeTargetOperands(executable, argv) returns every non-flag operand via operands() (line 441), so the script expression (and the value of -e) is emitted as a 'write-command' candidate, with the real file only as a later operand. protected-test-paths.test.mjs line 59 covers only `sed -i s/a/b/ TARGET`. Scope: the item body (Description, Triage 2026-10-18 section) names it as the same family, so I treat it as in scope; the Proposal and PO deferral text name only stash. A PO call is needed if scope is read strictly.",
+        "work": "In writeTargetOperands, for executable sed: take the first non-flag operand as the script unless -e/--expression/-f/--file was given, and treat the values of -e/-f (and glued -e<expr>) as non-targets; keep the remaining operands (files) as candidates, and keep a fail-closed fallback when the shape is unrecognised. Add positive cases (`sed -i -e 'X' -e 'Y' specs/f/x.md` -> candidate is the file only; expression with quotes/# separators) and negative cases (a protected path as file operand is still a candidate) to the AC-181 pin. Size S.",
+        "files": [
+          "plugins/pipeline-core/lib/protected-test-paths.mjs",
+          "plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs"
+        ],
+        "protected": [],
+        "test": "plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs"
+      }
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-207",
+    "itemId": "lifecycle-coordination-commands-refused-as-implementation-writes",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Coordination commands (inspect, reopen-design, cancel-submitted-plan, continuity-cas, continuity-integrate-final) are admitted by closed argv in the draft lifecycle with backslash/forward-slash/MSYS spelling normalised; near-misses stay refused.",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs 'point 1' cases (lines 40-87); code in lib/guard/sanctioned-args-scripts.mjs (cancel-submitted-plan at line 413) and lib/guard/command-catalogue.mjs. The pin fixture exercises phase 'design'/draft only; 'every phase where offered' (e.g. awaiting-approval) is not separately pinned, see last clause.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Read-only scripts under scratch/ (exactly `node scratch/<name>.mjs`) and the recovery-prescribed repository checker are admitted as read-only execution.",
+        "status": "done",
+        "evidence": "AC-207 pin 'point 2' cases (lines 89-107), including near-miss controls and absolute plus repository-relative checker spelling.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Onboarding scaffold paths are committable in the draft lifecycle.",
+        "status": "done",
+        "evidence": "AC-207 pin 'point 3' cases (lines 108-133) via evaluateStagedDevPlanPaths, with traversal/look-alike and real-implementation-path controls.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "The governed repair a typed recovery (F6) prescribes (checker and repair map) is reachable without an override.",
+        "status": "done",
+        "evidence": "AC-207 pin 'point 4' (line 134).",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Design-course end-to-end test on Windows Git Bash reaches present-plan with zero overrides.",
+        "status": "native-host",
+        "evidence": "Pin line 139 is a held skip: 'needs the Windows Git Bash end-to-end run; owner Coordinator (Linux/WSL run, PO decision K7)'.",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": "",
+        "host": "Windows Git Bash (Linux/WSL run per K7)"
+      },
+      {
+        "clause": "Added 2026-10-20 (D64): index changes, working-tree changes and pure observations are classified separately, so unstaging Pipeline-generated files (git restore --staged / git reset) is not a working-tree write.",
+        "status": "content",
+        "evidence": "protected-test-paths.mjs GIT_WRITE_VERBS (line 161) still treats restore and reset as writers whatever their flags; no '--staged' handling exists in protected-test-paths.mjs, lib/guard or the AC-207 pin (git grep finds '--staged' only in unrelated tests). The refusal seen (HGO-NARROWER-WRITER-REQUIRED) is raised from the override/lifecycle path, whose exact site I did not locate.",
+        "work": "Add index-only classification: `git restore --staged -- <paths>` and `git reset [-q] [--] <paths>` (no --hard/--mixed-with-worktree flags, no --source with --worktree) are index writes, not working-tree writes, and admitted for Pipeline-generated paths; keep every worktree-touching form refused. Locate and align the HGO-NARROWER-WRITER-REQUIRED site. Add positive and negative cases. Size M.",
+        "files": [
+          "plugins/pipeline-core/lib/protected-test-paths.mjs",
+          "plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs"
+        ],
+        "protected": [
+          "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "plugins/pipeline-core/lib/protected-test-paths.test.mjs (if a case is added there)"
+        ],
+        "test": "plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs"
+      },
+      {
+        "clause": "Added 2026-10-20: every recovery a refusal names is tested as a state machine (run the proposed action, retry the original, show progress; a recovery whose retry meets the same refusal fails).",
+        "status": "content",
+        "evidence": "No such generic recovery-loop test exists in the AC-207 pin or elsewhere I searched (pin tests are per-command admission checks only). Also the pin does not cover awaiting-approval for point 1-4 admissions.",
+        "work": "Add a table-driven test that, for each refusal code carrying retryActions/recovery text, runs the recovery command through the real shell lane then re-evaluates the original command and asserts a changed verdict; add awaiting-approval fixtures for points 1-4. Size M.",
+        "files": [
+          "plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs"
+        ],
+        "protected": [],
+        "test": "plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs"
+      }
+    ],
+    "changedSince20": ""
+  },
+  {
+    "ac": "AC-245",
+    "itemId": "role-route-preflight-with-self-dispatch-fallback",
+    "read": true,
+    "clauses": [
+      {
+        "clause": "Typed per-role route preflight (native / fallback-self-dispatch / unavailable with RRP-* codes); the fallback is a canonical read-only fresh-context template dispatch, never self-review; failing producers surface stderr and exit code (bounded, no absolute paths).",
+        "status": "done",
+        "evidence": "plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs: points 1, 2a, 2b, 3, 4a, 4b (lines 51-304).",
+        "work": "",
+        "files": [],
+        "protected": [],
+        "test": ""
+      },
+      {
+        "clause": "Added: on a failed or refused owner dispatch the course offers an explicit atomic recovery state keeping task identity and attempt history (recovery-state verb, C7).",
+        "status": "content",
+        "evidence": "git grep -i for recovery-state, dispatch-recovery, recover-owner, owner-recovery, attemptHistory, failed owner dispatch finds nothing in plugins/ or harness/; the only 'recover' matches in scripts/pipeline-state.mjs are unrelated (verify-recovery routes, session-authority member recovery, legacy v2 revocation recovery). Not built under another name as far as searched.",
+        "work": "Add a recovery-state verb to scripts/pipeline-state.mjs (slice-editable) that atomically moves a failed or refused owner dispatch into a recovery state keyed by the same task id with an appended attempt record, refuses a renamed task or free-text stand-in; add its sanctioned-args entry for lifecycle admission; add tests. Size L. Other 2026-10-17 added clauses (role-dependent preflight with no Elephant action for Goldfish/Critic; test commands routed to the host boundary from the first call) were not verified by me and are not in the hints.",
+        "files": [
+          "plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs"
+        ],
+        "protected": [
+          "plugins/pipeline-core/scripts/pipeline-state.mjs (slice-editable)",
+          "harness/scripts/pipeline-state.test.mjs",
+          "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+          "harness/verify-suites.json (only if a new test file is added)"
+        ],
+        "test": "harness/scripts/pipeline-state.test.mjs"
+      }
+    ],
+    "changedSince20": ""
+  }
+]

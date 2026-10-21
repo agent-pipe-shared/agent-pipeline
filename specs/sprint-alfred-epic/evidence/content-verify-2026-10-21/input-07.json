@@ -1,0 +1,116 @@
+[
+  {
+    "ac": "AC-117",
+    "itemId": "bootstrap-should-refresh-hooks-when-the-plugin-updated",
+    "file": "backlog/items/2026-10-05-bootstrap-should-refresh-hooks-when-the-plugin-updated.md",
+    "contentHints": [
+      {
+        "clause": "The bootstrap confirmation line is refused until the hook readback is current and carries the model-role field.",
+        "work": "Locate the confirmation-line validator in the pipeline-core start/preflight scripts; add a refusal case (stale readback or absent model-role field) to the AC-117 pin file, plus code if the line is not yet validated. Size S-M.",
+        "protected": []
+      },
+      {
+        "clause": "Preflight 2 todo injection-seam cases (preflight 77/79).",
+        "work": "Implement the two todo cases in the preflight test file named by 4d5bd1af1. Size S.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-135",
+    "itemId": "codex-wsl-required-advisor-has-no-completable-route",
+    "file": "backlog/items/2026-09-27-codex-wsl-required-advisor-has-no-completable-route.md",
+    "contentHints": [
+      {
+        "clause": "Answered receipts bind candidate, route, question/evidence digests, observed host result and answer digest; missing execution cannot be answered.",
+        "work": "Productive answered-receipt route: sealed admission recheck before turn/start, Advisor process namespace, custody, store and transaction wiring across codex-host-advisor-route.mjs, advisory-host-bridge.mjs and design-advisory-coordinator.mjs, plus tests in the AC-135 pin. Size L. Probably post-0.7.0 (PO scope call), since the honest unavailable outcome satisfies the item's deadlock requirement.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-160",
+    "itemId": "disjoint-signed-hgo-actions-invalidate-one-another",
+    "file": "backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+    "contentHints": [
+      {
+        "clause": "An unrelated authorized worktree edit between arming and consumption does not force a new signature; target, ancestry, policy, plugin, state and tool-input drift still fail closed; Bash and plugin installs keep strict whole-repo binding.",
+        "work": "Add a counted test: three independently signed disjoint actions, two sequential deliveries, then target-byte, absence, symlink, policy, plugin, expiry, replay and audit drift cases, plus a Bash case that stays strict. Target: the existing human-guard-override test file in plugins/pipeline-core/lib (name not confirmed). Size L if the consume logic is missing, M if only the test. Whether the consume logic matches the clause was not verified.",
+        "protected": []
+      },
+      {
+        "clause": "Until a safe contract exists, the signing preparer discloses serial dependence.",
+        "work": "Check the prepare-authorization output text in human-guard-override.mjs or its script; S.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-181",
+    "itemId": "git-stash-list-classified-as-working-tree-write",
+    "file": "backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md",
+    "contentHints": [
+      {
+        "clause": "Related sed -i parser symptom (2026-10-03 and 2026-10-18 observed): write-lane classifier reports the sed expression instead of the real target file.",
+        "work": "Decide whether sed target detection is in AC-181 scope. If yes: fix operand selection for sed -i/-e in extractShellWriteTargets (plugins/pipeline-core/lib/protected-test-paths.mjs) and add positive/negative cases to the pin file git-stash-list-classified-as-working-tree-write.test.mjs. Size S-M.",
+        "protected": [
+          "plugins/pipeline-core/lib/protected-test-paths.mjs (if it falls under the protected-test-paths family; check)",
+          "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-207",
+    "itemId": "lifecycle-coordination-commands-refused-as-implementation-writes",
+    "file": "backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md",
+    "contentHints": [
+      {
+        "clause": "Lifecycle coordination commands that inspect/nextAction emit are admitted by closed argv identity in every phase, with path spelling normalised.",
+        "work": "Verify continuity-cas, continuity-integrate-final and cancel-submitted-plan against the devplan shell lanes; add admission and spelling normalisation plus cases in the guard-lifecycle-ready test. Size M.",
+        "protected": [
+          "plugins/pipeline-core/lib/guard/*.mjs",
+          "plugins/pipeline-core/hooks/guard-devplan.mjs"
+        ]
+      },
+      {
+        "clause": "Read-only scripts under scratch/ and prescribed repository checkers are admitted as read-only execution.",
+        "work": "Design a closed read-only scratch/checker lane in the guard-devplan shell classification with tests. Size M to L; may need a PO decision on the shape.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-devplan.mjs",
+          "plugins/pipeline-core/lib/guard/*.mjs"
+        ]
+      },
+      {
+        "clause": "Onboarding scaffold paths are committable in every phase, or onboarding commits them itself.",
+        "work": "Admit the scaffold paths in the commit-msg/devplan path rules or have onboarding commit them, with a test. Size M.",
+        "protected": [
+          "plugins/pipeline-core/hooks/guard-devplan.mjs"
+        ]
+      },
+      {
+        "clause": "The governed repair a typed recovery (F6) prescribes is reachable without an override.",
+        "work": "Admit the governance inventory repair path for the F6 recovery, with test. Size S to M.",
+        "protected": [
+          "plugins/pipeline-core/lib/guard/*.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-245",
+    "itemId": "role-route-preflight-with-self-dispatch-fallback",
+    "file": "backlog/items/2026-10-03-role-route-preflight-with-self-dispatch-fallback.md",
+    "contentHints": [
+      {
+        "clause": "Added: an explicit atomic recovery state on a failed or refused owner dispatch keeps task identity and attempt history (recovery-state verb, C7).",
+        "work": "Add a recovery-state verb to scripts/pipeline-state.mjs with a test in harness/scripts/pipeline-state.test.mjs (plus a lifecycle guard allow-lane if the verb must be admitted). Size L. Verify with git grep for 'recover' in pipeline-state.mjs before dispatching; it may exist under another name.",
+        "protected": [
+          "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "harness/scripts/pipeline-state.test.mjs",
+          "harness/verify-suites.json (only if a new test file is added)"
+        ]
+      }
+    ]
+  }
+]

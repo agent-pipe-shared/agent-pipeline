@@ -1,0 +1,102 @@
+[
+  {
+    "ac": "AC-113",
+    "itemId": "approval-bound-design-package-lives-in-an-ignored-directory",
+    "file": "backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md",
+    "contentHints": [
+      {
+        "clause": "present-plan / approval refuses (fail closed) when a bound path is git-ignored (Proposal 2).",
+        "work": "If absent: refuse in the present-plan/approve route when a bound path is git-ignored; touches plugins/pipeline-core/lib/architecture-design.mjs (or the present-plan writer) and likely scripts/pipeline-state.mjs; test in the AC-113 pin file. Size M.",
+        "protected": [
+          "plugins/pipeline-core/scripts/pipeline-state.mjs (if the refusal lands in the writer)"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-130",
+    "itemId": "codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+    "file": "backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+    "contentHints": [
+      {
+        "clause": "Optional gap recorded by 76beed502: Readiness store creation directly on a fresh owner-private 0700 shared parent is not covered.",
+        "work": "Add one case to codex-design-readiness-host-store.shared-parent.test.mjs (fresh sanctioned mint, no chmod, create the readiness store, assert success). Not strictly in the written acceptance. Size S.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-152",
+    "itemId": "design-generator-repeats-large-source-material",
+    "file": "backlog/items/2026-09-27-design-generator-repeats-large-source-material.md",
+    "contentHints": [
+      {
+        "clause": "Routine inspect/pendingAsks responses compact after an ask was shown, full ask retrievable (Proposal, stored duplication).",
+        "work": "Compact inspect envelope in the design intake script plus a case in the pin file. Size M.",
+        "protected": []
+      },
+      {
+        "clause": "Generated PRD/spec drafts must not say 'do not hand-edit' while the reference requires elaboration before binding (Observed PF-06).",
+        "work": "Change the draft header text in the generator (design intake script) and add a case asserting the header in the pin file; size S.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-174",
+    "itemId": "foreign-worktree-closes-the-implementation-gate",
+    "file": "backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md",
+    "contentHints": [
+      {
+        "clause": "Reader (design-workflow-package-v2.mjs) keeps the underlying error code instead of a catch-all collapse.",
+        "work": "unverified: inspect design-workflow-package-v2.mjs ~line 142 and the RED pin; a patch in a protected path (guard-devplan / lib/guard) per remeasure; size unknown, assume M",
+        "protected": [
+          "plugins/pipeline-core/lib/guard/*.mjs (probable)"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-203",
+    "itemId": "host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+    "file": "backlog/items/2026-10-05-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.md",
+    "contentHints": [
+      {
+        "clause": "Kill Verify mid-run and confirm readiness stays ready (live crash simulation).",
+        "work": "Optional S: a test that kills a spawned verify stand-in and checks readiness, in the same pin file.",
+        "protected": [
+          "harness/scripts/verify.mjs only if the producer must change"
+        ]
+      }
+    ]
+  },
+  {
+    "ac": "AC-238",
+    "itemId": "push-classifier-misses-nested-quotes-and-redirect-before-push",
+    "file": "backlog/items/2026-10-06-push-classifier-misses-nested-quotes-and-redirect-before-push.md",
+    "contentHints": [
+      {
+        "clause": "A redirect between git and push (git 2>&1 push origin main) is classified a push.",
+        "work": "Add a table in plugins/pipeline-core/lib/git-cmd.test.mjs pinning git 2>&1 push, git >out push, git <in push, git 2>&1 --config-env=x push as pushes. Size S. Test file is not in the protected list (git-cmd.test.mjs is not named there); check it is registered in harness/verify-suites.json.",
+        "protected": []
+      },
+      {
+        "clause": "The two accepted false positives (git diff with a substituted merge-base; heredoc commit message in a quoted substitution containing a boundary git word) are pinned as documented accepted behaviour.",
+        "work": "Add two rows (expected push-candidate true, comment 'accepted false positive') to the same git-cmd.test.mjs table. Size S.",
+        "protected": []
+      }
+    ]
+  },
+  {
+    "ac": "AC-258",
+    "itemId": "signature-ceremony-requires-operator-work-and-breaks",
+    "file": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+    "contentHints": [
+      {
+        "clause": "A PO-signed configuration override is a durable layer later migrations respect, or the route is refused up front.",
+        "work": "Locate or add the test; M if the migration code needs a change.",
+        "protected": []
+      }
+    ]
+  }
+]
