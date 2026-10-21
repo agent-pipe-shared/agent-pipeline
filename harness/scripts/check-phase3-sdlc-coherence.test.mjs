@@ -335,16 +335,16 @@ test("the complete sanitized v2 Result is coherent", () => {
   assertValid(coherenceFixture());
 });
 
-test("schema-lite demonstrates its documented keyword limit and non-authoritative role", () => {
+test("schema-lite executes the nested event contract and keeps its documented keyword limit", () => {
   const schema = JSON.parse(readFileSync(new URL("./sdlc-run-graph.schema.json", import.meta.url), "utf8"));
   const valid = validateAgainstSchema(coherenceFixture(), schema);
   assert.equal(valid.valid, true, JSON.stringify(valid.errors));
 
   const malformed = coherenceFixture();
   malformed.sdlcRunGraph.events[0].untrustedProse = "not in the closed event contract";
-  const schemaLiteGap = validateAgainstSchema(malformed, schema);
-  assert.equal(schemaLiteGap.valid, true,
-    "schema-lite does not execute the published schema's $ref/oneOf nested event contract");
+  const nestedContract = validateAgainstSchema(malformed, schema);
+  assert.equal(nestedContract.valid, false,
+    "schema-lite executes the published schema's local $ref/oneOf nested event contract (7f37cc916)");
   assertInvalid(malformed, /event|closed|unexpected|additional|untrustedProse/i);
 
   const unsupportedFormalKeywords = {
