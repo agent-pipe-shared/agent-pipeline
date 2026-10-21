@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { digestJson } from "../lib/verify-resume.mjs";
 import { applyOnboardingKickoff, bindEphemeralPrivateCleanup, planOnboardingKickoff, readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
 import { listActiveSessionDescriptors, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+import { startBoundRequester } from "../lib/test-session-cleanup-requester-fixture.mjs";
 import { compileVerifySuites, createVerifyRun, deriveVerifyExecutionMetrics, resolveDefaultConcurrency, resolveSuiteChildEnvironment, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
 import whChildProcess, { execFileSync as whExecFileSync } from "node:child_process";
 import { promisify } from "node:util";
@@ -427,12 +428,13 @@ test("a session-less checkout with an already-active foreign session descriptor 
 
 test("an already-bound cleanup owner remains borrowed after passed and numeric failed terminals", async () => {
   const f = sessionlessCheckout("verify-journal-borrowed-", "Exercise borrowed Verify ownership");
-  const started = startSessionDescriptor(f.root, {});
+  const requester = startBoundRequester(f.root);
+  const started = requester.sessionCleanup;
   const unbound = readOnboardingSessionCleanupBinding({ rootDir: f.root });
-  const before = bindEphemeralPrivateCleanup({
+  const before = requester.run(() => bindEphemeralPrivateCleanup({
     rootDir: f.root,
     sessionCleanup: { sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 },
-  });
+  }));
   assert.equal(before.status, "bound");
   const stateBytes = readFileSync(f.statePath);
   const suiteFile = join(f.root, "fixture.test.mjs");
@@ -534,8 +536,9 @@ test("SIGINT interruption terminates only its child group, seals distinct immuta
 
 test("interruption keeps a borrowed descriptor and treats unknown child-group closure as unreleasable", async () => {
   const f = sessionlessCheckout("verify-journal-interrupted-borrowed-", "Exercise borrowed interrupted ownership");
-  const started = startSessionDescriptor(f.root, {});
-  const before = bindEphemeralPrivateCleanup({ rootDir: f.root, sessionCleanup: { sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 } });
+  const requester = startBoundRequester(f.root);
+  const started = requester.sessionCleanup;
+  const before = requester.run(() => bindEphemeralPrivateCleanup({ rootDir: f.root, sessionCleanup: { sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 } }));
   const suiteFile = join(f.root, "fixture.test.mjs");
   writeFileSync(suiteFile, "process.stdout.write('not started\\n')\n", { mode: 0o600 });
   const controller = new AbortController();

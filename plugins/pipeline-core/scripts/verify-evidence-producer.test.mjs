@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +22,7 @@ import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session
 import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
 import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
 
 function run(executable, args, options = {}) {
   const result = spawnSync(executable, args, { encoding: "utf8", ...options });
@@ -53,8 +54,17 @@ function activeSessionDescriptors(root) {
 }
 async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict = null, featureId = null } = {}) {
   mkdirSync(join(root, "specs"), { recursive: true });
+  // A session Critic over no registered course needs a generic batch over a review unit committed at the base.
+  writeFileSync(join(root, "specs", "spec.md"), "# Review fixture\nAC-1 AC-2\n");
+  writeFileSync(join(root, "specs", "review-unit.json"), JSON.stringify({
+    schema: "pipeline.critic-review-unit.v1", kind: "related-fixes", purpose: "Verify evidence producer fixture delivery",
+    specPath: "specs/spec.md", logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"],
+    deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null,
+  }));
+  git(root, ["add", "specs/spec.md", "specs/review-unit.json"]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "critic review unit base"]);
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
-  writeFileSync(join(root, "specs", "spec.md"), "# Review fixture\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Review fixture\nAC-1 AC-2\nchanged\n");
   if (featureId !== null) {
     mkdirSync(join(root, "specs", featureId, "evidence"), { recursive: true });
     writeFileSync(join(root, "specs", featureId, "lifecycle.json"), `${JSON.stringify({
@@ -94,11 +104,19 @@ async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict 
     },
   }, null, 2));
   const review = {
-    preflightInput: { root, base, candidate, specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/critic-candidate.json"], priorCriticEvidencePath: null },
+    preflightInput: { root, base, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], evidencePaths: ["evidence/critic-candidate.json"], priorCriticEvidencePath: null },
     taskId: "release-verify", projectId: "fixture", sessionId: "release-review-1", packetId,
     route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
     verdict: verdict ?? { findings: [], deliberately_not_flagged: ["fixture"], trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: true },
   };
+  const controlRoot = join(root, ".git", "agent-pipeline", "critic-packets");
+  mkdirSync(controlRoot, { recursive: true, mode: 0o700 });
+  chmodSync(join(root, ".git", "agent-pipeline"), 0o700);
+  chmodSync(controlRoot, 0o700);
+  const batch = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: {
+    taskId: "release-verify", baseCommit: base, candidateCommit: candidate, logicalWorkIds: ["AC-1", "AC-2"],
+    specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
+  review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
   admitSessionCriticReview(review);
   const final = finalizeSessionCriticReview(review);
   const observed = readConsumedCandidateReceipt({ controlRoot: join(root, ".git", "agent-pipeline", "critic-packets"), packetId });

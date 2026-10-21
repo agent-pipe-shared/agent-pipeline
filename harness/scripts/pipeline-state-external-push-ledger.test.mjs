@@ -275,7 +275,9 @@ check("PSXL05 approve-push refuses with PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED
   writeFileSync(join(dir, "pipeline.user.yaml"), 'schema: "pipeline.user.v1"\ngates:\n  push_external_ledger: "required"\n');
   const result = callApprove(bundle.argv, deps(dir, home, CANDIDATE));
   assert.equal(result.code, 2);
-  assert.ok(result.output.some((entry) => entry.stream === "error" && entry.text.includes("PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED")));
+  // The State authority route resolves the repository before the local write, so a non-repository now stops there
+  // (WT-GIT-FAILED); the ledger-side TOPOLOGY-UNRESOLVED refusal is only the later same-failure backstop.
+  assert.ok(result.output.some((entry) => entry.stream === "error" && /PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED|State authority route unavailable \(WT-GIT-FAILED\)/u.test(entry.text)), JSON.stringify(result.output));
   assert.ok(!result.output.some((entry) => entry.text.startsWith('Push approved by "PO"')), "success line must be unreachable");
 });
 

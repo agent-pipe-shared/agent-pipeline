@@ -37,6 +37,7 @@ export const WINDOWS_HIDE_SCAN_ALLOWLIST = Object.freeze([
   Object.freeze({ file: "plugins/pipeline-core/scripts/verify-journal.test.mjs", rule: "allow-child-process", reason: "guard-test fixture" }),
   Object.freeze({ file: "plugins/pipeline-core/scripts/verify-journal.test.mjs", rule: "foreign-spawner", reason: "guard-test fixture" }),
   Object.freeze({ file: "plugins/pipeline-core/scripts/verify-journal.test.mjs", rule: "node-options-mutation", reason: "guard-test fixture" }),
+  Object.freeze({ file: "plugins/pipeline-core/scripts/po-human-approval-openssl-path.test.mjs", rule: "node-options-mutation", reason: "fixture installs a --require hook to observe the openssl spawn path and restores NODE_OPTIONS in finally" }),
 ]);
 
 function isCommentLine(line) {

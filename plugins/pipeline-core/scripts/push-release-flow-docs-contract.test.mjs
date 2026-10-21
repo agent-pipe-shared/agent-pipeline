@@ -18,6 +18,7 @@
 // one, and so the wrong one is proven wrong by the same harness rather than by inspection.
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -39,7 +40,12 @@ const FIXED_GIT_HEAD = () => ({ ok: true, commit: COMMIT });
 const FIXED_GIT_CANDIDATE = () => ({ ok: true, commit: COMMIT, tree: TREE });
 
 function freshDir(prefix) {
-  return mkdtempSync(join(tmpdir(), `push-release-flow-docs-contract-${prefix}-`));
+  const dir = mkdtempSync(join(tmpdir(), `push-release-flow-docs-contract-${prefix}-`));
+  // The State authority route resolves the repository candidate, so the fixture needs a real work tree with a born HEAD (else WT-GIT-FAILED).
+  const options = { cwd: dir, windowsHide: true, stdio: "ignore", env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(dir) } };
+  execFileSync("git", ["init", "-q"], options);
+  execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], options);
+  return dir;
 }
 
 test("source release documentation names the shipped reader-review workflow and preserves its binding contract", () => {
@@ -50,8 +56,8 @@ test("source release documentation names the shipped reader-review workflow and 
     /Dispatch phase one as a fresh read-only subagent with no conversation\s+history/u,
     /every document path returned by\s+the checker's snapshot/u,
     /Dispatch phase two as a different fresh read-only subagent/u,
-    /If any covered document\s+changes,[\s\S]*restart both phases with a new round/u,
-    /Derive `record\.json` from a fresh checker snapshot,[\s\S]*Accept only `status: passed` with no findings/u,
+    /If any covered document\s+changes,[\s\S]*previous reports cannot supply ordinary unchanged-state\s+closure/u,
+    /Derive the ordinary v1 `record\.json` from a fresh\s+checker snapshot,[\s\S]*Accept only `status: passed` with no findings/u,
   ]) assert.match(skill, contract, `reader-review lost required source-bound procedure: ${contract}`);
   assert.doesNotMatch(skill, /\b(?:eleven|sixteen) document paths\b/u, "reader-review must follow the checker's current snapshot instead of a stale count");
 
