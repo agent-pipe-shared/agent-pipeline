@@ -561,3 +561,28 @@ Status: **partly closed.** Implementation complete; the Critic batch and PO acce
   where the advance would try a transition, and it re-reads the member inside the descriptor lock.
   The second call (~9531, phase `terminal-observed`) uses the retired advance. The outer release
   stays on its measured route. The live path is unchanged.
+- **Delivered (slice ALF-K1D-A-RETIRED-RELEASE4, `4fb40e587`):** measured as decided. The retired
+  inspect admitted the first call, the retired advance the second, and the registry admitted the plain
+  outer release after the scope exited; the retired release fallback was not needed. Binding 65/67
+  (B and E remain), recovery 39/39, onboarding-continuity 306/306 (host re-run). Follow-up within D74:
+  the three new repair hints still carry the placeholders `<plugin>` and `<checkout>` instead of a
+  runnable command; they are fixed in the K1D rest.
+
+### K1D measurement 2: D73 E placement (2026-10-21, orchestrator, by code reading)
+
+- The ordinary orphan release is `applyOrphanSessionCleanupBindingRelease` (`lib/onboarding-continuity.mjs`
+  ~3881). Its callers are `releaseOrphanSessionCleanupBinding` (used by `scripts/session-cleanup.mjs`
+  ~842), `scripts/pipeline-state.mjs` ~12354 (discard-feature) and the E case itself.
+  `lib/session-cleanup-recovery.mjs` is on none of these paths, so a member step placed there would not
+  reach the E case or either production caller.
+- It retires the descriptor (~3978) and then deletes the private binding (~3988) with no registry step.
+  RF2A's sequence is `releaseBindingInBoundary` (`lib/session-cleanup-lost-binding.mjs` ~182): inside
+  one registry boundary, skip on an absent registry (D44), `releaseLostSessionAuthorityMember`
+  (which refuses while the descriptor is active), release the binding, `healSessionAuthorityDrift`,
+  strict read-back.
+- **Elephant decision (within D73 E; the content is unchanged, only the placement):** the member step
+  goes into the shared apply, between the descriptor retirement and the binding delete, so both
+  production callers get it. `lib/onboarding-continuity.mjs` is at its zero-growth bound, so the step
+  lives in a small new module that both the apply and, later, `releaseBindingInBoundary` can use.
+  The apply runs under the State lock; the boundary order against `releaseBindingInBoundary`
+  (boundary first) is measured before the wiring, and an inversion is a stop.
