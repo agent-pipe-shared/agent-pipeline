@@ -487,3 +487,15 @@ The hang group splits into three kinds; no single shared lock explains it.
   ~792, `WT-SESSION-REUSED`; pinned by the binding suite). OBC059 therefore pins the refused second
   bind with no State or binding change, not a library replay. Side finding for the PO list: that
   refusal names no repair.
+- OBC059 restated in `55d6a6eb0`: onboarding-continuity 306/306.
+
+### K10 measurement 1 (2026-10-21, orchestrator, `scratch/k10-pool.mjs`)
+
+All twelve K10 suites run as one pool of width 8 (Verify's default) with ONE shared TMPDIR: all
+green, 334/334 cases (guard-dispatch 66, stop-fanout 24, architecture-prospective-companion 3,
+dispatch-budget-binding 11, dispatch-policy 46, dispatch-record-strip-for-critic 12,
+governance-action-artifact 9, project-authority 38, runner-profile-migration-v3 60,
+security-scanner-diagnostics 24, session-power-address-repair 17, wsl-ipc-compatibility 24). A shared
+TMPDIR under pool load does not reproduce the K10 reds at HEAD. Working hypothesis: the reds came from
+the exhausted session-address root (4096 slots, fixed by K1R and the after-suite repair) and from the
+K1 causes. **Next:** a full `verify.mjs --mode candidate` on a clean tree confirms or refutes it.
