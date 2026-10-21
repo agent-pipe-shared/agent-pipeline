@@ -118,7 +118,7 @@ export function parseArguments(argv) {
     else flags[name] = value;
   }
   if (positional.length !== spec.positional) throw usage(`${verb}: expected ${spec.positional} positional argument(s), got ${positional.length}`);
-  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:process.cwd()});if(governed.status==='required')flags.queue=resolve(process.cwd(),governed.path);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
+  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:process.cwd()});if(governed.status==='required')flags.queue=resolve(process.cwd(),governed.path);else if(governed.status==='refused'&&governed.code==='SQ-AUTHORITY-UNAVAILABLE')throw usage(`${verb}: --queue <path> is required: no governed course is resolvable from this directory (${governed.code}); repair: pass --queue <path>, or run from the repository root`);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
   return { verb, positional, flags };
 }
 
