@@ -33,6 +33,15 @@ test("stale map blocks strict push and explicit checkpoint persists typed debt",
     mkdirSync(join(dir, ".claude"));
     writeFileSync(join(dir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\npushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n");
     writeFileSync(join(dir, ".claude", "pipeline.json"), JSON.stringify({ project: "fixture", verify: null, autonomy: "gated", handover: "README.md" }));
+    // QG-04 (29629211c, PUSHSIG): a checkpoint push in signature mode needs a signed approval. This case proves
+    // architecture-map debt, not approval, so the push proof is stood down with the explicit v2 waiver; approval
+    // admission itself is covered by guard-push.test.mjs (PG-CHECKPOINT) and guard-push-checkpoint-approval.test.mjs.
+    mkdirSync(join(dir, "project"));
+    writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v2",
+      requiredKinds: ["push", "deploy", "publication"],
+      waivedKinds: [{ kind: "push", reason: "fixture proves architecture-map debt, not push approval" }],
+    }, null, 2) + "\n");
     mkdirSync(join(dir, "architecture", "map"), { recursive: true });
     mkdirSync(join(dir, "src"));
     writeFileSync(join(dir, "architecture", "map", "index.md"), "# Map\n");
