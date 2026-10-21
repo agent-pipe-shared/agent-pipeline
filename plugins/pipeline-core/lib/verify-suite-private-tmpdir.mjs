@@ -8,9 +8,11 @@
  * that builds a session-authority fixture under it threw `domain-ancestor-unsafe`, although the same
  * suite is green under a private TMPDIR.
  *
- * Shape: one 0700 per-run parent under `<real home>/pipeline-verify-tmp/` (or under the absolute
- * directory named by PIPELINE_VERIFY_TMP_ROOT), one 0700 directory per suite inside it, and
- * TMPDIR, TMP and TEMP all set to that directory. The parent is created lazily on the first suite,
+ * Shape: one 0700 per-run parent `<real home>/.pv/rXXXXXX` (or under the absolute directory named by
+ * PIPELINE_VERIFY_TMP_ROOT), one 0700 directory per suite inside it named by a two-character base-36
+ * index, and TMPDIR, TMP and TEMP all set to that directory. The names are deliberately short: suites
+ * bind AF_UNIX sockets below TMPDIR (a ~104-byte path limit, and a conservative 96-byte probe limit in
+ * wsl-ipc-compatibility), so the per-suite TMPDIR adds at most 16 characters to the real home path. The parent is created lazily on the first suite,
  * so a run that reuses every receipt creates nothing. It is removed when the run ends, on a
  * best-effort basis that can never mask a suite's outcome.
  *
@@ -29,7 +31,7 @@ import { isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 export const VERIFY_TMP_ROOT_VARIABLE = "PIPELINE_VERIFY_TMP_ROOT";
-const DEFAULT_ROOT_NAME = "pipeline-verify-tmp";
+const DEFAULT_ROOT_NAME = ".pv";
 const TMP_KEYS = Object.freeze(["TMPDIR", "TMP", "TEMP"]);
 const byRun = new WeakMap();
 
@@ -85,11 +87,12 @@ function resolveRoot(environment, home) {
 export function createVerifySuiteTmpdirs({ repoRoot, environment = process.env, platform = process.platform, home = homedir, harden = hardenWindowsPrivateDirectory, assess = assessWindowsPrivatePath } = {}) {
   let parent = null;
   let disposed = false;
+  let suiteIndex = 0;
   const ensureParent = () => {
     if (parent !== null) return parent;
     const root = resolveRoot(environment, home);
     mkdirSync(root, { recursive: true, mode: 0o700 });
-    const made = mkdtempSync(join(root, `run-${process.pid}-`));
+    const made = mkdtempSync(join(root, "r"));
     try {
       if (platform === "win32") {
         harden(made);
@@ -109,7 +112,8 @@ export function createVerifySuiteTmpdirs({ repoRoot, environment = process.env, 
   return {
     environmentFor(env) {
       if (disposed) throw fail("VERIFY-TMP-DISPOSED", "the run's private temp directories were already removed");
-      const dir = mkdtempSync(join(ensureParent(), "suite-"));
+      const dir = join(ensureParent(), (suiteIndex++).toString(36).padStart(2, "0"));
+      mkdirSync(dir, { mode: 0o700 });
       if (platform !== "win32") chmodSync(dir, 0o700);
       return privateTmpdirEnvironment(env ?? process.env, dir, { platform });
     },

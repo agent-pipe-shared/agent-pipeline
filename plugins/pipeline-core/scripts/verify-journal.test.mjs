@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { spawn as spawnChild, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { closeSync, chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { constants as osConstants, homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import test from "node:test";
@@ -1590,6 +1590,8 @@ test("D73: Verify gives each suite child its own private 0700 TMPDIR outside the
     assert.equal(seen.length, 2); assert.notEqual(seen[0].dir, seen[1].dir, "two suites, two directories"); assert.equal(dirname(seen[0].dir), dirname(seen[1].dir), "one per-run parent");
     for (const s of seen) { if (process.platform !== "win32") assert.deepEqual([s.mode, s.parentMode], [0o700, 0o700]); assert.deepEqual([s.env.TMP, s.env.TEMP], [s.dir, s.dir]); for (const root of [f.root, here]) assert.ok(relative(root, s.dir).startsWith(".."), "outside the checkout"); assert.equal(existsSync(dirname(s.dir)), false, "the per-run parent is gone after the run"); }
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("D73: the per-suite TMPDIR adds at most 16 characters to the real home path (AF_UNIX socket headroom)", { skip: process.platform === "win32" }, () => { const tmpdirs = createVerifySuiteTmpdirs({ repoRoot: process.cwd() }); try { const dir = tmpdirs.environmentFor({}).TMPDIR; const home = realpathSync(homedir()); assert.ok(dir.length <= home.length + 16, `${dir.length} chars`); assert.ok(dir.startsWith(join(home, ".pv", "r")), "inside the .pv root"); } finally { tmpdirs.dispose(); }
 });
 test("D73: an explicit environment keeps every other key, and the win32 NODE_OPTIONS composition is unchanged by the private TMPDIR", () => {
   const explicit = { A: "1", PIPELINE_VERIFY_CASE_COMPLETION_FD: "3", TMPDIR: "/ambient", Temp: "C:\\ambient" }, priv = { TMPDIR: "private-dir", TMP: "private-dir", TEMP: "private-dir" };
