@@ -112,7 +112,10 @@ Closures: M0 (measurements) and W1 (AC-142B, AC-224, AC-155A, implementation com
 `c578670d7`, Critic batch and PO acceptance pending) are closed; K1 is partly closed (2026-10-21,
 'K1 closure': implementation complete, Critic batch and PO acceptance pending; recovery 39/39,
 binding 61/66; the rest, binding A/B/E and GDW01, is the decision cluster K1D awaiting the PO; the
-model-family cases joined the D66 row); K1h with K10 is in progress. D70 (lost-binding recovery, built at
+model-family cases joined the D66 row); K1h with K10 is in progress (onboarding-continuity
+306/306; the first full Verify after it showed two Verify-only causes, the ambient TMPDIR and the
+completion-registry drift). D73 (2026-10-21, PO tiles) decides K1D A, E and GDW01 (GDW01 is fixed in
+0.7.0 through a guard drop-in) and a private TMPDIR per Verify suite. D70 (lost-binding recovery, built at
 `d2602f5cf`/`5e5c7d8f2`, implementation complete) and D71 (the per-user session-power address root
 past its 4096-slot bound: 3769 stale test slots moved aside, product fix in this candidate) are in
 `po-decisions-2026-10-18.md`. D72 settles both open K1 calls: the address root stays at the OS home

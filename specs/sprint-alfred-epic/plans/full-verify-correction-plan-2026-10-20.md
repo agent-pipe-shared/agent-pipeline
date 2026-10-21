@@ -499,3 +499,19 @@ security-scanner-diagnostics 24, session-power-address-repair 17, wsl-ipc-compat
 TMPDIR under pool load does not reproduce the K10 reds at HEAD. Working hypothesis: the reds came from
 the exhausted session-address root (4096 slots, fixed by K1R and the after-suite repair) and from the
 K1 causes. **Next:** a full `verify.mjs --mode candidate` on a clean tree confirms or refutes it.
+
+### Full Verify after K1h (2026-10-21, `fd3449cb1`, run `verify-1792556107360-fe82ef23e4f15a13`)
+
+Exit 1; about 150 red steps (classified with `scratch/verify-reds.mjs`, `COMPACT=1`). The hypothesis
+above is refuted: suites green alone are red under Verify. Two Verify-only causes dominate:
+- `domain-ancestor-unsafe` from `prepareSessionAuthorityRegistryFixture`
+  (`lib/test-item-approved-course-fixture.mjs` ~58): Verify passes the session's ambient TMPDIR to
+  every suite, and its ancestors fail the authority's ancestor check; under a private 0700 TMPDIR
+  the same cases pass (binding 30 red under Verify vs 5 alone, recovery 5 vs 0). D73: Verify gives
+  every suite a private 0700 TMPDIR.
+- `VERIFY-CASE-COMPLETION-DECLARATION` with zero failing cases (onboarding-continuity,
+  project-authority, stop-fanout, runner-profile-migration-v3, guard-dispatch, dispatch-policy,
+  governance-action-artifact, dispatch-budget-binding, dispatch-record-strip-for-critic and more):
+  the declared case lists in the protected completion registry drifted from the suites (K7; C15/C16
+  drop-ins).
+The other reds are classified after the TMPDIR fix and a re-run, into K2-K9 and D66.

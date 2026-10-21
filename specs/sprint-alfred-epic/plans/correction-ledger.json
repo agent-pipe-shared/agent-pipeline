@@ -25,13 +25,13 @@
       "id": "K1D",
       "title": "K1 rest awaiting PO decision: binding owning release after retirement (A), leftover authority journal (B), orphan release registry member (E), Codex governed dispatch owner (GDW01)",
       "status": "open",
-      "next": "PO decision from the PO list; then one package per decided group"
+      "next": "decided by D73 (A: release inside the retired-owner route; E: RF2A member step; GDW01: Codex owner route as a guard drop-in); B needs its probe; one package per group after K1h"
     },
     {
       "id": "K1h",
       "title": "hang group and Verify-only reds (with K10)",
       "status": "in-progress",
-      "next": "restate OBC059 on a neutral root inside a bound requester (K1h measurement 2), then measure the K10 suites under Verify concurrency; find whether one shared lock or registry wait explains them"
+      "next": "D73: Verify gives every suite a private 0700 TMPDIR in verify-journal.mjs (Goldfish); then re-run the full Verify and classify the remaining reds into K2-K9"
     },
     {
       "id": "K2",
