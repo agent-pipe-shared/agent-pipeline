@@ -9,6 +9,7 @@ import test from "node:test";
 
 import { run } from "./pipeline-state.mjs";
 import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
+import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
 
 const NOW = "2026-09-18T12:00:00.000Z";
 const SEEDED_VERIFY = "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"";
@@ -48,12 +49,26 @@ function quietConsole(fn) {
 }
 
 test("baseline-only implementation exposes and completes the typed late verify recovery", () => {
-  const root = rootFor("happy-path");
-  writeFixture(root);
-  const deps = { dir: root, now: () => NOW, architectureEntryReadiness: () => ({ status: "ready" }) };
+  // QG-04 (E14, specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md; AC-150): configure-verify now
+  // requires a VERIFIED approval record and reads the COMMITTED calibration layout; the former hand-seeded
+  // planApproval and uncommitted twins can supply neither. Only this examiner's setup predated the stricter,
+  // intended gate (the same repair as the NVA-GF-LATEVERIFY-1 examiner in pipeline-state.test.mjs). The setup
+  // reaches the approved, implementing state through the production writers (prepareApprovedItemCourseFixture),
+  // then commits the baseline-only twins; the configured twins are committed before the replay. The root lives
+  // under the checkout's scratch/ directory because the fixture refuses an OS-temp ancestor. Every assertion
+  // below is unchanged; the removed set-phase assertion is replaced by the approved fixture itself.
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "late-verify-happy-"));
+  prepareApprovedItemCourseFixture({ root });
+  const seeded = `${JSON.stringify({ project: "late-verify-fixture", verify: SEEDED_VERIFY, handover: "docs/state.md" }, null, 2)}\n`;
+  mkdirSync(join(root, "project"), { recursive: true });
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.json"), seeded);
+  writeFileSync(join(root, ".claude", "pipeline.json"), seeded);
+  const gitIn = (...args) => execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { windowsHide: true });
+  gitIn("add", "--", "project/pipeline.json", ".claude/pipeline.json");
+  gitIn("commit", "-q", "--no-verify", "-m", "seed unconfigured verify");
+  const deps = { dir: root, architectureEntryReadiness: () => ({ status: "ready" }) };
 
-  assert.equal(quietConsole(() => run(["set-phase", "--phase", "implementation"], deps)).result, 0,
-    "the deliberately baseline-only approved project enters implementation first");
   const inspection = quietConsole(() => run(["inspect"], deps));
   assert.equal(inspection.result, 0);
   const action = JSON.parse(inspection.logs.join("\n")).nextAction;
@@ -83,6 +98,10 @@ test("baseline-only implementation exposes and completes the typed late verify r
   assert.equal(checkVerifyContractConfigured(root).ok, true,
     "the push-readiness verify-contract check is now unblocked without an override or scratch workaround");
 
+  // QG-04 (E14): the replay and the already-configured refusal read the committed layout, so the two configured
+  // twins are committed with the add/commit pair the printed route names. No assertion below changes.
+  gitIn("add", "--", "project/pipeline.json", ".claude/pipeline.json");
+  gitIn("commit", "-q", "--no-verify", "-m", "chore: configure project verification");
   const configured = [readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")];
   assert.equal(quietConsole(() => run(["configure-verify", "--verify-command", command], deps)).result, 0,
     "the exact command is an idempotent zero-write replay");
