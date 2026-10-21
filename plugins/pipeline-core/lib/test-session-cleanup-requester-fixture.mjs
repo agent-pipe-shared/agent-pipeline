@@ -163,6 +163,30 @@ export function bindInsideRequesterContext(request) {
   return runtime.run(() => bindOnboardingSessionCleanup(request));
 }
 
+// K1h: a case that needs a REAL cleanup binding on a root (not a fabricated {sessionId, descriptorSha256}) runs the real
+// bind the way production does: a real descriptor with a bound requester (`startDescriptorWithBoundRequester`), and the
+// work inside that requester's own Source-owned context (`run`). `sessionCleanup` is the requester's own tuple, the only
+// one the controlled bind admits. A plain process is still refused; nothing is stubbed into a `bound` result.
+export function startBoundRequester(root, options = {}) {
+  const descriptor = startDescriptorWithBoundRequester(root, options);
+  const repository = inspectSignedDescriptorCustodyRepository(root);
+  const runtime = boundRequesterRuntimes.get(boundRequesterKey(repository, descriptor.sessionId));
+  return { sessionCleanup: { sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256 }, run: runtime.run };
+}
+
+// The real `bindOnboardingSessionCleanup` over the root's current State (exact CAS), inside a fresh bound requester.
+export function bindRealSessionCleanup(root, options = {}) {
+  const requester = startBoundRequester(root, options);
+  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+  const bound = requester.run(() => bindOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: before.stateSha256,
+    expectedRevision: before.revision,
+    sessionCleanup: requester.sessionCleanup,
+  }));
+  return { ...requester, bound };
+}
+
 export const BOUND_REQUESTER_DEPENDENCIES = Object.freeze({
   startSessionDescriptorFn: startDescriptorWithBoundRequester,
   bindOnboardingSessionCleanupFn: bindInsideRequesterContext,

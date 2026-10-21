@@ -85,6 +85,7 @@ import {
   validateKickoffGoal,
 } from "./onboarding-continuity.mjs";
 import { devNull } from "node:os";
+import { bindRealSessionCleanup, startBoundRequester } from "./test-session-cleanup-requester-fixture.mjs";
 
 const cases = [];
 let activeScratchRoots = null;
@@ -1129,8 +1130,8 @@ check("bindEphemeralPrivateCleanup only ever takes the private-runtime route, on
   const beforeBytes = readFileSync(statePath);
   const before = readOnboardingSessionCleanupBinding({ rootDir: root });
   assert.equal(before.status, "unbound");
-  const tuple = { sessionId: "ephemeral-session-01", descriptorSha256: "c".repeat(64) };
-  const bound = bindEphemeralPrivateCleanup({ rootDir: root, sessionCleanup: tuple });
+  const requester = startBoundRequester(root), tuple = requester.sessionCleanup;
+  const bound = requester.run(() => bindEphemeralPrivateCleanup({ rootDir: root, sessionCleanup: tuple }));
   assert.equal(bound.status, "bound");
   assert.equal(bound.storage, "private-runtime");
   assert.deepEqual(bound.sessionCleanup, tuple);
@@ -1158,13 +1159,7 @@ check("bindEphemeralPrivateCleanup refuses a state that is already bound, closed
   const root = fixture("ephemeral-cleanup-already-bound", { neutral: true });
   const plan = planOnboardingKickoff({ rootDir: root, goal: "Exercise the already-bound refusal" });
   applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
-  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
-  bindOnboardingSessionCleanup({
-    rootDir: root,
-    expectedStateSha256: before.stateSha256,
-    expectedRevision: before.revision,
-    sessionCleanup: { sessionId: "real-session-01", descriptorSha256: "e".repeat(64) },
-  });
+  bindRealSessionCleanup(root);
   expectKickoffError("SESSION-CLEANUP-EPHEMERAL-NOT-APPLICABLE", () => bindEphemeralPrivateCleanup({
     rootDir: root,
     sessionCleanup: { sessionId: "ephemeral-session-03", descriptorSha256: "f".repeat(64) },
@@ -1920,16 +1915,7 @@ function promotionSeed(name, { privatized = false, bumpRevision = privatized, po
     activate: true,
   });
   if (privatized) {
-    const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
-    bindOnboardingSessionCleanup({
-      rootDir: root,
-      expectedStateSha256: binding.stateSha256,
-      expectedRevision: 0,
-      sessionCleanup: {
-        sessionId: `session-${name}`,
-        descriptorSha256: "a".repeat(64),
-      },
-    });
+    bindRealSessionCleanup(root);
     // `bumpRevision` (default: mirrors `privatized`, so every existing caller
     // keeps promoting a revision-1 re-kickoff exactly as before) is set false
     // by the revision-0->1 recovery test below: it needs a private
