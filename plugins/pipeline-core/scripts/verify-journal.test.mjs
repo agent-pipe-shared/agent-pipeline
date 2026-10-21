@@ -5,8 +5,8 @@ import assert from "node:assert/strict";
 import { spawn as spawnChild, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { constants as osConstants, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { constants as osConstants, homedir, tmpdir } from "node:os";
+import { dirname, join, relative, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { digestJson } from "../lib/verify-resume.mjs";
@@ -15,17 +15,8 @@ import { listActiveSessionDescriptors, startSessionDescriptor } from "../lib/wor
 import { compileVerifySuites, createVerifyRun, deriveVerifyExecutionMetrics, resolveDefaultConcurrency, resolveSuiteChildEnvironment, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
 import whChildProcess, { execFileSync as whExecFileSync } from "node:child_process";
 import { promisify } from "node:util";
-import {
-  WINDOWS_HIDE_WRAPPED,
-  WINDOWS_VERIFY_CONCURRENCY_CAP,
-  WINDOWS_VERIFY_CONCURRENCY_DEFAULT,
-  clampWindowsVerifyConcurrency,
-  withWindowsHideEnv,
-  composeWindowsHideNodeOptions,
-  installWindowsHide,
-  resolveWindowsVerifyConcurrency,
-  windowsHideImportOption,
-} from "../lib/windows-hide-preload.mjs";
+import { WINDOWS_HIDE_WRAPPED, WINDOWS_VERIFY_CONCURRENCY_CAP, WINDOWS_VERIFY_CONCURRENCY_DEFAULT, clampWindowsVerifyConcurrency, withWindowsHideEnv, composeWindowsHideNodeOptions, installWindowsHide, resolveWindowsVerifyConcurrency, windowsHideImportOption } from "../lib/windows-hide-preload.mjs";
+import { VERIFY_TMP_ROOT_VARIABLE, createVerifySuiteTmpdirs, privateTmpdirEnvironment } from "../lib/verify-suite-private-tmpdir.mjs";
 import { WINDOWS_HIDE_SCAN_ALLOWLIST, scanSource, scanTree, staticImportGraph, summarizeScan } from "../lib/windows-hide-scan.mjs";
 
 // The journal deliberately emits one bounded public progress line per state
@@ -54,14 +45,7 @@ const artifact = verifySuiteArtifactName("fixture-suite");
 const completionPolicy = { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["C01", "C02"], maxBytes: 4096 };
 function snapshotFiles(root) {
   const files = {};
-  const visit = (directory, prefix = "") => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const relative = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) visit(path, relative);
-      else files[relative] = readFileSync(path);
-    }
-  };
+  const visit = (directory, prefix = "") => { for (const entry of readdirSync(directory, { withFileTypes: true })) { const name = prefix === "" ? entry.name : `${prefix}/${entry.name}`, path = join(directory, entry.name); if (entry.isDirectory()) visit(path, name); else files[name] = readFileSync(path); } };
   visit(root);
   return files;
 }
@@ -82,20 +66,8 @@ function sessionlessCheckout(prefix, goal) {
 }
 
 test("execution metrics retain lane/reuse facts and reject malformed measurement inputs", () => {
-  const metrics = deriveVerifyExecutionMetrics({
-    steps: [
-      { name: "pool", durationMs: 50, reused: false },
-      { name: "serial", durationMs: 20, reused: true },
-      { name: "exclusive", durationMs: 30, reused: false },
-    ],
-    startedAt: "2026-09-23T10:00:00.000Z",
-    completedAt: "2026-09-23T10:00:00.100Z",
-    concurrency: 2,
-    // Exclusive deliberately also appears in the serial set: exclusive takes
-    // precedence, matching the scheduler's lane selection.
-    serialLaneSuites: new Set(["serial", "exclusive"]),
-    exclusiveSuites: new Set(["exclusive"]),
-  });
+  // Exclusive deliberately also appears in the serial set: exclusive takes precedence, matching the scheduler's lane selection.
+  const metrics = deriveVerifyExecutionMetrics({ steps: [{ name: "pool", durationMs: 50, reused: false }, { name: "serial", durationMs: 20, reused: true }, { name: "exclusive", durationMs: 30, reused: false }], startedAt: "2026-09-23T10:00:00.000Z", completedAt: "2026-09-23T10:00:00.100Z", concurrency: 2, serialLaneSuites: new Set(["serial", "exclusive"]), exclusiveSuites: new Set(["exclusive"]) });
   assert.equal(metrics.executedSuiteDurationMs, 80);
   assert.equal(metrics.reusedSuiteDurationMs, 20);
   assert.deepEqual(metrics.executed, { pool: 1, serial: 0, exclusive: 1 });
@@ -1605,9 +1577,35 @@ test("ALFRED-WINHIDE2: runVerifyJournal hands each suite child this host's NODE_
       assert.equal(seen[0].env.NODE_OPTIONS, composeWindowsHideNodeOptions(process.env.NODE_OPTIONS, WH_WIN));
       assert.ok(seen[0].env.NODE_OPTIONS.includes(windowsHideImportOption()));
     } else {
-      assert.equal(seen[0].env, undefined, "non-win32: the spawn options are unchanged and the child inherits");
+      const ambient = { ...process.env, TMPDIR: 0, TMP: 0, TEMP: 0 };
+      assert.deepEqual({ ...seen[0].env, TMPDIR: 0, TMP: 0, TEMP: 0 }, ambient, "non-win32: the child gets the ambient environment unchanged except its private TMPDIR/TMP/TEMP (D73)");
     }
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("D73: Verify gives each suite child its own private 0700 TMPDIR outside the checkout and removes the per-run parent afterwards", async () => {
+  const f = fixture(), seen = [], here = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const spawn = (command, argv, options) => { const dir = options.env.TMPDIR; seen.push({ dir, env: options.env, mode: lstatSync(dir).mode & 0o777, parentMode: lstatSync(dirname(dir)).mode & 0o777 }); return spawnPass(); };
+  try {
+    assert.equal((await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: [...f.suites, { name: "second-suite", file: f.suiteFile }], policyInputs: { harness: "test" }, runId: "verify-k1h-private-tmp", registerRun, spawn, environment: {}, concurrency: 1 })).terminal.status, "passed");
+    assert.equal(seen.length, 2); assert.notEqual(seen[0].dir, seen[1].dir, "two suites, two directories"); assert.equal(dirname(seen[0].dir), dirname(seen[1].dir), "one per-run parent");
+    for (const s of seen) { if (process.platform !== "win32") assert.deepEqual([s.mode, s.parentMode], [0o700, 0o700]); assert.deepEqual([s.env.TMP, s.env.TEMP], [s.dir, s.dir]); for (const root of [f.root, here]) assert.ok(relative(root, s.dir).startsWith(".."), "outside the checkout"); assert.equal(existsSync(dirname(s.dir)), false, "the per-run parent is gone after the run"); }
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("D73: an explicit environment keeps every other key, and the win32 NODE_OPTIONS composition is unchanged by the private TMPDIR", () => {
+  const explicit = { A: "1", PIPELINE_VERIFY_CASE_COMPLETION_FD: "3", TMPDIR: "/ambient", Temp: "C:\\ambient" }, priv = { TMPDIR: "private-dir", TMP: "private-dir", TEMP: "private-dir" };
+  assert.deepEqual(privateTmpdirEnvironment(explicit, "private-dir", { platform: "linux" }), { A: "1", PIPELINE_VERIFY_CASE_COMPLETION_FD: "3", Temp: "C:\\ambient", ...priv });
+  assert.deepEqual(privateTmpdirEnvironment(explicit, "private-dir", { platform: "win32" }), { A: "1", PIPELINE_VERIFY_CASE_COMPLETION_FD: "3", ...priv }, "win32 names are case-insensitive"); assert.equal(explicit.TMPDIR, "/ambient", "never mutated");
+  const base = { PATH: "p", NODE_OPTIONS: "--no-warnings", Temp: "C:\\ambient" }, before = resolveSuiteChildEnvironment(undefined, { platform: "win32", base });
+  const after = resolveSuiteChildEnvironment(privateTmpdirEnvironment(base, "private-dir", { platform: "win32" }), { platform: "win32", base });
+  assert.equal(after.NODE_OPTIONS, before.NODE_OPTIONS); assert.deepEqual(after, { PATH: "p", NODE_OPTIONS: before.NODE_OPTIONS, ...priv });
+});
+test("D73: a per-run parent with an unsafe ancestor, or inside the checkout, is refused and leaves no directory behind", { skip: process.platform === "win32" }, () => {
+  const safe = mkdtempSync(join(homedir(), ".k1h-safe-")), unsafe = mkdtempSync(join(homedir(), ".k1h-unsafe-")), at = (repoRoot, root) => () => createVerifySuiteTmpdirs({ repoRoot, environment: { [VERIFY_TMP_ROOT_VARIABLE]: root } }).environmentFor({});
+  try {
+    chmodSync(safe, 0o700); chmodSync(unsafe, 0o770);
+    assert.throws(at(safe, join(unsafe, "root")), /VERIFY-TMP-ANCESTOR-UNSAFE/u); assert.deepEqual(readdirSync(join(unsafe, "root")), [], "the refused parent was discarded");
+    assert.throws(at(safe, join(safe, "inside")), /VERIFY-TMP-INSIDE-CHECKOUT/u); assert.deepEqual(readdirSync(join(safe, "inside")), []);
+  } finally { rmSync(safe, { recursive: true, force: true }); rmSync(unsafe, { recursive: true, force: true }); }
 });
 
 test("ALFRED-WINHIDE2/WINVERIFY: the default pool width is 4 on win32 and 8 elsewhere (six suites), an env override wins, and win32 never exceeds 5", async () => {

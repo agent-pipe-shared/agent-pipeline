@@ -11,13 +11,8 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 // module wraps child_process as a load-time side effect), because harness/scripts/verify.mjs
 // (TP-3, protected) imports this file. The guard test in verify-journal.test.mjs pins that edge.
 import { clampWindowsVerifyConcurrency, composeWindowsHideNodeOptions, resolveWindowsVerifyConcurrency } from "../lib/windows-hide-preload.mjs";
-import {
-  VERIFY_PROGRESS_SCHEMA,
-  digestJson,
-  planVerifyResume,
-  sealVerifySuiteReceipt,
-  validateVerifySuiteReceipt,
-} from "../lib/verify-resume.mjs";
+import { VERIFY_PROGRESS_SCHEMA, digestJson, planVerifyResume, sealVerifySuiteReceipt, validateVerifySuiteReceipt } from "../lib/verify-resume.mjs";
+import { disposeVerifySuiteTmpdirs, verifySuiteChildEnvironment } from "../lib/verify-suite-private-tmpdir.mjs";
 import { parseVerifyCaseCompletion, validateVerifyCaseCompletionPolicy } from "../lib/verify-case-completion-receipt.mjs";
 import { readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
 import { finalizeTemporaryResource, loadSessionDescriptor, registerTemporaryIntent } from "../lib/worktree-lifecycle.mjs";
@@ -1018,11 +1013,11 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
     cwd: suite.cwd,
     maxBuffer: MAX_LOG_BYTES,
     signal,
-    env: resolveSuiteChildEnvironment(completionPolicy === null ? undefined : {
+    env: resolveSuiteChildEnvironment(verifySuiteChildEnvironment(run, suite.cwd, completionPolicy === null ? undefined : {
       ...process.env,
       PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
       PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: String(completionPolicy.maxBytes),
-    }),
+    })),
     caseCompletion: completionPolicy,
   });
   const stdout = Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout ?? "");
@@ -1247,7 +1242,7 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
       }
       throw error;
     } finally {
-      guard?.dispose();
+      guard?.dispose(); disposeVerifySuiteTmpdirs(run);
       unlinkCallerSignal?.();
       // A termination signal that nobody else handles ends the process with the conventional code,
       // but only AFTER the owner above has been retired.
