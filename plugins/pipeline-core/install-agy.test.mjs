@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { installerUsageLines, postInstallGuidanceLines, refreshAntigravityInstallation, resolveAntigravityInstallerAttestationSource, selectPluginSource, updateAutonomousSettings, updatePluginRegistry, verifyAntigravityInstallerSource } from "./install-agy.mjs";
 import * as installerModule from "./install-agy.mjs";
@@ -330,7 +330,9 @@ test("Agy upgrade replaces the old physical root and survives its removal", (t) 
 
   updatePluginRegistry({ targetFile: registryFile, corePluginPath: newRoot });
   const bytes = readFileSync(registryFile, "utf8");
-  assert.deepEqual(JSON.parse(bytes), { entries: [unrelated, { path: newRoot }], custom: { keep: true } });
+  // D79: the tracked workspace registry never carries a machine path. This asserted `{ path: newRoot }` (absolute); the file lives at
+  // `<workspace>/.agents/plugins.json`, so the new binding is now the repo-relative path (QG-04 justification).
+  assert.deepEqual(JSON.parse(bytes), { entries: [unrelated, { path: "new/plugins/pipeline-core" }], custom: { keep: true } });
   rmSync(join(oldRoot, "plugin.json"));
   rmSync(oldRoot, { recursive: true });
   const readback = readFileSync(registryFile, "utf8");
@@ -360,9 +362,35 @@ test("Agy upgrade refuses an unverifiable deleted Pipeline-shaped registration",
   assert.equal(readFileSync(registryFile, "utf8"), bytes);
   writeFileSync(join(ambiguous, "plugin.json"), JSON.stringify({ name: "different-plugin" }));
   updatePluginRegistry({ targetFile: registryFile, corePluginPath: newRoot });
+  // D79: same justification as above - the appended binding is the repo-relative path, not the absolute `newRoot`.
   assert.deepEqual(JSON.parse(readFileSync(registryFile, "utf8")).entries, [
-    { path: ambiguous }, { path: otherRoot, enabled: false }, { path: newRoot },
+    { path: ambiguous }, { path: otherRoot, enabled: false }, { path: "new/plugins/pipeline-core" },
   ]);
+});
+
+test("D79: the tracked workspace registry never gains a machine path: relative entries stay, outside sources are refused, the global file keeps the absolute root", (t) => {
+  const { oldRoot, newRoot, otherRoot, registryFile, root, configRoot } = fixture(t);
+  // A tracked relative entry that already names the source is kept as it is and nothing is appended.
+  const tracked = `${JSON.stringify({ entries: [{ path: "new/plugins/pipeline-core" }, { path: otherRoot, enabled: false }] }, null, 2)}\n`;
+  writeFileSync(registryFile, tracked);
+  updatePluginRegistry({ targetFile: registryFile, corePluginPath: newRoot });
+  assert.equal(readFileSync(registryFile, "utf8"), tracked);
+  // A leaked absolute Pipeline entry is replaced by the relative path; the tracked relative entry is never rewritten or removed.
+  writeFileSync(registryFile, `${JSON.stringify({ entries: [{ path: oldRoot }, { path: "old/plugins/pipeline-core" }] })}\n`);
+  updatePluginRegistry({ targetFile: registryFile, corePluginPath: newRoot });
+  assert.deepEqual(JSON.parse(readFileSync(registryFile, "utf8")).entries, [{ path: "old/plugins/pipeline-core" }, { path: "new/plugins/pipeline-core" }]);
+  // A source outside the workspace has no repo-relative path: refused with the typed reason, bytes untouched.
+  const outside = join(dirname(root), `${basename(root)}-outside`, "plugins", "pipeline-core");
+  mkdirSync(outside, { recursive: true });
+  t.after(() => rmSync(dirname(dirname(outside)), { recursive: true, force: true }));
+  writeFileSync(join(outside, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
+  const before = readFileSync(registryFile);
+  assert.throws(() => updatePluginRegistry({ targetFile: registryFile, corePluginPath: outside }), /^Error: ATR-WORKSPACE-SOURCE-OUTSIDE\. Repair: use the global option/u);
+  assert.deepEqual(readFileSync(registryFile), before);
+  // The global registry (not under `.agents`) keeps binding the absolute root.
+  const globalFile = join(configRoot, "config", "plugins.json");
+  updatePluginRegistry({ targetFile: globalFile, corePluginPath: newRoot });
+  assert.deepEqual(JSON.parse(readFileSync(globalFile, "utf8")).entries, [{ path: newRoot }]);
 });
 
 test("Agy installer refuses malformed existing registry without changing bytes", (t) => {

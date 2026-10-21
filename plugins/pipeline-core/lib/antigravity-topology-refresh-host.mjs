@@ -5,7 +5,7 @@ import {mkdirSync,lstatSync,realpathSync,openSync,closeSync,writeFileSync,fsyncS
 import {join,dirname,resolve,isAbsolute,relative,sep} from 'node:path';
 import {homedir} from 'node:os';
 import {randomUUID} from 'node:crypto';
-import {observeAntigravityPluginTopology,observeAntigravityLoadedTopology,readAntigravityPhysicalJson,antigravityTopologySha256,supportsAntigravityPluginCliVersion,antigravityManagedPluginRoot,antigravityPathAbsent} from './antigravity-plugin-topology.mjs';
+import {observeAntigravityPluginTopology,observeAntigravityLoadedTopology,readAntigravityPhysicalJson,antigravityTopologySha256,supportsAntigravityPluginCliVersion,antigravityManagedPluginRoot,antigravityPathAbsent,antigravityRegistryEntries,antigravityWorkspaceRelativePath,ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE} from './antigravity-plugin-topology.mjs';
 import {rewriteAntigravityJsonBytes} from './antigravity-json-spans.mjs';
 import {createHash} from 'node:crypto';
 const NAME='agent-pipeline-core';
@@ -66,6 +66,28 @@ function wiring(observation,configRoot,workspaceRoot){
  }
  return result;
 }
+// D79: the tracked workspace registry never carries a machine path. A relative (tracked, path-free) entry is never a second root, never rewritten, never removed.
+const conflicting=(registry,root)=>registry.entries.some(e=>e.status==='observed'&&e.relative!==true&&e.root!==root);
+const refusal=(schema,e,extra={})=>{const reason=/^ATR-[A-Z-]+$/.test(e.message)?e.message:'ATR-UNAVAILABLE';return {schema,status:'refused',reason,...(reason==='ATR-WORKSPACE-SOURCE-OUTSIDE'?{guidance:ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE}:{}),...extra};};
+// What one registry needs, or null when it is bound. Global: exactly the source root. Workspace: no absolute Pipeline entry, plus (workspace scope only) a tracked relative entry naming the source, appended as the repo-relative path.
+function registryChange(observation,selected,scope,workspaceRoot){
+ const {tracked,pipeline,dangling}=antigravityRegistryEntries(observation.registries[selected]),source=observation.source;
+ if(selected==='global'){
+  const bound=pipeline.length===1&&pipeline[0].root===source.root,removed=(bound?dangling:[...pipeline,...dangling]).map(e=>e.index).sort((a,b)=>a-b);
+  const append=!bound&&(selected===scope||pipeline.length>0)?source.root:null;
+  return removed.length||append!==null?{removed,append}:null;
+ }
+ const removed=[...pipeline,...dangling].map(e=>e.index).sort((a,b)=>a-b),append=selected===scope&&!tracked.some(e=>e.root===source.root)?antigravityWorkspaceRelativePath(workspaceRoot,source.root):null;
+ if(selected===scope&&append===null&&!tracked.some(e=>e.root===source.root))throw Error('ATR-WORKSPACE-SOURCE-OUTSIDE');
+ return removed.length||append!==null?{removed,append}:null;
+}
+// The final readback of one registry: global holds only the source root (exactly once in its own scope); workspace holds no absolute Pipeline entry (and, in its own scope, a relative one naming the source).
+function registryBound(final,selected,scope,source){
+ const registry=final.registries[selected];if(registry.status!=='observed')return false;
+ const {tracked,pipeline}=antigravityRegistryEntries(registry);
+ if(selected==='global')return pipeline.every(e=>e.root===source.root)&&(selected!==scope||pipeline.length===1);
+ return pipeline.length===0&&(selected!==scope||tracked.some(e=>e.root===source.root));
+}
 function physicalCli(path){if(typeof path!=='string'||!isAbsolute(path)||resolve(path)!==path||!lstatSync(path).isFile())throw Error('ATR-CLI');return realpathSync(path);}
 export function resolveAntigravityCliPath(){const r=spawnSync(process.platform==='win32'?'where.exe':'which',['agy'],{encoding:'utf8',timeout:5000,maxBuffer:65536});if(r.status!==0||r.error)return null;try{return physicalCli(r.stdout.trim().split(/\r?\n/)[0]);}catch{return null;}}
 export function observeAntigravityLoadedTopologyWithWiring(args){
@@ -108,14 +130,15 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    // Only a stale copy requires a global lifecycle change.
    const retire=!!copy&&copy.content.sha256!==observation.source.content.sha256,install=scope==='global'&&(!copy||retire);
    const other=scope==='global'?'workspace':'global';
-   if(observation.registries[other].entries.some(e=>e.status==='observed'&&e.root!==observation.source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
+   if(conflicting(observation.registries[other],observation.source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
    if((retire||install||hooks.some(h=>h.scope==='global'&&h.changes)||scope==='global')&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');
+   if(scope==='workspace'&&antigravityWorkspaceRelativePath(workspaceRoot,observation.source.root)===null)throw Error('ATR-WORKSPACE-SOURCE-OUTSIDE');
    // A replaced managed copy is retired only after the source validates, so the plan validates first and again before the install.
    const validation=()=>({kind:'cli',argv:Object.freeze(['plugin','validate',observation.source.root])}),actions=[];if(retire&&install)actions.push(validation());if(retire)actions.push({kind:'cli',argv:Object.freeze(['plugin','uninstall',NAME])});if(install)actions.push(validation(),{kind:'cli',argv:Object.freeze(['plugin','install',observation.source.root])});
    for(const h of hooks)if(h.changes)actions.push({kind:'owned-wiring-rebind',scope:h.scope,path:h.path,sha256:h.sha256,changes:h.changes,preserveForeignBytes:true});
-   for(const selected of globalChangeApproved?[scope,other]:[scope]){const r=observation.registries[selected],owned=r.entries.filter(e=>e.status==='observed'),dangling=r.entries.filter(e=>e.status==='dangling-managed');if(selected!==scope&&!owned.length&&!dangling.length)continue;if(owned.length!==1||owned[0].root!==observation.source.root||dangling.length)actions.push({kind:'owned-registry-rebind',scope:selected,path:r.path,sha256:r.sha256,preserveForeignBytes:true});}
+   for(const selected of globalChangeApproved?[scope,other]:[scope]){const r=observation.registries[selected];if(registryChange(observation,selected,scope,workspaceRoot)!==null)actions.push({kind:'owned-registry-rebind',scope:selected,path:r.path,sha256:r.sha256,preserveForeignBytes:true});}
    const plan=Object.freeze({schema:'pipeline.antigravity-refresh-plan.v2',status:'prepared',scope,globalChangeApproved,sourceRoot:observation.source.root,sourceContentSha256:observation.source.content.sha256,observationSha256:antigravityTopologySha256(observation),actions:Object.freeze(actions.map(Object.freeze)),requiresFreshExecutingSession:true});plans.set(plan,plan.observationSha256);return plan;
-  }catch(e){return Object.freeze({schema:'pipeline.antigravity-refresh-plan.v2',status:'refused',reason:/^ATR-[A-Z-]+$/.test(e.message)?e.message:'ATR-UNAVAILABLE'});}
+  }catch(e){return Object.freeze(refusal('pipeline.antigravity-refresh-plan.v2',e));}
  },apply(plan){
   const bound=plans.get(plan);if(!bound)return {schema:'pipeline.antigravity-refresh-result.v1',status:'refused',reason:'ATR-UNOWNED-PLAN',completed:[]};
   plans.delete(plan);try{if(antigravityTopologySha256(observeAntigravityPluginTopology(args))!==bound)return {schema:'pipeline.antigravity-refresh-result.v1',status:'refused',reason:'ATR-TOPOLOGY-DRIFT',completed:[]};}catch{return {schema:'pipeline.antigravity-refresh-result.v1',status:'refused',reason:'ATR-TOPOLOGY-DRIFT',completed:[]};}
@@ -130,14 +153,15 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    if(managed.length>1||imports.length>1||(managed.length===1)!==(imports.length===1))throw Error('ATR-MANAGED-IMPORT-AMBIGUOUS');
    const hookPlans=wiring(observation,configRoot,workspaceRoot);
    const other=scope==='workspace'?'global':'workspace';
-   if(observation.registries[other].entries.some(e=>e.status==='observed'&&e.root!==source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
+   if(conflicting(observation.registries[other],source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
    const retire=managed.length===1&&managed[0].content.sha256!==source.content.sha256;
    const install=scope==='global'&&(managed.length===0||retire);
    const globalWiring=hookPlans.some(p=>p.scope==='global'&&p.changes>0);
    if((retire||install||globalWiring||scope==='global')&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');
+   if(scope==='workspace'&&antigravityWorkspaceRelativePath(workspaceRoot,source.root)===null)throw Error('ATR-WORKSPACE-SOURCE-OUTSIDE');
    // Preserve the physically verified ownership/preimage before an authorized
    // CLI uninstall removes a root referenced by an existing registry entry.
-   const registryPlans=(globalChangeApproved?[scope,other]:[scope]).map(selected=>({selected,registry:observation.registries[selected],pipeline:observation.registries[selected].entries.filter(e=>e.status==='observed'),dangling:observation.registries[selected].entries.filter(e=>e.status==='dangling-managed')})).filter(p=>p.selected===scope||p.pipeline.length>0||p.dangling.length>0);
+   const registryPlans=(globalChangeApproved?[scope,other]:[scope]).map(selected=>({selected,registry:observation.registries[selected],...antigravityRegistryEntries(observation.registries[selected])})).filter(p=>p.selected===scope||p.pipeline.length>0||p.dangling.length>0).map(p=>({...p,change:registryChange(observation,p.selected,scope,workspaceRoot)}));
    let checkpoint=antigravityTopologySha256(observation);
    function recheck(){const fresh=observeAntigravityPluginTopology(args);if(antigravityTopologySha256(fresh)!==checkpoint)throw Error('ATR-TOPOLOGY-DRIFT');return fresh;}
    const registryDigests=Object.fromEntries(Object.entries(observation.registries).map(([key,r])=>[key,r.sha256]));
@@ -159,15 +183,14 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    // bind it after lifecycle; a stale/unknown new command cannot become success.
    const newWiring=wiring(observation,configRoot,workspaceRoot);
    for(const hook of newWiring)if(hook.changes){if(hook.scope==='global'&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');recheck();changed=true;write(hook.path,hook.nextBytes,hook.sha256);completed.push('post-cli-wiring-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
-   for(const {selected,registry,pipeline,dangling} of registryPlans){
-    const bound=pipeline.length===1&&pipeline[0].root===source.root;
-    if(!bound||dangling.length){recheck();const f=read(registry.path);const original=f.bytes??Buffer.from('{"entries":[]}\n');
-     // A dangling managed entry (its directory is gone) is removed in the same owned rebind. Only the selected scope, or a registry already holding a Pipeline entry, gains the source root; foreign entries are never touched.
-     const removed=(bound?dangling:[...pipeline,...dangling]).map(e=>e.index).sort((a,b)=>a-b),appends=!bound&&(selected===scope||pipeline.length>0)?[{path:['entries'],values:[{path:source.root}]}]:[];
-     const next=rewriteAntigravityJsonBytes(original,{deletions:removed.map(i=>['entries',i]),...(appends.length?{appends}:{})});changed=true;write(registry.path,next,registry.sha256);completed.push(selected+'-registry-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
+   for(const {selected,registry,change} of registryPlans){
+    if(change!==null){recheck();const f=read(registry.path);const original=f.bytes??Buffer.from('{"entries":[]}\n');
+     // A dangling managed entry (its directory is gone) is removed in the same owned rebind. Only the selected scope, or a registry already holding a Pipeline entry, gains the source root (the workspace registry: its repo-relative path); foreign and tracked relative entries are never touched.
+     const appends=change.append!==null?[{path:['entries'],values:[{path:change.append}]}]:[];
+     const next=rewriteAntigravityJsonBytes(original,{deletions:change.removed.map(i=>['entries',i]),...(appends.length?{appends}:{})});changed=true;write(registry.path,next,registry.sha256);completed.push(selected+'-registry-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
    }
-   const final=observeAntigravityPluginTopology(args);if(final.source.content?.sha256!==source.content.sha256||final.registries[scope].status!=='observed'||final.registries[scope].entries.filter(e=>e.status==='observed').length!==1||final.registries[scope].entries.find(e=>e.status==='observed').root!==source.root)throw Error('ATR-FINAL-READBACK');
-   if(registryPlans.some(({selected})=>final.registries[selected].entries.some(e=>e.status==='observed'&&e.root!==source.root)||final.registries[selected].status!=='observed'))throw Error('ATR-FINAL-READBACK');
+   const final=observeAntigravityPluginTopology(args);if(final.source.content?.sha256!==source.content.sha256||!registryBound(final,scope,scope,source))throw Error('ATR-FINAL-READBACK');
+   if(registryPlans.some(({selected})=>!registryBound(final,selected,scope,source)))throw Error('ATR-FINAL-READBACK');
    if(wiring(final,configRoot,workspaceRoot).some(p=>p.changes>0))throw Error('ATR-FINAL-WIRING-READBACK');
    if(scope==='global'&&!final.managed.candidates[0])throw Error('ATR-FINAL-READBACK');
    if(final.managed.candidates.length){
@@ -176,7 +199,7 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
     const r=writeInstalledReceipt({provider:'antigravity',plugin:{name:'pipeline-core',version:source.version},sourcePluginRoot:source.root,installedPluginRoot:copy.root});if(r?.status!=='written')throw Error('ATR-ATTESTATION-FAILED');
    }
    return {schema:'pipeline.antigravity-refresh-result.v1',status:'refreshed',completed,changed,sourceContentSha256:source.content.sha256,finalTopologySha256:antigravityTopologySha256(final),requiresFreshExecutingSession:true};
-  }catch(e){return {schema:'pipeline.antigravity-refresh-result.v1',status:changed?'partial':'refused',reason:/^ATR-[A-Z-]+$/.test(e.message)?e.message:'ATR-UNAVAILABLE',completed,requiresFreshExecutingSession:true};}
+  }catch(e){return {...refusal('pipeline.antigravity-refresh-result.v1',e,{completed,requiresFreshExecutingSession:true}),status:changed?'partial':'refused'};}
   finally{active=false;}
  }};return Object.freeze(host);
 }

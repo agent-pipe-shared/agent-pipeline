@@ -37,34 +37,51 @@ test('sealed fixture refresh converges managed/import/global/workspace/wiring an
  assert.deepEqual(f.calls.map(a=>a[1]),[undefined,'validate','uninstall','validate','install']);
  const imported=JSON.parse(readFileSync(f.imports));assert.equal(imported.preserved,'import-key');assert(imported.imports.some(e=>e.name==='foreign-plugin'));
  const global=JSON.parse(readFileSync(f.global));assert.deepEqual(global.custom,{keep:true});assert.deepEqual(global.entries[1],{path:f.foreign,enabled:false});
- const local=JSON.parse(readFileSync(f.local));assert.equal(local.custom,'workspace');assert.deepEqual(local.entries,[{path:f.foreign,enabled:false},{path:f.approvedSourceRoot}]);
+ // D79: the tracked registry never carries a machine path. This used to expect the absolute source appended after the foreign entry; a global refresh now only REMOVES the absolute Pipeline entry (QG-04 justification).
+ const local=JSON.parse(readFileSync(f.local));assert.equal(local.custom,'workspace');assert.deepEqual(local.entries,[{path:f.foreign,enabled:false}]);
  const hooks=JSON.parse(readFileSync(wire));assert.equal(hooks.hooks[0].command,'node "'+join(f.approvedSourceRoot,'hooks','antigravity-start-hint.mjs')+'"');assert.equal(hooks.hooks[1].command,'foreign-check --safe');
  assert.equal(observeAntigravityLoadedTopology({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
  const count=f.calls.length,r2=host.refresh();assert.equal(r2.status,'refreshed');assert.equal(r2.changed,false);assert.equal(f.calls.length,count+1,'only finite read-only version check on repeated converged refresh');
 });
 test('workspace intent refuses stale global retirement; explicit global approval enables registry-only retirement',t=>{
  const f=fixture(t),before=readFileSync(f.global);let r=createAntigravityRefreshHost({...f.args,scope:'workspace',globalChangeApproved:false}).refresh();assert.equal(r.reason,'ATR-GLOBAL-SCOPE');assert.deepEqual(readFileSync(f.global),before);assert.equal(f.calls.length,1);
- r=createAntigravityRefreshHost({...f.args,scope:'workspace'}).refresh();assert.equal(r.status,'refreshed');assert.equal(existsSync(f.old),false);assert.equal(JSON.parse(readFileSync(f.local)).entries.at(-1).path,f.approvedSourceRoot);
+ // D79: the tracked registry never carries a machine path. This used to refresh with the source OUTSIDE the workspace and assert the absolute source path appended to the workspace registry; that is the leak this decision closes, so the outside source is now refused (nothing changes) and the refresh is driven with the source inside the workspace, asserting the repo-relative path (QG-04 justification).
+ const localBefore=readFileSync(f.local);r=createAntigravityRefreshHost({...f.args,scope:'workspace'}).refresh();assert.equal(r.status,'refused');assert.equal(r.reason,'ATR-WORKSPACE-SOURCE-OUTSIDE');assert.match(r.guidance,/global option/);assert.equal(existsSync(f.old),true);assert.equal(f.calls.length,2,'only the two read-only version checks');assert.deepEqual(readFileSync(f.local),localBefore);assert.deepEqual(readFileSync(f.global),before);
+ const g=fixture(t),inside=join(g.workspaceRoot,'plugins','pipeline-core');cpSync(g.approvedSourceRoot,inside,{recursive:true});
+ r=createAntigravityRefreshHost({...g.args,approvedSourceRoot:inside,scope:'workspace'}).refresh();assert.equal(r.status,'refreshed',JSON.stringify(r));assert.equal(existsSync(g.old),false);assert.deepEqual(JSON.parse(readFileSync(g.local)).entries,[{path:g.foreign,enabled:false},{path:'plugins/pipeline-core'}]);assert.equal(JSON.parse(readFileSync(g.global)).entries.at(-1).path,inside,'the global registry keeps the absolute root');
 });
 test('empty workspace binds an existing matching managed copy and attests its exact source',t=>{
- const f=fixture(t);rmSync(f.old,{recursive:true});cpSync(f.approvedSourceRoot,f.old,{recursive:true});
+ // D79: the tracked registry never carries a machine path. The source used to lie outside the workspace and the workspace registry received its absolute path; the source now lies inside the workspace (global registry re-pointed to it) and the registry receives the repo-relative path (QG-04 justification).
+ const f=fixture(t),inside=join(f.workspaceRoot,'plugins','pipeline-core');cpSync(f.approvedSourceRoot,inside,{recursive:true});rmSync(f.old,{recursive:true});cpSync(inside,f.old,{recursive:true});
+ f.put(f.global,{entries:[{path:inside},{path:f.foreign,enabled:false}],custom:{keep:true}});
  rmSync(join(f.workspaceRoot,'.agents'),{recursive:true});
  const receipts=[];
- const host=createAntigravityRefreshHost({...f.args,scope:'workspace',globalChangeApproved:false,writeInstalledReceipt:input=>{receipts.push(input);return {status:'written'};}});
+ const host=createAntigravityRefreshHost({...f.args,approvedSourceRoot:inside,scope:'workspace',globalChangeApproved:false,writeInstalledReceipt:input=>{receipts.push(input);return {status:'written'};}});
  const plan=host.prepare();assert.equal(plan.status,'prepared',JSON.stringify(plan));
  assert.equal(plan.actions.some(action=>action.kind==='cli'),false);
  const result=host.apply(plan);assert.equal(result.status,'refreshed',JSON.stringify(result));
  assert.deepEqual(f.calls,[['--version'],['--version']]);
  assert.equal(existsSync(f.old),true);
- assert.equal(JSON.parse(readFileSync(f.local)).entries.at(-1).path,f.approvedSourceRoot);
- assert.deepEqual(receipts,[{provider:'antigravity',plugin:{name:'pipeline-core',version:'0.7.0'},sourcePluginRoot:f.approvedSourceRoot,installedPluginRoot:f.old}]);
+ assert.deepEqual(JSON.parse(readFileSync(f.local)).entries,[{path:'plugins/pipeline-core'}]);
+ assert.deepEqual(receipts,[{provider:'antigravity',plugin:{name:'pipeline-core',version:'0.7.0'},sourcePluginRoot:inside,installedPluginRoot:f.old}]);
  assert.equal(observeAntigravityLoadedTopology({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
  assert.equal(observeAntigravityLoadedTopologyWithWiring({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
  const rel=fixture(t),relSource=join(rel.workspaceRoot,'plugins','pipeline-core');cpSync(rel.approvedSourceRoot,relSource,{recursive:true});rmSync(rel.old,{recursive:true});
  const imports=JSON.parse(readFileSync(rel.imports));rel.put(rel.imports,{...imports,imports:imports.imports.filter(e=>e.name!=='agent-pipeline-core')});rel.put(rel.local,{entries:[{path:'plugins/pipeline-core'}]});
- const observed=observeAntigravityPluginTopology(rel.args);assert.equal(observed.registries.workspace.status,'observed');assert.equal(observed.registries.workspace.entries[0].root,relSource);
- assert.equal(planAntigravityTopologyRefresh({observation:observed,scope:'workspace',cliVersion:'1.2.14'}).status,'prepared');
- assert.equal(createAntigravityRefreshHost({...rel.args,scope:'workspace',globalChangeApproved:false}).refresh().status,'refreshed');assert.equal(JSON.parse(readFileSync(rel.local)).entries.at(-1).path,rel.approvedSourceRoot);
+ const observed=observeAntigravityPluginTopology(rel.args);assert.equal(observed.registries.workspace.status,'observed');assert.equal(observed.registries.workspace.entries[0].root,relSource);assert.equal(observed.registries.workspace.entries[0].relative,true);
+ // D79: a relative entry is a tracked, path-free binding that is never rewritten. These two lines used to expect a 'prepared' plan and a rebind of the entry to the absolute (outside) source; the outside source is now held/refused with the file untouched, and a source that IS the relative entry's root needs no change at all (QG-04 justification).
+ const localBytes=readFileSync(rel.local);
+ const held=planAntigravityTopologyRefresh({observation:observed,scope:'workspace',cliVersion:'1.2.14'});assert.equal(held.status,'held');assert.equal(held.reason,'AT-WORKSPACE-SOURCE-OUTSIDE');assert.match(held.guidance,/global option.*inside the workspace/);assert.deepEqual(held.actions,[]);
+ assert.equal(createAntigravityRefreshHost({...rel.args,scope:'workspace',globalChangeApproved:false}).refresh().reason,'ATR-WORKSPACE-SOURCE-OUTSIDE');assert.deepEqual(readFileSync(rel.local),localBytes);
+ rel.put(rel.global,{entries:[{path:relSource},{path:rel.foreign,enabled:false}]});
+ const bound=observeAntigravityPluginTopology({...rel.args,approvedSourceRoot:relSource});
+ assert.equal(planAntigravityTopologyRefresh({observation:bound,scope:'workspace',cliVersion:'1.2.14'}).status,'metadata-current');
+ const boundResult=createAntigravityRefreshHost({...rel.args,approvedSourceRoot:relSource,scope:'workspace',globalChangeApproved:false}).refresh();assert.equal(boundResult.status,'refreshed',JSON.stringify(boundResult));assert.equal(boundResult.changed,false);assert.deepEqual(readFileSync(rel.local),localBytes);
+ // A leaked absolute entry for the same source is replaced by the repo-relative path; a foreign entry stays.
+ rel.put(rel.local,{entries:[{path:relSource},{path:rel.foreign,enabled:false}]});
+ const leaked=planAntigravityTopologyRefresh({observation:observeAntigravityPluginTopology({...rel.args,approvedSourceRoot:relSource}),scope:'workspace',cliVersion:'1.2.14'});
+ assert.equal(leaked.status,'prepared');assert.deepEqual(leaked.actions.map(a=>[a.kind,a.removeIndexes,a.appendPath]),[['registry-rebind',[0],'plugins/pipeline-core']]);
+ assert.equal(createAntigravityRefreshHost({...rel.args,approvedSourceRoot:relSource,scope:'workspace',globalChangeApproved:false}).refresh().status,'refreshed');assert.deepEqual(JSON.parse(readFileSync(rel.local)).entries,[{path:rel.foreign,enabled:false},{path:'plugins/pipeline-core'}]);
  const globalRelative=fixture(t);globalRelative.put(globalRelative.global,{entries:[{path:'plugins/pipeline-core'}]});assert.equal(observeAntigravityPluginTopology(globalRelative.args).registries.global.status,'unavailable');
  const escaping=fixture(t);escaping.put(escaping.local,{entries:[{path:'../source'}]});assert.equal(observeAntigravityPluginTopology(escaping.args).registries.workspace.status,'unavailable');
  const aliased=fixture(t),alias=join(aliased.workspaceRoot,'plugins','pipeline-core');mkdirSync(join(alias,'..'),{recursive:true});symlinkSync(aliased.approvedSourceRoot,alias);aliased.put(aliased.local,{entries:[{path:'plugins/pipeline-core'}]});

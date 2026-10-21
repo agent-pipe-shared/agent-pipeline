@@ -307,16 +307,140 @@ test('a refused validate still changes nothing: the stale managed copy is neithe
   assert.deepEqual(files(w.configRoot), before);
 });
 
-test('workspace scope keeps registering the shared source, never a generated view', (t) => {
+// ---- D79: the tracked workspace registry never carries a machine path ---------------------------------------------------------------
+// `<workspace>/.agents/plugins.json` is a tracked, committed file. A relative entry that resolves inside the workspace is path-free and is
+// never rewritten or removed; an absolute Pipeline entry there is a machine path that leaks to teammates, so it is removed (global scope)
+// or replaced by the repo-relative path (workspace scope, source inside the workspace). The global registry keeps the absolute view root.
+// UNVERIFIED: whether the real Antigravity host resolves a relative `entries[].path` against the workspace is not established here.
+
+const TRACKED_REGISTRY = '{"entries":[{"path":"plugins/pipeline-core"}]}\n';
+const git = (w, ...args) => execFileSync('git', ['-C', w.repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args], { encoding: 'utf8' });
+// The workspace IS the source checkout; the committed `.agents/plugins.json` carries the repo-relative Pipeline entry.
+function trackedWorkspace(t, { tracked = TRACKED_REGISTRY } = {}) {
+  const base = world(t);
+  const w = { ...base, workspaceRoot: base.repo, trackedPath: join(base.repo, '.agents', 'plugins.json') };
+  if (tracked !== null) {
+    mkdirSync(dirname(w.trackedPath), { recursive: true });
+    writeFileSync(w.trackedPath, tracked);
+    git(w, 'add', '.');
+    git(w, 'commit', '-m', 'track the workspace registry');
+  }
+  writeFileSync(w.importsPath, '{"imports":null}\n');
+  return w;
+}
+function filesContaining(root, needle) {
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === '.git') continue;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path); else if (readFileSync(path).includes(needle)) found.push(path);
+    }
+  };
+  walk(root);
+  return found;
+}
+const globalRegistryPaths = (w) => JSON.parse(readFileSync(w.registryPath, 'utf8')).entries.map((entry) => entry.path);
+
+test('D79: option 2 in a workspace that is the source checkout leaves the tracked path-free registry byte-identical and leaks no machine path', (t) => {
+  const w = trackedWorkspace(t);
+  const cli = fakeCli(w);
+  const first = installView(w, cli);
+  assert.equal(first.status, 'refreshed', JSON.stringify(first));
+  const viewRoot = cli.calls.find((argv) => argv[1] === 'install')[2];
+  assert.equal(readFileSync(w.trackedPath, 'utf8'), TRACKED_REGISTRY, 'the tracked registry is byte-identical');
+  assert.equal(git(w, 'status', '--porcelain'), '', 'the checkout stays clean');
+  assert.deepEqual(filesContaining(w.repo, w.home), [], 'no tracked or untracked file carries the home path');
+  assert.deepEqual(filesContaining(w.repo, w.base), [], 'no tracked or untracked file carries any fixture machine path');
+  assert.ok(globalRegistryPaths(w).includes(viewRoot), 'the global registry binds the installed runner-view root');
+  const second = installView(w, fakeCli(w));
+  assert.equal(second.status, 'refreshed', JSON.stringify(second));
+  assert.equal(second.changed, false, 'the converged state needs no further change');
+  assert.equal(readFileSync(w.trackedPath, 'utf8'), TRACKED_REGISTRY);
+  assert.equal(git(w, 'status', '--porcelain'), '');
+  assert.deepEqual(globalRegistryPaths(w).filter((path) => path === viewRoot), [viewRoot], 'the view root is bound exactly once');
+});
+
+test('D79: a legacy leaked absolute Pipeline entry in the workspace registry is removed by a global refresh, foreign bytes exact', (t) => {
   const w = world(t);
+  const local = join(w.workspaceRoot, '.agents', 'plugins.json');
+  mkdirSync(dirname(local), { recursive: true });
+  writeFileSync(local, `{\n "entries":[\n  ${FOREIGN_ENTRY(w)},\n  {"path":${JSON.stringify(w.pluginRoot)}}\n ]\n}\n`);
+  writeFileSync(w.importsPath, '{"imports":null}\n');
+  const result = installView(w, fakeCli(w));
+  assert.equal(result.status, 'refreshed', JSON.stringify(result));
+  const raw = readFileSync(local, 'utf8');
+  assert.ok(raw.includes(FOREIGN_ENTRY(w)), 'the foreign entry bytes are kept exactly');
+  assert.deepEqual(JSON.parse(raw).entries, [{ path: w.foreign, keep: true }], 'only the machine-path Pipeline entry is gone, nothing is appended');
+  assert.equal(raw.includes(w.pluginRoot), false);
+  assert.equal(raw.includes(w.home), false);
+});
+
+test('D79: workspace scope with the source outside the workspace is refused with the typed reason and its repair, nothing is written', (t) => {
+  const w = world(t);
+  const cli = fakeCli(w);
+  const before = files(w.base);
+  const result = installer.refreshAntigravityInstallation(
+    { configRoot: w.configRoot, workspaceRoot: w.workspaceRoot, approvedSourceRoot: w.pluginRoot, attestationSourceRoot: w.pluginRoot, scope: 'workspace', globalChangeApproved: false },
+    { runCli: cli.run });
+  assert.equal(result.status, 'refused', JSON.stringify(result));
+  assert.equal(result.reason, 'ATR-WORKSPACE-SOURCE-OUTSIDE');
+  assert.match(result.guidance, /global option/u, 'the refusal names the first repair');
+  assert.match(result.guidance, /inside the workspace/u, 'the refusal names the second repair');
+  assert.match(installer.describeInstallerSourceRefusal(result), /ATR-WORKSPACE-SOURCE-OUTSIDE\. .*global option/u);
+  assert.deepEqual(result.completed, []);
+  assert.equal(existsSync(join(w.workspaceRoot, '.agents', 'plugins.json')), false, 'no workspace registry is written');
+  assert.deepEqual(files(w.base), before, 'nothing under the fixture changed');
+  assert.deepEqual(verbs(cli.calls), []);
+  // The same refusal when an explicit global approval is present: an absolute path is never the fallback.
+  const approved = installer.refreshAntigravityInstallation(
+    { configRoot: w.configRoot, workspaceRoot: w.workspaceRoot, approvedSourceRoot: w.pluginRoot, attestationSourceRoot: w.pluginRoot, scope: 'workspace', globalChangeApproved: true },
+    { runCli: fakeCli(w).run });
+  assert.equal(approved.reason, 'ATR-WORKSPACE-SOURCE-OUTSIDE');
+  assert.equal(existsSync(join(w.workspaceRoot, '.agents', 'plugins.json')), false);
+});
+
+// D79: the tracked registry never carries a machine path. This case used to assert the ABSOLUTE source path in the workspace registry
+// (`[w.pluginRoot]`); that is exactly the leak this decision closes, so the assertion now pins the repo-relative path (QG-04 justification).
+test('workspace scope keeps registering the shared source (repo-relative), never a generated view', (t) => {
+  const w = trackedWorkspace(t, { tracked: null });
   const cli = fakeCli(w);
   const result = installer.refreshAntigravityInstallation(
     { configRoot: w.configRoot, workspaceRoot: w.workspaceRoot, approvedSourceRoot: w.pluginRoot, attestationSourceRoot: w.pluginRoot, scope: 'workspace', globalChangeApproved: false },
     { runCli: cli.run });
   assert.equal(result.status, 'refreshed', JSON.stringify(result));
-  assert.deepEqual(JSON.parse(readFileSync(join(w.workspaceRoot, '.agents', 'plugins.json'), 'utf8')).entries.map((entry) => entry.path), [w.pluginRoot]);
+  assert.deepEqual(JSON.parse(readFileSync(w.trackedPath, 'utf8')).entries.map((entry) => entry.path), ['plugins/pipeline-core']);
+  assert.equal(readFileSync(w.trackedPath, 'utf8').includes(w.base), false, 'the workspace registry carries no machine path');
   assert.deepEqual(verbs(cli.calls), []);
   assert.equal(existsSync(join(w.home, '.agent-pipeline')), false, 'no view is generated for a workspace registration');
+  const again = installer.refreshAntigravityInstallation(
+    { configRoot: w.configRoot, workspaceRoot: w.workspaceRoot, approvedSourceRoot: w.pluginRoot, attestationSourceRoot: w.pluginRoot, scope: 'workspace', globalChangeApproved: false },
+    { runCli: fakeCli(w).run });
+  assert.equal(again.status, 'refreshed', JSON.stringify(again));
+  assert.equal(again.changed, false, 'a second run finds the relative entry already bound');
+});
+
+test('D79: a relative workspace entry is marked relative and does not make the loaded topology ambiguous next to the global view entry', (t) => {
+  const w = trackedWorkspace(t);
+  const view = snap.publishAgyRunnerView({ sourcePluginRoot: w.pluginRoot, deps: w.snapshotDeps });
+  writeFileSync(w.registryPath, `{"entries":[{"path":${JSON.stringify(view.root)}}]}\n`);
+  const topology = observe(w);
+  assert.equal(topology.registries.workspace.status, 'observed');
+  assert.deepEqual(topology.registries.workspace.entries.map((entry) => [entry.status, entry.root, entry.relative]), [['observed', w.pluginRoot, true]]);
+  assert.equal(Object.hasOwn(topology.registries.global.entries[0], 'relative'), false, 'an absolute observation keeps its shape');
+  const loaded = observeAntigravityLoadedTopology({ loadedPluginRoot: view.root, configRoot: w.configRoot, workspaceRoot: w.workspaceRoot });
+  assert.notEqual(loaded.status, 'unavailable', JSON.stringify(loaded));
+  assert.equal(loaded.status, 'current', JSON.stringify(loaded));
+  assert.equal(loaded.sourcePluginRoot, view.root, 'the global/loaded root is preferred over the path-free workspace entry');
+  // Only relative entries: today's behaviour, the relative root is the source.
+  rmSync(w.registryPath);
+  const onlyRelative = observeAntigravityLoadedTopology({ loadedPluginRoot: w.pluginRoot, configRoot: w.configRoot, workspaceRoot: w.workspaceRoot });
+  assert.equal(onlyRelative.status, 'current', JSON.stringify(onlyRelative));
+  assert.equal(onlyRelative.sourcePluginRoot, w.pluginRoot);
+  // Two different absolute roots stay ambiguous: the relaxation covers path-free entries only.
+  writeFileSync(w.registryPath, `{"entries":[{"path":${JSON.stringify(view.root)}}]}\n`);
+  writeFileSync(w.trackedPath, `{"entries":[{"path":${JSON.stringify(w.pluginRoot)}}]}\n`);
+  assert.equal(observeAntigravityLoadedTopology({ loadedPluginRoot: view.root, configRoot: w.configRoot, workspaceRoot: w.workspaceRoot }).status, 'unavailable');
 });
 
 test('the interactive installer routes option 2 through the runner view and option 1 through the shared source', () => {

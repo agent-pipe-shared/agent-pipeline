@@ -9,7 +9,7 @@ import { isDirectInvocation } from "./lib/entrypoint.mjs";
 import { writeLocalDevelopmentInstalledPluginReceipt } from "./scripts/installed-plugin-attestation-host.mjs";
 import { homedir } from "node:os";
 import { createAntigravityRefreshHost, resolveAntigravityCliPath } from "./lib/antigravity-topology-refresh-host.mjs";
-import { observeAntigravityPluginTopology } from "./lib/antigravity-plugin-topology.mjs";
+import { ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE, antigravityWorkspaceRelativePath, observeAntigravityPluginTopology } from "./lib/antigravity-plugin-topology.mjs";
 import { observeRunnerPublicCoreIdentity, snapshotPhysicalPluginRoot } from "./lib/public-core-observation.mjs";
 import { installAgyFromCentralSnapshot as installAgyFromCentralSnapshotDefault } from "./lib/agy-central-refresh.mjs";
 import { execFileSync as nodeExecFileSync, spawnSync } from "node:child_process";
@@ -125,6 +125,10 @@ export function updatePluginRegistry({ targetFile, corePluginPath }) {
   if (!parentInfo.isDirectory() || parentInfo.isSymbolicLink() || realpathSync(parent) !== parent) {
     throw new Error("Unsafe plugin registry parent");
   }
+  // D79: `<workspace>/.agents/plugins.json` is a tracked file, so it only ever carries a repo-relative path, never a machine path.
+  const workspaceRoot = basename(parent) === ".agents" && basename(targetFile) === "plugins.json" ? dirname(parent) : null;
+  const relativeSource = workspaceRoot === null ? null : antigravityWorkspaceRelativePath(workspaceRoot, corePluginPath);
+  if (workspaceRoot !== null && relativeSource === null) throw new Error(`ATR-WORKSPACE-SOURCE-OUTSIDE. ${ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE}`);
   if (existsSync(targetFile)) {
     const targetInfo = lstatSync(targetFile);
     if (!targetInfo.isFile() || targetInfo.isSymbolicLink()) throw new Error("Unsafe plugin registry target");
@@ -141,7 +145,9 @@ export function updatePluginRegistry({ targetFile, corePluginPath }) {
     throw new Error(`Malformed plugin registry: ${targetFile}`);
   }
   const retained = config.entries.filter((entry) => !isPipelineRegistration(entry.path, corePluginPath));
-  const nextEntries = [...retained, { path: corePluginPath }];
+  // A relative entry is a tracked, path-free binding: it is retained untouched (isPipelineRegistration never claims it) and, when it already names the source, nothing is appended.
+  const tracked = workspaceRoot !== null && retained.some((entry) => !isAbsolute(entry.path) && resolve(workspaceRoot, entry.path) === corePluginPath);
+  const nextEntries = workspaceRoot === null ? [...retained, { path: corePluginPath }] : tracked ? retained : [...retained, { path: relativeSource }];
   if (JSON.stringify(config.entries) === JSON.stringify(nextEntries)) return;
   const temporary = join(parent, `.${basename(targetFile)}.${randomUUID()}.tmp`);
   let descriptor;
@@ -272,7 +278,7 @@ export function refreshAntigravityInstallation(options, dependencies = {}) {
   const receiptWriter = dependencies.writeInstalledReceipt ?? writeLocalDevelopmentInstalledPluginReceipt;
   const host = createAntigravityRefreshHost({ ...options, ...dependencies, writeInstalledReceipt: input => receiptWriter({ ...input, sourcePluginRoot: receiptSourceRoot }) });
   const plan = host.prepare();
-  if (plan.status !== "prepared") return { schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason: plan.reason, completed: [] };
+  if (plan.status !== "prepared") return { schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason: plan.reason, ...(plan.guidance ? { guidance: plan.guidance } : {}), completed: [] };
   return host.apply(plan);
 }
 
@@ -539,7 +545,7 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
   console.log("Antigravity may retain a managed imported copy alongside path registries; both are observed before refresh.");
   console.log("Where would you like to install the pipeline?\n");
   console.log("  1) Workspace-Local (Recommended for teams - writes .agents/plugins.json)");
-  console.log("  2) Global topology refresh (updates managed copy, owned global wiring/registry and existing Pipeline registration in this workspace)\n");
+  console.log("  2) Global topology refresh (updates managed copy, owned global wiring/registry; removes a machine-path Pipeline entry from this workspace's tracked .agents/plugins.json, a relative entry stays)\n");
 
   rl.question("Select option (1 or 2): ", (answer) => {
     let targetFile;
@@ -567,7 +573,7 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
       const refreshOptions = { configRoot, workspaceRoot: process.cwd(), approvedSourceRoot: corePluginPath, attestationSourceRoot, scope: answer.trim() === "2" ? "global" : "workspace", globalChangeApproved: answer.trim() === "2", cliPath: resolveAntigravityCliPath() };
       const result = answer.trim() === "2" ? refreshAntigravityGlobalFromRunnerView(refreshOptions) : refreshAntigravityInstallation(refreshOptions);
       console.log(JSON.stringify(result));
-      if (result.status !== "refreshed") throw new Error(result.reason ?? "ATR-REFRESH-UNAVAILABLE");
+      if (result.status !== "refreshed") throw new Error(describeInstallerSourceRefusal({ guidance: result.guidance, reason: result.reason ?? "ATR-REFRESH-UNAVAILABLE" }));
     } catch (error) {
       console.error(`Installation refused: ${error.message}`);
       rl.close();

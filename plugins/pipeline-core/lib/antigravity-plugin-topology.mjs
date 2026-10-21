@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Prepared physical diagnostics, never an executing-path attestation.
 import {openSync,closeSync,readSync,fstatSync,lstatSync,realpathSync,opendirSync,constants} from 'node:fs';
-import {resolve,join,isAbsolute,sep} from 'node:path';
+import {resolve,join,isAbsolute,sep,relative} from 'node:path';
 import {createHash} from 'node:crypto';
 import {parseStrictJson,canonicalizeJson} from './governance-event.mjs';
 
@@ -88,9 +88,25 @@ function registry(path,pluginName,workspaceRoot=null,managedRoot=null){
     if(!isAbsolute(v.path)&&(workspaceRoot===null||!root.startsWith(workspaceRoot+sep)))return {index,status:'unavailable'};
     const c=candidate(root,pluginName);
     if(c.status==='unavailable'&&managedRoot!==null&&v.path===managedRoot&&absent(root))return {index,root,status:'dangling-managed'};
-    return {index,...c};
+    // D79: a raw path that was relative is a tracked, path-free entry. The marker exists ONLY on those, so absolute observations keep their shape.
+    return {index,...c,...(isAbsolute(v.path)?{}:{relative:true})};
   });
   return {path,status:entries.some(e=>e.status==='unavailable')?'unavailable':'observed',sha256:f.sha256,entries};
+}
+// D79: the repair named by every refusal of a workspace registration whose source lies outside the workspace (host `ATR-…`, planner `AT-…`).
+export const ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE='Repair: use the global option (option 2), which registers the plugin outside the work tree, or install the plugin inside the workspace so a repo-relative path can be registered.';
+// D79: the tracked workspace registry never carries a machine path. The Pipeline entries of one registry, split by who owns them:
+// `tracked` (observed, raw path relative: never rewritten or removed, never a second root), `pipeline` (observed, absolute: owned and
+// replaced/removed), `dangling` (the vanished managed-copy entry). Foreign and unavailable entries are in none of the three.
+export function antigravityRegistryEntries(registry){
+  const entries=registry.entries;
+  return {tracked:entries.filter(e=>e.status==='observed'&&e.relative===true),pipeline:entries.filter(e=>e.status==='observed'&&e.relative!==true),dangling:entries.filter(e=>e.status==='dangling-managed')};
+}
+// The '/'-separated repo-relative path of `root` strictly inside `workspaceRoot`, else null (the source lies outside the workspace).
+export function antigravityWorkspaceRelativePath(workspaceRoot,root){
+  const rel=relative(workspaceRoot,root);
+  if(rel===''||rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel))return null;
+  return rel.split(sep).join('/');
 }
 export function observeAntigravityPluginTopology({configRoot,workspaceRoot,approvedSourceRoot,pluginName='agent-pipeline-core'}){
   if(!/^[a-z0-9][a-z0-9-]{0,79}$/.test(pluginName))throw Error('AT-NAME');
@@ -120,7 +136,7 @@ export function observeAntigravityPluginTopology({configRoot,workspaceRoot,appro
 // and subsequent independent observation remain separate trusted responsibilities.
 export function planAntigravityTopologyRefresh({observation,scope,globalChangeApproved=false,cliVersion}){
   const binding=snapshots.get(observation);if(!binding)throw Error('AT-NOT-PHYSICAL-OBSERVATION');
-  const held=reason=>freeze({schema:'pipeline.antigravity-refresh-plan.v1',status:'held',reason,observationSha256:binding.digest,actions:[]});
+  const held=(reason,guidance=null)=>freeze({schema:'pipeline.antigravity-refresh-plan.v1',status:'held',reason,...(guidance===null?{}:{guidance}),observationSha256:binding.digest,actions:[]});
   if(!['workspace','global'].includes(scope))return held('AT-SCOPE');
   if(!supportsAntigravityPluginCliVersion(cliVersion))return held('AT-CLI-CAPABILITY-UNOBSERVED');
   if(observation.source.status!=='observed'||observation.managed.status==='unavailable'||observation.importState.status==='unavailable'||Object.values(observation.registries).some(r=>r.status==='unavailable')||observation.wiring.some(w=>w.status==='unavailable'||w.status==='observed'))return held('AT-UNVERIFIABLE-SURFACE');
@@ -128,10 +144,14 @@ export function planAntigravityTopologyRefresh({observation,scope,globalChangeAp
   if(managed.length>1||imports.length>1||(imports.length===1&&managed.length!==1)||(managed.length===1&&imports.length!==1))return held('AT-MANAGED-IMPORT-AMBIGUOUS');
   const desired=observation.source,old=managed[0];
   const other=observation.registries[scope==='global'?'workspace':'global'];
-  if(other.entries.some(e=>e.status==='observed'&&e.root!==desired.root))return held('AT-OTHER-SCOPE-PIPELINE-CONFLICT');
+  // A tracked, path-free (relative) entry is never a second root.
+  if(other.entries.some(e=>e.status==='observed'&&e.relative!==true&&e.root!==desired.root))return held('AT-OTHER-SCOPE-PIPELINE-CONFLICT');
   const needsManaged=scope==='global'&&(!old||old.content.sha256!==desired.content.sha256);
   // A managed copy is global. Per-project intent never silently retires it.
   if((needsManaged||(scope==='workspace'&&old))&&!globalChangeApproved)return held('AT-GLOBAL-CHANGE-REQUIRES-EXPLICIT-SCOPE');
+  // D79: the workspace registry is tracked, so it only ever carries a repo-relative path; a source outside the workspace has none.
+  const workspacePath=scope==='workspace'?antigravityWorkspaceRelativePath(binding.workspaceRoot,desired.root):null;
+  if(scope==='workspace'&&workspacePath===null)return held('AT-WORKSPACE-SOURCE-OUTSIDE',ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE);
   const actions=[];
   if(needsManaged||(scope==='workspace'&&old)){
     // A replaced managed copy is retired only after the source validates, so the plan validates first and again before the install (same order as the host prepare()).
@@ -140,8 +160,14 @@ export function planAntigravityTopologyRefresh({observation,scope,globalChangeAp
     if(scope==='global')actions.push({kind:'cli',argv:['plugin','validate',desired.root]},{kind:'cli',argv:['plugin','install',desired.root]});
   }
   const registry=observation.registries[scope];
-  const pipeline=registry.entries.filter(e=>e.status==='observed'),dangling=registry.entries.filter(e=>e.status==='dangling-managed');
-  if(pipeline.length!==1||pipeline[0].root!==desired.root||dangling.length)actions.push({kind:'registry-rebind',scope,path:registry.path,expectedSha256:registry.sha256,removeIndexes:[...pipeline,...dangling].map(e=>e.index).sort((a,b)=>a-b),appendPath:desired.root,preserveOtherEntries:true});
+  const {tracked,pipeline,dangling}=antigravityRegistryEntries(registry);
+  if(scope==='global'){
+    if(pipeline.length!==1||pipeline[0].root!==desired.root||dangling.length)actions.push({kind:'registry-rebind',scope,path:registry.path,expectedSha256:registry.sha256,removeIndexes:[...pipeline,...dangling].map(e=>e.index).sort((a,b)=>a-b),appendPath:desired.root,preserveOtherEntries:true});
+  }else{
+    // Machine-path entries are replaced by the repo-relative path; a tracked relative entry that already names the source is kept as it is.
+    const bound=tracked.some(e=>e.root===desired.root);
+    if(pipeline.length||dangling.length||!bound)actions.push({kind:'registry-rebind',scope,path:registry.path,expectedSha256:registry.sha256,removeIndexes:[...pipeline,...dangling].map(e=>e.index).sort((a,b)=>a-b),...(bound?{}:{appendPath:workspacePath}),preserveOtherEntries:true});
+  }
   return freeze({schema:'pipeline.antigravity-refresh-plan.v1',status:actions.length?'prepared':'metadata-current',observationSha256:binding.digest,sourceContentSha256:desired.content.sha256,actions,requiresIndependentReadback:true,executingPath:'unknown'});
 }
 export function reobserveAntigravityTopology(observation){const args=snapshots.get(observation);if(!args)throw Error('AT-NOT-PHYSICAL-OBSERVATION');return observeAntigravityPluginTopology(args);}
@@ -153,7 +179,10 @@ export function observeAntigravityLoadedTopology({loadedPluginRoot,configRoot,wo
     const loaded=candidate(loadedPluginRoot,'agent-pipeline-core');if(loaded.status!=='observed')throw Error('AT-LOADED-UNAVAILABLE');
     const global=registry(join(configRoot,'config','plugins.json'),'agent-pipeline-core'),workspace=registry(join(workspaceRoot,'.agents','plugins.json'),'agent-pipeline-core',workspaceRoot);
     if([global,workspace].some(r=>r.status==='unavailable'))throw Error('AT-REGISTRY-UNAVAILABLE');
-    const roots=[...new Set([global,workspace].flatMap(r=>r.entries.filter(e=>e.status==='observed').map(e=>e.root)))];
+    // D79: a tracked, path-free workspace entry never competes with an absolute root (the global/loaded root wins); only when every observed entry is path-free do they decide.
+    const observed=r=>r.entries.filter(e=>e.status==='observed');
+    const absolute=[...new Set([global,workspace].flatMap(r=>observed(r).filter(e=>e.relative!==true).map(e=>e.root)))];
+    const roots=absolute.length>0?absolute:[...new Set(observed(workspace).map(e=>e.root))];
     if(roots.length!==1)throw Error('AT-REGISTRY-AMBIGUOUS');
     const observation=observeAntigravityPluginTopology({configRoot,workspaceRoot,approvedSourceRoot:roots[0]});
     if(observation.source.status!=='observed'||observation.managed.status==='unavailable'||observation.importState.status==='unavailable')throw Error('AT-TOPOLOGY-UNAVAILABLE');
