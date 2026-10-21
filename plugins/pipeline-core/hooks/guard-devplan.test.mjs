@@ -64,8 +64,8 @@ function verifyAdvisorLanes(dir, allowed, code = null) {
   if (code !== null) {
     if (!direct.stderr.includes(code)) throw new Error(direct.stderr);
     if (!shell.stderr.includes(code)) throw new Error(shell.stderr);
-    if (!direct.stderr.includes("reopen-design")) throw new Error(direct.stderr);
-    if (!shell.stderr.includes("design-advisory-admission.mjs inspect")) throw new Error(shell.stderr);
+    // QG-04 (E12, ADR-0085): the Advisor admission route is retired; the default remediation (designAdvisoryRemediation) names the live route in both lanes.
+    for (const lane of [direct, shell]) if (!lane.stderr.includes("present-plan --review-receipt") || lane.stderr.includes("design-advisory-admission.mjs")) throw new Error(lane.stderr);
   }
 }
 
