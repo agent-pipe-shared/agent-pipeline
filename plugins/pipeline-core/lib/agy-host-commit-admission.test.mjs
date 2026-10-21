@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync, openSync, rmSync, symlinkSync, writeFileSync } 
 import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { captureAgyHostCommitBaseline, assessAgyHostCommit, observeAgyHostHead } from "./agy-host-commit-admission.mjs";
+import { nativeGoldfishHookMessage } from "../hooks/native-goldfish-host.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const cases = [];
@@ -89,7 +90,42 @@ test("AHC06 rejects a rename unless both old and new paths are declared and allo
   assert.equal(result.code, "AGY-HOST-COMMIT-ADMITTED");
 }));
 
-assert.equal(cases.length, 6, "the complete Agy Host Commit Admission corpus must be registered before execution begins");
+test("AHC07 names the unignored Pipeline working files instead of a bare path mismatch, and still admits once they are ignored", () => fixture((context) => {
+  const route = "evidence/dispatch-route-ALF-X.json";
+  const writeRoute = () => { mkdirSync(join(context.root, "evidence"), { recursive: true }); writeFileSync(join(context.root, route), "{}\n"); };
+  const baseline = capture(context);
+  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
+  writeRoute();
+  const named = assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] });
+  assert.equal(named.code, "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED");
+  assert.deepEqual(named.pipelinePaths, [route]);
+  mkdirSync(join(context.root, "scratch", "pkg"), { recursive: true });
+  writeFileSync(join(context.root, "scratch", "pkg", "x.txt"), "x\n");
+  assert.deepEqual(assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] }).pipelinePaths, [route, "scratch/pkg/x.txt"]);
+  // A mismatch that the Pipeline paths do not explain keeps the unchanged refusal.
+  assert.equal(assessAgyHostCommit({ baseline, final: { changedPaths: ["src/other.mjs"] }, allowedPaths: ["src/other.mjs"] }).code, "AGY-HOST-COMMIT-PATH-MISMATCH");
+  // Control: the same dispatch in a project that ignores the working directories before the baseline is admitted.
+  rmSync(join(context.root, "evidence"), { recursive: true, force: true });
+  rmSync(join(context.root, "scratch"), { recursive: true, force: true });
+  context.git("checkout", "--", "src/one.mjs");
+  writeFileSync(join(context.root, ".gitignore"), "/evidence/\n/scratch/\n");
+  context.git("add", ".gitignore");
+  context.git("commit", "-qm", "ignore the Pipeline working directories");
+  const ignored = capture({ ...context, candidateCommit: context.git("rev-parse", "HEAD") });
+  writeFileSync(join(context.root, "src", "one.mjs"), "export const one = 2;\n");
+  writeRoute();
+  assert.equal(assessAgyHostCommit({ baseline: ignored, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs"] }).code, "AGY-HOST-COMMIT-ADMITTED");
+}));
+
+test("AHC08 the host hook prints a runnable repair for the unignored Pipeline paths", () => {
+  const message = nativeGoldfishHookMessage({ status: "recovery-required", code: "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED", commit: null, record: null });
+  assert.match(message, /AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED/u);
+  assert.match(message, /Repair: add the lines \/evidence\/ and \/scratch\/ to the project's \.gitignore and commit that change/u);
+  assert.match(message, /Orchestrator route[^:]*: .*Dispatch: <dispatchId> \(goldfish\).*dispatch-record-write\.mjs/u);
+  assert.match(message, /No commit or authorship record is claimed/u);
+});
+
+assert.equal(cases.length, 8, "the complete Agy Host Commit Admission corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

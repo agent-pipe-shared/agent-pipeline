@@ -12,6 +12,9 @@ const MAX_BASELINE_UNTRACKED = 64;
 const MAX_BASELINE_FILE_BYTES = 4 * 1024 * 1024;
 
 function fail(code) { return { ok: false, code }; }
+// The Pipeline's own working files: the dispatch guard's route record and the signed quality package's isolated checkout.
+// They only ever EXPLAIN a mismatch (they are never excluded from it), so the comparison below stays exact.
+const PIPELINE_WORKING_PATH = /^(?:evidence\/dispatch-route-[A-Za-z0-9._-]+\.json|scratch\/.+)$/u;
 function normalizedPath(value) {
   return typeof value === "string" && value.length > 0 && value.length <= 240
     && !/[\\\0\r\n]/u.test(value) && !value.startsWith("/") && !/^[A-Za-z]:/u.test(value)
@@ -143,7 +146,15 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
   if (preserved === null || !same(preserved.map((entry) => `${entry.path}:${entry.sha256}`), baseline.untracked.map((entry) => `${entry.path}:${entry.sha256}`))) return fail("AGY-HOST-COMMIT-BASELINE-CHANGED");
   const newUntracked = untracked.filter((path) => !baseline.untracked.some((entry) => entry.path === path) && path !== baseline.resultPath);
   const actual = [...new Set([...tracked, ...newUntracked])].filter(path=>!concurrent?.foreignPaths.includes(path)).sort();
-  if (!same(actual, final.changedPaths)) return fail("AGY-HOST-COMMIT-PATH-MISMATCH");
+  if (!same(actual, final.changedPaths)) {
+    // pipeline.owned-gitignore-without-evidence-breaks-every-item-governed-host-commit: when the claim is exactly the actual change
+    // minus unignored Pipeline working files, say so; any other mismatch keeps its code.
+    const unignored = actual.filter((path) => newUntracked.includes(path) && PIPELINE_WORKING_PATH.test(path) && !final.changedPaths.includes(path));
+    if (unignored.length > 0 && same(actual.filter((path) => !unignored.includes(path)), final.changedPaths)) {
+      return { ...fail("AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED"), pipelinePaths: unignored.slice(0, 20) };
+    }
+    return fail("AGY-HOST-COMMIT-PATH-MISMATCH");
+  }
   if (actual.length === 0 || !actual.every((path) => allowedPaths.includes(path))) return fail("AGY-HOST-COMMIT-CONSENT-PATH");
   const admittedBlobs = [];
   for (const path of actual) {
