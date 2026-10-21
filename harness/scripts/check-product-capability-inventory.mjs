@@ -409,7 +409,8 @@ const LIFECYCLE_GUARD_PATH = "plugins/pipeline-core/hooks/guard-lifecycle-ready.
 export function discoverEntryPoints(root) {
   const found = [];
   for (const dir of ENTRY_POINT_DIRS) {
-    for (const path of walkFiles(root, dir, (item) => item.endsWith(".mjs") && !item.endsWith(".test.mjs"))) {
+    for (const path of walkFiles(root, dir, (item) => item.endsWith(".mjs") && !item.endsWith(".test.mjs")
+      && !item.slice(dir.length + 1).includes("/"))) {
       const source = readFileSync(join(root, path), "utf8");
       if (!source.includes(USAGE_MARKER)) continue;
       const usageIndex = source.indexOf(USAGE_MARKER);
@@ -441,7 +442,10 @@ function agentReadableCorpus(root) {
   const guardSources = walkFiles(root, "plugins/pipeline-core/hooks", (item) =>
     /\/guard-[^/]+\.mjs$/.test(item) && !item.endsWith(".test.mjs") && item !== LIFECYCLE_GUARD_PATH)
     .map((path) => readFileSync(join(root, path), "utf8"));
-  return [...skillBodies, ...skillReferences, ...guardSources].join("\n \n");
+  // Dispatch prompt templates are read by every briefed Goldfish/Critic, so a script they name is agent-visible.
+  const promptTemplates = walkFiles(root, "plugins", (item) => /^plugins\/[^/]+\/templates\/prompts\/[^/]+\.md$/.test(item))
+    .map((path) => readFileSync(join(root, path), "utf8"));
+  return [...skillBodies, ...skillReferences, ...guardSources, ...promptTemplates].join("\n \n");
 }
 
 /**
@@ -504,6 +508,9 @@ export function checkEntryPointReachability({ root }) {
   } catch {
     guardSource = "";
   }
+  // S2 guard split (380eb7faa): the facade only re-exports; the `*_SCRIPT` admission declarations live in lib/guard.
+  guardSource += walkFiles(root, "plugins/pipeline-core/lib/guard", (item) => item.endsWith(".mjs") && !item.endsWith(".test.mjs"))
+    .map((path) => `\n${readFileSync(join(root, path), "utf8")}`).join("");
   for (const entryPoint of entryPoints) {
     const namedInBootstrap = bootstrapCorpus.includes(entryPoint.basename);
     const named = corpus.includes(entryPoint.basename);
