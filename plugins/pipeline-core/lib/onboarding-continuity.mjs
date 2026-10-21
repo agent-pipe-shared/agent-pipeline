@@ -103,6 +103,7 @@ import {
   observeOwnedSessionDescriptorOwnerHandle,
   observeOwnedSessionDescriptorClosureHandle, inspectOwnedSessionDescriptorClosure, inspectSignedDescriptorCustodyRepository,
 } from "./worktree-lifecycle.mjs";
+import { OrphanMemberStepError, runOrphanSessionAuthorityMemberStep } from "./session-authority-orphan-member-step.mjs";
 import {
   derivePlanLifecycle,
   validPlanCancellation,
@@ -3907,18 +3908,11 @@ export function applyOrphanSessionCleanupBindingRelease({
         && !current.state.discardedFeatures?.some((entry) => entry.id === plan.featureId)) {
         fail("SESSION-CLEANUP-ORPHAN-RELEASE-NOT-DISCARDED", "orphan cleanup release postimage does not contain the discarded feature");
       }
-      const currentBindingObs = {
-        binding: current.privateBinding,
-        sha256: current.privateBindingSha256,
-      };
+      const currentBindingObs = { binding: current.privateBinding, sha256: current.privateBindingSha256 };
       const currentReceiptObs = observePrivateCleanupReleaseReceipt(current.root, { spawn });
-      const receiptMatches = currentReceiptObs.status === "valid"
-        && sameOrphanReleaseReceipt(currentReceiptObs.receipt, plan.receipt);
+      const receiptMatches = currentReceiptObs.status === "valid" && sameOrphanReleaseReceipt(currentReceiptObs.receipt, plan.receipt);
       if (plan.status === "not-needed") {
-        if (currentBindingObs.binding !== null
-          || (plan.receipt === null
-            ? currentReceiptObs.status !== "absent"
-            : !receiptMatches)) {
+        if (currentBindingObs.binding !== null || (plan.receipt === null ? currentReceiptObs.status !== "absent" : !receiptMatches)) {
           fail("SESSION-CLEANUP-PRIVATE-CAS", "no-write orphan release plan preimage changed");
         }
         return {
@@ -3930,21 +3924,17 @@ export function applyOrphanSessionCleanupBindingRelease({
           mutated: false,
         };
       }
-      if (currentBindingObs.binding !== null
-        && (currentBindingObs.sha256 !== plan.binding.sha256
-          || currentBindingObs.binding.featureId !== plan.featureId
-          || canonicalSha256(currentBindingObs.binding.sessionCleanup)
-            !== canonicalSha256(plan.binding.sessionCleanup))) {
+      if (currentBindingObs.binding !== null && (currentBindingObs.sha256 !== plan.binding.sha256
+        || currentBindingObs.binding.featureId !== plan.featureId
+        || canonicalSha256(currentBindingObs.binding.sessionCleanup) !== canonicalSha256(plan.binding.sessionCleanup))) {
         fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding changed after release planning");
       }
       if (currentBindingObs.binding === null && !receiptMatches) {
         fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding disappeared without the planned receipt");
       }
-      if (currentBindingObs.binding !== null) {
-        const descriptorBeforeCommit = observeOrphanReleaseDescriptor(current.root, currentBindingObs.binding, deps);
-        if (canonicalSha256(descriptorBeforeCommit) !== canonicalSha256(plan.descriptor)) {
-          fail("SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE", "session descriptor changed after release planning");
-        }
+      if (currentBindingObs.binding !== null
+        && canonicalSha256(observeOrphanReleaseDescriptor(current.root, currentBindingObs.binding, deps)) !== canonicalSha256(plan.descriptor)) {
+        fail("SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE", "session descriptor changed after release planning");
       }
       if (!receiptMatches) {
         if (currentReceiptObs.status !== "absent") {
@@ -3960,53 +3950,24 @@ export function applyOrphanSessionCleanupBindingRelease({
       if (currentBindingObs.binding !== null) {
         const descriptorNow = observeOrphanReleaseDescriptor(current.root, currentBindingObs.binding, deps);
         if (descriptorNow !== null) {
-          if (plan.descriptor === null
-            || canonicalSha256(descriptorNow) !== canonicalSha256(plan.descriptor)) {
+          if (plan.descriptor === null || canonicalSha256(descriptorNow) !== canonicalSha256(plan.descriptor)) {
             fail("SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE", "session descriptor changed after release planning");
           }
           const loadDescriptor = deps.loadSessionDescriptorFn ?? deps.loadSessionDescriptor ?? loadSessionDescriptor;
-          const loaded = loadDescriptor(current.root, descriptorNow.sessionId, {
-            expectedDescriptorSha256: descriptorNow.descriptorSha256,
-          });
+          const loaded = loadDescriptor(current.root, descriptorNow.sessionId, { expectedDescriptorSha256: descriptorNow.descriptorSha256 });
           const commonDir = loaded.repo.commonDir;
           const manifestPath = join(commonDir, "agent-pipeline", "session-cleanup", "active", `${loaded.sessionId}.json`);
           if (existsSync(manifestPath)) {
             backupPrivateFile(commonDir, `session-cleanup-manifest.${loaded.sessionId}`, manifestPath, deps);
-            unlinkSync(manifestPath);
-            fsyncDirectory(dirname(manifestPath));
+            unlinkSync(manifestPath); fsyncDirectory(dirname(manifestPath));
           }
           backupPrivateFile(commonDir, `session-descriptor.${loaded.sessionId}`, loaded.path, deps);
-          unlinkSync(loaded.path);
-          fsyncDirectory(dirname(loaded.path));
+          unlinkSync(loaded.path); fsyncDirectory(dirname(loaded.path));
           deps.afterDescriptorRetire?.({ root: current.root, sessionId: loaded.sessionId });
         }
-        const bindingBeforeDelete = readPrivateCleanupBinding(current.root, { spawn });
-        if (bindingBeforeDelete.binding !== null) {
-          if (bindingBeforeDelete.sha256 !== plan.binding.sha256) {
-            fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding changed during release");
-          }
-          deletePrivateCleanupBinding(current.root, plan.binding.sessionCleanup, { spawn });
-          deps.afterBindingUnlink?.({ root: current.root });
-        }
       }
-      const finalBinding = readPrivateCleanupBinding(current.root, { spawn });
-      const finalReceipt = observePrivateCleanupReleaseReceipt(current.root, { spawn });
-      if (finalBinding.binding !== null
-        || finalReceipt.status !== "valid"
-        || !sameOrphanReleaseReceipt(finalReceipt.receipt, plan.receipt)) {
-        fail("SESSION-CLEANUP-ORPHAN-RELEASE-READBACK", "orphan cleanup release readback is invalid", { committed: true });
-      }
-      fsyncDirectory(finalReceipt.paths.directory);
-      return {
-        schema: SESSION_CLEANUP_BIND_SCHEMA,
-        status: "released",
-        root: current.root,
-        stateSha256: current.stateSha256,
-        featureId: plan.featureId,
-        receipt: finalReceipt.receipt,
-        mutated: true,
-        storage: "private-runtime",
-      };
+      // D73 (E): the binding delete and the final read-back belong to `finishOrphanSessionCleanupBindingRelease`, after the lock.
+      return { schema: SESSION_CLEANUP_BIND_SCHEMA, status: "receipt-committed", root: current.root, stateSha256: current.stateSha256, featureId: plan.featureId, mutated: true };
     } catch (error) {
       if (error instanceof KickoffError) {
         fail(error.code, error.message, { committed: committed || error.committed });
@@ -4015,35 +3976,69 @@ export function applyOrphanSessionCleanupBindingRelease({
     }
   };
   if (stateLockHeld) return execute();
-  const token = `session-cleanup-orphan-release-${plan.planSha256.slice(0, 32)}`;
-  const lock = acquireLock(
-    `${join(plan.root, authorityPaths(plan.root).state)}.lock`,
-    "pipeline.continuity-lock.v0",
-    token,
-    { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 },
-  );
-  try { return execute(); } finally { releaseLock(lock); }
+  const lock = acquireLock(`${join(plan.root, authorityPaths(plan.root).state)}.lock`, "pipeline.continuity-lock.v0",
+    `session-cleanup-orphan-release-${plan.planSha256.slice(0, 32)}`, { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 });
+  let applied;
+  try { applied = execute(); } finally { releaseLock(lock); }
+  return plan.status === "ready" ? finishOrphanSessionCleanupBindingRelease({ plan, deps }) : applied;
 }
 
-export function releaseOrphanSessionCleanupBinding({
-  rootDir,
-  by,
-  reason,
-  featureId = null,
-  deps = {},
-} = {}) {
-  const plan = planOrphanSessionCleanupBindingRelease({
-    rootDir,
-    by,
-    reason,
-    featureId,
-    deps,
-  });
-  return applyOrphanSessionCleanupBindingRelease({
-    plan,
-    expectedPlanSha256: plan.planSha256,
-    deps,
-  });
+/**
+ * D73 (E): the second half of the orphan release, run after the State lock is released (the continuity snapshot refuses a
+ * foreign State lock, so no registry step may run under it). One registry boundary rechecks the binding bytes and the receipt
+ * against the plan, releases the registry member FIRST, deletes the private binding under the State lock taken inside the
+ * boundary, then heals and reads the registry back strictly. A crash before the delete leaves the binding present: the rerun
+ * plans `ready` again, finds the receipt, and the member step returns `none`.
+ */
+export function finishOrphanSessionCleanupBindingRelease({ plan, deps = {} } = {}) {
+  if (!isObject(plan) || plan.schema !== SESSION_CLEANUP_ORPHAN_RELEASE_PLAN_SCHEMA || plan.status !== "ready"
+    || !SHA256_RE.test(plan.planSha256 ?? "") || canonicalSha256(orphanReleasePlanBinding(plan)) !== plan.planSha256) {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-PLAN", "orphan cleanup release plan is invalid or changed");
+  }
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  let current;
+  const recheck = () => {
+    const bound = readPrivateCleanupBinding(plan.root, { spawn });
+    const receipt = observePrivateCleanupReleaseReceipt(plan.root, { spawn });
+    if ((bound.binding !== null && bound.sha256 !== plan.binding.sha256) || receipt.status !== "valid" || !sameOrphanReleaseReceipt(receipt.receipt, plan.receipt)) {
+      fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding or release receipt changed before the orphan release finished", { committed: true });
+    }
+  };
+  const releaseBinding = () => {
+    deps.beforeBindingDelete?.({ root: plan.root });
+    const lock = acquireLock(`${join(plan.root, authorityPaths(plan.root).state)}.lock`, "pipeline.continuity-lock.v0",
+      `session-cleanup-orphan-release-${plan.planSha256.slice(0, 32)}`, { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 });
+    try {
+      current = observeMachineState(plan.root, spawn);
+      if (current.stateSha256 !== plan.stateAfterSha256) fail("SESSION-CLEANUP-RELEASE-CAS", "discarded State postimage does not match the orphan release plan", { committed: true });
+      const bound = readPrivateCleanupBinding(current.root, { spawn });
+      if (bound.binding === null) return;
+      if (bound.sha256 !== plan.binding.sha256) fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding changed during release", { committed: true });
+      deletePrivateCleanupBinding(current.root, plan.binding.sessionCleanup, { spawn });
+      deps.afterBindingUnlink?.({ root: current.root });
+    } finally { releaseLock(lock); }
+  };
+  try {
+    runOrphanSessionAuthorityMemberStep({ repository: () => continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(plan.root)),
+      target: plan.binding.sessionCleanup, recheck, releaseBinding });
+    const finalBinding = readPrivateCleanupBinding(current.root, { spawn });
+    const finalReceipt = observePrivateCleanupReleaseReceipt(current.root, { spawn });
+    if (finalBinding.binding !== null || finalReceipt.status !== "valid" || !sameOrphanReleaseReceipt(finalReceipt.receipt, plan.receipt)) {
+      fail("SESSION-CLEANUP-ORPHAN-RELEASE-READBACK", "orphan cleanup release readback is invalid", { committed: true });
+    }
+    fsyncDirectory(finalReceipt.paths.directory);
+    return { schema: SESSION_CLEANUP_BIND_SCHEMA, status: "released", root: current.root, stateSha256: current.stateSha256,
+      featureId: plan.featureId, receipt: finalReceipt.receipt, mutated: true, storage: "private-runtime" };
+  } catch (error) {
+    if (error instanceof OrphanMemberStepError) fail(error.code, `${error.message}; repair: ${error.repair}`, { committed: true });
+    if (error instanceof KickoffError) fail(error.code, error.message, { committed: true });
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-WRITE", "orphan cleanup release failed", { committed: true });
+  }
+}
+
+export function releaseOrphanSessionCleanupBinding({ rootDir, by, reason, featureId = null, deps = {} } = {}) {
+  const plan = planOrphanSessionCleanupBindingRelease({ rootDir, by, reason, featureId, deps });
+  return applyOrphanSessionCleanupBindingRelease({ plan, expectedPlanSha256: plan.planSha256, deps });
 }
 
 /**
@@ -9276,13 +9271,17 @@ function continuityAuthoritySnapshot(repository) {
     const ownJournal = /^continuity-authority-(execution|terminal)-[a-f0-9]{32}\.json$/.test(name);
     const privatization = name.startsWith(SESSION_CLEANUP_PRIVATIZATION_AUDIT_BASENAME+'.')
       || name.startsWith(SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_BASENAME+'.');
-    if (!allowed.has(name) && !ownJournal && !privatization) {
+    // D73 (E): the rotated release-receipt archive (`archiveObservedPrivateCleanupReleaseReceipt`) is named by its own byte digest.
+    const archive = /^session-cleanup-release-receipt\.([a-f0-9]{64})\.json$/.exec(name);
+    if (!allowed.has(name) && !ownJournal && !privatization && !archive) {
       if (name.startsWith('session-cleanup-') || name.startsWith('continuity-authority-'))
         fail('SDC-AUTHORITY-UNAVAILABLE','unknown continuity private namespace entry');
       continue; // Other intake namespaces have their own owners.
     }
     const path = join(paths.directory,name);
     const bytes = assertPrivateCleanupFile(path,'continuity namespace entry');
+    if (archive && createHash('sha256').update(bytes).digest('hex') !== archive[1])
+      fail('SDC-AUTHORITY-UNAVAILABLE','unknown continuity private namespace entry');
     let semantic;
     if (path === paths.key) semantic = {kind:'private-mac-key',sha256:createHash('sha256').update(bytes).digest('hex')};
     else {
@@ -9292,7 +9291,7 @@ function continuityAuthoritySnapshot(repository) {
           || !['execution','terminal'].includes(semantic.stage) || semantic.repositorySha256 !== canonicalSha256(repository)))
         fail('SDC-AUTHORITY-CAS','continuity authority journal binding');
     }
-    const namespaceId = path === paths.releaseReceipt || name.startsWith('continuity-authority-terminal-')
+    const namespaceId = path === paths.releaseReceipt || archive || name.startsWith('continuity-authority-terminal-')
       ? 'cleanup-release' : 'cleanup-binding';
     (namespaceId === 'cleanup-release' ? released : cleanup).push(continuityAuthorityFact(path,namespaceId,semantic));
   }
@@ -9503,7 +9502,7 @@ function continuityAuthorityExecute(data,port,{operationHandle,memberHandle,expe
           operation.expectedMemberRef=armedMember.memberRef;
           return {status:'executed',code:null,executionHandle,ownerResult,sourceRefs:[...operation.journalRefs]};
         });
-      } catch (error) { return {status:'unavailable',code:error.code ?? 'SDC-AUTHORITY-UNAVAILABLE',executionHandle:null,ownerResult:null,sourceRefs:[]}; }
+      } catch (error) { return {status:'unavailable',code:error.code ?? 'SDC-AUTHORITY-UNAVAILABLE',reason:error.reason ?? error.message,executionHandle:null,ownerResult:null,sourceRefs:[]}; }
 }
 function continuityAuthorityFinish(data,port,{operationHandle,executionHandle,entry,input,expectedMemberRef}) {
       try {
@@ -9579,7 +9578,7 @@ export function bindOnboardingSessionCleanup(request={}) {
     operationHandle:prepared.operationHandle}));
   const executed=continuityAuthorityExecute(data,port,{operationHandle:prepared.operationHandle,
     memberHandle:reserved.memberHandle,expectedMemberRef:reserved.memberRef});
-  if(executed.status!=='executed')fail(executed.code,'continuity owning bind failed after reservation');
+  if(executed.status!=='executed')fail(executed.code,`continuity owning bind failed after reservation (${executed.reason}); repair: node ${DEFAULT_SESSION_CLEANUP_SCRIPT} plan-recovery --repo ${repository.primaryRoot}, then run the action it names`);
   const ownedBinding={repository,port,data,prepared,reserved:{...reserved,
     memberRef:continuityAuthorityOperations.get(prepared.operationHandle).expectedMemberRef},executed};
   continuityAuthorityDirectBindings.set(continuityAuthorityDirectKey(repository,tuple),ownedBinding);
