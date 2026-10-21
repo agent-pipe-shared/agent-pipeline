@@ -312,12 +312,13 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
           fs.writeFileSync(path.join(mapDir, `${id}.md`), `---\ntype: Governed Module\nid: ${id}\nresponsibility: Own ${id}\nnonResponsibilities: []\nownedPaths:\n  - ${id}/**\npublicContracts: []\nallowedDependencies: []\nauthorityEffects: []\nverificationEntryPoints: []\nadrReferences: []\n---\n# ${id}\n`);
         }
         const valid = compileDecisionSummary(root, { write: false });
-        assert.equal(valid.authorityStatus, "source-validated");
-        assert.deepEqual(valid.effectiveProjection.decisionIds, ["ADR-1"]);
+        // d02409a8a adoption gate: no retained approved aggregate lists these byte-valid decisions, so none is
+        // effective yet (advisory decision-adoption-unverified); the compiled inventory still carries them.
+        assert.equal(valid.authorityStatus, "inventory-only");
+        assert.deepEqual(valid.effectiveProjection.decisionIds, []);
         assert.deepEqual(valid.decisions.find(({ id }) => id === "ADR-module").moduleIds, ["pipeline-core"]);
-        assert.deepEqual(valid.effectiveProjection.decisions, [{
-          id: "ADR-1", digest: record.digest, scope: "project", path: "docs/adr/ADR-1.md",
-        }]);
+        assert.deepEqual(valid.effectiveProjection.decisions, []);
+        assert.ok(valid.effectiveProjection.findings.some(({ code, path: findingPath }) => code === "decision-adoption-unverified" && findingPath === "docs/adr/ADR-1.md"));
         assert.deepEqual(valid.activeExceptions, []);
 
         const waivedBody = "# Claimed waiver\n";

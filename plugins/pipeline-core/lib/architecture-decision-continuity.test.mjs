@@ -8,6 +8,16 @@ import { join } from "node:path";
 import { canonical } from "./po-approval-proof.mjs";
 import { composeArchitectureDecisionContinuity, compareArchitectureDecisionContinuity,
   inspectArchitectureDecisionContinuity } from "./architecture-decision-continuity.mjs";
+import { inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
+
+// The fixture has no retained approved aggregate, so the production local view would be advisory
+// decision-adoption-unverified with no decisions. This case checks how the continuity composes a local
+// decision set with a signed inherited feed, so it reads the structural view (purpose key stripped, as
+// design-decision-bindings does).
+const structuralLocal = (options) => {
+  const { purpose, ...view } = inspectArchitectureDecisionAuthoringSources(options);
+  return view;
+};
 
 const SHA = "a".repeat(64);
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -117,7 +127,7 @@ test("AC-19 productive readback binds local ADR and configured signed inherited 
     proof: proof(source, orgKey) })}\n`);
   store(baseSource);
   const read = () => inspectArchitectureDecisionContinuity({ rootDir: root,
-    area: "pipeline-core", now: "2026-09-27T12:00:00.000Z", gitCommonDir: common });
+    area: "pipeline-core", now: "2026-09-27T12:00:00.000Z", gitCommonDir: common }, { inspectLocal: structuralLocal });
   const first = read();
   assert.equal(first.status, "ready");
   assert.deepEqual(first.decisions.map(({ id }) => id), ["ADR-PROJECT", "ORG-ADR-1"]);
