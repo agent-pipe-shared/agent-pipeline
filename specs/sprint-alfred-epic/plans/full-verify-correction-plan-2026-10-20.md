@@ -614,6 +614,29 @@ Status: **partly closed.** Implementation complete; the Critic batch and PO acce
   in-flight member), so a crash between the binding delete and the member step is recovered by
   rerunning `release-orphan-binding` (never-fully-blocking). This reverses RF2A's member-first order for
   this route only; the crash window it opens is covered by that rerun and named for the security read.
+- **Slice ALF-K1D-E-ORPHAN-MEMBER-STEP3 (checkpoint stop, wiring saved as `k1d-e3`, cancelled
+  `--started`):** with the member step after the lock, the six regressed cases are green again and
+  discard-feature stays 11/11. Two findings: (1) E then fails in the next bound start: 'continuity owning
+  bind failed after reservation' (`SDC-AUTHORITY-UNAVAILABLE`; the catch in `continuityAuthorityExecute`
+  ~9500 drops the inner reason and names no repair, a D74 gap). Orchestrator probe on the saved wiring
+  (temporary output line, tree reset afterwards): `continuityJoinActualBoundCleanupOwner` (~9841) ->
+  `continuityAuthoritySnapshot` (~9275) refuses 'unknown continuity private namespace entry' for
+  `session-cleanup-release-receipt.<sha256>.json`, the archive the bound start itself writes when it
+  rotates the release receipt (the E case asserts that archive). The snapshot's allowlist (~9268) admits
+  the live receipt but not its rotated archive. (2) A not-needed plan carries neither binding nor
+  descriptor, and the receipt holds no session tuple, so after a crash between the binding delete and the
+  member step the rerun cannot name the member: the after-delete order has no recovery.
+- **Elephant decision (within D73 E and D74; named for the D65 security read), replacing the previous
+  sequence:** keep RF2A's member-first order. The apply's locked part writes the receipt and retires the
+  descriptor (unchanged). After the lock is released, one registry boundary rechecks the binding bytes
+  against the plan, runs `releaseLostSessionAuthorityMember`, then deletes the binding (taking the State
+  lock inside the boundary, as `releaseBindingInBoundary` does through `releaseOnboardingSessionCleanupInternal`),
+  then heals with the strict read-back. A crash before the delete leaves the binding present, so the rerun
+  plans `ready` again, the replay finds the receipt, and the member step returns `none`. The snapshot
+  admits exactly the rotated archive shape `session-cleanup-release-receipt.<64 hex>.json` as a private
+  file whose bytes hash to the name; any other unknown entry stays refused. The catch in
+  `continuityAuthorityExecute` and 'continuity owning bind failed after reservation' carry the inner
+  reason and a runnable repair (D74).
 - **D75 B finding:** a continuation sent as a chat message after a recorded budget grant was refused
   by the agent as an unauthenticated mid-task amendment, which its briefing's stop rule requires. The
   D75 B build therefore needs an authenticated continuation: the agent must be able to verify the grant
