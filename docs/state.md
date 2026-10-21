@@ -246,6 +246,16 @@ private scratch remain local; important records are promoted to canonical paths.
 The [policy note](../specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/ignore-policy/policy.md)
 records actual Git checks and the consumer-onboarding follow-up.
 
+Retained Sentinel Epic authority (`governance/spec-retention.json`, archive
+`docs/spec-archive/2026-07-20-sentinel-recovery/`):
+[PRD](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md),
+[Spec](../specs/2026-07-19-sprint-sentinel-epic/spec.md),
+[acceptance matrix](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md),
+[reconciliation design](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md),
+[recovery](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md),
+[platform support](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md),
+[Windows blockers](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
+
 ## Commits and genuine remaining gates
 
 Item commit `5422e4b6e` normalizes three open schemas and records the candidate
