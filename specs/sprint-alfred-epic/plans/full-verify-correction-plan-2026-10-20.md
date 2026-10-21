@@ -594,6 +594,26 @@ Status: **partly closed.** Implementation complete; the Critic batch and PO acce
   `lib/session-authority-orphan-member-step.mjs` passes the architecture check. Wiring it into the
   apply left E red and turned six green orphan-release binding cases red (cause unmeasured);
   the wiring was reverted. Discard-feature baseline 11/11.
+- **Slice ALF-K1D-E-ORPHAN-MEMBER-STEP2 (measured stop, module saved as `k1d-e2`, cancelled
+  `--started`):** the E case and 'release-orphan-binding cleanly releases private binding for a
+  discarded feature' both fail with `SESSION-CLEANUP-ORPHAN-RELEASE-REGISTRY` (committed true), inner
+  `SDC-LOCK-HELD` 'continuity State lock held'. Origin: `continuityAuthoritySnapshot` (~9246), reached
+  through the continuity producer port's `reconcile` from `releaseLostSessionAuthorityMember`. The
+  snapshot refuses whenever the State lock file exists without a writer witness, and only an
+  `approve-plan` companion context carries one. Inside the apply, the release's own State lock reads as
+  foreign, so every registry step is refused under it. The earlier lock-order measurement answered a
+  different question. The other four regressed cases share the call chain (inferred, not stack-measured).
+- **Elephant decision (within D73 E; named for the D65 security read):** the member step runs after the
+  State lock is released, never under it. The snapshot's fail-closed refusal stays; giving it a witness
+  for the orphan release would relax an authority read and is rejected. Sequence: the apply keeps its
+  locked part unchanged (receipt, descriptor retirement, binding delete); when the apply took the lock
+  itself, it runs the member step (boundary: `releaseLostSessionAuthorityMember`, heal, strict
+  read-back) after `releaseLock`. `scripts/pipeline-state.mjs` discard-feature, which applies under its
+  held lock, runs the same exported step after `writeState` returns. The step also runs on the
+  `not-needed` path and is idempotent (`releaseLostSessionAuthorityMember` returns `none` with no
+  in-flight member), so a crash between the binding delete and the member step is recovered by
+  rerunning `release-orphan-binding` (never-fully-blocking). This reverses RF2A's member-first order for
+  this route only; the crash window it opens is covered by that rerun and named for the security read.
 - **D75 B finding:** a continuation sent as a chat message after a recorded budget grant was refused
   by the agent as an unauthenticated mid-task amendment, which its briefing's stop rule requires. The
   D75 B build therefore needs an authenticated continuation: the agent must be able to verify the grant
