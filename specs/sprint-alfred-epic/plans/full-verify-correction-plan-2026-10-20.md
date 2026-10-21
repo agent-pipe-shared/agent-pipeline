@@ -586,3 +586,16 @@ Status: **partly closed.** Implementation complete; the Critic batch and PO acce
   lives in a small new module that both the apply and, later, `releaseBindingInBoundary` can use.
   The apply runs under the State lock; the boundary order against `releaseBindingInBoundary`
   (boundary first) is measured before the wiring, and an inversion is a stop.
+- **Slice ALF-K1D-E-ORPHAN-MEMBER-STEP (stopped at its budget checkpoint, clean interim saved as
+  `k1d-e1`, cancelled `--started`):** lock order measured, not a stop: neither lock waits. The registry
+  boundary (`acquireRegistryLock`, registry ~181-198) refuses at once with `SDC-LOCK-HELD` and a repair;
+  the State lock (`acquireLock`, onboarding-continuity ~6080-6101) refuses at once with `KICKOFF-LOCKED`.
+  The inverted order can only yield a typed refusal, never a hang. The new module
+  `lib/session-authority-orphan-member-step.mjs` passes the architecture check. Wiring it into the
+  apply left E red and turned six green orphan-release binding cases red (cause unmeasured);
+  the wiring was reverted. Discard-feature baseline 11/11.
+- **D75 B finding:** a continuation sent as a chat message after a recorded budget grant was refused
+  by the agent as an unauthenticated mid-task amendment, which its briefing's stop rule requires. The
+  D75 B build therefore needs an authenticated continuation: the agent must be able to verify the grant
+  itself (for example, the hook's own message names the recorded grant and its digest), not take it
+  from the orchestrator's text.
