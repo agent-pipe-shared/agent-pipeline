@@ -55,14 +55,20 @@ Source: PO-supplied forensic analysis of the Codex WSL greenfield run (installed
   code points where the Spec requires FNV-1a over UTF-8 bytes.
 - So the 2026-10-08 template fix (`b3cabc7f8`) does not reach the consumer delivery route.
 
-Added acceptance (0.7.0, major):
+Added acceptance (0.7.0, major; rewritten 2026-10-21 by PO decision: one owner, test-first, no
+separate test-author dispatch, because a second dispatch must read the whole context in again):
 
-- For a product item, the delivery route dispatches the criterion-bound tests from the
-  approved requirements through a separate test-author dispatch before or independent of
-  the implementing owner, and the implementing owner may not modify them (QG-04).
-- The generated item briefing never assigns test ownership to the implementer.
-- A pin proves that a consumer item course with a declared test-author route actually
-  produces two dispatches with disjoint test and implementation write scopes.
+- For a product item, the one implementing Goldfish works in a mandatory order: (1) write the
+  criterion-bound tests from the approved requirements, never from its own implementation, and
+  record them RED against the original code before its first production edit; (2) implement;
+  (3) run exactly those tests GREEN and correct the implementation.
+- A test written in step 1 is changed after step 2 only with a written justification tied to the
+  criterion; weakening it to make the implementation pass is a QG-04 violation.
+- The generated item briefing (`dispatch-briefing.mjs build`) states this order and never presents
+  the tests as a confirmation of already-written code; a pin checks the rendered order.
+- The package's estimated tool calls for the whole cycle size the dispatch: above the tier cap the
+  generator binds the deep tier, above the deep cap it requires a grant rationale.
+- Independence stays with execution (host re-run, Full Verify) and the fresh Critic (QG-04).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

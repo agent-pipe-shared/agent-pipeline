@@ -250,7 +250,10 @@ normative shape is:
    checks and fixes. Keep the same live owner while that outcome is active; a
    large outcome may be divided only into vertical sub-outcomes that can each
    be verified independently. Do not dispatch test authorship and implementation
-   as separate default phases. Independence moves from test authorship to test
+   as separate default phases; inside the one dispatch the order is test-first
+   (criterion-bound cases written from the Spec and recorded RED before the first
+   production edit, then implementation, then the same cases GREEN; QG-04).
+   Independence moves from test authorship to test
    execution: the owner writes the tests, but its self-reported pass is not
    acceptance evidence. The declared targeted checks are executed again outside
    the owner's context (the host's declared item checks after return, then Full
