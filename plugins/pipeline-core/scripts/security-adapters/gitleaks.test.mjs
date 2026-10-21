@@ -318,7 +318,8 @@ test("run() flags a near-miss: a .gitleaksignore entry exists for the same path+
     // Stale entry: recorded at line 10, but edits moved the same finding down to line 55.
     const staleFinding = { File: relPath, RuleID: "fixture-rule", StartLine: 10, StartColumn: 4, Secret: "fixture-secret-value-a" };
     writeFileSync(join(rootDir, ".gitleaksignore"), `${gitleaksContentAuthorityLine(staleFinding)}\n`);
-    const liveFinding = { File: join(rootDir, relPath), RuleID: "fixture-rule", StartLine: 55, StartColumn: 4, Secret: "fixture-secret-value-b", Description: "fixture finding" };
+    // The SAME secret moved to another line: only that is a stale suppression; a different secret is a new finding (PO 2026-10-21).
+    const liveFinding = { File: join(rootDir, relPath), RuleID: "fixture-rule", StartLine: 55, StartColumn: 4, Secret: "fixture-secret-value-a", Description: "fixture finding" };
     const spySpawn = (cmd, args) => {
       writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify([liveFinding]));
       return { status: 0, stdout: "", stderr: "", error: null };
@@ -331,8 +332,9 @@ test("run() flags a near-miss: a .gitleaksignore entry exists for the same path+
     assert.match(msg, /line 10/, "must name the entry's recorded line");
     assert.match(msg, /line 55/, "must name the finding's current line");
     assert.match(msg, /gitleaks-repair-ignore\.mjs/, "must name the repair command literally");
-    assert.match(msg, /--path backlog\/fixture-nearmiss\.txt/);
-    assert.match(msg, /--rule fixture-rule/);
+    // The repair command is rendered break-safe: its path and rule operands are shell-quoted.
+    assert.match(msg, /--path '?backlog\/fixture-nearmiss\.txt'?/);
+    assert.match(msg, /--rule '?fixture-rule'?/);
     assert.match(msg, /--column 4/);
     assert.match(msg, /--old-line 10/);
   } finally {
