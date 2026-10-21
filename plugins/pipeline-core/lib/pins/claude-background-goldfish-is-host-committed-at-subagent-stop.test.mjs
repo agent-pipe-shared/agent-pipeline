@@ -238,7 +238,7 @@ function hook(fx, script, args, payload) {
     env: { ...process.env, CLAUDE_PROJECT_DIR: fx.root, GIT_CEILING_DIRECTORIES: fx.parent, HOME: fx.home, USERPROFILE: fx.home } });
   return { status: out.status, stdout: out.stdout ?? "", stderr: out.stderr ?? "" };
 }
-const toolInput = (fx, extra) => ({ subagent_type: fx.binding.role, prompt: fx.prompt, ...extra });
+const toolInput = (fx, extra) => ({ subagent_type: fx.binding.role, model: "sonnet", prompt: fx.prompt, ...extra });
 const call = (fx, event, toolUseId, extra, more = {}) => ({ hook_event_name: event, cwd: fx.root, session_id: SESSION, tool_name: "Agent",
   tool_use_id: toolUseId, tool_input: toolInput(fx, extra), ...more });
 const preToolUse = (fx, toolUseId, extra, guard = GUARD) => hook(fx, guard, [], call(fx, "PreToolUse", toolUseId, extra));
@@ -310,7 +310,10 @@ function assertCommittedOnceAtStop(fx, toolUseId) {
 function launchedPending(fx, toolUseId, extra) {
   const pre = preToolUse(fx, toolUseId, extra);
   assert.equal(pre.status, 0, `PreToolUse must admit the launch -- ${pre.stderr.slice(0, 600)}`);
-  assert.doesNotMatch(pre.stderr, /WARNING|BLOCKED/u, `no warning or block expected -- ${pre.stderr.slice(0, 600)}`);
+  // D78: the fixture's hand-written briefing draws the generated-briefing WARNING (QG-06 warn state until 0.7.1);
+  // it is not what this pin is about, so only that one warning is tolerated -- any other warning or block still fails.
+  const stderr = pre.stderr.split("\n").filter((line) => !/^WARNING \(guard-dispatch\): DBG-GENERATED-BRIEFING-REQUIRED:/u.test(line)).join("\n");
+  assert.doesNotMatch(stderr, /WARNING|BLOCKED/u, `no warning or block expected -- ${stderr.slice(0, 600)}`);
   const files = pendingFiles(fx);
   assert.equal(files.length, 1, "the launch wrote exactly one pending state");
   const pending = JSON.parse(readFileSync(join(stateDirectory(fx), files[0]), "utf8"));

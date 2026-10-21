@@ -245,7 +245,7 @@ describe("V-10 route digest is bound to the inline briefing actually sent", () =
     sequence += 1;
     const res = spawnSync(process.execPath, [GUARD], {
       input: JSON.stringify({ tool_use_id: `v10-pin-${process.pid}-${sequence}`, tool_name: "Task",
-        tool_input: { subagent_type: "pipeline-core:critic", prompt } }),
+        tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt } }),
       encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root },
     });
     return { code: res.status, stderr: res.stderr ?? "" };
@@ -327,7 +327,7 @@ describe("V-10 a recorded route makes the binding fire: the producer writes what
     sequence += 1;
     const res = spawnSync(process.execPath, [GUARD], {
       input: JSON.stringify({ tool_use_id: `v10-producer-pin-${process.pid}-${sequence}`, tool_name: "Task",
-        tool_input: { subagent_type: "pipeline-core:critic", prompt } }),
+        tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt } }),
       encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root },
     });
     return { code: res.status, stderr: res.stderr ?? "" };
@@ -479,11 +479,11 @@ function v10wBriefing(sliceId, { withSlice = true } = {}) {
 // One packet per transport the guard reads. The Workflow packet carries the briefing as a template literal, so the text
 // the guard extracts (and hashes) is exactly the text sent.
 const V10W_PACKET = {
-  native: (prompt, id) => ({ tool_use_id: id, tool_name: "Agent", tool_input: { subagent_type: V10W_ROLE, prompt } }),
+  native: (prompt, id) => ({ tool_use_id: id, tool_name: "Agent", tool_input: { subagent_type: V10W_ROLE, model: "sonnet", prompt } }),
   codex: (prompt, id) => ({ tool_use_id: id, tool_name: "spawn_agent", tool_input: { agent_type: V10W_ROLE, message: prompt } }),
   antigravity: (prompt, id) => ({ tool_use_id: id, tool_name: "invoke_subagent", tool_input: { Subagents: [{ TypeName: V10W_ROLE, Prompt: prompt }] } }),
   workflow: (prompt, id) => ({ tool_use_id: id, tool_name: "Workflow", tool_input: { script: `await agent({ agentType: '${V10W_ROLE}', prompt: \`${prompt}\` });` } }),
-  critic: (prompt, id) => ({ tool_use_id: id, tool_name: "Task", tool_input: { subagent_type: "pipeline-core:critic", prompt } }),
+  critic: (prompt, id) => ({ tool_use_id: id, tool_name: "Task", tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt } }),
 };
 
 const V10W_ORIGIN = "admission";

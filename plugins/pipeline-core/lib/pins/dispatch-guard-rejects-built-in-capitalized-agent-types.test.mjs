@@ -50,7 +50,7 @@ for (const type of ["Explore", "Plan", "general-purpose"]) {
   test(`A1/A2 CLI: Agent ${type} without a prohibition line is admitted`, () => {
     const { code, stderr } = guard({
       tool_use_id: `pin-${type}`, tool_name: "Agent",
-      tool_input: { subagent_type: type, description: "read-only research", prompt: "Read the repository and report where X is defined." },
+      tool_input: { subagent_type: type, model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
     });
     assert.equal(code, 0, stderr.slice(0, 300));
     assert.doesNotMatch(stderr, /APB-/u);
@@ -74,7 +74,7 @@ test("A2 CLI: a parallel Workflow batch of Explore, Plan and general-purpose is 
 test("A2 CLI: the hook never reports the misleading Advisor denial for a capitalised built-in", () => {
   const { stderr } = guard({
     tool_use_id: "pin-msg", tool_name: "Agent",
-    tool_input: { subagent_type: "Explore", description: "r", prompt: "Read and report." },
+    tool_input: { subagent_type: "Explore", model: "sonnet", description: "r", prompt: "Read and report." },
   });
   assert.doesNotMatch(stderr, /APB-DISPATCH-INVALID|cannot be assigned to one exact child/u);
 });
@@ -139,7 +139,7 @@ test("A3 module: an invalid role gets APB-ROLE-UNPARSEABLE naming the value", ()
 test("A3 CLI: the hook blocks an unparseable role with APB-ROLE-UNPARSEABLE naming it", () => {
   const { code, stderr } = guard({
     tool_use_id: "pin-bad", tool_name: "Agent",
-    tool_input: { subagent_type: "bad role", description: "r", prompt: `${PROHIBITION}\nRead and report.` },
+    tool_input: { subagent_type: "bad role", model: "sonnet", description: "r", prompt: `${PROHIBITION}\nRead and report.` },
   });
   assert.equal(code, 2, stderr.slice(0, 300));
   assert.match(stderr, /APB-ROLE-UNPARSEABLE/u);

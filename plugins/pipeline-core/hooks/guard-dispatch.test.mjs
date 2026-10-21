@@ -130,20 +130,20 @@ function nativeCodexWorkerPrompt(extra = {}) {
 // GD1 -- the failure this hook exists for, at the hook boundary.
 check("GD1 block  a Critic dispatch carrying a claims list", {
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x` },
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x` },
 }, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-CLAIMS-LIST", "templates/prompts/critic-review.md"] });
 
 check("GD2 allow  a references-only Critic dispatch", {
   tool_use_id: "gd2",
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:critic", prompt: CLEAN_CRITIC },
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: CLEAN_CRITIC },
 }, ALLOW);
 
 const prohibitedToolUseId = "gd2-advisor-prohibited";
 check("GD2a allow and bind a policy-clean Critic dispatch carrying the exact Advisor prohibition", {
   tool_use_id: prohibitedToolUseId,
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n- ${ADVISOR_PROHIBITION_LINE} (MP-26)` },
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: `${CLEAN_CRITIC}\n- ${ADVISOR_PROHIBITION_LINE} (MP-26)` },
 }, ALLOW);
 manualCheck("GD2b the pre-launch carrier contains only the exact role, disposition and prompt digest", () => {
   const key = createHash("sha256").update(prohibitedToolUseId).digest("hex");
@@ -164,7 +164,7 @@ manualCheck("GD2b the pre-launch carrier contains only the exact role, dispositi
 
 check("GD2c block a prohibition-bearing child whose parent tool-use id is absent", {
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n- ${ADVISOR_PROHIBITION_LINE} (MP-26)` },
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: `${CLEAN_CRITIC}\n- ${ADVISOR_PROHIBITION_LINE} (MP-26)` },
 }, BLOCK, { stderrIncludes: ["APB-PARENT-TOOL-USE-ID-MISSING"] });
 
 check("GD2d block a same-role Workflow batch whose mixed Advisor dispositions cannot map to exact children", {
@@ -233,7 +233,7 @@ for (const builtIn of ["Explore", "Plan", "general-purpose"]) {
   check(`GD2i allow a ${builtIn} dispatch without a prohibition line (exact live tool_input shape)`, {
     tool_use_id: `gd2i-${builtIn}`,
     tool_name: "Agent",
-    tool_input: { subagent_type: builtIn, description: "read-only research", prompt: "Read the repository and report where X is defined." },
+    tool_input: { subagent_type: builtIn, model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
   }, ALLOW);
 }
 check("GD2j allow a batch of two Explore dispatches without a prohibition line", {
@@ -345,18 +345,18 @@ manualCheck("GD2l the real Claude hook path resolves the dispatch carrier, denie
 // GD3 -- the `subagentType` spelling, so a runner that uses camelCase is not a silent no-op.
 check("GD3 block  the camelCase subagentType field is read too", {
   tool_name: "Agent",
-  tool_input: { subagentType: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n\nADVERSARIAL FOCUS: look here.` },
+  tool_input: { subagentType: "pipeline-core:critic", model: "opus", prompt: `${CLEAN_CRITIC}\n\nADVERSARIAL FOCUS: look here.` },
 }, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-HUNT-LIST"] });
 
 check("GD4 block  an incomplete Goldfish briefing", {
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: "Please fix the thing. Model: claude-sonnet-5." },
+  tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: "Please fix the thing. Model: claude-sonnet-5." },
 }, BLOCK, { stderrIncludes: ["DISPATCH-INCOMPLETE-BRIEFING", "GOAL"] });
 
 // GD5 -- roles with no template contract are not this hook's business.
 check("GD5 allow  an unrelated subagent type", {
   tool_name: "Task",
-  tool_input: { subagent_type: "general-purpose", prompt: "find where X is defined" },
+  tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt: "find where X is defined" },
 }, ALLOW);
 
 // GD6/GD7 -- fail-open. A guard that cannot read its input has no opinion, and a broken
@@ -369,13 +369,13 @@ check("GD8 the real critic-review.md template, filled, is dispatchable", {
   tool_use_id: "gd8",
   tool_name: "Task",
   // Mirrors dispatch-policy.test.mjs DP11: a filled Critic template at the implement-tier model needs no Opus rationale.
-  tool_input: { subagent_type: "pipeline-core:critic", prompt: filledTemplateBody("templates/prompts/critic-review.md", { modelId: "claude-sonnet-5", effort: "max" }) },
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: filledTemplateBody("templates/prompts/critic-review.md", { modelId: "claude-sonnet-5", effort: "max" }) },
 }, ALLOW);
 
 check("GD9 the real goldfish-task.md template, filled, is dispatchable", {
   tool_use_id: "gd9",
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: filledTemplateBody("templates/prompts/goldfish-task.md") },
+  tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: filledTemplateBody("templates/prompts/goldfish-task.md") },
 }, ALLOW);
 
 // GD10/GD11 -- Workflow-tool awareness (backlog 2026-08-18-guard-dispatch-has-no-workflow-tool-awareness):
@@ -443,17 +443,17 @@ check("GD15 allow  an Antigravity dispatch of an unrelated subagent type", {
 
 check("GD15a block a direct Agent packet with no role before launch", {
   tool_name: "Agent",
-  tool_input: { prompt: "do work" },
+  tool_input: { model: "sonnet", prompt: "do work" },
 }, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-REQUIRED", '"modelCalls":0'] });
 
 check("GD15b block a shipped direct role with no prompt before launch", {
   tool_name: "Agent",
-  tool_input: { subagent_type: "pipeline-core:consult-advisor", prompt: "" },
+  tool_input: { subagent_type: "pipeline-core:consult-advisor", model: "sonnet", prompt: "" },
 }, BLOCK, { stderrIncludes: ["DISPATCH-PROMPT-REQUIRED", '"phase":"packet"'] });
 
 check("GD15c block an unknown namespaced role before launch", {
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:critic-typo", prompt: CLEAN_CRITIC },
+  tool_input: { subagent_type: "pipeline-core:critic-typo", model: "sonnet", prompt: CLEAN_CRITIC },
 }, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-UNKNOWN", '"status":"rejected"'] });
 
 check("GD15d block a statically visible Workflow role without the plugin prefix", {
@@ -551,18 +551,18 @@ manualCheck("GD16 extractWorkflowDispatches is importable and callable directly,
 
 check("GD17 block  via the real path, a refusable dispatch still refuses after the entrypoint gate", {
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x` },
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x` },
 }, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-CLAIMS-LIST", "templates/prompts/critic-review.md"] });
 
 check("GD18 allow  via the real path, an admissible dispatch still admits after the entrypoint gate", {
   tool_use_id: "gd18",
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:critic", prompt: CLEAN_CRITIC },
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: CLEAN_CRITIC },
 }, ALLOW);
 
 check("GD18a block a budget-bearing Claude dispatch without its parent tool-use id before launch", {
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:critic", prompt: CLEAN_CRITIC },
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: CLEAN_CRITIC },
 }, BLOCK, { stderrIncludes: ["DBB-PARENT-TOOL-USE-ID-MISSING"] });
 
 manualCheck("GD19 block  invoked through a symlink to the module, the hook still refuses (the 2026-08-06 failure shape)", () => {
@@ -572,7 +572,7 @@ manualCheck("GD19 block  invoked through a symlink to the module, the hook still
     symlinkSync(GUARD, linked);
     const payload = {
       tool_name: "Task",
-      tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x` },
+      tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x` },
     };
     const res = spawnSync(process.execPath, [linked], { input: JSON.stringify(payload), encoding: "utf8" });
     const stderr = res.stderr ?? "";
@@ -638,7 +638,7 @@ function writeRoute(sliceId, record) {
 }
 const routeRecord = (sliceId, text) => ({ schema: "pipeline.dispatch-briefing-route.v1", sliceId, briefingSha256: routeSha(text) });
 const routeDispatch = (toolUseId, prompt) => ({
-  tool_use_id: toolUseId, tool_name: "Task", tool_input: { subagent_type: "pipeline-core:critic", prompt },
+  tool_use_id: toolUseId, tool_name: "Task", tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt },
 });
 
 manualCheck("GD21 allow  the inline briefing hashes to the digest its route record carries", () => {
@@ -830,7 +830,7 @@ function markedGoldfishPrompt() {
 // `background` is spread into tool_input: `{}` carries no run_in_background key at all.
 function markedGoldfishDispatch(root, toolUseId, background) {
   return { cwd: root, session_id: "gd-item-session", tool_name: "Agent", tool_use_id: toolUseId,
-    tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: markedGoldfishPrompt(), ...background } };
+    tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: markedGoldfishPrompt(), ...background } };
 }
 function runAt(payload, root, env = {}) {
   const res = spawnSync(process.execPath, [GUARD], {

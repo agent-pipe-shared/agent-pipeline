@@ -491,7 +491,7 @@ function requireEnrollment() {
 
 function runHook(c, prompt, config) {
   writeFileSync(join(hookRepo, "slice-queue.json"), `${JSON.stringify(QUEUE, null, 2)}\n`);
-  const payload = { tool_name: "Agent", tool_use_id: "toolu_fx", session_id: SESSION, cwd: hookRepo, tool_input: { subagent_type: "general-purpose", prompt } };
+  const payload = { tool_name: "Agent", tool_use_id: "toolu_fx", session_id: SESSION, cwd: hookRepo, tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt } };
   const env = { ...process.env, CLAUDE_PROJECT_DIR: hookRepo, PIPELINE_FANOUT_CONFIG: JSON.stringify({ queuePath: "slice-queue.json", commonDir: c.commonDir, ...config }) };
   return spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env, encoding: "utf8", cwd: hookRepo });
 }
@@ -530,7 +530,7 @@ test("hook: enforce + the same slice already live exits 2 naming FANOUT-SLICE-NO
 test("hook: no config exits 0 and never touches the ledger", { skip: enrollmentSkip ?? false }, () => {
   requireEnrollment();
   const c = makeCase("hook-noconfig");
-  const payload = { tool_name: "Agent", session_id: SESSION, cwd: hookRepo, tool_input: { subagent_type: "general-purpose", prompt: overlapB1 } };
+  const payload = { tool_name: "Agent", session_id: SESSION, cwd: hookRepo, tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt: overlapB1 } };
   const env = { ...process.env, CLAUDE_PROJECT_DIR: hookRepo };
   delete env.PIPELINE_FANOUT_CONFIG;
   const result = spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env, encoding: "utf8", cwd: hookRepo });
