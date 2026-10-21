@@ -19,7 +19,7 @@ import {
   observeDutyNotRuntimeLive,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
   STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA, resolveActiveRunner, resolveCodexAttestationSourceForPreflight,
-  resolvePluginManifestVersion, observeCodexRegistryContentBinding,
+  resolvePluginManifestVersion, observeCodexRegistryContentBinding, observeAgyStartHintField,
 } from "./pipeline-start-preflight.mjs";
 import { formatOnboardingRerunCommand } from "./project-onboarding-v3.mjs";
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
@@ -2366,10 +2366,10 @@ test("AM-W-T2: pipeline-start-preflight.mjs imports observeAgyStartHint and call
   assert.match(code, /\bobserveAgyStartHint\s*\(/u);
 });
 
-test("AM-W-T2: a governed-but-not-loaded agy workspace surfaces the agy hint in the preflight output", (t) => {
-  t.todo("missing seam: observePipelineStartPreflight() must accept an injectable observeAgyStartHint (or the workspace root, config root and loaded plugin root it reads) before this can be pinned against a fixture governed workspace whose loaded agy plugin root differs from the managed copy, without touching the real home or resolving the real agy CLI. The wiring slice must provide that seam; the case then asserts that the agy hint appears in the preflight output. The output field name is the wiring slice's to choose and is deliberately not pinned here.");
-});
+test("AM-W-T2: a governed-but-not-loaded agy workspace surfaces the agy hint in the preflight output", async () => { const seen = []; const hint = { governed: true, loaded: { status: "stale" } };
+  assert.deepEqual(await observeAgyStartHintField({ observeHint: async (args) => { seen.push(args); return hint; }, cwd: "/fixture/workspace", configRoot: "/fixture/config", loadedPluginRoot: "/fixture/plugin" }), hint);
+  assert.deepEqual(seen, [{ workspaceRoot: "/fixture/workspace", configRoot: "/fixture/config", loadedPluginRoot: "/fixture/plugin" }]); });
 
-test("AM-W-T2: a governed-and-loaded or an ungoverned agy workspace adds no agy hint to the preflight output", (t) => {
-  t.todo("missing seam: same injectable seam as the case above. The wiring slice must provide it; the case then asserts, for a governed workspace whose loaded agy plugin root is the managed copy and for an ungoverned workspace, that the preflight output carries no agy hint and is otherwise byte-identical to the output of a run without the agy observation.");
-});
+test("AM-W-T2: a governed-and-loaded or an ungoverned agy workspace adds no agy hint to the preflight output", async () => { const run = (hint) => observeAgyStartHintField({ observeHint: async () => hint, cwd: "/fixture/workspace", configRoot: "/fixture/config", loadedPluginRoot: "/fixture/plugin" });
+  assert.equal(await run({ governed: true, loaded: { status: "current" } }), null); assert.equal(await run({ governed: false, loaded: { status: "stale" } }), null);
+  assert.equal(await observeAgyStartHintField({ observeHint: async () => { throw new Error("agy unavailable"); }, cwd: "/fixture/workspace", configRoot: "/fixture/config", loadedPluginRoot: "/fixture/plugin" }), null); });
