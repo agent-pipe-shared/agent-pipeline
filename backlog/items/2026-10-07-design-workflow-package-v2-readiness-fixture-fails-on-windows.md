@@ -8,7 +8,7 @@ created: 2026-10-07
 source: "CLOSEOUT-T2 dispatch stop report, evidence/dispatch-record-CLOSEOUT-T2.json"
 sprint: alfred
 done_when: manual
-due: 2026-10-20
+due: 2026-11-04
 ---
 
 # The design-workflow package v2 readiness fixture fails on Windows
