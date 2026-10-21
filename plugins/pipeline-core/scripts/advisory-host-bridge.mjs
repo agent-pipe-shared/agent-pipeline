@@ -31,6 +31,7 @@ import {
   validateAdvisoryEvidenceBundleForRepository,
 } from "../lib/advisory-lifecycle-v2.mjs";
 import { validateAdvisoryReceipt } from "../lib/advisory-receipt.mjs";
+import { verifyAnsweredAdvisoryReceipt } from "../lib/advisory-answered-receipt.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
 import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
 import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
@@ -419,6 +420,14 @@ export async function runSelectedAdvisoryHost(input, transport = undefined) {
   if (!completed || completed.execution.selectionId !== selected.selectionId
     || completed.execution.selectionSha256 !== selected.selectionSha256
     || completed.execution.dutyReceipt.sha256 !== selected.dutyReceiptSha256) return unavailable(input, advisoryRoute, "selected-sandbox-required");
+  // An answer needs the receipt bound to candidate, route, question, evidence, host result and answer digest.
+  const bound = verifyAnsweredAdvisoryReceipt({ receipt: completed.receipt, execution: completed.execution, answer: completed.answer,
+    demand: input.demand, route: advisoryRoute, dispatch: input.dispatch, evidenceSha256: input.demand.evidenceSha256, selection: selected });
+  if (!bound.ok) {
+    const refused = unavailable(input, advisoryRoute, bound.code);
+    refused.advisoryResult.repair = bound.repair;
+    return refused;
+  }
   return {
     advisoryResult: { ok: true, code: "answered", answer: completed.answer, receipt: completed.receipt, attempts: [{ adapter: "host-consult", kind: "consult", runner: "codex", status: "answered" }] },
     execution: completed.execution,

@@ -229,3 +229,182 @@ test("RED mirror: dropping the WSL branch from a scratch copy of the route modul
     assert.equal(route, ROUTES.HOST);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// --- AC-135: the productive answered route binds the observed host execution ---
+// Fixture host result only: no Codex CLI, WSL process, model call or export runs.
+import { createHash } from "node:crypto";
+import { runSelectedAdvisoryHost } from "../../scripts/advisory-host-bridge.mjs";
+import { sandboxSelectionDigest } from "../../scripts/codex-sandbox-select.mjs";
+import { ANSWERED_RECEIPT_REFUSALS, verifyAnsweredAdvisoryReceipt } from "../advisory-answered-receipt.mjs";
+
+const ANSWER_MODEL = "gpt-6-sol";
+const ANSWER_TEXT = "Keep the boundary closed.";
+const sha256Hex = (value) => createHash("sha256").update(value).digest("hex");
+const RUNNER_WORDS = /codex|claude|antigravity|wsl/iu;
+function fixtureSelection(input, dispatchOverrides = {}) {
+  return {
+    schema: "pipeline.codex-sandbox-selection.v1", selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", repoFingerprint: "c".repeat(64), duty: "advisory",
+    dispatch: {
+      queueRevision: input.dispatch.queueRevision, candidateCommit: input.dispatch.candidateCommit, candidateTree: input.dispatch.candidateTree,
+      referenceSetSha256: input.sandboxContext.referenceSetSha256, requestSha256: "e".repeat(64), ...dispatchOverrides,
+    },
+    toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), observedHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
+    host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: "3".repeat(64) },
+    profile: { id: "codex-critic-intermediate.v1", sha256: "4".repeat(64), base: ":read-only", network: { enabled: true }, writableRootClass: "coordinator-scratch-only", scratchRootSha256: "5".repeat(64) },
+    preflight: { receiptSha256: "6".repeat(64), eligibility: "intermediate", terminalCode: "eligible", observedAt: "2026-07-19T00:00:00.000Z" },
+    compatibilityReceiptSha256: "7".repeat(64),
+    assurance: { class: "sandbox-read-only-except-coordinator-scratch-network-open", literal: "sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted" },
+    status: "selected", failureClass: null, observedAt: "2026-07-19T00:00:00.000Z",
+  };
+}
+function fixtureHostResult(t) {
+  return {
+    status: "answered", answer: ANSWER_TEXT, identity: { provider: "openai", modelId: ANSWER_MODEL, effort: "max" },
+    sandboxExecution: {
+      schema: "pipeline.codex-sandbox-host-execution.v1", selectionId: t.selectionId, selectionSha256: t.selectionSha256,
+      repoFingerprint: t.repoFingerprint, duty: "advisory", dispatch: t.dispatch,
+      observed: { cliSha256: t.toolchain.cliSha256, profileSha256: t.profile.sha256, networkEnabled: true, scratchRootSha256: t.profile.scratchRootSha256 },
+      terminal: { childStarted: true, exitCode: 0, stdioStatus: "complete", cleanupStatus: "complete" },
+    },
+  };
+}
+function answeredTransport(input, { dispatchOverrides, requested, invoke } = {}) {
+  return {
+    repoRoot,
+    resolveAdvisoryRoute: ({ candidateCommit: commit }) => ({
+      dutyId: "advisory", runner: "codex", model: ANSWER_MODEL, effort: "max", state: "default", sourceSha256: "a".repeat(64), candidateCommit: commit,
+    }),
+    selectModelRoleForTaskFn: () => { throw new Error("optional store unavailable"); },
+    dependencies: {
+      async executeSandboxedReadonlyDuty(request, dependencies) {
+        const chosen = fixtureSelection(input, dispatchOverrides);
+        const asked = requested ?? request.requested;
+        const launched = await dependencies.bridge.launch({
+          selectionId: chosen.selectionId, duty: "advisory", selection: chosen, requested: asked, references: request.references, profile: chosen.profile,
+          scratch: { path: "scratch/advisory-scratch", sha256: chosen.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot, codexPath: "fixture" },
+        });
+        const execution = await dependencies.bridge.finalize({ selection: chosen, launched, requested: asked, profile: chosen.profile });
+        return {
+          status: "answered", childStarted: true, selectionId: chosen.selectionId, selectionSha256: sandboxSelectionDigest(chosen),
+          executionReceiptSha256: sha256Hex(JSON.stringify(execution)), dutyReceiptSha256: execution.dutyReceipt.sha256, assurance: chosen.assurance,
+        };
+      },
+    },
+    async invokeCodexAdvisoryAppServer({ sandboxTransport }) {
+      return invoke ? invoke(sandboxTransport) : fixtureHostResult(sandboxTransport);
+    },
+  };
+}
+function boundParts(input, outcome, override = {}) {
+  return {
+    receipt: outcome.advisoryResult.receipt, execution: outcome.execution, answer: outcome.advisoryResult.answer, demand: input.demand,
+    route: { runner: "codex", model: ANSWER_MODEL, effort: "max" }, dispatch: input.dispatch,
+    evidenceSha256: input.demand.evidenceSha256, selection: outcome.sandboxBinding, ...override,
+  };
+}
+async function answeredFixture() {
+  const input = advisoryInput();
+  const outcome = await runSelectedAdvisoryHost(input, answeredTransport(input));
+  assert.equal(outcome.advisoryResult.ok, true, JSON.stringify(outcome.advisoryResult));
+  return { input, outcome };
+}
+
+test("AC-135: the answered route completes on a fixture host result and binds every digest it names", async () => {
+  const { input, outcome } = await answeredFixture();
+  assert.equal(outcome.advisoryResult.code, "answered");
+  assert.equal(outcome.advisoryResult.answer, ANSWER_TEXT);
+  assert.equal(outcome.advisoryResult.receipt.schema, "pipeline.advisory-receipt.v1", "the existing receipt format, no second one");
+  assert.equal(outcome.advisoryResult.receipt.observed.status, "answered");
+  const bound = verifyAnsweredAdvisoryReceipt(boundParts(input, outcome));
+  assert.equal(bound.ok, true, JSON.stringify(bound));
+  assert.deepEqual(bound.binding.candidate, { commit: candidateCommit, tree: candidateTree });
+  assert.deepEqual(bound.binding.route, { runner: "codex", model: ANSWER_MODEL, effort: "max" });
+  assert.equal(bound.binding.questionSha256, sha256Hex(input.question));
+  assert.equal(bound.binding.evidenceSha256, input.demand.evidenceSha256);
+  assert.equal(bound.binding.hostResult.selectionId, outcome.execution.selectionId);
+  assert.equal(bound.binding.hostResult.dutyReceiptSha256, outcome.execution.dutyReceipt.sha256);
+  assert.equal(bound.binding.answerSha256, sha256Hex(ANSWER_TEXT));
+  assert.equal(outcome.execution.dutyReceipt.sha256, sha256Hex(JSON.stringify(outcome.advisoryResult.receipt)));
+});
+
+test("AC-135: each binding mismatch is refused with its typed code and a runner-neutral repair", async () => {
+  const { input, outcome } = await answeredFixture();
+  const zero = "0".repeat(64);
+  const withExecution = (p, patch) => ({ execution: { ...p.execution, ...patch } });
+  const cases = [
+    ["candidate commit", "advisory_answered_candidate_mismatch", (p) => ({ dispatch: { ...p.dispatch, candidateCommit: "d".repeat(40) } })],
+    ["candidate tree", "advisory_answered_candidate_mismatch", (p) => ({ dispatch: { ...p.dispatch, candidateTree: "e".repeat(40) } })],
+    ["execution queue revision", "advisory_answered_candidate_mismatch", (p) => withExecution(p, { dispatch: { ...p.execution.dispatch, queueRevision: 9 } })],
+    ["route model", "advisory_answered_route_mismatch", (p) => ({ route: { ...p.route, model: "other-model" } })],
+    ["route effort", "advisory_answered_route_mismatch", (p) => ({ route: { ...p.route, effort: "high" } })],
+    ["requested route", "advisory_answered_route_mismatch", (p) => withExecution(p, { requested: { runner: "codex", model: "other-model" } })],
+    ["question digest", "advisory_answered_question_mismatch", (p) => ({ demand: { ...p.demand, questionSha256: zero } })],
+    ["evidence digest", "advisory_answered_evidence_mismatch", () => ({ evidenceSha256: zero })],
+    ["execution evidence digest", "advisory_answered_evidence_mismatch", (p) => withExecution(p, { dispatch: { ...p.execution.dispatch, referenceSetSha256: zero } })],
+    ["host result duty receipt digest", "advisory_answered_host_result_mismatch", (p) => withExecution(p, { dutyReceipt: { ...p.execution.dutyReceipt, sha256: zero } })],
+    ["host result selection", "advisory_answered_host_result_mismatch", (p) => ({ selection: { ...p.selection, selectionId: "css_bbbbbbbbbbbbbbbbbbbbbbbbbi" } })],
+    ["host result terminal", "advisory_answered_host_result_mismatch", (p) => withExecution(p, { terminal: { ...p.execution.terminal, exitCode: 1 } })],
+    ["answer digest", "advisory_answered_answer_mismatch", () => ({ answer: "A different answer than the one receipted." })],
+  ];
+  const parts = boundParts(input, outcome);
+  for (const [name, code, mutate] of cases) {
+    const refused = verifyAnsweredAdvisoryReceipt({ ...parts, ...mutate(parts) });
+    assert.equal(refused.ok, false, `${name}: must be refused`);
+    assert.equal(refused.code, code, `${name}: typed code`);
+    assert.equal(refused.repair, ANSWERED_RECEIPT_REFUSALS[code], `${name}: the repair is named`);
+    assert.equal(RUNNER_WORDS.test(refused.repair), false, `${name}: runner-neutral message`);
+  }
+  for (const [code, repair] of Object.entries(ANSWERED_RECEIPT_REFUSALS)) {
+    assert.match(code, /^advisory_answered_[a-z_]+$/u);
+    assert.equal(repair.length > 40 && !RUNNER_WORDS.test(repair), true, `${code}: neutral, actionable repair`);
+  }
+});
+
+test("AC-135: a receipt for an execution that did not happen cannot be answered", async () => {
+  const { input, outcome } = await answeredFixture();
+  const parts = boundParts(input, outcome);
+  const missing = "advisory_answered_execution_missing";
+  const executions = [
+    null,
+    undefined,
+    { ...parts.execution, schema: "pipeline.not-an-execution.v1" },
+    { ...parts.execution, terminal: { ...parts.execution.terminal, childStarted: false } },
+    { ...parts.execution, dutyReceipt: { ...parts.execution.dutyReceipt, status: "unavailable" } },
+  ];
+  for (const execution of executions) {
+    const refused = verifyAnsweredAdvisoryReceipt({ ...parts, execution, selection: undefined });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.code, missing);
+    assert.match(refused.repair, /execution record/u);
+  }
+  const noChild = { ...parts.receipt, observed: { status: "unavailable", identity: null }, answerSha256: null,
+    fallback: { reason: "consult-unavailable", redactedErrorClass: "unavailable" } };
+  assert.equal(verifyAnsweredAdvisoryReceipt({ ...parts, receipt: noChild }).code, "advisory_answered_receipt_invalid");
+  assert.equal(verifyAnsweredAdvisoryReceipt({ ...parts, receipt: { ...parts.receipt, answerSha256: null } }).code, "advisory_answered_receipt_invalid");
+});
+
+test("AC-135: the bridge returns no answer when the observed host result does not bind the candidate or the route", async () => {
+  const cases = [
+    ["candidate", "advisory_answered_candidate_mismatch", { dispatchOverrides: { candidateCommit: "d".repeat(40) } }],
+    ["route", "advisory_answered_route_mismatch", { requested: { runner: "codex", model: "other-model" } }],
+  ];
+  for (const [name, code, options] of cases) {
+    const input = advisoryInput();
+    const outcome = await runSelectedAdvisoryHost(input, answeredTransport(input, options));
+    assert.equal(outcome.advisoryResult.ok, false, `${name}: no answer`);
+    assert.equal(outcome.advisoryResult.code, code);
+    assert.equal(outcome.advisoryResult.answer, null);
+    assert.equal(outcome.advisoryResult.repair, ANSWERED_RECEIPT_REFUSALS[code]);
+    assert.equal(outcome.advisoryResult.receipt.observed.status, "unavailable", "the receipt claims no answered execution");
+    assert.equal(outcome.advisoryResult.receipt.answerSha256, null);
+    assert.equal(outcome.execution, null);
+  }
+  // A host result without any execution record never reaches an answer at all.
+  const input = advisoryInput();
+  const absent = await runSelectedAdvisoryHost(input, answeredTransport(input, {
+    invoke: () => ({ status: "answered", answer: "must be discarded", identity: { provider: "openai", modelId: ANSWER_MODEL, effort: "max" } }),
+  }));
+  assert.equal(absent.advisoryResult.ok, false);
+  assert.equal(absent.advisoryResult.answer, null);
+  assert.equal(absent.execution, null);
+});
