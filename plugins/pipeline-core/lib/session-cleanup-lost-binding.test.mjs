@@ -270,6 +270,36 @@ test("D72 releaseArchivedOrphanBinding refuses with a typed code and writes noth
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// D44 / AC-203 (K1): no production route creates the session-authority registry before the first governed item dispatch, so a
+// legacy root upgraded to this build can hold a lost binding with no registry at all. The release must not die on the raw
+// ENOENT of the missing catalogue: the member step has nothing to release (`{ status: "none" }`), the binding release goes
+// ahead, and the registry stays absent. Entering the boundary creates the lock directory only, never a catalogue.
+test("D44 a lost binding on a root that never had a session-authority registry releases without creating one", () => {
+  const root = createLegacyLayoutFixture({ prefix: "lost-binding", name: "no-registry", goal: "Test lost binding release without a registry" });
+  try {
+    const repository = inspectSignedDescriptorCustodyRepository(root);
+    const bound = writeHistoricLegacyBinding({ root, sessionId: "session-no-registry" });
+    const loaded = loadSessionDescriptor(root, bound.output.sessionId, { expectedDescriptorSha256: bound.output.descriptorSha256 });
+    unlinkSync(loaded.path);
+    const plan = planSessionCleanupRecovery({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "release-lost-binding");
+    const catalogue = join(registryRoot(root), "catalogue.json");
+    assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "absent" });
+    assert.equal(existsSync(catalogue), false);
+    assert.equal(observeSessionCleanupState(root).sessionCleanup.sessionId, bound.output.sessionId);
+
+    const released = releaseLostSessionCleanupBinding({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+    assert.equal(released.status, "released");
+    assert.equal(released.sessionCleanup, null);
+    assert.equal(observeSessionCleanupState(root).sessionCleanup, null);
+    // No registry was created as a side effect of the release.
+    assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "absent" });
+    assert.equal(existsSync(catalogue), false);
+    assert.equal(existsSync(join(registryRoot(root), "releases")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("D72 a crash after the registry member step converges when archive-orphan is rerun in a fresh process", () => {
   const { root, tuple } = archivedFixture("orphan-crash");
   try {

@@ -27,6 +27,7 @@ import {
 } from "./worktree-lifecycle.mjs";
 import {
   healSessionAuthorityDrift,
+  inspectSessionAuthorityRegistryRead,
   releaseLostSessionAuthorityMember,
   withSessionAuthorityBoundary,
 } from "./session-authority-registry.mjs";
@@ -174,20 +175,29 @@ export function releaseLostSessionCleanupBinding({
 /**
  * The crash-safe boundary sequence both release routes share, in one registry boundary: re-check the route's own
  * preconditions under the boundary, release the registry member FIRST, the private binding second under the State CAS
- * the caller read, then heal the registry and read it back strictly.
+ * the caller read, then heal the registry and read it back strictly. A root whose registry does not exist yet (D44) has
+ * no member to release: the member step is skipped and the heal's `absent` read-back is accepted; the release never
+ * creates a registry.
  */
 function releaseBindingInBoundary({ root, tuple, stateSha256, revision, recheck, codePrefix, repair }) {
   const repository = continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(root));
   return withSessionAuthorityBoundary({ repository }, (token) => {
     recheck();
-    try {
-      releaseLostSessionAuthorityMember({ boundary: token, producerId: "onboarding-continuity", target: tuple });
-    } catch (error) {
-      if (error?.code === "SDC-AUTHORITY-CAS" && error?.reason === "lost-binding-members-ambiguous") {
-        refuse(`${codePrefix}-MEMBER`, "more than one in-flight registry member names the lost session",
-          typeof error.repair === "string" ? error.repair : repair);
+    // D44: no production route creates the registry before the first governed item dispatch, so a root upgraded to this
+    // build can hold a lost binding with no registry at all. Under the boundary lock the catalogue cannot appear, so an
+    // `absent` read means no member can name the lost session: the member step has nothing to release and is skipped.
+    // Every other status (`readable`, `refused`) takes the member step exactly as before and keeps its own refusals.
+    const registryAbsent = inspectSessionAuthorityRegistryRead({ repository }).status === "absent";
+    if (!registryAbsent) {
+      try {
+        releaseLostSessionAuthorityMember({ boundary: token, producerId: "onboarding-continuity", target: tuple });
+      } catch (error) {
+        if (error?.code === "SDC-AUTHORITY-CAS" && error?.reason === "lost-binding-members-ambiguous") {
+          refuse(`${codePrefix}-MEMBER`, "more than one in-flight registry member names the lost session",
+            typeof error.repair === "string" ? error.repair : repair);
+        }
+        throw error;
       }
-      throw error;
     }
     const released = releaseOnboardingSessionCleanupInternal({
       rootDir: root,
@@ -200,8 +210,10 @@ function releaseBindingInBoundary({ root, tuple, stateSha256, revision, recheck,
     }
     // The binding release moved the producer namespace the member step baselined, and no in-flight member remains, so
     // the registry's own heal adopts it; the heal ends in the registry's strict read-back.
+    // With no registry at the member step the heal's own `absent` is the expected read-back; a registry that was present
+    // at the member step and reads back `absent` (or anything but `readable`) is still refused.
     const registry = healSessionAuthorityDrift({ boundary: token });
-    if (registry.status !== "readable") {
+    if (registry.status !== "readable" && !(registryAbsent && registry.status === "absent")) {
       refuse(`${codePrefix}-READBACK`,
         `the session-authority registry did not read back strictly after the release (${registry.code ?? "refused"}: ${registry.reason ?? "unreadable"})`,
         repair);
