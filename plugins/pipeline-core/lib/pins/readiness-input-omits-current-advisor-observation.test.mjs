@@ -6,20 +6,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalJson } from '../codex-sandbox-compatibility.mjs';
 import { createAdvisoryRouteSelection } from '../advisory-route-selection.mjs';
 import { readCurrentReadinessAdvisorObservation, rereadCurrentReadinessAdvisorObservation } from '../codex-readiness-finalization.mjs';
-import { buildCodexToolFreeReadinessRequest, runCodexToolFreeDesignReadiness } from '../codex-tool-free-design-readiness.mjs';
+import { buildCodexToolFreeReadinessRequest, runCodexToolFreeDesignReadiness, verifyCodexToolFreeBindingFromSources } from '../codex-tool-free-design-readiness.mjs';
+// Managed-host cases (points 6, 2, 3) reuse the green fixtures of codex-readiness-finalization.test.mjs.
+import { readinessFixture } from '../codex-readiness-finalization.fixture.mjs';
+import { advisorHostFixture } from '../codex-advisor-host.fixture.mjs';
+import { createCodexDesignReadinessHostStore } from '../codex-design-readiness-host-store.mjs';
+import { verifyDesignReadinessHostExecution } from '../design-readiness-host-evidence.mjs';
+import { runIsolatedStructuredHost } from '../codex-isolated-structured-host.mjs';
+import { designAdvisorValueSha256 } from '../design-advisor-course.mjs';
+import { coordinateInitialDesignAdvisory } from '../design-advisory-coordinator-v2.mjs';
+import { createNativeInitialAdvisorExecution } from '../native-initial-advisor-execution.mjs';
+import { loadRunnerProfilesV3Registry } from '../runner-profiles-v3.mjs';
+import { readDesignReadinessPreparationFromRepository } from '../design-workflow-package-v2.mjs';
+import { exportCodexDesignAdvisorArtifacts } from '../../scripts/codex-design-advisor-bootstrap.mjs';
 
 const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 const scratchRoot = join(repoRoot, 'scratch');
 const names = ['input', 'prd', 'spec', 'design', 'traceability'];
 const sha = value => createHash('sha256').update(value).digest('hex');
 const MARKER = 'SUPPLEMENTAL_UNTRUSTED_ADVISOR_OBSERVATION_JSON';
-const HOST_LIMIT = 'host-limitation: needs the linux-only private readiness store and managed host process; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)';
+// The managed-host cases need the linux-only private readiness store (uid/mode bits) and a real managed child process.
+const NON_LINUX = process.platform === 'linux' ? false : 'host-limitation: needs the linux-only private readiness store and managed host process; owner Coordinator, due 2026-11-04 (Linux/WSL run, PO decision K7)';
 
 function fixture(t) {
   mkdirSync(scratchRoot, { recursive: true });
@@ -131,6 +144,199 @@ test('AC-241 points 1+3: the host entry transmits the verified observation and r
   assert.equal(both.code, 'CTFR-ADVISOR-OBSERVATION-AMBIGUOUS'); assert.equal(calls, 2);
 });
 
-test('AC-241 point 6: bootstrap-to-host-to-fresh-verifier delivery with private custody (managed child, fresh verifier)', { skip: HOST_LIMIT }, () => {});
-test('AC-241 point 2: answered observation (private course/disposition) distinct from no-child unavailable', { skip: HOST_LIMIT }, () => {});
-test('AC-241 point 3: drift after the actual turn refuses publication and the private readiness record', { skip: HOST_LIMIT }, () => {});
+// ---- managed-host helpers: the fixture app-server is a real Node child speaking the app-server protocol; no provider is contacted ----
+const CHILD_ANCHOR = 'const p=m.params.outputSchema.properties, lit=value=>value.enum[0];';
+const COMPLETED_ANCHOR = "send({method:'turn/completed'";
+const ownerOnly = path => { const s = statSync(path); return s.uid === process.getuid() && (s.mode & 0o077) === 0; };
+const receiptFileOf = (f, receiptId) => join(f.store.processRoot, '..', 'receipts', `${receiptId}.json`);
+const sourceBytesOf = f => Object.fromEntries(names.map(n => [n, { path: f.sources[n].path, bytes: readFileSync(join(f.root, f.sources[n].path)) }]));
+const sourceContentOf = f => Object.fromEntries(names.map(n => [n, { ...f.sources[n], content: readFileSync(join(f.root, f.sources[n].path), 'utf8') }]));
+const requestFor = (f, advisorObservation, dispatchId) => buildCodexToolFreeReadinessRequest({ dispatchId, candidate: f.candidate, sources: f.sources, route: f.route, sourceContent: sourceContentOf(f), advisorObservation });
+const patchChild = (f, edit) => { const script = join(f.input, 'app-server'); writeFileSync(script, edit(readFileSync(script, 'utf8'))); };
+// The child exits 23 unless the supplemental block arrives, 24 unless the delivered observation satisfies `predicate` (evaluated in the child on `supplied`).
+function demandObservation(source, predicate) {
+  assert.ok(source.includes(CHILD_ANCHOR), 'fixture app-server anchor present');
+  return source.replace(CHILD_ANCHOR, () => `${CHILD_ANCHOR}
+const marker='${MARKER}\\n';const raw=m.params.input[0].text.split(marker)[1];
+if(!raw)process.exit(23);const supplied=JSON.parse(raw.slice(raw.indexOf('{')));if(!(${predicate}))process.exit(24);`);
+}
+// The child appends one byte to `path` after answering and before it announces turn/completed.
+function driftBeforeCompletion(source, path) {
+  assert.ok(source.includes(COMPLETED_ANCHOR), 'fixture app-server completion anchor present');
+  return source.replace(COMPLETED_ANCHOR, () => `require('node:fs').appendFileSync(${JSON.stringify(path)},' ');${COMPLETED_ANCHOR}`);
+}
+// Same receipt + route files and refs as the declared current Advisor evidence of the finalization test, over a real committed readiness fixture.
+function advisorContextFor(f) {
+  const receipt = { schema: 'pipeline.advisory-receipt.v1', receiptId: 'current-advisor',
+    dispatch: { dispatchId: 'current-advisor', queueRevision: 0, candidateCommit: f.candidate.commit, candidateTree: f.candidate.tree },
+    duty: 'advisory', profile: 'feature', configuredRoute: { runner: 'codex', selector: { kind: 'model-id', value: 'fixture-model' }, effort: 'high' },
+    adapter: 'consult', observed: { status: 'unavailable', identity: null }, questionSha256: f.sources.design.sha256, answerSha256: null,
+    fallback: { reason: 'consult-unavailable', redactedErrorClass: 'unavailable' }, emittedAtMs: 1000 };
+  const receiptBytes = Buffer.from(canonicalJson(receipt));
+  const route = createAdvisoryRouteSelection({ receipt, receiptBytes, code: 'ordinary-consult-host-callback-unavailable' }), routeBytes = Buffer.from(canonicalJson(route));
+  writeFileSync(join(f.root, 'advisor.receipt.json'), receiptBytes); writeFileSync(join(f.root, 'advisor.route.json'), routeBytes);
+  const refs = { receiptRef: { path: 'advisor.receipt.json', sha256: sha(receiptBytes) }, routeRef: { path: 'advisor.route.json', sha256: sha(routeBytes) } };
+  return { receipt, route, refs, observation: readCurrentReadinessAdvisorObservation({ repoRoot: f.root, candidate: f.candidate, sources: f.sources, ...refs }) };
+}
+// Native Claude path: the coordinator proves a no-child failure; the published preparation is read back into an observation.
+async function nativeUnavailableObservation(f) {
+  const route = { model: null, effort: null, sourceSha256: designAdvisorValueSha256(loadRunnerProfilesV3Registry()), candidateCommit: f.candidate.commit };
+  const coordination = await coordinateInitialDesignAdvisory({ repoRoot: f.root, runner: 'claude', featureId: 'verified-feature', authoringDispatchId: 'verified-author', sources: f.sources,
+    reason: 'risk-review', profile: 'feature', dispatch: { dispatchId: 'initial-no-child', queueRevision: 0, candidateCommit: f.candidate.commit, candidateTree: f.candidate.tree },
+    route, hostExecution: createNativeInitialAdvisorExecution({ runner: 'claude' }) });
+  assert.equal(coordination.status, 'unavailable-pending-final-approval', JSON.stringify(coordination));
+  mkdirSync(join(f.root, 'evidence'));
+  const artifacts = exportCodexDesignAdvisorArtifacts(f.root, 'evidence/failure', coordination);
+  const preparation = { schema: 'pipeline.design-readiness-preparation.v2', featureId: 'verified-feature', authoringDispatchId: 'verified-author', candidate: f.candidate, sources: f.sources,
+    advisor: { status: 'unavailable', runner: 'claude', profile: 'feature', route, initialContext: artifacts.initial, courseBinding: coordination.courseBinding, consultation: null, hostReceipt: null,
+      receipt: null, report: null, disposition: null, revisions: [], failureEvidence: artifacts.failure,
+      proposedException: { kind: 'advisor-unavailable', approval: 'final', oneTime: true, rationale: 'Review the proved no-child failure.' } }, createdAt: new Date().toISOString() };
+  writeFileSync(join(f.root, 'evidence', 'preparation.json'), canonicalJson(preparation));
+  const prepared = readDesignReadinessPreparationFromRepository({ repoRoot: f.root, packagePath: 'evidence/preparation.json' });
+  assert.equal(prepared.ok, true, JSON.stringify(prepared));
+  return prepared.advisorObservation;
+}
+// Codex path: a real managed advisor child answers; the Elephant's disposition is published; the preparation is read back with the trusted executable.
+async function answeredObservation(answered) {
+  const consultation = await coordinateInitialDesignAdvisory({ repoRoot: answered.root, featureId: 'advisor-feature', authoringDispatchId: 'elephant-author', sources: answered.sources,
+    reason: 'risk-review', profile: 'feature', dispatch: answered.args.dispatch, route: answered.route, hostExecution: answered.execution });
+  assert.equal(consultation.ok, true, JSON.stringify(consultation));
+  mkdirSync(join(answered.root, 'evidence'));
+  const artifacts = exportCodexDesignAdvisorArtifacts(answered.root, 'evidence/answer', consultation);
+  const preparation = { schema: 'pipeline.design-readiness-preparation.v2', featureId: 'advisor-feature', authoringDispatchId: 'elephant-author', candidate: answered.candidate, sources: answered.sources,
+    advisor: { status: 'answered', runner: 'codex', profile: 'feature', route: answered.route, initialContext: artifacts.initial, courseBinding: consultation.courseBinding,
+      consultation: consultation.consultation, hostReceipt: consultation.hostReceipt, receipt: artifacts.receipt, report: artifacts.report,
+      disposition: { schema: 'pipeline.design-advisor-disposition.v1', courseId: consultation.courseBinding.courseId, consultationSha256: designAdvisorValueSha256(consultation.consultation),
+        proposalSetSha256: consultation.consultation.proposalSetSha256, items: [{ proposalId: 'proposal-1', decision: 'reject', rationale: 'Retain the documented design.', revisionCommit: null }],
+        ownerDispatchId: 'elephant-author', createdAt: new Date().toISOString() }, revisions: [] }, createdAt: new Date().toISOString() };
+  writeFileSync(join(answered.root, 'evidence', 'preparation.json'), canonicalJson(preparation));
+  const prepared = readDesignReadinessPreparationFromRepository({ repoRoot: answered.root, packagePath: 'evidence/preparation.json', trustedAdvisorExecutablePath: process.execPath });
+  assert.equal(prepared.ok, true, JSON.stringify(prepared));
+  return prepared.advisorObservation;
+}
+
+test('AC-241 point 6: bootstrap-to-host-to-fresh-verifier delivery with private custody (managed child, fresh verifier)', { skip: NON_LINUX }, async t => {
+  const f = readinessFixture(t), a = advisorContextFor(f);
+  const demands = `supplied.receipt.observed.status==='unavailable'&&supplied.route.childStarted===false&&supplied.receipt.questionSha256===${JSON.stringify(f.sources.design.sha256)}`;
+  patchChild(f, source => demandObservation(source, demands));
+  // Control: a separate fixture whose child demands the same block never receives it, so the child exits and nothing is published.
+  const c = readinessFixture(t); patchChild(c, source => demandObservation(source, demands));
+  const control = await runCodexToolFreeDesignReadiness({ ...c.args });
+  assert.equal(control.status, 'unavailable', JSON.stringify(control)); assert.equal(control.report, null); assert.equal(control.code, 'CTFR-HOST-UNAVAILABLE');
+  assert.equal(existsSync(receiptFileOf(c, control.receiptId)), false, 'no private readiness record without the delivered observation');
+
+  const result = await runCodexToolFreeDesignReadiness({ ...f.args, advisorObservationRefs: a.refs });
+  assert.equal(result.status, 'reviewed', JSON.stringify(result));
+  assert.equal(Object.keys(result.report.sources).length, 5); assert.equal(Object.hasOwn(result.report, 'advisorObservation'), false);
+  const saved = f.store.read(result.receiptId, result.expected); assert.ok(saved);
+  const withObservation = requestFor(f, a.observation, f.args.dispatchId), plain = requestFor(f, null, f.args.dispatchId);
+  assert.equal(saved.value.requestSha256, withObservation.requestSha256, 'the managed child was started on the request that carries the observation');
+  assert.notEqual(saved.value.requestSha256, plain.requestSha256);
+  // Private custody: journal directory, every journal entry and the receipt file are owner-only.
+  const journal = join(f.store.processRoot, `codex-host-${result.receiptId}`), entries = readdirSync(journal);
+  assert.ok(entries.includes('readiness-finalization.json'));
+  for (const path of [journal, receiptFileOf(f, result.receiptId), ...entries.map(name => join(journal, name))]) assert.ok(ownerOnly(path), `owner-only: ${basename(path)}`);
+
+  // Fresh verifier: a new store over the same .git, the declared refs and independently supplied source bytes.
+  const fresh = createCodexDesignReadinessHostStore({ gitCommonDir: join(f.root, '.git'), repoFingerprint: f.repoFingerprint, trustedExecutablePath: process.execPath });
+  assert.equal(fresh.read(result.receiptId, result.expected).sha256, saved.sha256);
+  const bind = extra => verifyCodexToolFreeBindingFromSources({ repoRoot: f.root, hostExecution: result.report.hostExecution, report: result.report, candidate: f.candidate, sources: f.sources,
+    sourceBytes: sourceBytesOf(f), route: f.route, store: fresh, repoFingerprint: f.repoFingerprint, ...extra });
+  assert.equal(bind({ advisorObservationRefs: a.refs }).ok, true);
+  assert.equal(bind({ advisorObservationRefs: null }).ok, false, 'the fresh verifier cannot silently omit context bound into the actual request');
+  assert.equal(bind({ advisorObservation: structuredClone(a.observation) }).ok, true, 'a faithful copy is re-read and accepted');
+  const forged = structuredClone(a.observation); forged.route.childStarted = true;
+  assert.equal(bind({ advisorObservation: forged }).ok, false, 'a caller-forged copy cannot stand in for the re-read');
+  const verifyArgs = { repoRoot: f.root, hostExecution: result.report.hostExecution, readinessReceipt: result.report, candidate: f.candidate, sources: f.sources, sourceBytes: sourceBytesOf(f),
+    advisorObservationRefs: a.refs, resolveRoute: () => ({ state: 'default', runner: 'codex', ...f.route }), resolveCodexExecutable: () => process.execPath };
+  assert.equal(verifyDesignReadinessHostExecution(verifyArgs).ok, true);
+  assert.equal(verifyDesignReadinessHostExecution({ ...verifyArgs, advisorObservationRefs: null }).ok, false);
+  // A hash-consistent route file that now claims a started child is a forged context, not a drifted one.
+  const routePath = join(f.root, 'advisor.route.json'), originalRoute = readFileSync(routePath);
+  const forgedRouteBytes = Buffer.from(canonicalJson({ ...a.route, childStarted: true, attemptCount: 1 })); writeFileSync(routePath, forgedRouteBytes);
+  const forgedRefs = { ...a.refs, routeRef: { path: 'advisor.route.json', sha256: sha(forgedRouteBytes) } };
+  assert.equal(bind({ advisorObservationRefs: forgedRefs }).ok, false); assert.equal(verifyDesignReadinessHostExecution({ ...verifyArgs, advisorObservationRefs: forgedRefs }).ok, false);
+  writeFileSync(routePath, originalRoute); assert.equal(bind({ advisorObservationRefs: a.refs }).ok, true, 'restored context verifies again');
+  // Drift of the declared route file after publication (last: it stays drifted).
+  writeFileSync(routePath, Buffer.concat([originalRoute, Buffer.from(' ')]));
+  assert.equal(bind({ advisorObservationRefs: a.refs }).ok, false); assert.equal(verifyDesignReadinessHostExecution(verifyArgs).ok, false);
+});
+
+test('AC-241 point 2: answered observation (private course/disposition) distinct from no-child unavailable', { skip: NON_LINUX }, async t => {
+  const f = readinessFixture(t), readinessChild = readFileSync(join(f.input, 'app-server'), 'utf8');
+  const unavailable = await nativeUnavailableObservation(f);
+  assert.equal(unavailable.advisor.status, 'unavailable'); assert.equal(unavailable.failure.childStarted, false);
+  for (const field of ['consultation', 'hostReceipt', 'disposition']) assert.equal(unavailable.advisor[field], null, `unavailable carries no ${field}`);
+
+  // The answered course runs a real managed advisor child; the readiness child must then be launched from inside that store's own repository.
+  const answered = advisorHostFixture(t);
+  const inputs = join(answered.root, '.git', 'agent-pipeline', 'design-readiness-inputs', answered.repoFingerprint); mkdirSync(inputs, { recursive: true, mode: 0o700 });
+  const answeredInput = mkdtempSync(join(inputs, 'input-'));
+  const answer = await answeredObservation(answered);
+  assert.equal(answer.advisor.status, 'answered');
+  for (const field of ['consultation', 'hostReceipt', 'disposition']) assert.notEqual(answer.advisor[field], null, `answered carries ${field}`);
+  assert.deepEqual(rereadCurrentReadinessAdvisorObservation(answered.root, answer, answered.sources, process.execPath), answer);
+  assert.deepEqual(rereadCurrentReadinessAdvisorObservation(f.root, unavailable, f.sources, process.execPath), unavailable);
+
+  // The two observations change the request, and differ from each other and from the plain request.
+  const digests = [requestFor(f, null, 'distinct').requestSha256, requestFor(f, unavailable, 'distinct').requestSha256, requestFor(f, answer, 'distinct').requestSha256];
+  assert.equal(new Set(digests).size, 3, 'plain, unavailable and answered requests are pairwise distinct');
+
+  // Each managed child demands the status it is supposed to receive (exit 24 otherwise), so a swapped observation cannot reach a passing run.
+  patchChild(f, () => demandObservation(readinessChild, "supplied.advisor.status==='unavailable'&&supplied.failure.childStarted===false&&supplied.advisor.consultation===null&&supplied.advisor.disposition===null"));
+  const answeredChild = demandObservation(readinessChild, "supplied.advisor.status==='answered'&&supplied.advisor.consultation!==null&&supplied.advisor.hostReceipt!==null&&supplied.advisor.disposition!==null");
+  writeFileSync(join(answeredInput, 'app-server'), answeredChild);
+  const answeredArgs = dispatchId => ({ repoRoot: answered.root, repoFingerprint: answered.repoFingerprint, dispatchId, candidate: answered.candidate, sources: answered.sources, route: answered.route,
+    codexPath: process.execPath, store: answered.store, inputDirectory: answeredInput, readCandidate: () => answered.candidate });
+  const noChild = await runCodexToolFreeDesignReadiness({ ...f.args, advisorObservation: unavailable });
+  assert.equal(noChild.status, 'reviewed', JSON.stringify(noChild));
+  assert.equal(f.store.read(noChild.receiptId, noChild.expected).value.requestSha256, requestFor(f, unavailable, f.args.dispatchId).requestSha256);
+  const answeredRun = await runCodexToolFreeDesignReadiness({ ...answeredArgs('answered-final-readiness'), advisorObservation: answer });
+  assert.equal(answeredRun.status, 'reviewed', JSON.stringify(answeredRun));
+  assert.equal(answered.store.read(answeredRun.receiptId, answeredRun.expected).value.requestSha256, requestFor(answered, answer, 'answered-final-readiness').requestSha256);
+
+  // Relabelling either observation to the other status is refused before any child launch (the same call accepts the unrelabelled one).
+  const asAnswered = structuredClone(unavailable); asAnswered.advisor.status = 'answered';
+  assert.throws(() => rereadCurrentReadinessAdvisorObservation(f.root, asAnswered, f.sources, process.execPath));
+  const refusedAsAnswered = await runCodexToolFreeDesignReadiness({ ...f.args, dispatchId: 'relabelled-unavailable', advisorObservation: asAnswered });
+  assert.equal(refusedAsAnswered.status, 'unavailable'); assert.equal(refusedAsAnswered.receiptId, null);
+  const asUnavailable = structuredClone(answer); asUnavailable.advisor.status = 'unavailable';
+  assert.throws(() => rereadCurrentReadinessAdvisorObservation(answered.root, asUnavailable, answered.sources, process.execPath));
+  const refusedAsUnavailable = await runCodexToolFreeDesignReadiness({ ...answeredArgs('relabelled-answered'), advisorObservation: asUnavailable });
+  assert.equal(refusedAsUnavailable.status, 'unavailable'); assert.equal(refusedAsUnavailable.receiptId, null);
+});
+
+test('AC-241 point 3: drift after the actual turn refuses publication and the private readiness record', { skip: NON_LINUX }, async t => {
+  // drifting: null (control) | { file, when: 'in-child' (the app-server appends a byte before turn/completed) | 'after-host' (appended after the host returned ok, before publication) }
+  const attempt = async drifting => {
+    const f = readinessFixture(t), a = advisorContextFor(f), path = join(f.root, drifting?.file ?? 'advisor.receipt.json'), original = readFileSync(path);
+    if (drifting?.when === 'in-child') patchChild(f, source => driftBeforeCompletion(source, path));
+    let invoked = 0, receiptId = null, host = null;
+    const result = await runCodexToolFreeDesignReadiness({ ...f.args, advisorObservationRefs: a.refs, invokeHost: async input => {
+      invoked += 1; receiptId = input.managedProcess.receiptId; host = await runIsolatedStructuredHost(input);
+      if (drifting?.when === 'after-host') writeFileSync(path, Buffer.concat([original, Buffer.from(' ')]));
+      return host; } });
+    return { f, result, invoked, receiptId, host, drifted: !readFileSync(path).equals(original) };
+  };
+  // Control: no drift, the same flow publishes the private readiness record.
+  const control = await attempt(null);
+  assert.equal(control.result.status, 'reviewed', JSON.stringify(control.result)); assert.equal(control.drifted, false); assert.equal(control.host.ok, true);
+  assert.equal(existsSync(receiptFileOf(control.f, control.receiptId)), true); assert.equal(control.result.receiptId, control.receiptId);
+  for (const file of ['advisor.receipt.json', 'advisor.route.json']) {
+    // Drift before completion: the host's own finalization refuses it after the child's turn, and nothing is published.
+    const drift = await attempt({ file, when: 'in-child' });
+    assert.equal(drift.invoked, 1, file); assert.equal(drift.drifted, true, `${file}: the child appended its byte`);
+    assert.equal(drift.host.ok, false, file); assert.equal(drift.host.code, 'host-readiness-finalization-unavailable', file);
+    assert.equal(drift.host.observed.turnId, 'fresh-fixture-turn', `${file}: the actual turn ran`); assert.equal(drift.host.observed.ownership.status, 'closed', `${file}: the child was reaped`);
+    assert.equal(drift.result.status, 'unavailable', file); assert.equal(drift.result.report, null, file);
+    assert.equal(drift.result.code, 'CTFR-HOST-UNAVAILABLE', file); assert.equal(drift.result.transportCode, drift.host.code, file);
+    assert.equal(drift.result.receiptId, drift.receiptId, 'the receipt id was assigned before the host was invoked');
+    assert.equal(existsSync(receiptFileOf(drift.f, drift.receiptId)), false, `${file}: no private readiness record is published`);
+    // Drift after a successful host run, at the publication gate itself.
+    const late = await attempt({ file, when: 'after-host' });
+    assert.equal(late.host.ok, true, file); assert.equal(late.drifted, true, file);
+    assert.equal(late.result.status, 'unavailable', file); assert.equal(late.result.report, null, file);
+    assert.notEqual(late.result.code, 'CTFR-HOST-UNAVAILABLE', `${file}: refused at publication, not by the host`);
+    assert.equal(existsSync(receiptFileOf(late.f, late.receiptId)), false, `${file}: no private readiness record is published`);
+  }
+});
