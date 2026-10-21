@@ -33,6 +33,10 @@ export const BOUND_PATH_FIELD_CLASSIFICATION = Object.freeze({
   "planApproval.designWorkflowPackagePath": "tracked-required",
   // transient scratch request file; no State digest binds it (its name merely echoes the package digest)
   "planPresentation.designWorkflowApprovalRequestPath": "not-bound",
+  // transient scratch design-approval request file of the review-receipt route; no State digest binds the file
+  "planPresentation.designApprovalRequestPath": "not-bound",
+  // rigor journal pointer; the entry digest covers the journal body, no digest of the plan file is recorded beside it
+  "rigorHistory.body.planPath": "not-bound",
   // historical Phoenix record: active-feature pointer, no digest beside it
   "phoenixEpicHistory.activeFeature.planPath": "not-bound",
   // historical Phoenix submission binds the plan by planSha256
