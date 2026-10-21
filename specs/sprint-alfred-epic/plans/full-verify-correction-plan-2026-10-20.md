@@ -370,3 +370,35 @@ Interim entry.
   theme of the binding reds (package C).
 - **Next:** design-workflow-package-builder (0/3), the AFK worker-request package, then package C (deep,
   binding reds plus the GDW01 owner question with a shared fixture module in scope).
+
+### K1 measurement 9 (2026-10-21, dispatch ALF-K1C-BINDING-REDS, classification only, no edits)
+
+- **K1f/K1g delivered:** design-workflow-package-builder 3/3 (`314cd6bb8`); AFK worker requests moved
+  beside the ledger root, afk-transaction-host 2/2 (`c8c4fb947`); the pure projection-writer
+  precondition runs before the authority lifetime, afk-claude-host 10/10, afk-transaction-host 3/3,
+  afk-activation 13/13 (`41ba365df`).
+- **Binding suite 56/66, ten reds classified:**
+  - **C (1, fixture gap):** 'a single unbound descriptor requires an activated digest-bound rebind'
+    creates its orphan with the plain `startSessionDescriptor` (test ~1663); `bind-orphan` then binds in
+    a plain context and is refused at `onboarding-continuity.mjs` ~9571. Recipe:
+    `startDescriptorWithBoundRequester`.
+  - **D (4, stale fixture):** the composite-recovery cases pin the legacy-layout State, but their first
+    bound `start` migrates the root to neutral (AC-203 K1c: a Source-owned bound bind is admitted only
+    for a neutral project). Recipe: `writeHistoricLegacyBinding` instead of the bound start (~1928,
+    ~2057, ~2098, ~2180); assertions unchanged. The drift loop's 'orphan-set' iteration never ran.
+  - **A (3, fixture gap, one risk):** 'continuity owning release failed': `releaseOnboardingSessionCleanup`
+    → `continuityAuthorityFinish` (~9508) → `continuityAuthorityCurrent` (~9310) needs the bound
+    requester context of the owning bind; the fixture supplies it for start and bind only. Recipe: a
+    fixture export `releaseInsideRequesterContext`, wired only for the `cleanup`/`release-binding` verbs
+    in the binding test's `invoke()` (not in the shared dependency set, which the recovery code branches
+    on). Risk: those verbs retire the descriptor before the release; if the requester readback does not
+    survive retirement, A is a product question (`runOwnedContinuityRetiredTerminal` ~11103 admits only
+    `close-feature` and `release-owned-transition`).
+  - **B (1, unresolved):** the second bound start after a `release-closed-feature` recovery is refused
+    in `prepareOperation` (~9423-9446, every cause mapped to UNAVAILABLE); likely E's family.
+  - **E (1, product question):** after the ordinary orphan release, the next bound start fails with
+    `onboarding-continuity:namespace-drift`: the first bind's registry member is still armed, because
+    `applyOrphanSessionCleanupBindingRelease` (~3881) releases the binding without the registry member
+    step that the owning release and RF2A's `releaseArchivedOrphanBinding` perform.
+- **Next:** C and D (implementor, precise recipes), then A with the retirement risk measured first, then B
+  and E.
