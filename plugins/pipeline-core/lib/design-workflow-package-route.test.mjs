@@ -156,9 +156,9 @@ test("R4-T0-6 a native readiness route keeps the package admissible and non-auth
   assert.equal(result.implementationAuthority, false);
 });
 
-test("R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code", () => {
+test("R4-T0-6 regression: present-plan refuses the retired --design-workflow-package route with its typed code and the replacement (ADR-0085)", () => {
   const text = readFileSync(new URL("../scripts/pipeline-state.mjs", import.meta.url), "utf8");
-  assert.ok(text.includes("no presentation or approval lock was recorded"), "refusal wording must not change");
+  assert.ok(text.includes("DWP-PRESENT-RETIRED: use present-plan --review-receipt"), "the retired route must name its typed code and the route that replaces it");
 });
 
 test("R4-T0-7 an Advisor answered through consult is admitted WITH the derived fallback-self-dispatch label", () => {
