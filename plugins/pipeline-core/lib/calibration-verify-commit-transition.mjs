@@ -277,3 +277,16 @@ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths 
     return { ok: true, code: "CVCT-COMMIT-READY", paths: facts.entries.map((entry) => entry.path) };
   } catch (error) { return unavailable(error); }
 }
+
+/** One-line repair per unmet configure-verify condition (AC-140, never-fully-blocking). */
+export function configureVerifyRepair(code) {
+  if (code === "CVCT-AUTHORITY-STALE") return "restore the approved PRD/Spec bytes, or run reopen-design and approve the plan again";
+  if (code === "CVCT-PROFILE-STALE") return "restore the approved PO profile, or submit and approve the plan again";
+  if (code === "CVCT-FILE") return "make the State file a private regular file of its owner (mode 0600 on POSIX, owner-only ACL on Windows), then retry";
+  if (code === "CVCT-SOURCE-MISSING" || code === "CVCT-PATH") return "restore the approved source file the approval names (or run reopen-design and approve again), then retry";
+  if (code === "CVCT-CAS" || code === "CVCT-APPROVAL-CAS") return "a source changed during the check; retry once no other write is running";
+  if (code === "CVCT-HEAD-UNAVAILABLE" || code === "CVCT-HEAD") return "check out a valid committed HEAD, then retry";
+  if (code === "CVCT-MODE-UNAVAILABLE") return "set the human approval mode (gates.push_approval: signature or chat) in pipeline.user.yaml, then retry";
+  if (String(code).startsWith("DAB-") || code === "CVCT-DESIGN-REQUEST-UNAVAILABLE" || code === "CVCT-DESIGN-APPROVAL-MISMATCH") return "the design approval no longer matches its request; present and approve the current design again";
+  return "run `pipeline-state.mjs inspect` and follow its nextAction, then retry";
+}
