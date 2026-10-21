@@ -2807,7 +2807,7 @@ test("blank real root inspect and plan are read-only", () => {
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
-      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
       "project/pipeline.json", "project/pipeline.yaml",
     ]);
   } finally { dispose(path); }
@@ -7203,7 +7203,8 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     assert.equal(appServerFirst.continuity.status, "absent-pristine");
     assert.equal(appServerFirst.nextAction, null);
 
-    mkdirSync(join(pristine, "docs"));
+    // Onboarding now seeds docs/adr/ (D80), so docs/ already exists in an onboarded root.
+    mkdirSync(join(pristine, "docs"), { recursive: true });
     writeFileSync(join(pristine, "docs", "state.md"), "manual handover\n", { flag: "wx" });
     const damaged = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: pristine,
@@ -7507,10 +7508,10 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.deepEqual(
       plan.targets.map((target) => target.path),
       [
-        "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+        "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
         "project/pipeline.json", "project/pipeline.yaml",
       ],
-      "fresh onboarding seeds the canonical project authority and the ignore rules for the paths it writes into; runtime targets are initialized later",
+      "fresh onboarding seeds the canonical project authority, the ignore rules for the paths it writes into, and the docs/adr decision-record hint and template (D80); runtime targets are initialized later",
     );
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: false, deps: fakeDeps }).status, "activation-required");
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
@@ -7673,7 +7674,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.runnerPermissions, inspected.runnerPermissions);
     assert.deepEqual(planned.targets.map((target) => target.path), [
-      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
       "project/pipeline.json", "project/pipeline.yaml",
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
