@@ -41,6 +41,10 @@ Either write the route record before the baseline capture, or treat the guard's 
 record as a known foreign path in the completion comparison. Also name the missing ignore
 entry in the refusal. Check whether NGHS17 shares this cause.
 
+## Coverage read 2026-10-21
+
+Still reproducible in source: `lib/agy-host-commit-admission.mjs` counts every new untracked path as a child change, and the hook prints only the generic text. First half (the host commit) is addressed by the refusal route (new code `AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED`, pins AHC07/AHC08, hook repair text); the comparison itself is deliberately not relaxed. Open: the quality-package apply half (`QUALITY-PACKAGE-BASE-DRIFT` on an unignored `scratch/`), whether NGHS17 shares the cause, and the PO choice between this refusal and treating the guard's own route record as a known foreign path.
+
 ## Acceptance
 
 - An item-governed host commit succeeds in a consumer whose `.gitignore` lacks `/evidence/`,

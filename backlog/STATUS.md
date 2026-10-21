@@ -143,6 +143,7 @@
 | pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff | closed | defect | pipeline | — | 2026-08-23 | — | — |
 | pipeline.briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them | closed | workflow-improvement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.briefing-bundling-two-findings-asks-for-two-dispatches | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem. |
+| pipeline.briefing-generator-is-not-a-product-capability | open | requirement | pipeline | alfred | 2026-10-21 | — | — |
 | pipeline.briefing-model-field-contradicts-agent-definition | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.browser-preflight-misses-missing-host-library | closed | defect | pipeline | alfred | 2026-09-27 | — | — |
@@ -272,7 +273,7 @@
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
 | pipeline.design-trailer-verifier-lost-after-closure | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.design-workflow-package-omits-contract | open | defect | pipeline | alfred | 2026-09-28 | — | — |
-| pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
+| pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows | open | defect | pipeline | alfred | 2026-10-07 | 2026-11-04 | — |
 | pipeline.design-workflow-signing-request-schema-drift | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.desktop-app-support-is-unverified | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
@@ -616,6 +617,7 @@
 | pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.pipeline-owned-files-dirty-the-push-tree | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions | closed | defect | pipeline | nova | 2026-08-29 | — | — |
+| pipeline.pipeline-state-is-a-13810-line-monolith | open | defect | pipeline | none | 2026-10-21 | — | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | — | 2026-08-05 | — | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony | closed | defect | pipeline | nova | 2026-08-29 | — | — |
@@ -676,6 +678,7 @@
 | pipeline.promotion-freezes-a-prd-the-po-gate-will-reject | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.protected-baseline-rejects-canonical-discarded-idle-state | open | defect | pipeline | alfred | 2026-09-29 | — | — |
+| pipeline.protected-file-set-audit-after-0-7-0 | open | defect | pipeline | none | 2026-10-21 | — | — |
 | pipeline.protected-guard-imports-unprotected-grammar-and-classifier | open | defect | pipeline | alfred | 2026-10-21 | — | — |
 | pipeline.publication-authority-lacks-execution-time-criticalproof-reverification | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.published-lifecycle-event-schema-still-enumerates-cancellation | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -764,6 +767,7 @@
 | pipeline.runtime-projections-drift-after-v3-refresh | closed | defect | pipeline | nova-b | 2026-08-28 | — | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
 | pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop | closed | defect | pipeline | nova | 2026-09-13 | — | NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies. |
 | pipeline.scanner-bootstrap-is-not-self-sufficient | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
+| pipeline.scanner-diagnostics-keep-no-finding-provenance-before-suppression | open | defect | pipeline | none | 2026-10-21 | — | — |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | closed | defect | pipeline | nova | 2026-08-08 | 2026-08-15 | — |
 | pipeline.scratch-has-no-retention-and-no-durability-check | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.scratch-must-remain-writable-across-lifecycle-states | open | requirement | pipeline | alfred | 2026-09-27 | — | — |
@@ -823,6 +827,7 @@
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-08-10 | — |
 | pipeline.spec-retention-on-close | closed | defect | pipeline | — | 2026-07-20 | — | — |
 | pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy | open | defect | pipeline | nightwing | 2026-08-12 | 2026-09-12 | — |
+| pipeline.stale-plan-invalidation-reopens-the-authority-edit-lock | open | defect | pipeline | alfred | 2026-10-21 | — | — |
 | pipeline.stale-worktree-directories-accumulate-with-no-sweep | closed | defect | pipeline | nova | 2026-08-27 | — | — |
 | pipeline.staleness-check-unsettled-top-level-await-warning | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.standing-critic-consent-reprompts-host-approval | closed | requirement | pipeline | none | 2026-09-09 | — | — |
@@ -839,6 +844,7 @@
 | pipeline.test-fixtures-inside-the-checkout-write-the-real-repository | open | defect | pipeline | alfred | 2026-10-18 | — | — |
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | closed | defect | pipeline | alfred | 2026-08-08 | 2026-08-15 | — |
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
+| pipeline.the-agy-installer-writes-a-machine-path-into-a-tracked-file | open | defect | pipeline | alfred | 2026-10-21 | — | — |
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | closed | defect | pipeline | nova-b | 2026-08-28 | — | Scheduled for Nova B (PO decision 2026-08-28) |
 | pipeline.the-architecture-map-is-not-enforced | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink | closed | defect | pipeline | nova-b | 2026-09-07 | — | — |
@@ -846,6 +852,7 @@
 | pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries | closed | defect | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.the-elephant-fast-path-excludes-the-small-test-first-fix | open | requirement | pipeline | none | 2026-10-21 | — | — |
 | pipeline.the-guard-git-test-is-past-its-line-bound | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
@@ -952,7 +959,7 @@
 
 ## Counts
 
-- open: 266
+- open: 273
 - in_progress: 0
 - closed: 664
 - rejected: 3

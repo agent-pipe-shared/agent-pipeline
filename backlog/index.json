@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "783a62cdf1657016d333f6215c2a4f38741efbd3e7626f9401d6fcf0a44cc112"
+    "transitionHead": "725f8b7f26e79800bb76f3ea1573574c7b3edf5042b38276d8f9025774a16bd8"
   },
   "counts": {
-    "open": 266,
+    "open": 273,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -1779,6 +1779,16 @@
       "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md"
     },
     {
+      "id": "pipeline.briefing-generator-is-not-a-product-capability",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "PO decision D78 2026-10-21, specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.briefing-model-field-contradicts-agent-definition",
       "status": "closed",
       "type": "defect",
@@ -3415,7 +3425,7 @@
       "created": "2026-10-07",
       "source": "CLOSEOUT-T2 dispatch stop report, evidence/dispatch-record-CLOSEOUT-T2.json",
       "deferred": false,
-      "due": "2026-10-20",
+      "due": "2026-11-04",
       "sprint": "alfred"
     },
     {
@@ -7789,6 +7799,16 @@
       "closureEvidence": "harness/scripts/generate-elephant-role-prohibitions.test.mjs"
     },
     {
+      "id": "pipeline.pipeline-state-is-a-13810-line-monolith",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "PO question 2026-10-21 while patch 13 (AC-140 typed configure-verify repair) had to be made line-neutral",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
       "status": "closed",
       "type": "defect",
@@ -8571,6 +8591,16 @@
       "source": "Actual Guard CLI positives after public onboarding, canonical discard, ready-gate validation and active governance-scope observation.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.protected-file-set-audit-after-0-7-0",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "PO decision 2026-10-21, follow-up of pipeline.protected-guard-imports-unprotected-grammar-and-classifier",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.protected-guard-imports-unprotected-grammar-and-classifier",
@@ -9728,6 +9758,16 @@
       "closureEvidence": "plugins/pipeline-core/scripts/security-scan.test.mjs"
     },
     {
+      "id": "pipeline.scanner-diagnostics-keep-no-finding-provenance-before-suppression",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "PO decision D77 2026-10-21 (AC-249 Oct 10 suffix deferred), specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.scratch-cleanup-mechanism-not-wired-to-any-event",
       "status": "closed",
       "type": "defect",
@@ -10463,6 +10503,16 @@
       "sprint": "nightwing"
     },
     {
+      "id": "pipeline.stale-plan-invalidation-reopens-the-authority-edit-lock",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "Alfred session incident 2026-10-21 (scratch/incident-report.md): an admitted Edit of the bound Spec dropped the session to readiness partial; no agent-runnable repair existed while the PO was remote.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.stale-worktree-directories-accumulate-with-no-sweep",
       "status": "closed",
       "type": "defect",
@@ -10672,6 +10722,16 @@
       "closureEvidence": "backlog/items/2026-08-17-test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention.md"
     },
     {
+      "id": "pipeline.the-agy-installer-writes-a-machine-path-into-a-tracked-file",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "coverage-gaps-2026-10-19.md (Measurement gaps: 'It needs a backlog item (an installer must not write a machine path into a tracked file)'); 2026-10-21 coverage read found no item for it",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package",
       "status": "closed",
       "type": "defect",
@@ -10761,6 +10821,16 @@
       "closureRepository": "self",
       "closureCommit": "63c1a8ab06f2169ad490b3a1c3d5b178707f1d4c",
       "closureEvidence": "templates/prompts/goldfish-task.md"
+    },
+    {
+      "id": "pipeline.the-elephant-fast-path-excludes-the-small-test-first-fix",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "PO question 2026-10-21: 'gibt es einen Grund alles im Elephant zu machen? ... wenn es zu kleine Sachen sind, sollte der Elephant die selber machen'; PO: create the item",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.the-guard-git-test-is-past-its-line-bound",

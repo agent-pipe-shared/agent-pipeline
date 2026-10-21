@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.briefing-generator-is-not-a-product-capability
-type: feature
+type: requirement
 owner: pipeline
 status: open
 created: 2026-10-21
