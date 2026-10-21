@@ -676,6 +676,7 @@
 | pipeline.promotion-freezes-a-prd-the-po-gate-will-reject | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.protected-baseline-rejects-canonical-discarded-idle-state | open | defect | pipeline | alfred | 2026-09-29 | — | — |
+| pipeline.protected-guard-imports-unprotected-grammar-and-classifier | open | defect | pipeline | alfred | 2026-10-21 | — | — |
 | pipeline.publication-authority-lacks-execution-time-criticalproof-reverification | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.published-lifecycle-event-schema-still-enumerates-cancellation | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination | closed | defect | pipeline | — | 2026-08-18 | — | — |
@@ -951,7 +952,7 @@
 
 ## Counts
 
-- open: 265
+- open: 266
 - in_progress: 0
 - closed: 664
 - rejected: 3

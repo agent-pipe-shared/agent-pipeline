@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e0ba7c94fee40a8d820895829f399bcd943c39bf9cfa58d5f8ad443cbebc2d01"
+    "transitionHead": "783a62cdf1657016d333f6215c2a4f38741efbd3e7626f9401d6fcf0a44cc112"
   },
   "counts": {
-    "open": 265,
+    "open": 266,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -8569,6 +8569,16 @@
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "Actual Guard CLI positives after public onboarding, canonical discard, ready-gate validation and active governance-scope observation.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.protected-guard-imports-unprotected-grammar-and-classifier",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "PO question 2026-10-21 during the K13 package cut, specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md K13 measurement 1",
       "deferred": false,
       "sprint": "alfred"
     },

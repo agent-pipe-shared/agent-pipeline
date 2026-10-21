@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-21
-source: PO question 2026-10-21 during the K13 package cut (specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md, K13 measurement 1)
+source: "PO question 2026-10-21 during the K13 package cut, specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md K13 measurement 1"
 sprint: alfred
 done_when: manual
 ---
@@ -32,10 +32,10 @@ held and are routed as signature drop-ins until this item is decided.
 
 - `hooks/guard-command-grammar.mjs` and `lib/protected-test-paths.mjs` are protected sources in
   `protected-baseline.json` (PO-signed baseline change).
-- Every module that a protected guard source imports, transitively, is either protected or named
-  in a reviewed list of modules whose output cannot widen an admission; a check fails on a new
-  unprotected import.
 - A pin edits each newly protected file as an agent and shows the refusal with its repair route.
+- PO 2026-10-21: protect both files now, in 0.7.0. The audit of every other module a protected
+  guard imports, and its check, is the 0.7.x item
+  `backlog/items/2026-10-21-protected-file-set-audit-after-0-7-0.md`.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
