@@ -28,6 +28,16 @@ const SCHEMA_PATH = path.join(REPO_ROOT, "schemas", "pipeline.rigor-derivation.v
 const policy = JSON.parse(fs.readFileSync(POLICY_PATH, "utf8"));
 const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, "utf8"));
 
+// B1 accepted-dimension observations (D2/D3/C1). Spec 5.1: an absent or unknown observation can
+// only raise the floor, so a fixture that expects a mini floor must supply them.
+const H1 = "a".repeat(64), H2 = "b".repeat(64), H3 = "c".repeat(64);
+const BINDINGS = {
+  protectedIdentity: { value: { baselineRevision: 1, baselineDigest: H1, mergedDigest: H2 }, status: "available", sourceContract: "pipeline.protected-baseline.v1" },
+  architectureProfile: { value: { id: "inherited-agent-first", source: "plugins/pipeline-core/architecture/agent-first-profile.v1.json", sha256: H1 }, status: "available", sourceContract: "pipeline.architecture-profile.v1" },
+  fitnessOutcomes: { value: { sourceSha256: H3, outcomes: [{ classId: 1, propertyId: "context-locality", outcome: "pass" }] }, status: "available", sourceContract: "pipeline.rigor-fitness-projection.v1" },
+  interruptionLineage: { value: { featureId: "test-feature", snapshotSha256: H2, lineageCount: 0, receiptCount: 0 }, status: "available", sourceContract: "pipeline.interruption-store-snapshot.v1" }
+};
+
 describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
   test("Git observation failures and untracked paths cannot masquerade as an empty mini surface", () => {
     const broken = inferInputsFromRepo(REPO_ROOT, { execFileSyncFn() { throw new Error("git unavailable"); } });
@@ -108,7 +118,8 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
       contractDeltas: { value: false, status: "available", sourceContract: "pipeline.contract-freeze.v1" },
       reversibility: { value: "high", status: "available", sourceContract: "pipeline.reversibility.v1" },
       diffStats: { value: { files: 1, lines: 10 }, status: "available", sourceContract: "git.diff-stat" },
-      selectedProfile: { value: "mini", status: "available", sourceContract: "human.plan" }
+      selectedProfile: { value: "mini", status: "available", sourceContract: "human.plan" },
+      ...BINDINGS
     };
 
     // inputB has permuted key order and permuted path arrays
@@ -119,7 +130,8 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
       contractDeltas: { value: false, sourceContract: "pipeline.contract-freeze.v1", status: "available" },
       protectedTouches: { sourceContract: "pipeline.protected-baseline.v1", value: false, status: "available" },
       actualPaths: { status: "available", value: ["./docs/readme.md"], sourceContract: "git.diff" },
-      plannedPaths: { value: ["docs/readme.md"], sourceContract: "pipeline.plan.v1", status: "available" }
+      plannedPaths: { value: ["docs/readme.md"], sourceContract: "pipeline.plan.v1", status: "available" },
+      ...BINDINGS
     };
 
     const resultA = deriveMinimumRigor(inputA, policy);
@@ -147,7 +159,8 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
       contractDeltas: false,
       reversibility: "high",
       diffStats: { files: 1, lines: 10 },
-      selectedProfile: "mini"
+      selectedProfile: "mini",
+      ...BINDINGS
     };
     const baselineResult = deriveMinimumRigor(routineInput, policy);
     assert.equal(baselineResult.minProfile, "mini");
@@ -235,7 +248,8 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
       contractDeltas: false,
       reversibility: "high",
       diffStats: { files: 1, lines: 15 },
-      selectedProfile: "mini"
+      selectedProfile: "mini",
+      ...BINDINGS
     };
     const result = deriveMinimumRigor(input, policy);
     assert.equal(result.minProfile, "mini");
@@ -243,6 +257,24 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
     assert.equal(result.escalationTriggers.length, 0);
     assert.equal(result.disagreementLog, undefined);
     assert.match(result.explanation, /Routine change qualifies for mini profile/);
+  });
+
+  // Fixture 6a: the same routine change WITHOUT the four accepted-dimension observations cannot reach mini
+  test("6a. Absent protectedIdentity / architectureProfile / fitnessOutcomes / interruptionLineage can only raise the floor", () => {
+    const input = {
+      plannedPaths: ["docs/readme.md"],
+      actualPaths: ["docs/readme.md"],
+      protectedTouches: false,
+      contractDeltas: false,
+      reversibility: "high",
+      diffStats: { files: 1, lines: 15 },
+      selectedProfile: "mini"
+    };
+    const result = deriveMinimumRigor(input, policy);
+    assert.equal(result.minProfile, "feature");
+    for (const dimension of ["protectedIdentity", "architectureProfile", "fitnessOutcomes", "interruptionLineage"]) {
+      assert.ok(result.escalationTriggers.includes(`UNAVAILABLE_OR_UNKNOWN_INPUT:${dimension}`), dimension);
+    }
   });
 
   // Fixture 7: Planned surface vs actual surface expansion escalates floor
@@ -286,7 +318,8 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
       contractDeltas: false,
       reversibility: "high",
       diffStats: { files: 1, lines: 10 },
-      selectedProfile: "epic"
+      selectedProfile: "epic",
+      ...BINDINGS
     };
     const result = deriveMinimumRigor(input, policy);
     // Derived minimum floor remains mini
@@ -341,7 +374,8 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
       contractDeltas: false,
       reversibility: "high",
       diffStats: { files: 1, lines: 10 },
-      selectedProfile: "mini"
+      selectedProfile: "mini",
+      ...BINDINGS
     };
     fs.writeFileSync(tmpInputsFile, JSON.stringify(testInputs), "utf8");
 
