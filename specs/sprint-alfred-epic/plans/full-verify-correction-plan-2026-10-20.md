@@ -476,3 +476,14 @@ The hang group splits into three kinds; no single shared lock explains it.
   before launch instead of `AGY-SESSION-FAMILY-RETURN-CONTRACT-UNQUALIFIED`. This is a model-family
   refusal: it joins the D66 row (AGY-S2S4S5).
 - **Next:** OBC059 restatement; then K10 under Verify concurrency.
+- **OBC059 measurement and Elephant decision (2026-10-21).** The slice ALF-K1H-OBC059-RESTATE
+  measured the case on a neutral root inside a bound requester. The bind is private
+  (`storage: 'private-runtime'`): revision and State sha stay unchanged, and the tracked State is
+  byte-identical. A foreign tuple is refused with `SDC-AUTHORITY-CAS`. The release returns
+  `released` with the revision unchanged. A second bind with the own tuple does not return `reused`:
+  `prepareOperation` requires an unbound preimage (`lib/onboarding-continuity.mjs` ~9431) and the
+  refusal surfaces as `SDC-AUTHORITY-UNAVAILABLE` 'continuity owner preparation refused'. Decision
+  (Elephant, under the fix rule): K1c moved same-session reuse to the CLI (`scripts/session-cleanup.mjs`
+  ~792, `WT-SESSION-REUSED`; pinned by the binding suite). OBC059 therefore pins the refused second
+  bind with no State or binding change, not a library replay. Side finding for the PO list: that
+  refusal names no repair.
