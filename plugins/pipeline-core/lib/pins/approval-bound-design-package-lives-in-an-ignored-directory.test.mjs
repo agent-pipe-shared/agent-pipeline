@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -190,6 +190,7 @@ async function routeFixture(t, { ignored = null } = {}) {
     }
   }
   writeFileSync(receiptPath, gate.serializePoGateProfileReceipt(receipt));
+  chmodSync(receiptPath, 0o600);
   const topology = { repoRoot: primary, gitCommonDir: common, primaryRoot: primary, registeredWorktreeRoots: [primary] };
   const authority = gate.validatePoGateAuthority(topology);
   assert.equal(authority.ok, true, JSON.stringify(authority));

@@ -114,7 +114,11 @@ test("W1: a physical root alias is resolved before containment (alias root and r
     // session started through an alias spelling decides exactly like the physical root.
     const deps = depsFor(alias, "bootstrap-binding-required");
     assert.equal(ps("Set-Content -LiteralPath scratch/nested/a.md -Value x", deps).exitCode, 0, "alias project dir, relative target");
-    assert.equal(ps(`Set-Content -LiteralPath '${join(alias, "scratch", "nested", "a.md")}' -Value x`, deps).exitCode, 0, "alias project dir, alias-spelled target");
+    // powershell-dialect.mjs powerShellScratchPath: off win32 an absolute (win32-rooted) PowerShell target is refused outright,
+    // so the alias-spelled absolute target is admitted only on a native Windows host and fails closed everywhere else.
+    const aliasAbs = ps(`Set-Content -LiteralPath '${join(alias, "scratch", "nested", "a.md")}' -Value x`, deps);
+    if (WIN) assert.equal(aliasAbs.exitCode, 0, "alias project dir, alias-spelled target");
+    else assert.match(aliasAbs.stderr, GRAMMAR, "alias project dir, alias-spelled absolute target is refused off win32");
     assert.match(ps("Set-Content -LiteralPath src/a.md -Value x", deps).stderr, GRAMMAR, "alias project dir, non-scratch target");
     // The bare predicate stays fail-closed on an unresolved alias root: it never widens scope.
     assert.equal(isPhysicalIntakeScratchPath("scratch/nested/a.md", alias), false, "unresolved alias root is refused by the predicate itself");
@@ -211,9 +215,17 @@ test("W3: the guard admits PowerShell New-Item and Set-Content/Add-Content for s
         "Set-Content -LiteralPath scratch/nested/report.md -Value report",
         "Set-Content -Path scratch/nested/report.md -Value report -Encoding utf8",
         "Add-Content -LiteralPath scratch/nested/report.md -Value more",
+      ]) assert.equal(ps(command, deps).exitCode, 0, `${status}: ${command}`);
+      // Absolute spellings: powerShellScratchPath admits them only on a native Windows host (off win32 any win32-rooted
+      // target, which includes every POSIX absolute path, is refused -- fail closed).
+      for (const command of [
         `New-Item -Path '${abs("nested", "abs.md")}' -ItemType File`,
         `Set-Content -LiteralPath '${abs("nested", "abs.md")}' -Value x`,
-      ]) assert.equal(ps(command, deps).exitCode, 0, `${status}: ${command}`);
+      ]) {
+        const result = ps(command, deps);
+        if (WIN) assert.equal(result.exitCode, 0, `${status}: ${command}`);
+        else { assert.equal(result.exitCode, 2, `${status}: ${command}`); assert.match(result.stderr, GRAMMAR, `${status}: ${command}`); }
+      }
       if (WIN) {
         const native = abs("nested", "native.md");
         const lowerDrive = native[0].toLowerCase() + native.slice(1);

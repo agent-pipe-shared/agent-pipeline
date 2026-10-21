@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 // Import order matters (see the todo case "runtime-host cannot be entered first"): the invocation
@@ -121,7 +121,8 @@ test("P3 real git repository: activation observation reports inactive, not the g
 });
 
 test("P3 platform drive-rooted common dir with a real activation marker reports active", (t) => {
-  const commonDir = makeScratch("alfp501-active");
+  const repoDir = makeRealRepo("alfp501-active");
+  const commonDir = path.join(repoDir, ".git");
   try {
     const authoritySha256 = "a".repeat(64);
     const familyDir = path.join(commonDir, "agent-pipeline", "model-family-host");
@@ -136,7 +137,11 @@ test("P3 platform drive-rooted common dir with a real activation marker reports 
     writeFileSync(path.join(familyDir, "activation.json"), JSON.stringify(marker));
     writeFileSync(path.join(familyDir, stateFile), JSON.stringify(state));
     writeFileSync(path.join(familyDir, "current.json"), JSON.stringify(pointer));
-    const host = createModelFamilyRuntimeHost({ cwd: commonDir, resolveCommonDir: () => commonDir,
+    if (process.platform !== "win32") { // the store refuses group/other-accessible entries; mkdirSync/writeFileSync honour the umask
+      for (const dir of [path.join(commonDir, "agent-pipeline"), familyDir, path.join(familyDir, "receipts")]) chmodSync(dir, 0o700);
+      for (const file of ["activation.json", stateFile, "current.json"]) chmodSync(path.join(familyDir, file), 0o600);
+    }
+    const host = createModelFamilyRuntimeHost({ cwd: repoDir, resolveCommonDir: () => commonDir,
       trustedSources: { readAuthorityInputs: () => ({ ok: false }), readPinInputs: () => [],
         readFreshDiscovery: () => ({ ok: false }), readCurrentCandidate: () => ({ ok: false }),
         launchDriver: () => ({ ok: false }) } });
@@ -156,7 +161,7 @@ test("P3 platform drive-rooted common dir with a real activation marker reports 
     assert.equal(result.ok, true, result.code);
     assert.equal(result.status, "active");
     assert.equal(result.authoritySha256, authoritySha256);
-  } finally { rmSync(commonDir, { recursive: true, force: true }); }
+  } finally { rmSync(repoDir, { recursive: true, force: true }); }
 });
 
 test("P3 CLI: bootstrap on a real repository never returns the git-common-dir-unavailable code", () => {

@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {appendFileSync,cpSync,existsSync,mkdirSync,readdirSync,readFileSync,rmSync,statSync,writeFileSync} from 'node:fs';
+import {appendFileSync,chmodSync,cpSync,existsSync,lstatSync,mkdirSync,readdirSync,readFileSync,renameSync,rmSync,statSync,symlinkSync,writeFileSync} from 'node:fs';
 import {basename,dirname,join,relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createProjectUninstallController,PROJECT_UNINSTALL_FAULT_STAGES} from '../project-uninstall.mjs';
@@ -277,10 +277,18 @@ for(const runners of [['claude'],['codex'],['antigravity']])test('per-runner fix
 });
 
 test('alias and private-directory mode refusals (PU-ALIAS, PU-PRIVATE-MODE) need symlinks and mode bits',{skip:process.platform==='win32'?'host-limitation: directory symlinks and POSIX directory mode bits are unavailable on native Windows; owner Coordinator, due 2026-10-19, Linux/WSL run (PO decision K7)':false},t=>{
- const f=fixture(t),plan=f.controller.plan({rootDir:f.root}),link=join(f.root,'alias-dir');
- spawnSync('ln',['-s',join(f.root,'docs'),link]);
- assert(existsSync(link));
- assert.throws(()=>f.controller.apply(plan,options(plan)),e=>['PU-PREIMAGE-DRIFT','PU-ALIAS'].includes(e.code));
+ // An alias is refused only where it sits on a path the uninstall owns (an unrelated symlink beside the footprint is none of its business).
+ const f=fixture(t),plan=f.controller.plan({rootDir:f.root}),owned=join(f.root,'.claude/pipeline.json');
+ renameSync(owned,owned+'.real');symlinkSync(owned+'.real',owned);
+ assert(lstatSync(owned).isSymbolicLink());
+ assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-ALIAS');
+ assert(!existsSync(join(plan.controls,plan.planSha256,'journal.json')),'a refused apply leaves no journal');
+ // PU-PRIVATE-MODE: the per-plan controls directory must be owner-only.
+ const g=fixture(t),planG=g.controller.plan({rootDir:g.root}),controls=join(planG.controls,planG.planSha256);
+ mkdirSync(controls,{recursive:true});chmodSync(controls,0o755);
+ assert.throws(()=>g.controller.apply(planG,options(planG)),e=>e.code==='PU-PRIVATE-MODE');
+ assert(!existsSync(join(controls,'journal.json')),'a refused apply leaves no journal');
+ assert.equal(g.scope.observe({rootDir:g.root}).state,'active');
 });
 
 test('SETUP.md documents the uninstall path with exactly the verbs, flags and refusal codes the CLI really has',()=>{

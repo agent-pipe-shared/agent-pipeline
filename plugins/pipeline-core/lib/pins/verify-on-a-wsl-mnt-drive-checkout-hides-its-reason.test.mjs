@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { VERIFY_PRIVATE_DIRECTORY_HINT, registerRunRecordOwner } from "../../scripts/verify-journal.mjs";
 
+import { verifyRunDirectory } from "../verify-run-record.mjs";
 import { observeNativeWindowsProcess } from "../windows-native-process-observer.mjs";
 
 // registerRunRecordOwner reads the own process start identity BEFORE it calls the injected seam; on native
@@ -122,7 +123,7 @@ test("P5: real directory path with permissive modes reaches the operator as type
     const pipeline = join(common, "agent-pipeline");
     mkdirSync(pipeline, { mode: 0o700 });
     chmodSync(pipeline, 0o777); // what DrvFs reports for every path
-    const thrown = capture(() => registerRunRecordOwner({ gitCommonDir: common, runId: "verify-p5", runPath: join(common, "run") }));
+    const thrown = capture(() => registerRunRecordOwner({ gitCommonDir: common, runId: "verify-p5", runPath: verifyRunDirectory(common, "verify-p5") }));
     assert.ok(thrown instanceof Error);
     assert.match(thrown.message, /^VERIFY-CLEANUP-REGISTRATION-REQUIRED/u);
     assert.match(thrown.message, /VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE/u);

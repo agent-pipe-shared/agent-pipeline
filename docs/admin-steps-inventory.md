@@ -41,8 +41,8 @@ Agent-executable layers (1b reconcile, `push-init`, `push-prepare`, `approve-pus
 | Marketplace/plugin update plus `/reload-plugins` when update is recommended | per session (when notified) | PO | automatable (the helper deliberately never updates; a typed next action could offer it) | `harness/session-bootstrap.md:211`, `:181` |
 | Run `git restore` etc. in own terminal when the auto-mode classifier refuses | per push (when refused) | PO terminal | required because the classifier is a harness layer outside the Pipeline | `docs/push-release-flow.md:516-554` |
 | Edit `.claude/settings.json` guard/permission surfaces | on demand | PO | required because the self-sealing surface rejects agent edits | `docs/push-release-flow.md:544-554` |
-| Do not use Desktop WSL sessions for a governed repository | per session | PO | required because those sessions load no plugins, so no guard runs | `docs/runner-support.md:33` |
-| Run signing and `!` commands in the integrated or an external terminal (Desktop) | per push | PO terminal | required because of C8 | `docs/runner-support.md:35` |
+| Do not use Desktop WSL sessions for a governed repository | per session | PO | required because those sessions load no plugins, so no guard runs | `docs/runner-support.md:48` |
+| Run signing and `!` commands in the integrated or an external terminal (Desktop) | per push | PO terminal | required because of C8 | `docs/runner-support.md:50` |
 
 ## Codex
 

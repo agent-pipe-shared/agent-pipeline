@@ -112,7 +112,10 @@ test('AC-167 point 5: the preflight-published hook-provisioning action is execut
 const pluginRoot = fileURLToPath(new URL('../../', import.meta.url)).replace(/[\\/]$/u, '');
 const literalPreflight = '${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs';
 
-test('AC-167 point 4b: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity', () => {
+// Host dialect: only the native-Windows guard dialect accepts a `${VAR}` word; the POSIX dialect refuses it
+// in parseGuardCommand (GUARD-PARSE-UNSUPPORTED) before the lane classifies anything, so the lane unit returns null.
+const literalNeedsWin32 = process.platform === 'win32' ? false : 'host-limitation: the POSIX guard dialect refuses ${VAR} words at parse time';
+test('AC-167 point 4b: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity', { skip: literalNeedsWin32 }, () => {
   const env = { PIPELINE_PLUGIN_ROOT: pluginRoot };
   assertAdmitted(`node ${quote(literalPreflight)}`, 'literal preflight with the variable set to this plugin', { env });
   const variant = '${pipeline_plugin_root}/SCRIPTS/Pipeline-Start-Preflight.mjs';
@@ -126,15 +129,18 @@ test('AC-167 point 5b: the exact published provisioning action, clone-hook-readi
   assertAdmitted(`node ${quote(forwardSlash(provision))} --root ${quote(root)} --apply`, 'forward-slash clone-hook-readiness nextAction');
 });
 
-test('AC-167 control: the literal-variable and hook-action admissions are closed -- every other shape stays refused', () => {
-  const provision = join(pluginScripts, 'clone-hook-readiness.mjs');
-  const refresh = join(pluginScripts, 'refresh-mandatory-hooks.mjs');
+test('AC-167 control (literal variable): every other literal-variable shape stays refused', { skip: literalNeedsWin32 }, () => {
   const elsewhere = { PIPELINE_PLUGIN_ROOT: join(root, 'no-such-plugin-root') };
   assertRefusedAsOpaque(`node ${quote(literalPreflight)} --extra`, 'literal preflight with an extra argument');
   assertRefusedAsOpaque(`node ${quote('${PIPELINE_PLUGIN_ROOT}/scripts/other.mjs')}`, 'literal variable with a foreign script');
   assertRefusedAsOpaque(`node ${quote(literalPreflight + 'x')}`, 'literal look-alike script name');
   assertRefusedAsOpaque(`node ${quote('${OTHER_ROOT}/scripts/pipeline-start-preflight.mjs')}`, 'a different variable');
   assertRefusedAsOpaque(`node ${quote(literalPreflight)}`, 'literal preflight with the variable set to another directory', { env: elsewhere });
+});
+
+test('AC-167 control: the hook-action admissions are closed -- every other shape stays refused', () => {
+  const provision = join(pluginScripts, 'clone-hook-readiness.mjs');
+  const refresh = join(pluginScripts, 'refresh-mandatory-hooks.mjs');
   assertRefusedAsOpaque(`node ${quote(provision)} --root ${quote(root)}`, 'provisioning without --apply');
   assertRefusedAsOpaque(`node ${quote(provision)} --root ${quote(root)} --apply --extra`, 'provisioning with an extra argument');
   assertRefusedAsOpaque(`node ${quote(provision)} --root ${quote(join(root, 'other'))} --apply`, 'provisioning for a foreign root');

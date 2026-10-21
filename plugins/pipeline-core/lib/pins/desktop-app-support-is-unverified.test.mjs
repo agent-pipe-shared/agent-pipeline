@@ -77,11 +77,11 @@ describe("AC-159 desktop-app-support-is-unverified", () => {
     const flat = adminInventory.replace(/\s+/g, " ");
     assert.match(flat, /Do not use Desktop WSL sessions for a governed repository \| per session \| PO \|/);
     assert.match(flat, /Run signing and `!` commands in the integrated or an external terminal \(Desktop\) \| per push \| PO terminal \|/);
-    assert.match(flat, /docs\/runner-support\.md:33/);
-    assert.match(flat, /docs\/runner-support\.md:35/);
+    assert.match(flat, /docs\/runner-support\.md:48/);
+    assert.match(flat, /docs\/runner-support\.md:50/);
     const lines = runnerSupport.split("\n");
-    assert.match(lines[32], /Desktop WSL sessions load no plugins/);
-    assert.match(lines[34], /PO\/human commands/);
+    assert.match(lines[47], /Desktop WSL sessions load no plugins/);
+    assert.match(lines[49], /PO\/human commands/);
   });
 
   describe("RED: the examiner fails on a scratch mutation of the real text", () => {

@@ -337,6 +337,11 @@ test("AC-274 first enrollment follows the repository-capability route and unveri
     assert.deepEqual(checkpointBytes(fixture.root), rootBytes);
 
     // A plain folder with retained history: no invented capability or private storage root, a concrete route instead.
+    // The plain folder is not a repository, so the ceiling that keeps the git-init'd fixtures away from this checkout
+    // must not apply to it: with it, git reports "not a repository" while the governance scope's own ancestor walk still
+    // finds this checkout's .git and refuses (GS-GIT-UNAVAILABLE). The sibling pin first-enrollment-enters-retirement-before-consent
+    // runs the same plain-folder scenario without a ceiling.
+    delete process.env.GIT_CEILING_DIRECTORIES;
     mkdirSync(join(plain, ".agent-pipeline"));
     const retained = join(plain, ".agent-pipeline", "onboarding-consent.json");
     const retainedBytes = Buffer.from('{"retained":"fixture"}\n');
