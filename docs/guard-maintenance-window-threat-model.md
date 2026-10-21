@@ -611,6 +611,25 @@ accounts for dispatch fan-out), and
 `plugins/pipeline-core/lib/plan-approval-device-rebind.mjs` (rebinds a plan
 approval to a device, so it decides what an approval still covers).
 
+Closure repair GMWKC01/GMWKC03 (2026-10-21) adds eight first-party modules that kernel
+files import and that were never listed; each executes with kernel authority:
+`plugins/pipeline-core/lib/advisory-answered-receipt.mjs` (the answered-Advisor
+receipt that `scripts/advisory-host-bridge.mjs` accepts),
+`plugins/pipeline-core/lib/dispatch-briefing-build.mjs` (builds the generated
+briefing whose admission `hooks/guard-dispatch.mjs` decides),
+`plugins/pipeline-core/lib/dispatch-budget-notice.mjs` (the budget notice
+`hooks/guard-dispatch-budget.mjs` announces),
+`plugins/pipeline-core/lib/node-sandbox-probe.mjs` (the sandbox probe
+`scripts/pipeline-start-preflight.mjs` relies on),
+`plugins/pipeline-core/lib/pipeline-owned-files.mjs` (which files the push and
+commit writers treat as pipeline-owned),
+`plugins/pipeline-core/lib/session-authority-observers.mjs` (the observers
+`lib/native-goldfish-host-state.mjs` reads),
+`plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs` (the
+orphan-member step of the onboarding continuity), and
+`plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs` (releases a lost
+or archived session-cleanup binding for `lib/session-cleanup-recovery.mjs`).
+
 This source closure does not establish protected-source delivery, independent
 review, native qualification or activation.
 
