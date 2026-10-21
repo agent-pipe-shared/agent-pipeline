@@ -16,8 +16,7 @@
  * directory grants no trust by itself: trust comes only from the pair check against the
  * `authority` scratch file. "Neither present" keeps CRITICAL-PROOF-LOCAL-ANCHOR-UNAVAILABLE.
  *
- * Expected state when first committed (test-only dispatch, QG-04 RED pins on purpose):
- *   case 1 RED, case 2 GREEN, case 3a RED, case 3b RED, case 4 GREEN.
+ * All five cases are GREEN since da20519dd (the anchor is resolved through resolvePoKeyDirectory).
  *
  * "Passes the anchor stage" is observed on a COMPLETE, validly signed bundle: the next stage
  * after the anchor pair check is the proof verification, which succeeds, so the observable is
@@ -30,7 +29,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -127,7 +126,10 @@ function buildFixture({ signer, plane = null, legacy = null }) {
     }));
   }
   if (legacy !== null) {
-    mkdirSync(join(common, "agent-pipeline"), { recursive: true });
+    // QG-04 (d02409a8a; AC-150): the product's own writer creates this namespace owner-private (po-human-approval.mjs),
+    // and stateCataloguePresent refuses a group/other-accessible one (SDC-PRIVATE-PATH) before the anchor is reached.
+    mkdirSync(join(common, "agent-pipeline"), { recursive: true, mode: 0o700 });
+    chmodSync(join(common, "agent-pipeline"), 0o700);
     writeFileSync(join(common, "agent-pipeline", "po-key-directory.json"), JSON.stringify({
       schema: "pipeline.po-key-directory.v1",
       poKeyDirectory: legacy.directory,
