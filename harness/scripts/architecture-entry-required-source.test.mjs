@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspectArchitectureEntryReadiness, ARCHITECTURE_ENTRY_SCOPE } from "../../plugins/pipeline-core/lib/architecture-entry-readiness.mjs";
 import { inspectArchitectureDecisionContinuity } from "../../plugins/pipeline-core/lib/architecture-decision-continuity.mjs";
-import { inspectEffectiveArchitectureDecisions } from "../../plugins/pipeline-core/lib/architecture-effective-decisions.mjs";
+import { inspectArchitectureDecisionAuthoringSources } from "../../plugins/pipeline-core/lib/architecture-effective-decisions.mjs";
 import { resolveOrganizationArchitectureSources } from "../../plugins/pipeline-core/lib/organization-architecture-source.mjs";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
@@ -42,7 +42,7 @@ function observe(inherited) {
       schema: "pipeline.architecture-decision.v1", id: "ADR-REPRO", title: "Reproduction",
       status: "accepted", digest: sha(body), scope: "project", date: "2026-10-09",
     }) + "\n");
-    const local = inspectEffectiveArchitectureDecisions({ rootDir: root, area: "pipeline-core", now });
+    const local = inspectArchitectureDecisionAuthoringSources({ rootDir: root, area: "pipeline-core", now });
     assert.equal(local.status, "ready", JSON.stringify(local));
     const readerCalls = [];
     const result = inspectArchitectureEntryReadiness({

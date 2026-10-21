@@ -159,6 +159,11 @@ async function assertBaseline(role) {
   const { result } = await run({ role, hooks: {} });
   assert.equal(result.status, "ready", "precondition: all-current hooks must give a ready envelope");
   assert.equal(result.mandatoryHookReadiness.status, "ready");
+  if (role === "goldfish" || role === "critic") {
+    // AC-245 / P1-1 (scopePreflightToRole): a Goldfish/Critic envelope withholds the executable onboarding action.
+    assert.equal(result.nextAction, null, "precondition: subagent envelope withholds the coordinator action");
+    return result;
+  }
   assert.equal(result.nextAction?.kind, "command", "precondition: ready envelope carries the onboarding action");
   assert.equal(basename(result.nextAction.argv[0]), "project-onboarding-v3.mjs");
   assert.equal(result.nextAction.argv[1], "inspect");
