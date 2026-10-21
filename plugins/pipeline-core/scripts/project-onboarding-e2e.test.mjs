@@ -11,7 +11,7 @@
  * the real nested-process apply transactions.
  */
 import assert from "node:assert/strict";
-import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
+import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -47,7 +47,7 @@ import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-re
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 import { devPlanGateVerdict } from "../lib/guard-devplan-policy.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
-import { materializeTestDesignWorkflowPackage } from "../lib/test-design-workflow-fixture.mjs";
+import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { buildAdvisoryEvidenceBundle } from "../lib/advisory-lifecycle-v2.mjs";
 import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
 import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
@@ -117,6 +117,17 @@ function greenfieldRoot() {
   throw new Error("no writable temporary parent without an existing Git control is available for the greenfield contract");
 }
 function dispose(path) { rmSync(path, { recursive: true, force: true }); }
+// QG-04 (E12, ADR-0085): signs the live design-approval request (present-plan --review-receipt route) in process with the
+// key the bootstrap anchored as "fixture-po-key"; the proof lands next to the request, where observeDesignApprovalRequest reads it.
+function signDesignApprovalRequest(cwd, requestPath, privateKey) {
+  const request = JSON.parse(readFileSync(join(cwd, requestPath), "utf8"));
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "fixture-po-key",
+    publicKey: createPublicKey(privateKey).export({ type: "spki", format: "pem" }).toString(),
+    signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), privateKey).toString("base64"),
+  };
+  writeFileSync(join(cwd, requestPath.replace("request-", "proof-")), `${JSON.stringify(proof)}\n`);
+}
 function stripGeneratedArchitectureTemplate(content, { required = false } = {}) {
   const template = renderArchitectureDesignSkeleton().trimEnd();
   const count = content.split(template).length - 1;
@@ -1018,20 +1029,8 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       const submitted = run("node", submittedArgv);
       assert.equal(submitted.status, 0, submitted.stderr);
       const submission = readFixtureState(cwd).planSubmission;
-      const designFixture = materializeTestDesignWorkflowPackage({
-        root: cwd, featureId: submission.featureId,
-        planPath: submission.planPath, specPath: submission.specPath,
-        candidate: candidateAtHead(cwd),
-        signerPrivateKey, signerKeyReference: "fixture-po-key",
-      });
-      bindFixtureReadiness(cwd, runner, designFixture);
-      // R7-3-T2e: the bound-path gate (R7-3a) refuses present-plan for a package that is not tracked and clean at HEAD. Commit EXACTLY the
-      // package's bound set (package, Advisor receipt, readiness) only after bindFixtureReadiness has rewritten the readiness and the package;
-      // the package keeps its design-candidate binding and the v1 reader admits this evidence-only descendant of that candidate (F1e).
-      const boundPackage = JSON.parse(readFileSync(join(cwd, designFixture.packagePath), "utf8"));
-      commitFixturePaths(cwd, [designFixture.packagePath, boundPackage.advisor.receipt.path, boundPackage.readiness.path],
-        "test: commit the design workflow package", "stage-0");
-      Object.assign(designWorkflowDeps, designFixture.deps);
+      const reviewReceiptPath = `${dirname(submission.planPath)}/review/design-review-receipt-1.json`;
+      fixtureGit(cwd, ["ls-files", "--error-unmatch", "--", reviewReceiptPath]);
       designWorkflowDeps.gitCandidate = () => ({ ok: true, ...candidateAtHead(cwd) });
       designWorkflowDeps.verifyDesignReadinessHostExecution = verifyDesignReadinessHostExecution;
       designWorkflowDeps.inspectArchitectureDesign = (rootDir, scope) => inspectArchitectureDesign(rootDir, scope, {
@@ -1041,25 +1040,24 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       const bootstrapPolicy = readCriticalHumanProofPolicy(cwd);
       assert.equal(bootstrapPolicy.ok, true);
       designWorkflowDeps.readCriticalHumanProofPolicy = () => bootstrapPolicy;
-      const presentedArgv = [stateScript, "present-plan", "--by", "Greenfield E2E PO", "--design-workflow-package", designFixture.packagePath];
+      const presentedArgv = [stateScript, "present-plan", "--by", "Greenfield E2E PO", "--review-receipt", reviewReceiptPath];
       const presented = run("node", presentedArgv);
       assert.equal(presented.status, 0, presented.stderr);
       const presentation = readFixtureState(cwd).planPresentation;
-      designFixture.signRequest(presentation.designWorkflowApprovalRequestPath);
-      if (typeof beforePlanApproval === "function") beforePlanApproval({ cwd, presentation, designFixture });
+      assert.equal(presentation.schema, "pipeline.plan-presentation.v3");
+      signDesignApprovalRequest(cwd, presentation.designApprovalRequestPath, signerPrivateKey);
+      if (typeof beforePlanApproval === "function") beforePlanApproval({ cwd, presentation });
       const promotedState = readFixtureState(cwd);
       assert.equal(promotedState.bootstrapAcknowledgementRequired, undefined,
         `${runner}: epic/feature must not ask for a second pre-course PO signature`);
       const stagingPrd = readFileSync(join(cwd, submission.planPath), "utf8");
       assert.doesNotMatch(stagingPrd, /PO_GATE_PRD_ACKNOWLEDGEMENT/u,
         `${runner}: the staging document remains an unapproved draft before Advisor/readiness`);
-      assert.equal(existsSync(join(cwd, designFixture.packagePath)), true,
-        `${runner}: the complete reviewed package is the final approval subject`);
-      designWorkflowDeps.isattyFn = () => true;
-      designWorkflowDeps.readLineFn = () => `approve-${presentation.designWorkflowPackageSha256.slice(0, 12)}`;
+      assert.equal(existsSync(join(cwd, reviewReceiptPath)), true,
+        `${runner}: the committed review receipt is the final approval subject`);
       const approvedArgv = [
         stateScript, "approve-plan",
-        "--design-workflow-approval-request", presentation.designWorkflowApprovalRequestPath,
+        "--design-approval-request", presentation.designApprovalRequestPath,
       ];
       const approved = run("node", approvedArgv);
       assert.equal(approved.status, 0, approved.stderr);
@@ -1446,7 +1444,26 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         [`${sourceBase}/traceability.md`, `Requirements for ${featureId} are mapped.\n`],
       ];
       for (const [relativePath, bytes] of fixtureSources) writeFileSync(join(path, relativePath), bytes);
-      const designSourcePaths = [fixtureSources[0][0], prdPath, `${sourceBase}/spec.md`, fixtureSources[1][0], fixtureSources[2][0]];
+      // QG-04 (E12, ADR-0085): one ordinary review over the finished sources replaces the Advisor/readiness package; the report
+      // and receipt are committed WITH the sources so the design candidate stays the single HEAD (the candidate assertion below holds).
+      mkdirSync(join(path, sourceBase, "review"), { recursive: true });
+      const reviewReportPath = `${sourceBase}/review/design-review-1.md`;
+      const reviewReceiptFile = `${sourceBase}/review/design-review-receipt-1.json`;
+      writeFileSync(join(path, reviewReportPath), "# Design review 1\nVerdict: pass.\n");
+      const sourceFor = (relativePath) => ({ path: relativePath, sha256: createHash("sha256").update(readFileSync(join(path, relativePath))).digest("hex") });
+      const createdReceipt = createDesignReviewReceipt({
+        featureId, previous: null,
+        sources: { prd: sourceFor(prdPath), spec: sourceFor(`${sourceBase}/spec.md`), companions: [fixtureSources[1][0], fixtureSources[2][0]].map(sourceFor) },
+        reviewer: { runner: "claude", model: "claude-opus-4" }, report: sourceFor(reviewReportPath),
+        openFindingIds: [], reviewedAt: "2026-10-09T09:00:00.000Z",
+      });
+      assert.equal(createdReceipt.ok, true, `${runner}: fixture review receipt refused: ${createdReceipt.code}`);
+      writeFileSync(join(path, reviewReceiptFile), Buffer.from(createdReceipt.bytes));
+      // d02409a8a: an absent docs/adr is a hard ARCH-DECISION-SOURCE-UNAVAILABLE block at set-phase implementation, so a design
+      // without ADR references still needs the (empty) tracked directory (same as lib/pins/three-runner-happy-path-with-two-po-approvals).
+      mkdirSync(join(path, "docs/adr"), { recursive: true });
+      writeFileSync(join(path, "docs/adr/.gitkeep"), "");
+      const designSourcePaths = [fixtureSources[0][0], prdPath, `${sourceBase}/spec.md`, fixtureSources[1][0], fixtureSources[2][0], reviewReportPath, reviewReceiptFile, "docs/adr/.gitkeep"];
       const beforeSourceCommit = readFixtureState(path);
       assert.equal(beforeSourceCommit.planApproved, false);
       assert.equal(beforeSourceCommit.planSubmission, undefined);
@@ -1478,9 +1495,9 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       assert.equal(preApproval.outcome, "ready", `${runner}: the final design-workflow approval must complete the lifecycle ${JSON.stringify(preApproval)}`);
       assert.equal(preState.planApproved, true);
       assert.equal(preState.activeFeature.phase, "implementation");
-      assert.equal(preState.planApproval?.schema, "pipeline.plan-approval.v7");
+      assert.equal(preState.planApproval?.schema, "pipeline.plan-approval.v9");
       assert.equal(preState.planApproval?.poGateAuthority?.planPath, preState.activeFeature.planPath);
-      assert.match(preState.planPresentation?.designWorkflowPackageSha256 ?? "", /^[a-f0-9]{64}$/u);
+      assert.match(preState.planPresentation?.designApprovalRequestPath ?? "", /^scratch\/design-approval-request-[a-f0-9]{64}\.json$/u);
       assert.deepEqual(candidateAtHead(path), designCandidate,
         `${runner}: final approval remains bound to the committed five-source candidate`);
       testContext.diagnostic(`${runner}: real lifecycle gate after final approval ${JSON.stringify(productProbe())}`);
@@ -1546,9 +1563,9 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       assert.ok(planSteps.some((argv) => argv[1] === "present-plan"),
         `${runner}: the returned inspect chain must execute present-plan`);
       assert.ok(planSteps.some((argv) => argv[1] === "approve-plan"
-        && argv.includes("--design-workflow-approval-request")
+        && argv.includes("--design-approval-request")
         && !argv.includes("--bootstrap-acknowledgement-receipt")),
-      `${runner}: the Epic/Feature approval must consume its signed design-workflow request without a bootstrap receipt`);
+      `${runner}: the Epic/Feature approval must consume its signed design approval request without a bootstrap receipt`);
       assert.equal(planSteps.some((argv) => argv[1] === "approve-plan" && argv.includes("--by")), false,
         `${runner}: signature mode must not regress to the legacy --by approval route`);
       assert.equal(planSteps.filter((argv) => argv[1] === "approve-plan").length, 1,
