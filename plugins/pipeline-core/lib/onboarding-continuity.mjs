@@ -9288,7 +9288,7 @@ function continuityAuthoritySnapshot(repository) {
       try { semantic = JSON.parse(bytes.toString('utf8')); }
       catch { fail('SDC-AUTHORITY-UNAVAILABLE','continuity private entry malformed'); }
       if (ownJournal && (semantic.schema !== 'pipeline.continuity-authority-observation.v1'
-          || !['execution','terminal'].includes(semantic.stage) || semantic.repositorySha256 !== canonicalSha256(repository)))
+          || !['execution','terminal'].includes(semantic.stage) || ![canonicalSha256({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir}),canonicalSha256(repository)].includes(semantic.repositorySha256)))
         fail('SDC-AUTHORITY-CAS','continuity authority journal binding');
     }
     const namespaceId = path === paths.releaseReceipt || archive || name.startsWith('continuity-authority-terminal-')
@@ -9330,7 +9330,7 @@ function continuityAuthorityJournal(operation,stage,value) {
   const paths = privateCleanupPaths(operation.data.repository.primaryRoot);
   const path = join(paths.directory,`continuity-authority-${stage}-${operation.id}.json`);
   const body = {schema:'pipeline.continuity-authority-observation.v1',stage,
-    repositorySha256:canonicalSha256(operation.data.repository),bindingSha256:operation.bindingSha256,
+    repositorySha256:canonicalSha256({primaryRoot:operation.data.repository.primaryRoot,commonDir:operation.data.repository.commonDir}),bindingSha256:operation.bindingSha256,
     association:operation.association,source:value};
   const fd = openSync(path,constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,0o600);
   try { writeFileSync(fd,canonicalJson(body)); fsyncSync(fd); } finally { closeSync(fd); }
