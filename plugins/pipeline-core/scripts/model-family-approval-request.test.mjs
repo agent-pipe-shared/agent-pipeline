@@ -309,11 +309,14 @@ test("closed request schema rejects extra authority fields and an invalid candid
 
 test("canonical PO signer resolves the family request before guard fallback and rejects an unresolved family schema", () => {
   const signer = readFileSync(new URL("./po-human-approval.mjs", import.meta.url), "utf8");
-  const resolveAt = signer.indexOf("const modelFamilyApproval =");
-  const denyAt = signer.indexOf("scratchRequestRecord?.schema === MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA && modelFamilyApproval === null");
-  const selectAt = signer.indexOf("?? modelFamilyApproval");
-  const genericFallbackAt = signer.indexOf("describeGmw({ rootDir: repository, intentSha256 })");
-  assert.ok(resolveAt >= 0 && denyAt > resolveAt && selectAt > denyAt && genericFallbackAt > selectAt,
+  // The signer selects the disclosure with a schema switch: the family case resolves its own request and names its
+  // invalid-request refusal, the generic HGO/GMW describers live only in the null-request default branch, and the
+  // closed refusal follows the switch. (The earlier `const modelFamilyApproval =` form was replaced by that switch.)
+  const resolveAt = signer.indexOf("case MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA:");
+  const denyAt = signer.indexOf("the model-family request does not bind the current candidate");
+  const genericFallbackAt = signer.indexOf("record = describeGmw({ rootDir: repository, intentSha256 })");
+  const selectAt = signer.indexOf("if (invalidRequest !== null && (record === null || record.resolved !== true)) fail(invalidRequest)");
+  assert.ok(resolveAt >= 0 && denyAt > resolveAt && genericFallbackAt > denyAt && selectAt > genericFallbackAt,
     "family requests must receive their own exact disclosure and fail closed before generic HGO/GMW fallback");
   assert.match(signer, /the model-family request does not bind the current candidate/u);
 });

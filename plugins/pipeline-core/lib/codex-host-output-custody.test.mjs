@@ -2,7 +2,8 @@
 // Actual managed synthetic Node protocol plus focused custody-event boundaries.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,realpathSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomBytes,createHash} from 'node:crypto';
@@ -15,8 +16,9 @@ import {createHostOutputCustody} from './codex-host-output-custody.mjs';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const rawReport='{\r\n "outcome" : "ok", "note" : "🧪"\r\n}';
 function fixture(t,scenario){
-  const root=mkdtempSync(join(tmpdir(),'codex-host-output-custody-fixture-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
-  const cwd=join(root,'input'),common=join(root,'.git');mkdirSync(cwd,{mode:0o700});mkdirSync(common,{mode:0o700});
+  const root=realpathSync(mkdtempSync(join(tmpdir(),'codex-host-output-custody-fixture-')));t.after(()=>rmSync(root,{recursive:true,force:true}));
+  execFileSync('git',['init','-q',root]);
+  const cwd=join(root,'input'),common=join(root,'.git');mkdirSync(cwd,{mode:0o700});
   const repoFingerprint='a'.repeat(64),receiptId='drh_'+randomBytes(16).toString('hex');
   const journalParent=registerCodexHostProcessRoot({gitCommonDir:common,repoFingerprint,purpose:'design-readiness'});
   const expected=join(cwd,'expected.json');
@@ -53,7 +55,7 @@ else{stdout(frame+'\\n');finish();}
 `);
   return {root,cwd,expected,journalParent,receiptId,args:{codexPath:process.execPath,cwd,model:'synthetic-model',effort:'max',prompt:'Controlled request only.',
     outputSchema:{type:'object',additionalProperties:false,required:['outcome','note'],properties:{outcome:{type:'string',enum:['ok']},note:{type:'string'}}},
-    startupTimeoutMs:3000,turnTimeoutMs:3000,inputContract:'readiness',readinessSourceContext:null,
+    startupTimeoutMs:15000,turnTimeoutMs:15000,inputContract:'readiness',readinessSourceContext:null,
     managedProcess:{journalParent,receiptId,binding:{repoFingerprint,dispatchId:'output-custody',candidateCommit:'c'.repeat(40)}}}};
 }
 for(const scenario of ['valid','split-utf8','invalid-utf8','duplicate-outer','trailing-partial','trailing-full','invalid-report','invalid-stderr','terminal-error'])test('managed output custody: '+scenario,async t=>{

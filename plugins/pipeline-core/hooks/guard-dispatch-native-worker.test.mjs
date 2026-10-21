@@ -126,7 +126,10 @@ manualCheck("GD15n prepare a native pending binding for a complete dispatched Co
     recordConsentGiven({ rootDir: fixture });
     assert.equal(observeGovernanceScope({ rootDir: fixture }).requiresEnforcement, true,
       "native fixture must be admitted through canonical governance enrollment");
-    execFileSync("git", ["add", "--", ".agent-pipeline/onboarding-consent.json", "src/change.mjs"], { cwd: fixture });
+    mkdirSync(join(fixture, ".claude"), { recursive: true });
+    writeFileSync(join(fixture, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    writeFileSync(join(fixture, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0" })}\n`);
+    execFileSync("git", ["add", "--", ".agent-pipeline/onboarding-consent.json", "src/change.mjs", ".claude/pipeline.yaml", ".claude/pipeline-state.json"], { cwd: fixture });
     execFileSync("git", ["commit", "-q", "-m", "fixture candidate"], { cwd: fixture });
     assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: fixture, encoding: "utf8" }).trim(), "",
       "native preparation fixture must begin from a clean committed tree");

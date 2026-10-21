@@ -11,7 +11,8 @@ import { createModelFamilyDiscoveryHost } from "./model-family-discovery.mjs";
 import { createCodexFamilyAdapter } from "./model-family-codex-adapter.mjs";
 import { createClaudeFamilyAdapter } from "./model-family-claude-adapter.mjs";
 import { createAntigravityFamilyAdapter } from "./model-family-antigravity-adapter.mjs";
-import { createModelFamilyHostController } from "./model-family-host-store.mjs";
+import { createModelFamilyHostController, createModelFamilyHostAuthorityLifecycle } from "./model-family-host-store.mjs";
+import { prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
 import { canonicalizeJson } from "./governance-event.mjs";
 import { createModelFamilyDiscoveryHost as createAssemblyDiscoveryHost, RULE_FIELDS as ASSEMBLY_RULE_FIELDS, digest as assemblyS2Digest } from "./model-family-discovery.mjs";
 import { createCodexFamilyAdapter as createAssemblyCodexAdapter } from "./model-family-codex-adapter.mjs";
@@ -121,7 +122,8 @@ async function realS4Receipt() {
     hardEligibility: { runner: "codex", taskRoute: route.taskRoute, role: "frontier", effort: route.effort,
       evidenceSha256: sha("hard"), minimumVersion: null, deniedModelIds: [] }, variantRule: null,
     compatibility: { runner: "codex", taskRoute: route.taskRoute, role: "frontier", effort: route.effort, modelId, evidenceSha256: sha("compat") }, latestAlias: null };
-  const root = mkdtempSync(join(resolve("/var/tmp"), "s4-s6-real-receipt-"));
+  const registryFixture = prepareSessionAuthorityRegistryFixture({ prefix: "s4-s6-real-receipt-" });
+  const root = registryFixture.root;
   const source = {
     readAuthorityInputs: () => ({ bundle, routeSource: { ok: true, taskRoutes, configuredRoutes }, trustAnchors: anchors, predecessor: null }),
     readPinInputs: () => [],
@@ -130,13 +132,14 @@ async function realS4Receipt() {
     launchDriver: () => ({ ok: true, value: null }),
   };
   try {
-    const host = createModelFamilyHostController({ rootDir: root, trustedSources: source, clock: () => Date.parse("2026-10-01T10:00:30.000Z") });
+    const host = createModelFamilyHostController({ rootDir: root, trustedSources: source, clock: () => Date.parse("2026-10-01T10:00:30.000Z"),
+      authorityLifecycle: createModelFamilyHostAuthorityLifecycle({ repository: registryFixture.repository }) });
     const active = host.activate(); if (!active.ok) throw new Error(`S4 activation failed: ${active.code}`);
     const prepared = host.prepare({ key: { runner: "codex", installationBindingSha256: bindings.installationBindingSha256,
       accountBindingSha256: bindings.accountBindingSha256, sessionId: "session:interop", invocationId: "invocation:interop" }, assignment: route });
     if (!prepared.ok) throw new Error(`S4 prepare failed: ${prepared.code}`);
     return { receipt: prepared.value.receipt, bindings, provenanceSha256: sha("s4-provenance") };
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { rmSync(registryFixture.repoDir, { recursive: true, force: true }); }
 }
 
 for (const runner of EXECUTION_RUNNERS) {
