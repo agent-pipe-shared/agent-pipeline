@@ -439,3 +439,22 @@ K1D (ledger), which waits for the PO.
   commits carry the `Dispatch:` and `Commit-Act: orchestrator` trailers); several deep dispatches stopped
   at their budget and were continued from saved interim files under `scratch/`.
 - **Next:** K1h with K10 (hang group and Verify-only reds); K1D when the PO decides.
+
+### K1h measurement 1 (2026-10-21, orchestrator, each suite alone, `scratch/run-quiet.mjs`, 15-minute cap)
+
+The hang group splits into three kinds; no single shared lock explains it.
+
+- **Hangs even alone (cap reached, no summary):** `lib/native-goldfish-host-state.test.mjs` (last output a
+  governed briefing in the `implementing` phase) and `lib/model-family-host-store.test.mjs` (its
+  MFHS002-008, MFHS023, MFHS028 are D66 typed pending; the run ends in a child-process exit trace).
+- **Finishes alone, red:** `lib/onboarding-continuity.test.mjs` 267/306, 39 reds, nearly all
+  post-privatization promotion and its crash recovery (OBC119-OBC160), plus OBC055, OBC059, OBC060,
+  OBC062 (cleanup bind/release CAS and the ephemeral private cleanup); `lib/agy-session-dispatch.test.mjs`
+  6/7 ('actual Agy S2 S4 S5 native callers launch each signed successor once ...');
+  `lib/model-family-invocation.test.mjs` 12/14 (MFI012, MFI013, both D66 typed pending).
+- **Green alone:** `lib/design-workflow-package-v2.test.mjs` 2/2, `lib/native-goldfish-host-finalizer.test.mjs`
+  15/15, `scripts/project-reset-git-hooks.test.mjs` 17/17; their Verify hang is a concurrency effect (K10
+  class).
+- **Next:** find the hanging case of native-goldfish-host-state (per-case run); classify the
+  onboarding-continuity reds (they share the bind/release paths of K1D A/B/E, so the classification
+  may move them there); then K10 under Verify concurrency.
