@@ -17,6 +17,21 @@ test('Readiness shared parent: actual sanctioned GUID mint leaves0755 shared par
  assert.equal(mode(shared),0o755);assert.equal(mode(dirname(dirname(store.processRoot))),0o700);assert.equal(mode(dirname(store.processRoot)),0o700);assert.equal(mode(store.processRoot),0o700);assert.equal(mode(join(dirname(store.processRoot),'receipts')),0o700);
  assert.deepEqual(readFileSync(binding),before);let evaluated=0;assert.equal(store.readForBinding(ID,bindingContext(repoFingerprint,()=>evaluated++)),null);assert.equal(evaluated,1);
 });
+// AC-130 follow-up recorded by 76beed502: the first case widens the parent to 0755 before creating the store;
+// this one creates the store directly on the fresh owner-private 0700 parent the sanctioned mint leaves behind.
+const OWNER_PRIVATE_SKIP=process.platform==='linux'?false:'host-limitation: owner-private 0700 modes are shown on the linux private store only; owner Coordinator, due 2026-11-04 (Linux/WSL run)';
+test('Readiness shared parent: store is created directly on the fresh owner-private 0700 shared parent without any chmod to 0755',{skip:OWNER_PRIVATE_SKIP},async t=>{
+ const {common,root}=sharedFixture(t),repoFingerprint=await readLocalRepositoryFingerprint({repositoryRoot:root}),shared=join(common,'agent-pipeline'),binding=join(shared,'governance-events','repository-binding.json'),before=readFileSync(binding),commonMode=mode(common);
+ assert.equal(mode(shared),0o700,'the sanctioned mint leaves the shared parent owner-private');assert.equal(lstatSync(shared).uid,process.getuid());
+ const store=createCodexDesignReadinessHostStore({gitCommonDir:common,repoFingerprint}),repository=dirname(store.processRoot),receipts=join(repository,'receipts');
+ assert.equal(mode(shared),0o700,'creation neither widens nor repairs the shared parent');assert.equal(mode(common),commonMode,'the common directory is untouched');
+ for(const path of [dirname(repository),repository,store.processRoot,receipts])assert.equal(mode(path),0o700,'private descendant '+path.slice(shared.length));
+ assert.equal(dirname(dirname(repository)),shared,'the namespace sits directly on the 0700 shared parent');
+ assert.deepEqual(readFileSync(binding),before,'the sanctioned repository binding is byte-identical');
+ let evaluated=0;assert.equal(store.readForBinding(ID,bindingContext(repoFingerprint,()=>evaluated++)),null);assert.equal(evaluated,1,'the 0700 parent passes root admission, so the context is evaluated');
+ assert.throws(()=>store.write({receiptId:ID},{}),{code:'CRHS-RECORD-OR-OWNERSHIP-INVALID'},'write admission reaches record validation, not a root-drift refusal');assert.deepEqual(readdirSync(receipts),[]);
+ assert.equal(mode(shared),0o700);
+});
 test('Readiness shared parent: common0775 and0777 reject before creating namespace without chmod repair',t=>{
  for(const unsafe of [0o775,0o777]){const {common}=sharedFixture(t);chmodSync(common,unsafe);assert.throws(()=>createCodexDesignReadinessHostStore({gitCommonDir:common,repoFingerprint:REPO}),{code:'CRHS-COMMON-DIR'});assert.equal(mode(common),unsafe);assert.equal(readdirSync(common).includes('agent-pipeline'),false);}
 });
