@@ -26,7 +26,7 @@ import {
   planOnboardingKickoffPromotion,
   planOrphanSessionCleanupBindingRelease,
   observeSessionCleanupState,
-  readOnboardingSessionCleanupBinding,
+  readOnboardingSessionCleanupBinding, releaseOnboardingSessionCleanup,
 } from "../lib/onboarding-continuity.mjs";
 import {
   applySessionCleanupRecovery,
@@ -358,6 +358,22 @@ test("release-binding completes an interrupted post-cleanup State release", () =
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// D73 A / D74: an owner retired in-process is released by the owning route; a release with no retained owner names a repair.
+test("owner retirement still releases the binding, and a release without a retained owner names its typed repair", () => {
+  const root = fixture("release-retired-owner");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-retired-release"]);
+    const loaded = loadSessionDescriptor(root, started.output.sessionId, { expectedDescriptorSha256: started.output.descriptorSha256 });
+    assert.equal(cleanupSession(root, loaded, { allowAbsent: true }).ok, true);
+    retireSessionDescriptor(root, loaded);
+    assert.equal(invoke(["release-binding", "--repo", root]).output.code, "WT-SESSION-BINDING-RELEASED");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+    const released = { rootDir: root, sessionCleanup: { sessionId: started.output.sessionId, descriptorSha256: started.output.descriptorSha256 } };
+    assert.throws(() => releaseOnboardingSessionCleanup(released),
+      (error) => error?.code === "SDC-AUTHORITY-UNAVAILABLE" && /plan-recovery --repo /u.test(error.message));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("plan-recovery repairs only the exact historical kickoff-promotion cleanup mismatch", () => {

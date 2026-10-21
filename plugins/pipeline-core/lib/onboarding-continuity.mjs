@@ -101,7 +101,7 @@ import {
   listActiveSessionDescriptors,
   loadSessionDescriptor,
   observeOwnedSessionDescriptorOwnerHandle,
-  observeOwnedSessionDescriptorClosureHandle,
+  observeOwnedSessionDescriptorClosureHandle, inspectOwnedSessionDescriptorClosure, inspectSignedDescriptorCustodyRepository,
 } from "./worktree-lifecycle.mjs";
 import {
   derivePlanLifecycle,
@@ -110,14 +110,14 @@ import {
 } from "./plan-spec-state-v2.mjs";
 import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
-import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { readSourceOwnedAuthorityContext, createSignedCleanupRequesterObserver,
   inspectSourceOwnedCurrentAuthorityContext, inspectSourceOwnedRequesterInvocation, withSourceOwnedRetiredOwnerTerminalContext,
   inspectSourceOwnedRetiredOwnerTerminalContext } from "./session-requester-bridge.mjs";
 import { withSessionAuthorityBoundary, advanceSessionAuthorityMember, reserveSessionAuthorityMember, releaseSessionAuthorityMember,
   inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord,
   inspectSourceOwnedSessionAuthorityStateRefresh, inspectSourceOwnedSessionAuthorityCompanionRefresh,
-  executeSourceOwnedControlledContinuityTicketProbe } from "./session-authority-registry.mjs";
+  executeSourceOwnedControlledContinuityTicketProbe, advanceSourceOwnedRetiredSessionAuthorityMember,
+  inspectSourceOwnedRetiredSessionAuthorityMember } from "./session-authority-registry.mjs";
 import { isOwnedStateAuthorityWriteHandle, observeStateAuthorityWrite,
   observeStateAuthorityWriteTerminal, isOwnedStateAuthorityCompanionWriteHandle,
   observeStateAuthorityCompanionWrite, observeStateAuthorityCompanionWriteTerminal,
@@ -9514,11 +9514,10 @@ function continuityAuthorityFinish(data,port,{operationHandle,executionHandle,en
           fail('SDC-AUTHORITY-CAS','continuity terminal origin or entry');
         continuityAuthorityCurrent(data,operation.requesterHandle);
         return withSessionAuthorityBoundary({repository:data.repository},boundary=>{
-          const currentMember=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,
-            expectedMemberRef,operationHandle});
+          const retired=continuityRetiredOwnerScope.getStore()?.entry==='release';
+          const currentMember=(retired?inspectSourceOwnedRetiredSessionAuthorityMember:advanceSessionAuthorityMember)({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef,operationHandle});
           operation.expectedMemberRef=currentMember.memberRef;
-          const tuple = {sessionId:operation.association.target.sessionId,
-            descriptorSha256:operation.association.target.descriptorSha256};
+          const tuple = {sessionId:operation.association.target.sessionId,descriptorSha256:operation.association.target.descriptorSha256};
           const ownerResult = continuityAuthorityWriterRun(operation,'release',()=>releaseOnboardingSessionCleanup({rootDir:data.repository.primaryRoot,...input,sessionCleanup:tuple}));
           operation.terminalOwnerResult = ownerResult;
           const snapshot = continuityAuthoritySnapshot(data.repository);
@@ -9528,8 +9527,7 @@ function continuityAuthorityFinish(data,port,{operationHandle,executionHandle,en
           operation.phase = 'terminal-observed';
           const terminalHandle = continuityAuthorityHandle(continuityAuthorityTerminals,
             {operation,memberships:continuityAuthoritySnapshot(data.repository).memberships});
-          const terminalMember=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,
-            expectedMemberRef,operationHandle});
+          const terminalMember=(retired?advanceSourceOwnedRetiredSessionAuthorityMember:advanceSessionAuthorityMember)({boundary,producerPort:port,memberHandle:operation.memberHandle,expectedMemberRef,operationHandle});
           operation.expectedMemberRef=terminalMember.memberRef;
           return {status:'observed',terminalHandle,sourceRefs:[...operation.journalRefs]};
         });
@@ -9575,7 +9573,7 @@ export function bindOnboardingSessionCleanup(request={}) {
   if(!continuityAuthorityEqual(request.sessionCleanup,tuple))fail('SDC-AUTHORITY-CAS','continuity caller tuple is not current owner');
   const prepared=port.prepareOperation({requesterHandle:context.requesterHandle,entry:'bind',
     input:{expectedStateSha256:request.expectedStateSha256,expectedRevision:request.expectedRevision}});
-  if(prepared.status!=='prepared')fail(prepared.code,'continuity owner preparation refused');
+  if(prepared.status!=='prepared')fail(prepared.code,'continuity owner preparation refused; a bound session is reused by session-cleanup.mjs start (WT-SESSION-REUSED), otherwise read the typed recovery with node <plugin>/scripts/session-cleanup.mjs plan-recovery --repo <checkout> and run the action it names');
   const reserved=withSessionAuthorityBoundary({repository},boundary=>reserveSessionAuthorityMember({boundary,
     producerPort:port,association:port.observeOperation(prepared.operationHandle).association,
     operationHandle:prepared.operationHandle}));
@@ -9593,13 +9591,14 @@ export function releaseOnboardingSessionCleanup(request={}) {
   const repository=continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(request.rootDir));
   const owned=continuityAuthorityDirectBindings.get(continuityAuthorityDirectKey(repository,request.sessionCleanup));
   if(!owned||!continuityAuthorityEqual(repository,owned.repository))
-    fail('SDC-AUTHORITY-UNAVAILABLE','continuity owning execution recovery required before release');
-  const memberRef=continuityAuthorityReadMemberRef(repository,owned.reserved.memberRef);
-  const terminal=continuityAuthorityFinish(owned.data,owned.port,{operationHandle:owned.prepared.operationHandle,
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity owning execution recovery required before release; read the typed recovery with node <plugin>/scripts/session-cleanup.mjs plan-recovery --repo <checkout> and run the action it names');
+  const memberRef=continuityAuthorityReadMemberRef(repository,owned.reserved.memberRef),operation=continuityAuthorityOperations.get(owned.prepared.operationHandle);
+  const finish=()=>continuityAuthorityFinish(owned.data,owned.port,{operationHandle:owned.prepared.operationHandle,
     executionHandle:owned.executed.executionHandle,entry:'release',
     input:{expectedStateSha256:request.expectedStateSha256,expectedRevision:request.expectedRevision},expectedMemberRef:memberRef});
-  if(terminal.status!=='observed')fail(terminal.code,'continuity owning release failed');
-  const operation=continuityAuthorityOperations.get(owned.prepared.operationHandle);
+  const retired=inspectOwnedSessionDescriptorClosure({repository,target:operation.association.target}).assurance==='physical-owner-retirement';
+  const terminal=retired?runOwnedContinuityRetiredTerminal(operation,'release',finish):finish();
+  if(terminal.status!=='observed')fail(terminal.code,'continuity owning release failed; read the typed recovery with node <plugin>/scripts/session-cleanup.mjs plan-recovery --repo <checkout> and run the action it names');
   withSessionAuthorityBoundary({repository},boundary=>releaseSessionAuthorityMember({boundary,producerPort:owned.port,
     memberHandle:owned.reserved.memberHandle,expectedMemberRef:continuityAuthorityReadMemberRef(repository,memberRef),
     terminalHandle:terminal.terminalHandle}));
@@ -11084,7 +11083,7 @@ function retainContinuityControlledOwnerInvocation(operation) {
 function continuityReadRetiredOwner(operation) {
   const scope=continuityRetiredOwnerScope.getStore();
   if(!scope||scope.operation!==operation
-      ||!['close-feature','release-owned-transition'].includes(scope.entry))
+      ||!['close-feature','release-owned-transition','release'].includes(scope.entry))
     fail('SDC-AUTHORITY-UNAVAILABLE','continuity owning terminal scope required');
   const retained=continuityRetainedOwnerInvocations.get(operation);
   if(!retained)fail('SDC-AUTHORITY-UNAVAILABLE','continuity original local owner was not retained');
@@ -11101,7 +11100,7 @@ function continuityReadRetiredOwner(operation) {
   return observed.currentRequester;
 }
 function runOwnedContinuityRetiredTerminal(operation,entry,callback) {
-  if(!['close-feature','release-owned-transition'].includes(entry)
+  if(!['close-feature','release-owned-transition','release'].includes(entry)
       ||typeof callback!=='function'||continuityRetiredOwnerScope.getStore()
       ||continuityAuthorityOperations.get(operation.operationHandle)!==operation
       ||operation.phase!=='armed'||operation.legacy)
