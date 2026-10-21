@@ -60,6 +60,14 @@ command. From the project root:
 3. Invoke `/pipeline-core:pipeline-start` as the first Pipeline action in the
    new session and follow its returned onboarding action.
 
+Agy also keeps a managed plugin directory and an import manifest, which can
+hold a stale copy that shadows the registered plugin. Keep a single source and
+refresh with `node ".../plugins/pipeline-core/install-agy.mjs" --refresh`: it
+prints the plan and asks first (`--yes` only together with `--refresh`).
+Then restart Agy and read the session lock; `agy plugin list` and
+`plugins.json` are not proof of what is loaded. A global install is inert
+outside opted-in repositories, except the destructive-git protection.
+
 The installer also offers an optional autonomous tool policy while installing.
 If selected, it writes `.agents/settings.json`; this runner-local option does
 not grant plan, release, remote, or human authority. Launching `agy` alone does

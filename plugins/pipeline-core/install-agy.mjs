@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { randomUUID } from "node:crypto";
-import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, cpSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
@@ -20,8 +20,10 @@ const hasMarketplace = existsSync(join(LOCAL_MARKETPLACE, "plugins", "pipeline-c
 
 export function installerUsageLines() {
   return [
-    "Usage: node install-agy.mjs",
+    "Usage: node install-agy.mjs [--refresh [--yes]]",
     "",
+    "--refresh (developer entry): sync the local marketplace copy from this approved directory, remediate the global Agy topology, then read it back.",
+    "--refresh prints the exact plan first and asks for confirmation; --yes skips only that question and is accepted only together with --refresh.",
     "Run this from an approved Agent-Pipeline plugin directory while your shell is in the project Antigravity will govern.",
     "The interactive installer defaults to that approved directory. A local marketplace copy is an explicit pre-release development choice.",
     "The installer checks physical managed/import/registry/wiring topology and readback; it does not prove GitHub origin or release authenticity.",
@@ -383,6 +385,86 @@ export function verifyAntigravityInstallerSource({ configRoot, workspaceRoot, so
   return { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE", ...(Array.isArray(source?.reasonCodes) ? { reasonCodes: source.reasonCodes } : {}) };
 }
 
+/** Parse the installer's own flags. An unknown flag or `--yes` without `--refresh` is a refusal that names its repair. */
+export function parseInstallerArguments(argv = []) {
+  const flags = new Set(argv);
+  const known = new Set(["--help", "-h", "--refresh", "--yes"]);
+  const unknown = argv.filter((a) => !known.has(a));
+  if (unknown.length > 0) return { error: `Unknown option: ${unknown[0]}. Repair: run with --help to list the accepted options.` };
+  if (flags.has("--yes") && !flags.has("--refresh")) {
+    return { error: "--yes is accepted only together with --refresh. Repair: add --refresh (developer entry), or drop --yes and answer the installer prompts." };
+  }
+  return { help: flags.has("--help") || flags.has("-h"), refresh: flags.has("--refresh"), yes: flags.has("--yes") };
+}
+
+/** The exact remediation plan as text lines, from a prepared host plan; nothing here changes anything. */
+export function describeRefreshPlan({ plan, syncFrom = null, syncTo = null } = {}) {
+  const lines = ["=== Refresh plan (nothing has been changed yet) ==="];
+  let step = 1;
+  if (syncFrom && syncTo) lines.push(`${step++}. Sync the local marketplace copy: replace ${syncTo} with the contents of ${syncFrom}.`);
+  else lines.push(`${step++}. Sync: not needed, the approved directory is used in place.`);
+  const actions = Array.isArray(plan?.actions) ? plan.actions : [];
+  if (actions.length === 0) lines.push(`${step++}. Remediation: none, the observed topology already matches the approved source.`);
+  for (const action of actions) {
+    if (action.kind === "cli") lines.push(`${step++}. Remediation: agy ${action.argv.join(" ")} (installs the generated runner view of the approved source).`);
+    else lines.push(`${step++}. Remediation: ${action.kind} in ${action.path} (only Pipeline-owned entries; foreign entries stay byte-identical).`);
+  }
+  lines.push(`${step}. Readback: observe the managed copy, import manifest, registries and hook wiring again and report them.`);
+  lines.push("Afterwards restart Agy and read the session lock: the readback is a physical diagnostic, never proof of what is loaded.");
+  return lines;
+}
+
+/**
+ * Developer entry --refresh: sync, then remediation, then readback. The plan is printed first; without --yes the
+ * operator must confirm, and a declined or unavailable confirmation changes nothing.
+ */
+export async function runDeveloperRefresh({ yes = false, syncFrom = null, syncTo = null, prepare, sync, remediate, readback, confirm, print = console.log } = {}) {
+  const plan = prepare();
+  if (plan?.status !== "prepared") {
+    print(`Refresh refused before any change: ${plan?.reason ?? "ATR-UNAVAILABLE"}`);
+    return { status: "refused", reason: plan?.reason ?? "ATR-UNAVAILABLE", exitCode: 1 };
+  }
+  for (const line of describeRefreshPlan({ plan, syncFrom, syncTo })) print(line);
+  if (!yes) {
+    let answer = false;
+    try { answer = await confirm("Apply this plan? [y/N]: "); } catch { answer = false; }
+    if (answer !== true) {
+      print("Not confirmed; nothing was changed. Repair: rerun and answer y, or pass --refresh --yes.");
+      return { status: "declined", exitCode: 1 };
+    }
+  }
+  if (syncFrom && syncTo) sync({ from: syncFrom, to: syncTo });
+  const result = remediate();
+  print(JSON.stringify(result));
+  if (result?.status !== "refreshed") return { status: "failed", reason: result?.reason ?? "ATR-REFRESH-UNAVAILABLE", result, exitCode: 1 };
+  const observed = readback();
+  for (const line of observed.lines) print(line);
+  return { status: "refreshed", result, readback: observed, exitCode: 0 };
+}
+
+/** Replace the marketplace copy from the approved directory with path APIs only (no shell, no rsync). */
+export function syncMarketplaceCopy({ from, to }) {
+  if (resolve(from) === resolve(to) || basename(to) !== "pipeline-core" || basename(dirname(to)) !== "plugins") {
+    throw new Error("Unsafe marketplace copy target; nothing was synced");
+  }
+  rmSync(to, { recursive: true, force: true });
+  cpSync(from, to, { recursive: true, filter: (source) => { const name = basename(source); return name !== ".git" && name !== "node_modules"; } });
+}
+
+/** What the readback reports: physical observation only. It never claims an executing path. */
+export function readbackLines(observation) {
+  const managed = observation?.managed?.candidates ?? [];
+  const imports = observation?.importState?.entries ?? [];
+  const sourceSha = observation?.source?.content?.sha256 ?? "unobserved";
+  return [
+    "=== Readback (physical diagnostic) ===",
+    `approved source content: ${sourceSha}`,
+    `managed copies: ${managed.length}${managed[0] ? ` (content ${managed[0].content?.sha256 ?? "unobserved"})` : ""}`,
+    `import manifest entries: ${imports.length}`,
+    "This is not proof of what is loaded: restart Agy, then read the session lock. `agy plugin list` and plugins.json do not prove it either.",
+  ];
+}
+
 /** Choice 3: publish the per-user central agy snapshot and refresh the global agy copy from it. Injectable for tests. */
 export async function runCentralSnapshotInstall({
   sourcePluginRoot,
@@ -527,8 +609,38 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  if (process.argv.slice(2).includes("--help") || process.argv.slice(2).includes("-h")) {
+  const parsed = parseInstallerArguments(process.argv.slice(2));
+  if (parsed.error) {
+    console.error(`Installation refused: ${parsed.error}`);
+    process.exitCode = 1;
+  } else if (parsed.help) {
     for (const line of installerUsageLines()) console.log(line);
+  } else if (parsed.refresh) {
+    const configRoot = join(homedir(), ".gemini");
+    const workspaceRoot = process.cwd();
+    const marketplaceCopy = join(LOCAL_MARKETPLACE, "plugins", "pipeline-core");
+    const syncTo = hasMarketplace && resolve(marketplaceCopy) !== resolve(SCRIPT_DIR) ? marketplaceCopy : null;
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const options = () => {
+      const binding = resolveAntigravityInstallerAttestationSource({ sourcePluginRoot: SCRIPT_DIR, discoveryPluginRoot: SCRIPT_DIR });
+      if (binding.status === "rejected") throw new Error(describeInstallerSourceRefusal(binding));
+      return { configRoot, workspaceRoot, approvedSourceRoot: SCRIPT_DIR, attestationSourceRoot: binding.attestationSourceRoot, scope: "global", globalChangeApproved: true, cliPath: resolveAntigravityCliPath() };
+    };
+    try {
+      if (!existsSync(configRoot)) mkdirSync(configRoot, { mode: 0o700 });
+      runDeveloperRefresh({
+        yes: parsed.yes, syncFrom: syncTo ? SCRIPT_DIR : null, syncTo,
+        prepare: () => createAntigravityRefreshHost(options()).prepare(),
+        sync: syncMarketplaceCopy,
+        remediate: () => refreshAntigravityGlobalFromRunnerView(options()),
+        readback: () => ({ lines: readbackLines(observeAntigravityPluginTopology({ configRoot, workspaceRoot, approvedSourceRoot: SCRIPT_DIR })) }),
+        confirm: (question) => new Promise((done) => rl.question(question, (a) => done(/^y(es)?$/i.test(a.trim())))),
+      }).then((r) => { process.exitCode = r.exitCode; }, (error) => { console.error(`Installation refused: ${error.message}`); process.exitCode = 1; }).finally(() => rl.close());
+    } catch (error) {
+      console.error(`Installation refused: ${error.message}`);
+      process.exitCode = 1;
+      rl.close();
+    }
   } else {
     runInteractiveInstaller();
   }

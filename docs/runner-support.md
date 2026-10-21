@@ -23,6 +23,21 @@ Runner evidence and platform evidence are independent. In particular, the
 synthetic macOS contract suite does not claim native macOS support for any
 runner.
 
+## Antigravity managed plugin directory and global install contract
+
+Agy keeps a managed copy of an imported plugin in its config directory and
+lists it in an import manifest, alongside the path registries. Keep a single
+source per scope; a stale managed copy can shadow the registered plugin. The
+developer command `install-agy.mjs --refresh` prints its plan, asks for
+confirmation (`--yes` only together with `--refresh`), remediates through Agy's
+own lifecycle and reads the result back. Restart Agy and read the session lock
+for proof; `agy plugin list`, `plugins.json` and the readback are not proof of
+what is loaded.
+
+A global install is inert outside opted-in repositories: hooks neither block,
+inject instructions nor write there. The exception is the destructive-git
+protection, which stays on everywhere.
+
 ## Claude Desktop app
 
 Local Desktop sessions on a Windows path share settings, user-scope plugins,

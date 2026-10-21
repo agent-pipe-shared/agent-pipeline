@@ -255,6 +255,14 @@ test("AC-226 item 7: governed enrollment keeps enforcing; record drift fails tow
   assert.equal(JSON.parse(call(dir, "codex-pretool-guard.mjs", "malformed").stdout).hookSpecificOutput.permissionDecision, "deny");
 });
 
+test("AC-226 docs: SETUP.md and runner-support.md state that a global install is inert outside opted-in repositories except destructive-git protection", () => {
+  for (const rel of ["SETUP.md", "docs/runner-support.md"]) {
+    const text = readFileSync(join(repoRoot, rel), "utf8").replace(/\s+/g, " ");
+    assert.match(text, /inert outside opted-in repositories/i, rel);
+    assert.match(text, /destructive-git protection/i, rel);
+  }
+});
+
 test("AC-226 item 7: wiring enumeration covers every hook command of all three runners (new hooks are noticed)", () => {
   const hooks = wiredHooks();
   for (const must of ["guard-git.mjs", "guard-lifecycle-ready.mjs", "codex-pretool-guard.mjs", "antigravity-pretool-guard.mjs", "staleness-check.mjs"])

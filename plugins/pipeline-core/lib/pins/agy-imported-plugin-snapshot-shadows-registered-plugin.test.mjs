@@ -342,6 +342,21 @@ test("P6 every refused verdict carries a typed ATR-* reason, never the untyped f
   }
 });
 
+// AC-110 (2) text pin: the four reader documents describe the managed directory, the refresh command and the proof boundary.
+test("P7 docs describe the managed plugin directory, the refresh command, the restart-plus-lock proof and the non-proof surfaces", () => {
+  for (const rel of ["SETUP.md", "GEMINI.md", "docs/runner-support.md", "plugins/pipeline-core/skills/pipeline-start/references/local-plugin-attestation.md"]) {
+    const text = readFileSync(join(repoRoot, rel), "utf8").replace(/\s+/g, " ");
+    assert.match(text, /managed plugin directory/, rel + " names the managed plugin directory");
+    assert.match(text, /import manifest/, rel + " names the import manifest");
+    assert.match(text, /single source/, rel + " states the single-source rule");
+    assert.match(text, /install-agy\.mjs"? --refresh|install-agy\.mjs --refresh/, rel + " names the refresh command");
+    assert.match(text, /session lock/, rel + " names the restart-plus-lock proof");
+    assert.match(text, /agy plugin list/, rel + " names agy plugin list");
+    assert.match(text, /plugins\.json/, rel + " names plugins.json");
+    assert.match(text, /not proof of what is loaded/, rel + " says they are not proof");
+  }
+});
+
 test("HOST-LIMITATION skip: directory-mode/symlink aliasing cases (owner Coordinator, due 2026-10-19, Linux/WSL run, PO decision K7)", { skip: process.platform === "win32" ? "host-limitation: directory symlinks unavailable on native Windows; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)" : false }, () => {
   const f = incident();
   const alias = join(f.workspaceRoot, "plugins", "pipeline-core");

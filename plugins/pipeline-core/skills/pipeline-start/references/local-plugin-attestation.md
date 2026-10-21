@@ -28,3 +28,9 @@ installer locator, returns `plugin-attestation-required` with
 `nextAction: null`. Run `install-agy.mjs` from the clean source checkout and
 restart the runner as instructed by the installer. The source path cannot be
 recovered safely from Antigravity's path-only registry and must not be guessed.
+
+Agy also keeps a managed plugin directory and an import manifest; keep a single
+source per scope. Refresh with `install-agy.mjs --refresh` (plan printed first,
+confirmation required, `--yes` only together with `--refresh`), then restart
+and read the session lock. `agy plugin list` and `plugins.json` are not proof
+of what is loaded.

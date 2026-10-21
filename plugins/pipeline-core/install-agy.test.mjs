@@ -446,3 +446,79 @@ test("Agy installer never follows registry-file or parent aliases while updating
   assert.throws(() => updatePluginRegistry({ targetFile: join(aliasParent, "plugins.json"), corePluginPath: newRoot }), /Unsafe plugin registry parent/u);
   assert.deepEqual(readdirSync(join(root, ".agents")), []);
 });
+
+// AC-110 (1): developer --refresh prints the plan first, changes nothing without confirmation, and ends in a readback.
+function refreshHarness({ plan, answer = true, remediation = { status: "refreshed" } } = {}) {
+  const calls = [], printed = [];
+  const deps = {
+    prepare: () => { calls.push("prepare"); return plan ?? { status: "prepared", actions: [{ kind: "cli", argv: ["plugin", "validate", "SRC"] }, { kind: "cli", argv: ["plugin", "uninstall", "agent-pipeline-core"] }, { kind: "cli", argv: ["plugin", "install", "SRC"] }] }; },
+    sync: () => { calls.push("sync"); },
+    remediate: () => { calls.push("remediate"); return remediation; },
+    readback: () => { calls.push("readback"); return { lines: ["=== Readback (physical diagnostic) ==="] }; },
+    confirm: async () => { calls.push("confirm"); return answer; },
+    print: (line) => printed.push(line),
+  };
+  return { calls, printed, deps };
+}
+
+test("Agy --refresh prints the exact plan before any change, then syncs, remediates and reads back in order", async () => {
+  const h = refreshHarness();
+  const r = await installerModule.runDeveloperRefresh({ ...h.deps, syncFrom: "A", syncTo: "B" });
+  assert.equal(r.status, "refreshed");
+  assert.deepEqual(h.calls, ["prepare", "confirm", "sync", "remediate", "readback"]);
+  const text = h.printed.join("\n");
+  assert.match(text, /nothing has been changed yet/u);
+  assert.match(text, /agy plugin uninstall agent-pipeline-core/u);
+  assert.match(text, /not proof of what is loaded|never proof of what is loaded/u);
+  assert.ok(h.printed.findIndex((l) => /nothing has been changed yet/u.test(l)) < h.printed.findIndex((l) => /Readback/u.test(l)));
+});
+
+test("Agy --refresh without confirmation changes nothing and names the repair", async () => {
+  const h = refreshHarness({ answer: false });
+  const r = await installerModule.runDeveloperRefresh({ ...h.deps, syncFrom: "A", syncTo: "B" });
+  assert.equal(r.status, "declined");
+  assert.equal(r.exitCode, 1);
+  assert.deepEqual(h.calls, ["prepare", "confirm"]);
+  assert.match(h.printed.join("\n"), /Repair:/u);
+});
+
+test("Agy --refresh --yes skips only the question; a refused plan changes nothing", async () => {
+  const h = refreshHarness();
+  assert.equal((await installerModule.runDeveloperRefresh({ ...h.deps, yes: true })).status, "refreshed");
+  assert.equal(h.calls.includes("confirm"), false);
+  assert.equal(h.calls.includes("sync"), false, "no sync step when the approved directory is used in place");
+  const refused = refreshHarness({ plan: { status: "refused", reason: "ATR-CLI-CAPABILITY" } });
+  const r = await installerModule.runDeveloperRefresh({ ...refused.deps, yes: true });
+  assert.equal(r.status, "refused");
+  assert.deepEqual(refused.calls, ["prepare"]);
+});
+
+test("Agy --yes without --refresh is refused with a repair, before any interactive prompt", () => {
+  const parsed = installerModule.parseInstallerArguments(["--yes"]);
+  assert.match(parsed.error, /--yes is accepted only together with --refresh/u);
+  assert.match(parsed.error, /Repair:/u);
+  assert.deepEqual(installerModule.parseInstallerArguments(["--refresh", "--yes"]), { help: false, refresh: true, yes: true });
+  const run = spawnSync(process.execPath, [fileURLToPath(new URL("./install-agy.mjs", import.meta.url)), "--yes"], { encoding: "utf8", timeout: 20000, input: "" });
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /Repair:/u);
+});
+
+test("Agy --refresh readback reports the physical topology and never claims a loaded path", () => {
+  const lines = installerModule.readbackLines({ source: { content: { sha256: "a" } }, managed: { candidates: [{ content: { sha256: "b" } }] }, importState: { entries: [{}] } }).join("\n");
+  assert.match(lines, /managed copies: 1 \(content b\)/u);
+  assert.match(lines, /import manifest entries: 1/u);
+  assert.match(lines, /not proof of what is loaded/u);
+  assert.match(installerUsageLines().join("\n"), /--refresh/u);
+});
+
+test("Agy marketplace sync replaces the copy with path APIs and refuses an unsafe target", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "agy-sync-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const from = join(root, "src"), to = join(root, "m", "plugins", "pipeline-core");
+  mkdirSync(from, { recursive: true }); mkdirSync(to, { recursive: true });
+  writeFileSync(join(from, "plugin.json"), "{}");
+  writeFileSync(join(to, "stale.txt"), "old");
+  installerModule.syncMarketplaceCopy({ from, to });
+  assert.deepEqual(readdirSync(to), ["plugin.json"]);
+  assert.throws(() => installerModule.syncMarketplaceCopy({ from, to: join(root, "elsewhere") }), /Unsafe marketplace copy target/u);
+});

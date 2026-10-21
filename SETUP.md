@@ -700,6 +700,33 @@ The installer refuses an unverifiable, Pipeline-shaped stale path instead of
 deleting an entry it cannot prove it owns; do not work around this by editing
 the registry by hand.
 
+**Agy's managed plugin directory and import manifest.** Besides the path
+registries (`.agents/plugins.json` and the global `plugins.json`), Agy keeps a
+managed copy of an imported plugin in its own config directory
+(`plugins/agent-pipeline-core`) and lists it in `import_manifest.json`. That
+managed copy can be stale while the registered path is current, and a stale
+same-version copy can shadow the registered plugin. Keep a **single source**:
+one approved plugin directory per scope, and no hand-edited copy beside it. The
+developer refresh command is:
+
+```sh
+node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs" --refresh
+```
+
+It prints the exact plan (sync of the local marketplace copy, the Agy
+lifecycle steps, a readback) before it changes anything and asks for
+confirmation. `--yes` skips only that question and is accepted only together
+with `--refresh`; on its own it is refused with a repair. After the refresh,
+**fully restart Agy and read the session lock** (the first
+`/pipeline-core:pipeline-start` of the new session reports it). `agy plugin
+list` and `plugins.json` are not proof of what is loaded, and neither is the
+installer's readback, which is a physical diagnostic only.
+
+**Inert outside opted-in repositories.** A global install acts only in
+repositories that opted in. Outside them the hooks are inert: no blocking, no
+injected instructions, no writes. The one exception is the destructive-git
+protection, which stays active everywhere.
+
 If launching Agy from this same terminal, check Node.js immediately before
 launching it. On macOS/Linux use:
 
