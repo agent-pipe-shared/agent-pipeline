@@ -515,3 +515,26 @@ above is refuted: suites green alone are red under Verify. Two Verify-only cause
   the declared case lists in the protected completion registry drifted from the suites (K7; C15/C16
   drop-ins).
 The other reds are classified after the TMPDIR fix and a re-run, into K2-K9 and D66.
+
+### K1h closure (2026-10-21, partly closed with a named rest)
+
+Status: **partly closed.** Implementation complete; the Critic batch and PO acceptance are pending.
+- **Delivered (commits):** onboarding-continuity bind inside a bound requester `cb47dff84` (38 reds);
+  OBC059 restated to the K1c contract `55d6a6eb0` (306/306); Verify private 0700 TMPDIR per suite
+  (D73) `b73b423b1`, shortened for AF_UNIX socket paths `216a9c78f`.
+- **Measured effect (second full Verify `b73b423b1`, then the short-path fix measured per suite):**
+  session-cleanup-binding 30 red under Verify -> 5 (the K1D A/B/E cases); session-cleanup-recovery
+  red -> green; native-goldfish-host-state alone 38/38 (no hang); the twelve K10 suites green as a
+  width-8 pool; security-scanner-diagnostics and wsl-ipc-compatibility 24/24 under the private env.
+- **Named rest (owner cluster):**
+  - Verify-load-only reds, green alone under the private env: `pipeline-state-rebind-mutable` (4)
+    and onboarding-continuity OBC129 ('fixed address namespace changed') -> K9, measured again in
+    the next full Verify.
+  - `scripts/verify-journal.test.mjs` 92/95, three reds that predate K1h: two bind from a plain
+    process (K1c fixture gap, same fix as `cb47dff84`) and the WINVERIFY guard finding nine
+    `NODE_OPTIONS` mutations in `scripts/po-human-approval-openssl-path.test.mjs` -> K9.
+  - `VERIFY-CASE-COMPLETION-DECLARATION` with zero failing cases (about 25 suites) -> K7 (C15/C16).
+  - agy-session-dispatch AGY-S2S4S5 and the model-family cases -> the D66 row.
+  - The five binding reds -> K1D (D73 A, B probe, E).
+- **Agent todos:** a SIGKILLed Verify leaves `<home>/.pv/r*` behind (no stale sweep yet); two
+  leftover measurement directories `<home>/.pv??????` from the first short-path attempt.

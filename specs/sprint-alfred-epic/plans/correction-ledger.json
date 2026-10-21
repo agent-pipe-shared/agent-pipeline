@@ -24,14 +24,14 @@
     {
       "id": "K1D",
       "title": "K1 rest awaiting PO decision: binding owning release after retirement (A), leftover authority journal (B), orphan release registry member (E), Codex governed dispatch owner (GDW01)",
-      "status": "open",
-      "next": "decided by D73 (A: release inside the retired-owner route; E: RF2A member step; GDW01: Codex owner route as a guard drop-in); B needs its probe; one package per group after K1h"
+      "status": "in-progress",
+      "next": "D73 A first (ALF-K1D-A-RETIRED-RELEASE), then E (RF2A member step), the B probe, the D74 repair hint, GDW01 as a guard drop-in"
     },
     {
       "id": "K1h",
       "title": "hang group and Verify-only reds (with K10)",
-      "status": "in-progress",
-      "next": "D73: Verify gives every suite a private 0700 TMPDIR in verify-journal.mjs (Goldfish); then re-run the full Verify and classify the remaining reds into K2-K9"
+      "status": "closed",
+      "next": "-"
     },
     {
       "id": "K2",

@@ -115,7 +115,10 @@ binding 61/66; the rest, binding A/B/E and GDW01, is the decision cluster K1D aw
 model-family cases joined the D66 row); K1h with K10 is in progress (onboarding-continuity
 306/306; the first full Verify after it showed two Verify-only causes, the ambient TMPDIR and the
 completion-registry drift). D73 (2026-10-21, PO tiles) decides K1D A, E and GDW01 (GDW01 is fixed in
-0.7.0 through a guard drop-in) and a private TMPDIR per Verify suite. D70 (lost-binding recovery, built at
+0.7.0 through a guard drop-in) and a private TMPDIR per Verify suite; D74 fixes refusals without a
+repair in 0.7.0. K1h is partly closed (2026-10-21, 'K1h closure': implementation complete, Critic
+batch and PO acceptance pending; private Verify TMPDIR `b73b423b1`/`216a9c78f`; the named rest went
+to K7, K9, K1D and the D66 row). K1D is in progress. D70 (lost-binding recovery, built at
 `d2602f5cf`/`5e5c7d8f2`, implementation complete) and D71 (the per-user session-power address root
 past its 4096-slot bound: 3769 stale test slots moved aside, product fix in this candidate) are in
 `po-decisions-2026-10-18.md`. D72 settles both open K1 calls: the address root stays at the OS home
