@@ -31,7 +31,7 @@
       "id": "K1h",
       "title": "hang group and Verify-only reds (with K10)",
       "status": "in-progress",
-      "next": "rerun each hang-group and K10 suite alone under a private TMPDIR, then measure under Verify concurrency; find whether one shared lock or registry wait explains them"
+      "next": "restate OBC059 on a neutral root inside a bound requester (K1h measurement 2), then measure the K10 suites under Verify concurrency; find whether one shared lock or registry wait explains them"
     },
     {
       "id": "K2",

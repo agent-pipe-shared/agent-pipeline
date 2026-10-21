@@ -32,7 +32,7 @@ real defect green.
 | K8 | Guard hook suites that crash or time out | guard-apply-patch, guard-devplan, guard-gate-strength (TP-6), notebook-write-coverage (TP-10), antigravity-pretool-guard, lifecycle-denial-loop RC04C001, codex-session-start-hint SSH003 | whole-file failure after 30-95 s | AC-195 / AC-247 area; TP-6/TP-10 to the bundled ceremony if the test must change |
 | K9 | Remaining single suites | control-placement, agy-final-return AFR18, slice-queue-cli SC15, pipeline-state-rebind-runner (2), codex-host-output-custody (9), pipeline-state-late-verify, local-worker-supervisor-cli (9), nova-verify-journal (3), afk-claude-host, afk-activation, runner-contracts.schema (mechanic.claude tuple), gitleaks near-miss, security-scan + security-scan-snapshot (2), pipeline-start-preflight-pre-push-observation, wire-dispatch-budget-hook (7), guard-dispatch-budget-checkpoint GDBC10, pipeline-state-push-anchor (3), design-approval-command-admission, design-advisory-admission-cli (2), r7-3-bound-paths, agy-session-authority (2), goldfish-antigravity-live-host, pipeline-start-preflight-enforcement (2), the Windows and WSL pins, pin-no-uninstall, pin-worktrees (AC-274), pin-draft-phase (AC-167), pin-claude-session-start | mixed | per suite, by area |
 | K10 | Green alone, red only in Verify | wsl-ipc-compatibility, stop-fanout, runner-profile-migration-v3, project-authority, guard-dispatch, dispatch-policy, governance-action-artifact, dispatch-budget-binding, dispatch-record-strip-for-critic, security-scanner-diagnostics, architecture-prospective-companion, session-authority-repair; scratch-package-staging needs Verify's FD3 | Verify-only cause (load, shared state, case completion) | measured with K1h |
-| — | Typed pending by D66 | MFHS002-008, MFHS023, MFHS028, MFI012, MFI013, MFMP003, CADH001, readiness-host case; from K1: CCH136, CCH137, codex-critic-session-route, MFE018 | assertions unchanged, counted pending | AC-212 |
+| — | Typed pending by D66 | MFHS002-008, MFHS023, MFHS028, MFI012, MFI013, MFMP003, CADH001, readiness-host case; from K1: CCH136, CCH137, codex-critic-session-route, MFE018; from K1h: agy-session-dispatch AGY-S2S4S5 | assertions unchanged, counted pending | AC-212 |
 
 ## Order
 
@@ -458,3 +458,21 @@ The hang group splits into three kinds; no single shared lock explains it.
 - **Next:** find the hanging case of native-goldfish-host-state (per-case run); classify the
   onboarding-continuity reds (they share the bind/release paths of K1D A/B/E, so the classification
   may move them there); then K10 under Verify concurrency.
+
+### K1h measurement 2 (2026-10-21, orchestrator)
+
+- `lib/native-goldfish-host-state.test.mjs`: 38/38 green alone with a 60-second per-case timeout
+  (`scratch/run-timeout.mjs`). No case hangs. The earlier cap is a state or environment effect of the
+  sequential run (K10 class), not a red case.
+- `lib/onboarding-continuity.test.mjs`: 305/306 after `cb47dff84` (ALF-K1H-OBC-CONTROLLED-BIND). 38
+  reds were a fixture gap: the cases bound from a plain process with a fabricated tuple, and production
+  never does. The promotion apply only rewrites an existing binding, `bindEphemeralPrivateCleanup` has
+  no production caller, and the session-cleanup bind seam binds a requester to its own descriptor. The
+  cases now run the real bind inside a bound requester. Rest: OBC059 pins a pre-K1c bind on a
+  legacy-layout root and expects `SESSION-CLEANUP-BIND-CAS`. The controlled bind refuses a foreign
+  tuple with `SDC-AUTHORITY-CAS` and needs a neutral root. Restating the pin is sanctioned by the fix
+  rule, since K1c changed what it pins (follow-up slice).
+- `lib/agy-session-dispatch.test.mjs` 6/7: the red case gets `MODEL-FAMILY-NATIVE-REQUEST-REFUSED`
+  before launch instead of `AGY-SESSION-FAMILY-RETURN-CONTRACT-UNQUALIFIED`. This is a model-family
+  refusal: it joins the D66 row (AGY-S2S4S5).
+- **Next:** OBC059 restatement; then K10 under Verify concurrency.
