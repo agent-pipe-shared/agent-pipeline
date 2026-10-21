@@ -570,3 +570,27 @@ test("an Evidence cell without a backlog item names the repair", async () => {
   assert.equal(result.code, "DBG-ITEM-EVIDENCE-MISSING");
   assert.match(result.message, /repair: /u);
 });
+
+test("init-dispatch-record prints a valid opening v4 record whose digests come from the generated briefing (AC-163)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { runInitDispatchRecord } = await import("./init-dispatch-record.mjs");
+  const { validateDispatchRecord } = await import("../lib/dispatch-record.mjs");
+  const { fx, argv } = packageFixture();
+  const built = runDispatchBriefing([...argv, "--out", "scratch/briefing-ALF-T1.md"], depsOf(fx));
+  assert.equal(built.ok, true, JSON.stringify(built));
+  const result = runInitDispatchRecord(["--root", fx.root, "--briefing", "scratch/briefing-ALF-T1.md"]);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.path, "evidence/dispatch-record-ALF-T1.json");
+  const { binding } = parseNativeGoldfishBriefing(readFileSync(join(fx.root, "scratch/briefing-ALF-T1.md"), "utf8"));
+  const r = result.record;
+  assert.deepEqual([r.taskId, r.agentType, r.model, r.effort, r.rulesetSha, r.candidateCommit],
+    [binding.dispatchId, binding.agentType, binding.model, binding.effort, binding.rulesetSha, binding.candidateCommit]);
+  assert.equal(r.candidateCommit, COMMIT);
+  assert.equal(r.rulesetSha, RULESET);
+  assert.equal(r.outcome, "in-progress");
+  assert.deepEqual([r.commits, r.log, r.report, r.resultSha256], [[], [], null, null]);
+  assert.doesNotThrow(() => validateDispatchRecord(r));
+  const missing = runInitDispatchRecord(["--root", fx.root, "--briefing", "scratch/none.md"]);
+  assert.equal(missing.code, "IDR-BRIEFING-UNREADABLE");
+  assert.match(missing.message, /repair: /u);
+});
