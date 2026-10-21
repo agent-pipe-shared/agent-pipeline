@@ -92,6 +92,12 @@
       "title": "D76 fan-out across clusters as a product rule (dispatch admission refuses overlapping scopes; shared-tree guidance)",
       "status": "open",
       "next": "recon dispatch-briefing/guard-dispatch overlap checks, then one deep slice"
+    },
+    {
+      "id": "K13",
+      "title": "D61 content scope: the 2026-10-20 content clauses still open (scope pass), as parallel item packages",
+      "status": "in-progress",
+      "next": "seven read-only readers re-verify the 76 clauses at HEAD (scratch/content-verify/); then disjoint unprotected packages fan out, protected parts go to the bundled signature sitting"
     }
   ]
 }
