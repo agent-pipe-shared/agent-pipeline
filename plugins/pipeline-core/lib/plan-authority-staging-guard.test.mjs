@@ -503,6 +503,29 @@ test("authority documents are editable during design phase, and frozen during im
       requireProjectOnboardingReadyFn: readyStub,
     });
     assert.equal(reopenedResult.exitCode, 0, "reopened design must unlock editing again");
+
+    // 4. A re-approval after the reopen binds the documents again, although approve-plan
+    // keeps the superseded invalidation on State (incident 2026-10-21).
+    state.activeFeature.phase = "implementation";
+    state.planApproved = true;
+    state.planSubmission = { submittedAt: "2026-08-28T11:00:00.000Z" };
+    state.planApproval = { approvedAt: "2026-08-28T12:00:00.000Z" };
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify(state));
+    const reapprovedResult = evaluateLifecycleReadyGuard(editPrd, {
+      projectDir: root,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(reapprovedResult.exitCode, 2, "a stale invalidation must not release a re-approved plan");
+    assert.match(reapprovedResult.stderr, /GUARD-LIFECYCLE-AUTHORITY-BOUND/);
+
+    // 5. An invalidation newer than the submission and the approval still releases it.
+    state.planInvalidation.invalidatedAt = "2026-08-28T13:00:00.000Z";
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify(state));
+    const freshReopenResult = evaluateLifecycleReadyGuard(editPrd, {
+      projectDir: root,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(freshReopenResult.exitCode, 0, "a current invalidation keeps the sanctioned edit route");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

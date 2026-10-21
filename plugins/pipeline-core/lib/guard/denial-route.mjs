@@ -295,6 +295,9 @@ export function protectedAuthorityDocumentWriteOnly(matchedRelativePath) {
  * `submit-plan`/`approve-plan` re-establishes it (recorded as `planInvalidation` on
  * State); a state carrying it is legitimately mid a sanctioned edit and is not
  * matched here -- matching it would refuse the very route this refusal names.
+ * approve-plan keeps the invalidation it supersedes on State (it is bound into the
+ * approval as `priorInvalidationSha256`), so only an invalidation newer than both the
+ * current submission and the current approval still releases the binding.
  *
  * Fails OPEN on anything absent, unreadable, unparseable, or short of the exact
  * shape expected: this is an additional, data-dependent write-time refusal layered
@@ -302,6 +305,16 @@ export function protectedAuthorityDocumentWriteOnly(matchedRelativePath) {
  * when nothing can be determined about the current binding, there is nothing yet
  * known to protect here, and the existing post-hoc continuity check is unchanged.
  */
+function planInvalidationReleasesBinding(state) {
+  const invalidation = state.planInvalidation;
+  if (invalidation === null || typeof invalidation !== "object") return false;
+  const invalidatedAt = Date.parse(invalidation.invalidatedAt);
+  if (!Number.isFinite(invalidatedAt)) return true; // age unknown -- keep the documented release
+  return ![state.planSubmission?.submittedAt, state.planApproval?.approvedAt]
+    .map((value) => Date.parse(value))
+    .some((at) => Number.isFinite(at) && at > invalidatedAt);
+}
+
 export function boundAuthorityDocumentPath(root, requested) {
   for (const relativeStatePath of [join(".claude", "pipeline-state.json"), join("project", "pipeline-state.json")]) {
     let raw;
@@ -317,7 +330,7 @@ export function boundAuthorityDocumentPath(root, requested) {
       return null; // present but unreadable -- nothing determinable, fail open
     }
     if (state === null || typeof state !== "object" || Array.isArray(state)) return null;
-    if (state.planInvalidation !== null && typeof state.planInvalidation === "object") return null;
+    if (planInvalidationReleasesBinding(state)) return null;
     if (state.activeFeature?.phase === "design" && state.planApproved !== true) return null;
     const authority = state.continuity?.authority;
     if (authority === null || typeof authority !== "object") return null;
