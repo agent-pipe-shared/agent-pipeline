@@ -125,7 +125,8 @@ const DENIALS = [{ guard: "guard-gate-strength.mjs", reason: "GS-1: fixture reas
 test("appendOverrideDeniedLedgerEvent produces a correctly-linked requested+denied pair", async () => {
   const { root } = await fixture();
   try {
-    const toolInput = { file_path: "pipeline.user.yaml", content: "fixture edit\n" };
+    // 0ee5b8d69 (PO decision 2026-10-17, AC-258): pipeline.user.yaml is non-overridable; any overridable protected path serves the ledger helper.
+    const toolInput = { file_path: "project/guard-config.json", content: "fixture edit\n" };
     const recorded = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: DENIALS });
     assert.equal(recorded.status, "planned");
     const result = await appendOverrideDeniedLedgerEvent({
@@ -160,7 +161,7 @@ test("appendOverrideDeniedLedgerEvent produces a correctly-linked requested+deni
 test("appendOverrideConsumedLedgerEvent produces a correctly-linked consumed event against a live prior grant", async () => {
   const { root, fingerprint } = await fixture();
   try {
-    const toolInput = { file_path: "pipeline.user.yaml", content: "consumed fixture\n" };
+    const toolInput = { file_path: "project/guard-config.json", content: "consumed fixture\n" };
     const recorded = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: DENIALS });
     assert.equal(recorded.status, "planned");
     const plan = planHumanGuardOverride({
