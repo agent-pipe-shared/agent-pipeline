@@ -26,6 +26,14 @@ run. Three behaviours lose their examiner in that suite:
 
 `design-approval-route.e2e.test.mjs` covers the live approval happy path only.
 
+A fourth examiner is parked the same way (2026-10-21):
+`pipeline-state-rebind-runner.test.mjs`, "inspect exposes one typed PO approval
+action after submit and presentation, independent of runner". The call now asserts
+the retirement refusal; the runner-neutral rendering of the approval action
+(`inputs[]`, `--design-approval-request`, v9 approval) lost its examiner and has to
+be re-expressed on `present-plan --review-receipt` (about 60-80 lines: committed
+sources, receipt, report, accepted-contract policy binding).
+
 ## Acceptance
 
 - Each of the three behaviours has a running examiner on the
