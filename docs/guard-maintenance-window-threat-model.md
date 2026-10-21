@@ -611,6 +611,12 @@ accounts for dispatch fan-out), and
 `plugins/pipeline-core/lib/plan-approval-device-rebind.mjs` (rebinds a plan
 approval to a device, so it decides what an approval still covers).
 
+Dispatch-model enforcement (D84, 2026-10-21) adds
+`plugins/pipeline-core/lib/dispatch-model-enforcement.mjs` (decides whether the
+tool-layer `model` of a subagent dispatch is one the configured routing selects,
+so it decides whether `hooks/guard-dispatch.mjs` lets a dispatch inherit the
+session model); the module imports only kernel paths and is itself one.
+
 Closure repair GMWKC01/GMWKC03 (2026-10-21) adds eight first-party modules that kernel
 files import and that were never listed; each executes with kernel authority:
 `plugins/pipeline-core/lib/advisory-answered-receipt.mjs` (the answered-Advisor
