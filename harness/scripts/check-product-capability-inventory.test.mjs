@@ -637,7 +637,9 @@ check("an early failed case still emits dispositions for the complete declared c
     },
     shell: false,
     stdio: ["ignore", "pipe", "pipe", "pipe"],
-    timeout: 30_000,
+    // The child runs the whole corpus (several git clones); 30 s was cut off at case 17 under load (measured 30.1 s). The
+    // bound only guards a hung child, so it is generous. Assertions are unchanged.
+    timeout: 120_000,
   });
   assert.notEqual(probe.status, 0, "the injected early case must fail");
   const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
