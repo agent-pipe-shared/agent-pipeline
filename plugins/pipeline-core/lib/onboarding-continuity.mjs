@@ -9135,8 +9135,8 @@ const continuityAuthorityOperations = new WeakMap();
 const continuityAuthorityExecutions = new WeakMap();
 const continuityAuthorityTerminals = new WeakMap();
 
-function continuityAuthorityUnavailable(reason) {
-  return Object.freeze({status:'unavailable',code:'SDC-AUTHORITY-UNAVAILABLE',reason});
+function continuityAuthorityUnavailable(reason,error) { // D74 (K1D B): a caught error keeps its code AND message, never just the code
+  return Object.freeze({status:'unavailable',code:'SDC-AUTHORITY-UNAVAILABLE',reason:error?.code?`${error.code}: ${String(error.message??'').replace(/[\u0000-\u001f]+/gu,' ').slice(0,240)}`:reason});
 }
 function continuityAuthorityEqual(a,b) { return canonicalJson(a) === canonicalJson(b); }
 function continuityAuthorityHandle(map, value) {
@@ -9441,7 +9441,7 @@ export function createOnboardingContinuityAuthorityProducerPort({repository}) {
         data.operations.add(operation);
         data.assurance = requester.assurance;
         return {status:'prepared',operationHandle,inputSha256:canonicalSha256(input),preimageRefs:[]};
-      } catch (error) { return continuityAuthorityUnavailable(error.code ?? 'continuity-prepare'); }
+      } catch (error) { return continuityAuthorityUnavailable('continuity-prepare',error); }
     },
     executeOperation:async request=>continuityAuthorityExecute(data,port,request),
     executeAfkTransaction:request=>continuityExecuteAfkTransaction(data,port,request),
@@ -9465,7 +9465,7 @@ export function createOnboardingContinuityAuthorityProducerPort({repository}) {
             || !continuityAuthorityEqual(member.sourceFacts,observed.sourceFacts))
           fail('SDC-AUTHORITY-CAS','continuity recovery owner binding changed');
         return {status:'recovered',operationHandle:operation.operationHandle,executionHandle:operation.executionHandle};
-      } catch (error) { return continuityAuthorityUnavailable(error.code ?? 'continuity-recover'); }
+      } catch (error) { return continuityAuthorityUnavailable('continuity-recover',error); }
     },
   };
   port = Object.freeze(methods); continuityAuthorityPorts.set(port,data);
@@ -9530,7 +9530,7 @@ function continuityAuthorityFinish(data,port,{operationHandle,executionHandle,en
           operation.expectedMemberRef=terminalMember.memberRef;
           return {status:'observed',terminalHandle,sourceRefs:[...operation.journalRefs]};
         });
-      } catch (error) { return continuityAuthorityUnavailable(error.code ?? 'continuity-finish'); }
+      } catch (error) { return continuityAuthorityUnavailable('continuity-finish',error); }
 }
 // Existing synchronous writer entrypoints participate in the same owning
 // reservation/effect implementation as the async producer interface.
@@ -9572,7 +9572,7 @@ export function bindOnboardingSessionCleanup(request={}) {
   if(!continuityAuthorityEqual(request.sessionCleanup,tuple))fail('SDC-AUTHORITY-CAS','continuity caller tuple is not current owner');
   const prepared=port.prepareOperation({requesterHandle:context.requesterHandle,entry:'bind',
     input:{expectedStateSha256:request.expectedStateSha256,expectedRevision:request.expectedRevision}});
-  if(prepared.status!=='prepared')fail(prepared.code,'continuity owner preparation refused; a bound session is reused by session-cleanup.mjs start (WT-SESSION-REUSED), otherwise read the typed recovery with node <plugin>/scripts/session-cleanup.mjs plan-recovery --repo <checkout> and run the action it names');
+  if(prepared.status!=='prepared')fail(prepared.code,`continuity owner preparation refused (${prepared.reason ?? prepared.code}); a bound session is reused by session-cleanup.mjs start (WT-SESSION-REUSED), otherwise read the typed recovery with node ${DEFAULT_SESSION_CLEANUP_SCRIPT} plan-recovery --repo ${repository.primaryRoot} and run the action it names`);
   const reserved=withSessionAuthorityBoundary({repository},boundary=>reserveSessionAuthorityMember({boundary,
     producerPort:port,association:port.observeOperation(prepared.operationHandle).association,
     operationHandle:prepared.operationHandle}));
@@ -9590,14 +9590,14 @@ export function releaseOnboardingSessionCleanup(request={}) {
   const repository=continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(request.rootDir));
   const owned=continuityAuthorityDirectBindings.get(continuityAuthorityDirectKey(repository,request.sessionCleanup));
   if(!owned||!continuityAuthorityEqual(repository,owned.repository))
-    fail('SDC-AUTHORITY-UNAVAILABLE','continuity owning execution recovery required before release; read the typed recovery with node <plugin>/scripts/session-cleanup.mjs plan-recovery --repo <checkout> and run the action it names');
+    fail('SDC-AUTHORITY-UNAVAILABLE',`continuity owning execution recovery required before release; read the typed recovery with node ${DEFAULT_SESSION_CLEANUP_SCRIPT} plan-recovery --repo ${repository.primaryRoot} and run the action it names`);
   const memberRef=continuityAuthorityReadMemberRef(repository,owned.reserved.memberRef),operation=continuityAuthorityOperations.get(owned.prepared.operationHandle);
   const finish=()=>continuityAuthorityFinish(owned.data,owned.port,{operationHandle:owned.prepared.operationHandle,
     executionHandle:owned.executed.executionHandle,entry:'release',
     input:{expectedStateSha256:request.expectedStateSha256,expectedRevision:request.expectedRevision},expectedMemberRef:memberRef});
   const retired=inspectOwnedSessionDescriptorClosure({repository,target:operation.association.target}).assurance==='physical-owner-retirement';
   const terminal=retired?runOwnedContinuityRetiredTerminal(operation,'release',finish):finish();
-  if(terminal.status!=='observed')fail(terminal.code,'continuity owning release failed; read the typed recovery with node <plugin>/scripts/session-cleanup.mjs plan-recovery --repo <checkout> and run the action it names');
+  if(terminal.status!=='observed')fail(terminal.code,`continuity owning release failed; read the typed recovery with node ${DEFAULT_SESSION_CLEANUP_SCRIPT} plan-recovery --repo ${repository.primaryRoot} and run the action it names`);
   withSessionAuthorityBoundary({repository},boundary=>releaseSessionAuthorityMember({boundary,producerPort:owned.port,
     memberHandle:owned.reserved.memberHandle,expectedMemberRef:continuityAuthorityReadMemberRef(repository,memberRef),
     terminalHandle:terminal.terminalHandle}));
