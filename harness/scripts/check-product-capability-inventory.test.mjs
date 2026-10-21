@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,7 @@ import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test
 import { produceCriticDiagnostic } from "../../plugins/pipeline-core/lib/critic-diagnostic-producer.mjs";
 import { canonicalJson, sha256 } from "../../plugins/pipeline-core/scripts/critic-packet-preflight.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "../../plugins/pipeline-core/scripts/session-critic-finalizer.mjs";
+import { registerGenericCriticBatch } from "../../plugins/pipeline-core/lib/critic-generic-batch.mjs";
 import { PORTABLE_CRITIC_EXPORT_PATH, PORTABLE_CRITIC_EXPORT_SCHEMA,
   preparePortableCriticExport, verifyPortableCriticExport } from "../../plugins/pipeline-core/lib/portable-critic-export.mjs";
 import { canonical, PO_APPROVAL_PROOF_SCHEMA } from "../../plugins/pipeline-core/lib/po-approval-proof.mjs";
@@ -287,11 +288,21 @@ check("HAW-A04c reads a genuinely consumed private Critic receipt across a commi
     return git(["rev-parse", "HEAD"]);
   };
   try {
-    git(["init", "-q"]);
+    // QG-04 (d02409a8a; AC-150): a non-feature finalize needs a generic batch reservation, so the fixture
+    // mirrors the maintained one in session-critic-finalizer.test.mjs: branch main, a review unit committed
+    // at the base, a committed authored dispatch record between a source and a descendant candidate, and a
+    // registered batch. Every assertion below is unchanged.
+    git(["init", "-q", "-b", "main"]);
     for (const path of [".claude", "specs", "evidence", "docs", "project",
       "specs/sprint-alfred-epic/plans"]) mkdirSync(join(root, path), { recursive: true });
     writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
-    writeFileSync(join(root, "specs", "spec.md"), "# Spec\n");
+    writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\n");
+    writeFileSync(join(root, "specs", "review-unit.json"), JSON.stringify({
+      schema: "pipeline.critic-review-unit.v1", kind: "related-fixes",
+      purpose: "Repair one delivery boundary across the affected consumers", specPath: "specs/spec.md",
+      logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"],
+      deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null,
+    }));
     const portablePlan = "specs/sprint-alfred-epic/plans/sprint-alfred-execution-roadmap.md";
     const portableSpec = "specs/sprint-alfred-epic/spec.md";
     writeFileSync(join(root, portablePlan), "# Reviewed plan\n");
@@ -308,18 +319,14 @@ check("HAW-A04c reads a genuinely consumed private Critic receipt across a commi
     };
     writeFileSync(join(root, inventoryPath), `${JSON.stringify(pending)}\n`);
     const base = commit("base");
-    writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nCandidate.\n");
-    const candidate = commit("review candidate");
-    const tree = git(["rev-parse", "HEAD^{tree}"]);
-    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({
-      root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
-      command: [process.execPath, "-e", "console.log('fixture check')"], logPath: "evidence/targeted.log",
-    }))}\n`);
+    writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nSource candidate.\n");
+    const sourceCandidate = commit("source candidate");
     writeFileSync(join(root, "evidence", "dispatch-record-nova-b-lnd5.json"), JSON.stringify({
       schema: "pipeline.dispatch-record.v3", taskId: "nova-b-lnd5", agentType: "default",
       model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
-      dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate,
-      resultSha256: "a".repeat(64), log: [], report: { text: "done", changedFiles: ["specs/spec.md"] },
+      dispatcher: "elephant", outcome: "completed", commits: [sourceCandidate], candidateCommit: sourceCandidate,
+      resultSha256: "a".repeat(64), log: [{ phase: "verify", toolUseCount: 1 }],
+      report: { text: "done", changedFiles: ["specs/spec.md"] },
       criticRequired: {
         schema: "pipeline.critic-required-decision.v1",
         trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true,
@@ -327,8 +334,26 @@ check("HAW-A04c reads a genuinely consumed private Critic receipt across a commi
         appliedRow: "T1",
       },
     }));
+    commit("persist authored dispatch record");
+    writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nCandidate.\n");
+    const candidate = commit("review candidate");
+    const tree = git(["rev-parse", "HEAD^{tree}"]);
+    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({
+      root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
+      command: [process.execPath, "-e", "console.log('fixture check')"], logPath: "evidence/targeted.log",
+    }))}\n`);
+    const controlRoot = join(root, ".git", "agent-pipeline", "critic-packets");
+    mkdirSync(controlRoot, { recursive: true, mode: 0o700 });
+    chmodSync(join(root, ".git", "agent-pipeline"), 0o700);
+    chmodSync(controlRoot, 0o700);
+    const registeredBatch = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: {
+      taskId: "nova-b-lnd5", baseCommit: base, candidateCommit: candidate,
+      logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
+      signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json",
+    } });
     const criticRequest = {
-      preflightInput: { root, base, candidate, specPath: "specs/spec.md", guardrailPaths: [],
+      genericBatchRef: { ...registeredBatch.batchRef, memberSha256: registeredBatch.memberSha256 },
+      preflightInput: { root, base, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
         evidencePaths: ["evidence/verify.json"], priorCriticEvidencePath: null },
       taskId: "nova-b-lnd5", projectId: "pipeline", sessionId: "session-inventory-1", packetId: "7".repeat(32),
       route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent",
