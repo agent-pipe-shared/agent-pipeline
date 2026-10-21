@@ -196,7 +196,8 @@ assert.match(kickoffDesign, /Never infer, silently select, or retrospectively cl
 assert.match(kickoffDesign, /`specs\/kickoff-\*` files are provisional bootstrap\nanchors, not the standard long-term design location/u);
 assert.match(kickoffDesign, /`specs\/YYYY-MM-DD_short-topic\/`/u);
 assert.match(kickoffDesign, /`prd_short-topic\.md`, `spec\.md`, and `design-input\.md`/u);
-assert.match(kickoffDesign, /The PRD and Spec both\nlink to it and carry a compact traceability table/u);
+assert.match(kickoffDesign, /The PRD and Spec both carry a\n`Source:` line \(the `design-input\.md` path and sha256\)/u);
+assert.match(kickoffDesign, /the PRD and Spec carry a compact traceability table/u);
 assert.match(kickoffDesign, /include a valid Mermaid flow\/sequence\/state diagram wherever it materially\nclarifies that flow/u);
 assert.match(kickoffDesign, /Treat that named package as a pre-authority staging set/u);
 assert.match(kickoffDesign, /only its digest-bound `kickoff promote apply` to bind the PRD\/Spec in State\nand the source-evidence path\/hash in the same immutable continuity transaction\./u);
