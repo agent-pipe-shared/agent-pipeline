@@ -1879,7 +1879,7 @@ function awaitingApprovalFixture() {
   const argv = action.applyAction.argv.map((part) => (
     part === "<PO_PLAN_APPROVER_NAME>" ? "Probe Person" : part
   ));
-  const executed = spawnSync(action.applyAction.executable, [...argv, "--dir", root], { encoding: "utf8" });
+  const executed = spawnSync(action.applyAction.executable, [...argv, "--dir", root], { cwd: root, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root } }); // `--dir` is inert: aim the child at the fixture, not the real checkout
   const stderr = executed.stderr ?? "";
   assert.ok(!/unknown subcommand|Usage:|requires --by/i.test(stderr),
     "the returned approve-plan argv must reach its own gate logic: " + stderr);
@@ -2729,7 +2729,7 @@ function attendedProfileDeps(fixture, extra = {}) {
   assert.equal(wrong.status, 1);
   assert.match(wrong.err, /CHAT-GATE-CONFIRMATION-MISMATCH/);
   assertProfileBytesUnchanged(before);
-  const pipe = spawnSync(process.execPath, planned.applyAction.argv, { cwd: fixture.root, encoding: 'utf8', input: `${PO_ACK_APPLY_CONFIRMATION_TOKEN}\n` });
+  const pipe = spawnSync(process.execPath, planned.applyAction.argv, { cwd: fixture.root, env: { ...process.env, CLAUDE_PROJECT_DIR: fixture.root }, encoding: 'utf8', input: `${PO_ACK_APPLY_CONFIRMATION_TOKEN}\n` });
   assert.equal(pipe.status, 1, pipe.stderr);
   assert.match(pipe.stderr, /CHAT-GATE-NOT-ATTENDED/);
   assertProfileBytesUnchanged(before);
