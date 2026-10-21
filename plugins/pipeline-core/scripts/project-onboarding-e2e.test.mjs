@@ -35,7 +35,7 @@ import {
   planProjectOnboardingKickoffV4,
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
 } from "../lib/project-onboarding-v3.mjs";
-import { derivePoGateRepositoryFingerprint, PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
+import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER } from "../lib/po-gate-authority.mjs";
 import {
   consumeRuntimeReadback,
   issueLaunchTicket,
@@ -48,15 +48,8 @@ import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs"
 import { devPlanGateVerdict } from "../lib/guard-devplan-policy.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
-import { buildAdvisoryEvidenceBundle } from "../lib/advisory-lifecycle-v2.mjs";
-import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
-import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
-import { registeredRouting, RUNNER_PROFILES_V3_REGISTRY_SHA256, validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
-import { parseYaml } from "../lib/yaml-lite.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
-import { designReadinessReportSha256, designReadinessRunnerSelectionSha256, validateDesignReadinessModelOutput, verifyDesignReadinessHostExecution } from "../lib/design-readiness-host-evidence.mjs";
-import { createDesignReadinessRunnerHostStore } from "../lib/design-readiness-runner-host-store.mjs";
-import { buildRunnerDesignReadinessPrompt } from "../lib/runner-readiness-request.mjs";
+import { verifyDesignReadinessHostExecution } from "../lib/design-readiness-host-evidence.mjs";
 import { observeOnboardingBootstrapPlanApproval, readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput } from "../lib/onboarding-continuity.mjs";
 import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
 import { renderArchitectureDesignSkeleton } from "../lib/design-authoring.mjs";
@@ -818,126 +811,6 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
     for (const hook of hooks) assert.equal(createHash("sha256").update(readFileSync(hook.path)).digest("hex"), hook.sha256,
       "successful fixture commits preserve the enforcing generated hooks");
     return candidateAtHead(cwd);
-  };
-  const bindFixtureReadiness = (cwd, runner, designFixture) => {
-    const packageFile = join(cwd, designFixture.packagePath);
-    const designPackage = JSON.parse(readFileSync(packageFile, "utf8"));
-    const originalReadiness = JSON.parse(readFileSync(join(cwd, designPackage.readiness.path), "utf8"));
-    const candidate = candidateAtHead(cwd);
-    assert.deepEqual(candidate, designPackage.candidate);
-    // The v1 package admits a separate review runner. This local report-only
-    // child is a fixture host producer, never a native provider consultation.
-    // Codex's declined export decision remains unchanged throughout the test.
-    const requestedReviewRunner = runner === "codex" ? "claude" : runner;
-    const requestedRoute = resolveV3DutyRoute({ rootDir: cwd, dutyId: "readiness", runner: requestedReviewRunner, candidateCommit: candidate.commit });
-    testContext.diagnostic(`${runner}: exact requested readiness route ${JSON.stringify({
-      authoringRunner: runner, requestedRunner: requestedReviewRunner, route: requestedRoute,
-      registeredCell: registeredRouting().duties.readiness[requestedReviewRunner], registrySha256: RUNNER_PROFILES_V3_REGISTRY_SHA256,
-      reasonFieldPresent: Object.hasOwn(requestedRoute, "reason"),
-      explanation: "The resolver returns the frozen registered candidate-bound duty cell state; it does not probe a live provider." })}`);
-    let resolvedRoute = requestedRoute;
-    if (runner === "antigravity") {
-      assert.equal(requestedRoute.state, "unavailable");
-      assert.equal(registeredRouting().duties.readiness.antigravity.state, "unavailable");
-      const committedPolicy = fixtureGit(cwd, ["show", `${candidate.commit}:pipeline.user.yaml`]);
-      assert.equal(sha256(committedPolicy), requestedRoute.sourceSha256);
-      const policy = parseYaml(committedPolicy);
-      assert.equal(validatePipelineUserV3(policy).ok, true);
-      const spoofedPolicy = JSON.parse(JSON.stringify(policy));
-      spoofedPolicy.routing.duties.readiness.antigravity.state = "default";
-      const spoof = validatePipelineUserV3(spoofedPolicy);
-      assert.equal(spoof.ok, false, "an unavailable duty cannot be promoted by fixture source edits");
-      assert.ok(spoof.errors.some((error) => error.code === "frozen_mapping"
-        && error.path === "$.routing.duties.readiness.antigravity.state"), JSON.stringify(spoof));
-      // Historical v1 permits an independently selected readiness runner.
-      // Assign its existing Claude route to this local report-only fixture,
-      // as for Codex above; AGY's registered route remains unavailable.
-      resolvedRoute = resolveV3DutyRoute({ rootDir: cwd, dutyId: "readiness", runner: "claude", candidateCommit: candidate.commit });
-    }
-    const reviewRunner = resolvedRoute.runner;
-    assert.equal(resolvedRoute.state, "default");
-    assert.equal(resolvedRoute.sourceSha256, requestedRoute.sourceSha256);
-    assert.equal(resolvedRoute.candidateCommit, candidate.commit);
-    assert.equal(reviewRunner, "claude");
-    testContext.diagnostic(`${runner}: assigned local readiness host ${JSON.stringify({ authoringRunner: runner,
-      reviewRunner, route: resolvedRoute, assignment: runner === "antigravity"
-        ? "independent-v1-Claude-host; AGY-route-unavailable" : "existing-v1-local-host",
-      nativeProviderAvailabilityClaim: false })}`);
-    const route = Object.fromEntries(["model", "effort", "sourceSha256", "candidateCommit"].map((key) => [key, resolvedRoute[key]]));
-    const sources = designPackage.sources;
-    for (const source of Object.values(sources)) {
-      assert.equal(fixtureGit(cwd, ["show", `${candidate.commit}:${source.path}`]), readFileSync(join(cwd, source.path), "utf8"));
-    }
-    const evidenceBundle = buildAdvisoryEvidenceBundle(cwd, Object.values(sources).map((source) => source.path).sort());
-    const prompt = buildRunnerDesignReadinessPrompt({ runner: reviewRunner, dispatchId: originalReadiness.dispatchId,
-      candidate, sources, evidenceBundle, route });
-    const reviewRoot = mkdtempSync(join(tmpdir(), "pipeline-e2e-readiness-host-"));
-    let child;
-    let report;
-    try {
-      const childPath = join(reviewRoot, "report-only-fixture.mjs");
-      writeFileSync(childPath, [
-        "import { readFileSync } from 'node:fs';",
-        "const input = JSON.parse(readFileSync(0, 'utf8'));",
-        "const report = { schema: 'pipeline.design-readiness-receipt.v1', dispatchId: input.dispatchId, runner: input.runner,",
-        "candidate: input.candidate, sources: input.sources, outcome: 'ready-for-po-review', findings: [], unresolvedChoices: [],",
-        "summary: 'Disposable local fixture report for one final PO review; no provider consultation or approval.' };",
-        "process.stdout.write(JSON.stringify(report) + '\\n');",
-      ].join("\n") + "\n");
-      child = spawnSync(process.execPath, [childPath], { cwd: reviewRoot, encoding: "utf8", shell: false,
-        input: JSON.stringify({ dispatchId: originalReadiness.dispatchId, runner: reviewRunner, candidate, sources, prompt }),
-        timeout: 10_000, maxBuffer: 1024 * 1024 });
-      assert.equal(child.error ?? null, null);
-      assert.equal(child.signal, null);
-      assert.equal(child.status, 0, child.stderr);
-      report = JSON.parse(child.stdout);
-      assert.equal(validateDesignReadinessModelOutput(report).valid, true);
-      assert.deepEqual(candidateAtHead(cwd), candidate);
-      for (const source of Object.values(sources)) assert.equal(createHash("sha256").update(readFileSync(join(cwd, source.path))).digest("hex"), source.sha256);
-    } finally {
-      rmSync(reviewRoot, { recursive: true, force: true });
-    }
-    const topology = resolvePoGateRepositoryTopology(cwd);
-    const repoFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: topology.gitCommonDir, primaryRoot: topology.primaryRoot });
-    const receiptId = `drh_${createHash("sha256").update(`${cwd}\0${report.dispatchId}`).digest("hex").slice(0, 32)}`;
-    const record = {
-      schema: "pipeline.design-readiness-runner-host-receipt.v1", receiptId, runner: reviewRunner,
-      repoFingerprint, dispatchId: report.dispatchId, candidate, sources, route,
-      executableSha256: createHash("sha256").update(readFileSync(process.execPath)).digest("hex"),
-      requestSha256: createHash("sha256").update(prompt).digest("hex"),
-      responseSha256: createHash("sha256").update(child.stdout).digest("hex"),
-      dutyReceiptSha256: designReadinessReportSha256(report),
-      child: { started: true, exitCode: child.status, signal: child.signal, stdoutStatus: "complete", writeToolsObserved: false },
-      createdAt: "2026-09-27T10:00:00.000Z",
-    };
-    const store = createDesignReadinessRunnerHostStore({ gitCommonDir: topology.gitCommonDir, repoFingerprint });
-    const saved = store.write(record);
-    const readiness = { ...report, hostExecution: { schema: "pipeline.design-readiness-host-execution.v1", runner: reviewRunner,
-      repoFingerprint, selectionId: receiptId, selectionSha256: designReadinessRunnerSelectionSha256(record),
-      executionReceiptSha256: saved.sha256, dutyReceiptSha256: record.dutyReceiptSha256, route } };
-    const readinessBytes = Buffer.from(canonicalJson(readiness));
-    writeFileSync(join(cwd, designPackage.readiness.path), readinessBytes);
-    designPackage.readiness.sha256 = createHash("sha256").update(readinessBytes).digest("hex");
-    writeFileSync(packageFile, canonicalJson(designPackage));
-    const sourceBytes = Object.fromEntries(Object.entries(sources).map(([name, source]) => [name, { path: source.path, bytes: readFileSync(join(cwd, source.path)) }]));
-    const checked = verifyDesignReadinessHostExecution({ repoRoot: cwd, hostExecution: readiness.hostExecution,
-      readinessReceipt: readiness, candidate, sources, sourceBytes });
-    assert.equal(checked.ok, true, JSON.stringify(checked));
-    assert.equal(checked.assurance, "host-observed-local");
-    if (runner === "antigravity") {
-      const unavailableRoute = Object.fromEntries(["model", "effort", "sourceSha256", "candidateCommit"].map((key) => [key, requestedRoute[key]]));
-      const unavailableHost = { ...readiness.hostExecution, runner: "antigravity", route: unavailableRoute };
-      const refused = verifyDesignReadinessHostExecution({ repoRoot: cwd, hostExecution: unavailableHost,
-        readinessReceipt: { ...readiness, runner: "antigravity", hostExecution: unavailableHost }, candidate, sources, sourceBytes });
-      assert.equal(refused.ok, false);
-      assert.equal(refused.code, "DWP-READINESS-HOST-ROUTE-MISMATCH",
-        "the actual verifier must still reject a claimed AGY host on the unavailable duty");
-      assert.deepEqual(candidateAtHead(cwd), candidate);
-      assert.equal(sha256(fixtureGit(cwd, ["show", `${candidate.commit}:pipeline.user.yaml`])), requestedRoute.sourceSha256);
-      testContext.diagnostic(`${runner}: readiness route negatives ${JSON.stringify({
-        frozenDefaultSpoofRejected: true, unavailableHostCode: refused.code, committedPolicyUnchanged: true })}`);
-    }
-    testContext.diagnostic(`${runner}: canonical fixture readiness ${JSON.stringify({ reviewRunner, candidate, selectionId: receiptId, assurance: checked.assurance, providerAttestation: false })}`);
   };
   const readFixtureState = (cwd) => {
     const readback = readPipelineState(cwd);
