@@ -80,6 +80,18 @@
       "title": "remaining single suites",
       "status": "open",
       "next": "split by area"
+    },
+    {
+      "id": "K11",
+      "title": "D75 typed continuation after budget stops and classified cancel reasons (hook layer)",
+      "status": "in-progress",
+      "next": "slices S1 grant summary, S2 briefing wording, S4 cancel class core in parallel; then S3 hook messages and S5 cancel CLI (scratch/d75-build-plan-2026-10-21.md)"
+    },
+    {
+      "id": "K12",
+      "title": "D76 fan-out across clusters as a product rule (dispatch admission refuses overlapping scopes; shared-tree guidance)",
+      "status": "open",
+      "next": "recon dispatch-briefing/guard-dispatch overlap checks, then one deep slice"
     }
   ]
 }

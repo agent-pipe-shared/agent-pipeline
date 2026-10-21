@@ -22,21 +22,24 @@ for (const c of ledger.clusters) {
   if (!["open", "in-progress", "closed"].includes(c.status)) problems.push(`${c.id}: unknown status ${c.status}`);
   if (c.status === "closed" && !hasClosure(c.id)) problems.push(`${c.id}: closed without a committed closure heading '### ${c.id} ' in ${ledger.plan}`);
 }
+// D76 (amends D67): several clusters may be in progress at once; disjointness is checked per dispatch below.
 const active = ledger.clusters.filter((c) => c.status === "in-progress");
-if (active.length > 1) problems.push(`more than one cluster in-progress: ${active.map((c) => c.id).join(", ")}`);
 
-const [verb, id] = process.argv.slice(2);
+const [verb, id, ...scope] = process.argv.slice(2);
 if (verb === undefined) {
   for (const c of ledger.clusters) console.log(`${c.status.padEnd(11)} ${c.id.padEnd(4)} ${c.title} :: next: ${c.next}`);
   if (problems.length) { console.log(`INCONSISTENT:\n- ${problems.join("\n- ")}`); process.exit(1); }
-  console.log(active.length ? `ACTIVE ${active[0].id}: close it (closure entry + ledger 'closed', committed) before starting another cluster.` : "No cluster in progress.");
+  console.log(active.length ? `ACTIVE ${active.map((c) => c.id).join(", ")}: close each with a closure entry + ledger 'closed', committed.` : "No cluster in progress.");
   process.exit(0);
 }
-if (verb !== "admit" || !id) fail("CL-USAGE", "use: correction-ledger-check.mjs [admit <cluster-id>]");
+if (verb !== "admit" || !id) fail("CL-USAGE", "use: correction-ledger-check.mjs [admit <cluster-id> <scope-path>...]");
 if (problems.length) fail("CL-INCONSISTENT", problems.join("; "));
 const target = ledger.clusters.find((c) => c.id === id);
 if (!target) fail("CL-UNKNOWN", `cluster ${id} is not in the committed ledger`);
-if (target.status !== "in-progress") fail("CL-NOT-IN-PROGRESS", `cluster ${id} is ${target.status}; set it in-progress in the committed ledger first${active.length ? `, after closing ${active[0].id}` : ""}`);
-const dirty = git("status", "--porcelain", "--untracked-files=no").trim();
-if (dirty) fail("CL-TREE-DIRTY", `commit or restore tracked changes first:\n${dirty}`);
+if (target.status !== "in-progress") fail("CL-NOT-IN-PROGRESS", `cluster ${id} is ${target.status}; set it in-progress in the committed ledger first`);
+// D76: other running dispatches may leave the tree dirty; only a dirty path inside this dispatch's scope blocks it.
+const dirty = git("status", "--porcelain", "--untracked-files=all").split("\n").filter(Boolean).map((l) => l.slice(3));
+const overlap = dirty.filter((p) => scope.includes(p));
+if (!scope.length) fail("CL-USAGE", "admit needs the dispatch's write scope paths (D76 disjointness check)");
+if (overlap.length) fail("CL-SCOPE-DIRTY", `these scope paths carry uncommitted changes of another dispatch; wait for it or pick a disjoint scope:\n${overlap.join("\n")}`);
 console.log(`ADMITTED ${id}`);
