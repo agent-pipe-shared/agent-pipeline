@@ -1059,66 +1059,51 @@ check("apply creates exact state, configured handover, private history, and imme
 });
 
 check("cleanup descriptor bind and release use exact state CAS without touching other fields", () => {
-  const root = fixture("cleanup-binding");
+  // K1c: the bind is a private-runtime write, so the tracked State never changes (2) and the
+  // revision stays put; the library bind needs an unbound preimage, so a second bind is refused (3)
+  // (same-session reuse is a CLI concern, WT-SESSION-REUSED); the release likewise leaves State alone (5).
+  const root = fixture("cleanup-binding", { neutral: true });
   const plan = planOnboardingKickoff({ rootDir: root, goal: "Bind cleanup safely" });
-  applyOnboardingKickoff({
-    plan,
-    expectedPlanSha256: plan.planSha256,
-    activate: true,
-  });
-  const statePath = join(root, ".claude", "pipeline-state.json");
-  const beforeState = JSON.parse(readFileSync(statePath, "utf8"));
+  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const statePath = join(root, "project", "pipeline-state.json");
+  const requester = startBoundRequester(root), tuple = requester.sessionCleanup;
+  const beforeBytes = readFileSync(statePath);
   const before = readOnboardingSessionCleanupBinding({ rootDir: root });
   assert.equal(before.status, "unbound");
-  const tuple = {
-    sessionId: "session-cleanup-bind-01",
-    descriptorSha256: "a".repeat(64),
-  };
-  const bound = bindOnboardingSessionCleanup({
-    rootDir: root,
-    expectedStateSha256: before.stateSha256,
-    expectedRevision: before.revision,
-    sessionCleanup: tuple,
-    deps: { randomUUID: () => "11111111-1111-4111-8111-111111111111" },
-  });
-  assert.equal(bound.status, "bound");
-  assert.equal(bound.mutated, true);
-  assert.equal(bound.revision, before.revision + 1);
-  assert.deepEqual(bound.sessionCleanup, tuple);
-  const boundState = JSON.parse(readFileSync(statePath, "utf8"));
-  assert.deepEqual(
-    { ...boundState, continuity: undefined },
-    { ...beforeState, continuity: undefined },
-  );
+  const request = { rootDir: root, expectedStateSha256: before.stateSha256, expectedRevision: before.revision };
+  requester.run(() => {
+    const bound = bindOnboardingSessionCleanup({ ...request, sessionCleanup: tuple });
+    assert.equal(bound.status, "bound");
+    assert.equal(bound.mutated, true);
+    assert.deepEqual(bound.sessionCleanup, tuple);
+    assert.equal(bound.storage, "private-runtime");
+    assert.equal(bound.revision, before.revision);
+    assert.equal(bound.stateSha256, before.stateSha256);
+    assert.deepEqual(readFileSync(statePath), beforeBytes);
+    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: root }).sessionCleanup, tuple);
 
-  const replay = bindOnboardingSessionCleanup({
-    rootDir: root,
-    expectedStateSha256: before.stateSha256,
-    expectedRevision: before.revision,
-    sessionCleanup: tuple,
-  });
-  assert.equal(replay.status, "reused");
-  assert.equal(replay.mutated, false);
-  expectKickoffError("SESSION-CLEANUP-BIND-CAS", () => bindOnboardingSessionCleanup({
-    rootDir: root,
-    expectedStateSha256: before.stateSha256,
-    expectedRevision: before.revision,
-    sessionCleanup: {
-      sessionId: "session-cleanup-other-02",
-      descriptorSha256: "b".repeat(64),
-    },
-  }));
+    expectKickoffError("SDC-AUTHORITY-UNAVAILABLE", () => bindOnboardingSessionCleanup({
+      ...request, sessionCleanup: tuple,
+    }));
+    assert.deepEqual(readFileSync(statePath), beforeBytes);
+    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: root }).sessionCleanup, tuple);
 
-  const released = releaseOnboardingSessionCleanup({
-    rootDir: root,
-    expectedStateSha256: bound.stateSha256,
-    expectedRevision: bound.revision,
-    sessionCleanup: tuple,
-    deps: { randomUUID: () => "22222222-2222-4222-8222-222222222222" },
+    expectKickoffError("SDC-AUTHORITY-CAS", () => bindOnboardingSessionCleanup({
+      ...request,
+      sessionCleanup: { sessionId: "session-cleanup-other-02", descriptorSha256: "b".repeat(64) },
+    }));
+    assert.deepEqual(readFileSync(statePath), beforeBytes);
+
+    const released = releaseOnboardingSessionCleanup({
+      rootDir: root, expectedStateSha256: bound.stateSha256, expectedRevision: bound.revision, sessionCleanup: tuple,
+    });
+    assert.equal(released.status, "released");
+    assert.equal(released.mutated, true);
+    assert.equal(released.sessionCleanup, null);
+    assert.equal(released.storage, "private-runtime");
+    assert.equal(released.revision, bound.revision);
+    assert.deepEqual(readFileSync(statePath), beforeBytes);
   });
-  assert.equal(released.status, "released");
-  assert.equal(released.mutated, true);
-  assert.equal(released.revision, bound.revision + 1);
   assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
 });
 
