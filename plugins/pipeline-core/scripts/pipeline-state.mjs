@@ -558,7 +558,7 @@ import {
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
 
-import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout } from "../lib/calibration-verify-commit-transition.mjs";
+import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout, configureVerifyRepair } from "../lib/calibration-verify-commit-transition.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -10675,7 +10675,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       const commitTransition = prepareCalibrationVerifyCommitTransition({rootDir: dir, verifyCommand: command});
       if (!commitTransition?.ok || !commitTransition.preparedHandle
         || !sameJson(commitTransition.paths, twins.paths)) {
-        console.error(`Error: configure-verify commit route unavailable (${commitTransition?.code ?? "CVCT-PREPARE-UNAVAILABLE"}); zero calibration write.`);
+        console.error(`Error: configure-verify commit route unavailable (${commitTransition?.code ?? "CVCT-PREPARE-UNAVAILABLE"}); zero calibration write; repair: ${configureVerifyRepair(commitTransition?.code ?? "CVCT-PREPARE-UNAVAILABLE")}`);
         return 2;
       }
       const written = writeCalibrationVerifyCommand(dir, command);
@@ -13768,7 +13768,7 @@ export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
       approvalBasis = observed.authorityBasis;
     } else if (["epic","feature"].includes(state.planSubmission.profile)) {
       const observed = observeDesignApprovalRequest({dir:root,presentation:state.planPresentation,submission:state.planSubmission,signature:mode.mode === "signature"});
-      const stored = state.planApproval.designApproval;
+      if (!observed.ok) return unavailable(/^(?:CVCT|DAB)-[A-Z0-9-]+$/u.test(observed.code ?? "") ? observed.code : "CVCT-DESIGN-REQUEST-UNAVAILABLE"); const stored = state.planApproval.designApproval;
       if (!observed.ok || !stored || stored.mode !== mode.mode
         || stored.bindingSha256 !== observed.bindingSha256 || stored.intentSha256 !== observed.intentSha256
         || canonicalDesignApproval(state.planApproval.designApprovalBinding) !== canonicalDesignApproval(observed.request.binding)
@@ -13776,7 +13776,7 @@ export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
           || canonicalDesignApproval(stored.proof) !== canonicalDesignApproval(observed.proof)
           || stored.approvedBy !== `verified:${observed.signer.keyReference}`))
         || (mode.mode === "chat" && (mode.scope !== "global" || mode.source !== "pipeline.user.yaml"
-          || stored.proof !== null || stored.proofSha256 !== null))) return unavailable("CVCT-APPROVAL-UNAVAILABLE");
+          || stored.proof !== null || stored.proofSha256 !== null))) return unavailable("CVCT-DESIGN-APPROVAL-MISMATCH");
       retain(state.planPresentation.designApprovalRequestPath);
       if (mode.mode === "signature") retain(state.planPresentation.designApprovalRequestPath.replace("request-","proof-"));
       for (const entry of observed.request.binding.reviewReceipts) retain(entry.path);
@@ -13806,5 +13806,5 @@ export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
       submissionSha256:sha256CanonicalJson(state.planSubmission),approvalSha256:sha256CanonicalJson(state.planApproval),
       authoritySha256:sha256CanonicalJson(authority.value),approvalBasis,
       sourceRefs:Object.freeze([...new Map(refs.map(ref=>[ref.path,ref])).values()].sort((a,b)=>a.path.localeCompare(b.path)))});
-  } catch { return unavailable("CVCT-APPROVAL-UNAVAILABLE"); }
+  } catch (error) { return unavailable(/^CVCT-[A-Z0-9-]+$/u.test(error?.message ?? "") ? error.message : error?.code === "ENOENT" ? "CVCT-SOURCE-MISSING" : "CVCT-APPROVAL-UNAVAILABLE"); } // AC-140: keep the typed source failure
 }
