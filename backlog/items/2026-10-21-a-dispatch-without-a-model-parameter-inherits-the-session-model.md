@@ -50,3 +50,15 @@ model they used and ruled that this must never depend on the Elephant.
   type) exists before the change (QG-04/QG-07), and the enforcement lives in the
   hook, not in the briefing text (runner/platform-neutral).
 - The enforcing change touches a protected hook and needs a signature round.
+
+## Progress (2026-10-21, autonomous window)
+
+The pure decision is committed: `lib/dispatch-model-enforcement.mjs`
+(`evaluateDispatchModel`, 9 cases in its test, written RED first). It refuses a missing
+or unrouted `model` for the Claude Task/Agent tool and only warns when a duty-bound
+agent type names a configured but different selector (the MP-05/MP-07 escalation shape,
+so the grant route stays open; promoting that warning to a refusal needs the grant
+record this item still asks for). Still open: the hook wiring (operator drop-in, scratch
+patch 33, plus `model` in existing hook test fixtures), Workflow `agent()` dispatches,
+the Codex and Antigravity transports, and a live observation that the hook input carries
+the dispatcher's `model` field.

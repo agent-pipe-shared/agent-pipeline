@@ -128,6 +128,34 @@ function deltaAttempt(round, correctionCommits, packet = packet2) {
   };
 }
 
+// Contract moved (review-economy admitReviewAttempt): from round 2 on, compile() admits only a
+// "delta" attempt and refuses a "full" one before any invalidation check (CRL-REVIEW-REFUSED), so a
+// later broad record can no longer be compiled. This helper re-seals a compiled delta record as the
+// retained historical broad shape, which the record validators still accept and check.
+function historicalBroad(deltaRecord, invalidation) {
+  const record = structuredClone(deltaRecord);
+  record.request.mode = "full";
+  record.request.admissionCode = "RE-HISTORICAL-BROAD";
+  record.invalidation = invalidation;
+  record.request.compiledSha256 = sha256Canonical({
+    packetId: record.request.packetId,
+    candidate: record.candidate,
+    diff: record.diff,
+    references: record.references,
+    packages: record.packages,
+    coverage: {
+      changedPaths: record.coverage.changedPaths,
+      acceptanceIds: record.coverage.acceptanceIds,
+      integrationEdges: record.coverage.integrationEdges,
+    },
+    mode: record.request.mode,
+    admissionCode: record.request.admissionCode,
+  });
+  const { recordSha256: _previous, ...core } = record;
+  record.recordSha256 = sha256Canonical(core);
+  return record;
+}
+
 check("ships a complete Draft-2020-12 schema parallel to the runtime root and nested contracts", () => {
   const schema = JSON.parse(readFileSync(new URL("../scripts/critic-review-lineage.schema.json", import.meta.url), "utf8"));
   assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
@@ -316,7 +344,7 @@ check("requires a typed invalidation for every later broad review", () => {
     verdict: findingsVerdict,
     findings: [findingOpen],
   });
-  assert.throws(() => compile({
+  const laterReview = (overrides) => compile({
     packet: packet2,
     reviewId: "review-2",
     parent: first,
@@ -324,20 +352,26 @@ check("requires a typed invalidation for every later broad review", () => {
     verdict: findingsVerdict,
     findings: [{ ...findingOpen, priorFindingId: findingOpen.id }],
     correction: correction(),
+    ...overrides,
+  });
+  // Contract moved: a round-2 "full" attempt is now refused outright (was CRL-INVALIDATION when
+  // the typed invalidation was missing); the typed-invalidation rule is checked on the delta
+  // attempt (must carry none) and on the retained broad record (must carry a typed reason).
+  assert.throws(() => laterReview({
     invalidation: none,
     reviewAttempt: { round: 2, correctionCommits: 1, requestedMode: "full" },
-  }), /CRL-INVALIDATION/u);
-  const broad = compile({
-    packet: packet2,
-    reviewId: "review-2",
-    parent: first,
-    coverage: completeCoverage(packet2),
-    verdict: findingsVerdict,
-    findings: [{ ...findingOpen, priorFindingId: findingOpen.id }],
-    correction: correction(),
+  }), /CRL-REVIEW-REFUSED/u);
+  assert.throws(() => laterReview({
     invalidation: explicitFull,
-    reviewAttempt: { round: 2, correctionCommits: 1, requestedMode: "full" },
-  });
+    reviewAttempt: deltaAttempt(2, 1),
+  }), /CRL-INVALIDATION/u);
+  const delta = laterReview({ invalidation: none, reviewAttempt: deltaAttempt(2, 1) });
+  assert.equal(
+    validateCriticReviewLineage(historicalBroad(delta, none)).code,
+    "CRL-FULL-INVALIDATION",
+  );
+  const broad = historicalBroad(delta, explicitFull);
+  assert.equal(validateCriticReviewLineage(broad).ok, true);
   assert.equal(broad.request.mode, "full");
   assert.equal(broad.invalidation.reason, "explicit-broad-review");
 });
@@ -356,13 +390,17 @@ check("genesis pending cannot invent findings while later failed/pending records
     findings: [findingOpen],
     verdict: { status: "failed", schemaValid: false, resultSha256: null, failure: "timeout" },
     correction: correction(),
-    invalidation: explicitFull,
-    reviewAttempt: { round: 2, correctionCommits: 1, requestedMode: "full" },
+    invalidation: none,
+    reviewAttempt: deltaAttempt(2, 1),
   });
   assert.deepEqual(failed.findings, first.findings);
+  // Contract moved: later rounds are delta-only with invalidation none, and a same-candidate rerun
+  // (prior-review-failure, full) can no longer be compiled; the pending retry is a new correction.
   const retryPacket = {
     ...packet2,
     packetId: "3".repeat(32),
+    candidate: { base: O("4"), commit: O("6"), tree: O("7") },
+    diff: { ...packet2.diff, base: O("4"), commit: O("6"), sha256: H("1") },
     bindings: { ...packet2.bindings, requestSha256: H("e") },
   };
   const pendingRetry = compile({
@@ -370,8 +408,9 @@ check("genesis pending cannot invent findings while later failed/pending records
     reviewId: "review-3-pending",
     parent: failed,
     findings: structuredClone(failed.findings),
-    invalidation: { kind: "full-review-required", reason: "prior-review-failure", evidenceSha256: H("e") },
-    reviewAttempt: { round: 3, correctionCommits: 1, requestedMode: "full" },
+    correction: correction(retryPacket),
+    invalidation: none,
+    reviewAttempt: deltaAttempt(3, 2, retryPacket),
     lane: { laneId: "critic-lane-3", contextSha256: H("f"), evidenceSha256: H("1") },
   });
   assert.deepEqual(pendingRetry.findings, failed.findings);
@@ -655,7 +694,9 @@ check("release corrections bind the previous reviewed candidate, impact closure 
     invalidation: none,
   }), /CRL-RELEASE-FINDING-OUTSIDE-DELTA/u);
 
-  const broad = compile({
+  // Contract moved: a round-2 "full" attempt no longer compiles, so the broad record is the
+  // retained historical shape (see historicalBroad), not a compiled one.
+  const broad = historicalBroad(compile({
     packet: packet2,
     reviewId: "review-2-broad-release",
     parent: first,
@@ -663,9 +704,9 @@ check("release corrections bind the previous reviewed candidate, impact closure 
     verdict: noFindings,
     findings: [fixed],
     correction: correction(),
-    invalidation: explicitFull,
-    reviewAttempt: { round: 2, correctionCommits: 1, requestedMode: "full" },
-  });
+    invalidation: none,
+    reviewAttempt: deltaAttempt(2, 1),
+  }), explicitFull);
   const broadScope = compileReleaseCriticReviewScope({
     parent: first,
     packet: packet2,
