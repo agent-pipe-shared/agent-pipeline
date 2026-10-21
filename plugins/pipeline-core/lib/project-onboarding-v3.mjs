@@ -10,7 +10,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
 import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
-import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
+import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
 // Behavioural seam for the criterion-bound AC-174 pin: the handover decision is exercised through the
 // real function with the module's existing `fs.inspectArchitectureDesign` injection, not by reading source text.
@@ -5687,7 +5687,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   const agentEntry = initialGreenfieldAgentEntryTarget(scaffoldClassification);
   const internal = [
     ...initialGreenfieldMapTargets(scaffoldClassification),
-    ...(agentEntry ? [agentEntry] : []),
+    ...(agentEntry ? [agentEntry] : []), ...initialGreenfieldDecisionRecordTargets(scaffoldClassification),
     ...[
       NEUTRAL_CALIBRATION,
       NEUTRAL_MANIFEST,
@@ -5709,8 +5709,8 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
       ? "source"
       : (target.path === ".gitignore"
         ? "project-ignore"
-        : (target.path === "AGENTS.md" ? "project-entry"
-          : (target.path.startsWith("project/") ? "project-authority" : "runtime"))),
+        : (target.path === "AGENTS.md" ? "project-entry" : (target.path.startsWith("docs/adr/") ? "project-decision-records"
+          : (target.path.startsWith("project/") ? "project-authority" : "runtime")))),
     before: describe(null),
     after: describe(target.bytes),
     changed: true,
