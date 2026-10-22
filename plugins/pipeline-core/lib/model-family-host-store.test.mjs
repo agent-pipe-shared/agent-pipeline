@@ -1099,4 +1099,65 @@ test("a native admission without an admitNativeRequest port refuses synchronousl
   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
+// D113 (specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md): an asynchronous native producer is journalled by a
+// source-owned BEGIN ticket (the synchronous prefix of the effect, bound and inventoried under the registry lock) and closed
+// by a source-owned SETTLE step once the promise settles. The registry lock is never held across the await and is never left
+// behind. These cases are appended after the existing contract cases, so no earlier case id moves.
+test("D113 an asynchronous driver does not hold the registry lock across its await; the settled launch leaves the registry usable", async () => {
+  const f = fixture();
+  try {
+    activate(f);
+    const lockPath = join(f.root, "session-authority", "registry.lock");
+    const held = invoke(f, key("d113-async-launch"));
+    assert.equal(held.ok, true, held.code);
+    assert.equal(existsSync(lockPath), false, "premise: no registry lock before the launch");
+    let lockDuringAwait = "driver-not-awaited";
+    f.source.launchDriver = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      lockDuringAwait = existsSync(lockPath);
+      return { ok: true, value: { launched: true } };
+    };
+    const launched = await f.controller.launch({ invocation: held.value, packetBindingSha256: held.value.receipt.packetBindingSha256 });
+    assert.equal(launched.ok, true, launched.code);
+    assert.equal(lockDuringAwait, false, "the registry lock is released after the BEGIN ticket, not held across the await");
+    assert.equal(existsSync(lockPath), false, "the settled launch leaves no registry lock behind");
+    const next = invoke(f, key("d113-after-settle"));
+    assert.equal(next.ok, true, `a following prepare completes after the settle step: ${next.code}`);
+    assert.equal(existsSync(lockPath), false);
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
+});
+
+test("D113 a rejecting or declared-async effect is settled by the owner: the rejection surfaces and the registry lock is always released", async () => {
+  const f = fixture();
+  try {
+    activate(f);
+    const lockPath = join(f.root, "session-authority", "registry.lock");
+    const resolved = await f.authorityLifecycle.run({ kind: "prepare" }, async () => { await new Promise((resolve) => setTimeout(resolve, 5)); return 7; });
+    assert.equal(resolved, 7, "a declared async function is a promise-returning effect like any other");
+    assert.equal(existsSync(lockPath), false);
+    await assert.rejects(() => f.authorityLifecycle.run({ kind: "prepare" }, () => Promise.reject(new Error("d113-driver-rejected"))),
+      /d113-driver-rejected/u, "the original rejection reaches the caller, not a lock error");
+    assert.equal(existsSync(lockPath), false, "a rejected asynchronous phase leaves no registry lock behind");
+    const next = invoke(f, key("d113-after-rejection"));
+    assert.equal(next.ok, true, `a following prepare completes after the rejection: ${next.code}`);
+    assert.equal(existsSync(lockPath), false);
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
+});
+
+test("D113 the settle step refuses a write the continuation made outside the begin ticket's scope, and still releases the lock", async () => {
+  const f = fixture();
+  try {
+    activate(f);
+    const lockPath = join(f.root, "session-authority", "registry.lock");
+    const stray = join(f.root, "model-family-host", "stray-d113.json");
+    await assert.rejects(() => f.authorityLifecycle.run({ kind: "prepare" }, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      writeFileSync(stray, "{}", { mode: 0o600 });
+      return 1;
+    }), (error) => error?.name === "SessionAuthorityError" && /model-family-host:/u.test(error.reason ?? ""));
+    assert.equal(existsSync(lockPath), false, "a refused settle leaves no registry lock behind");
+    assert.equal(existsSync(stray), true, "the refused write is kept as evidence, not silently removed");
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
+});
+
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
