@@ -453,7 +453,8 @@ async function buildSubmittedFeature(prefix) {
   // Initialize the actual neutral authority tier before State/owner capture.
   writeFileIn(dir, "project/pipeline.yaml", readFileSync(join(dir, ".claude/pipeline.yaml"), "utf8"));
 
-  const specBytes = Buffer.from("# Test Spec\n", "utf8");
+  // AC-264 / D85: submit-plan also checks the delivery hand-off of a governed root, so the Spec carries one admitted criterion row.
+  const specBytes = Buffer.from("# Test Spec\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | The e2e fixture feature works. |\n", "utf8");
   const specSha256 = sha256(specBytes);
   writeFileIn(dir, SPEC_PATH, specBytes.toString("utf8"));
   const prdText = `${poGate.PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${poGate.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${specSha256} -->\n# Test PRD\nImplementation surface: \`src/index.mjs\`.\n`;

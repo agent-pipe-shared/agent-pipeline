@@ -370,7 +370,8 @@ test("set-feature initializes revision-0 continuity so submit-plan succeeds with
 
     mkdirSync(join(root, "specs", featureId), { recursive: true });
     const prdText = "# PRD\nRequirements here.\n";
-    const specText = "# Spec\nSpecification details.\n";
+    // AC-264 / D85: a governed root's submit-plan also needs a Spec with one admitted criterion row.
+    const specText = "# Spec\nSpecification details.\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | Continuity is initialized by set-feature. |\n";
     writeFileSync(join(root, planPath), prdText, "utf8");
     writeFileSync(join(root, specPath), specText, "utf8");
 

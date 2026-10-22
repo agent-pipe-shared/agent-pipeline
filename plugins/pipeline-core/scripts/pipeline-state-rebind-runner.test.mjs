@@ -200,7 +200,8 @@ function generatorSubmitFixture(name, { exempt }) {
   const specPath = `specs/${featureId}/spec.md`;
   mkdirSync(join(dir, `specs/${featureId}`), { recursive: true });
   mkdirSync(dirname(statePath(dir)), { recursive: true });
-  writeFileSync(join(dir, specPath), "# Generated specification\n");
+  // AC-264 / D85: this root is enrolled (governed), so submit-plan also needs a Spec with one admitted criterion row.
+  writeFileSync(join(dir, specPath), "# Generated specification\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | The generated feature works. |\n");
   const specSha256 = hash(readFileSync(join(dir, specPath)));
   writeFileSync(join(dir, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${specSha256} -->\n# Generated plan\n`);
   const planSha256 = hash(readFileSync(join(dir, planPath)));

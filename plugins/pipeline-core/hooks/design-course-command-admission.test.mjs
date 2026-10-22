@@ -45,7 +45,8 @@ export function fixture(profile = 'feature') {
   writeFileSync(join(root, '.agent-pipeline/onboarding-consent.json'), JSON.stringify({
     schema: 'pipeline.onboarding-consent-marker.v1', status: 'consent-given-onboarding-incomplete', consentGivenAt: now,
   }));
-  const spec = '# Technical Spec\nGuard admission regression.\n';
+  // AC-264 / D85: a governed root's submit-plan also needs a Spec whose delivery hand-off is ready (one admitted criterion row).
+  const spec = '# Technical Spec\nGuard admission regression.\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | Guard admission regression. |\n';
   const plan = `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${digest(spec)} -->\n# PRD\n${featureId}\n`;
   const sourcePaths = { input: `specs/${featureId}/design-input.md`, prd: planPath, spec: specPath,
     design: `specs/${featureId}/design.md`, traceability: `specs/${featureId}/traceability.md` };
