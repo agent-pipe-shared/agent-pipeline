@@ -4,46 +4,29 @@
 > Previous state text is preserved as a public projection in the archive below.
 > Calibration: [`project/pipeline.json`](../project/pipeline.json) names this file as the handover.
 
-**Latest handover (2026-10-22, content-final pass; read this first, it wins over the older blocks below):**
-- Built since the K1 handover and committed on `feat/sprint-alfred`: PO sitting blocks 1-3 applied (K39-K49: delivery hand-off
-  check K40 per D134, onboarding fixtures K49, authority-restore advice K45), AC-9 adopted by a signed scoped adoption
-  (`architecture/adoption-state.json`, ref `po-0.7.0-adopt-2026-10-22`), D141/D142 recorded, MFI011 active again, the F3
-  digest-prompt fix `98a53938e`, the GND009 real-git pin `109ce619f`. Evidence: `specs/sprint-alfred-epic/evidence/`
-  `linux-single-verifys-2026-10-22.md` (counted Linux runs) and `gap-readers-2026-10-22/` (status readers, unverified verdicts).
-- Observed by the PO at the terminal: F3 first-anchor recovery ends `BTR-RECOVERED` in a throwaway repo; its prompt text was
-  erased by readline (fixed). F1/F2 (signing prompt on WSL/PowerShell) are observed at the push signature.
-- Not done, by owner: critic 174, po-acceptance 144, native-host 101, agent 67 (mostly stale-claim re-checks, item-text updates and
-  gitleaks/semgrep/onboarding-timing runs), po-decision 29, verify-wsl 17, po-signature 5. Full Verify, Opus Critic reads,
-  Windows work (D133), the Reader 2+1 course (D140) and the final delivery remeasure come AFTER the stamped install.
-- Order the PO set: content, Linux single runs, push-init for the exact HEAD, PO signs (WSL and PowerShell), `approve-push`, push
-  (exact command shown first), stamp (only on the PO's call), then STOP until the PO has installed the candidate.
-- Known follow-ups for the PO list: `TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE` should name the missing home directory as the
-  repair; `scratch/run-parallel.mjs` counted 8 instead of 9 cases for `git-null-device-sites` and reported green for a red new
-  case once (check its `--src` handling); WINACL001 possible product defect; MFHS023/028 cross-process ownership (post-0.7.0);
-  backlog item texts with stale "still open" text (K50 found 3 of 4 already pinned, K51 found all 5 stubs already real).
-
-- Stamped at `9355151ff` (`0.7.0+<runner>.20261022204428.79cda46`, basis HEAD `79cda4601`); the PO installs; later commits reach the
-  install by the PO's sync and are not covered by the stamp. NO new work starts until the PO has installed the candidate.
-- Push is NOT done: `pipeline-state.mjs approve-push` is refused with `SDC-AUTHORITY-UNAVAILABLE: state-push-source-requester`
-  whenever `.git/agent-pipeline/session-authority/catalogue.json` exists (no production code binds the source-owned requester
-  context outside the session-power controller). The PO decided: no release with this function broken and no workaround
-  (no catalogue removal, no legacy fallback). Builder K52 (clone `scratch/clones/k52`, briefing `scratch/briefing-k52.md`) diagnoses
-  and, if safe, delivers a protected diff for `pipeline-state.mjs`; the PO applies it as operator. The signature of
-  `79cda4601` is spent and must be repeated on the final HEAD (`push-prepare.mjs --checkpoint`, then `authorize-critical`).
-- Order after the push and the PO's install (PO call 2026-10-22, the PO is then away): (1) the scripts consolidation below (K53,
-  briefing `scratch/briefing-k53.md`, stopped before its first commit); (2) a fresh delivery-matrix remeasure on the final HEAD
-  (replaces `delivery-status-current.md`; last measured at `9a12beab7`); (3) work autonomously through everything content-wise the
-  agent can do alone (the `agent` clauses of the matrix, stale-claim re-checks first); (4) collect every PO topic separately in
-  the PO list and never block on it.
-- `approve-push` fix: PO chose Option A (2026-10-22): signature-mode `approve-push` runs the legacy route under the PF-54 in-flight
-  gate while a catalogue exists, proof verification unchanged; builder K52 delivers a protected diff for `pipeline-state.mjs`
-  that the PO applies as operator, then a new push signature on the final HEAD.
-- First work block after the install (PO-agreed 2026-10-22): move the reusable helpers out of untracked `scratch/` into the tracked
-  `scripts/` folder with usage headers (stamp with the 7-character hash, isolated runner `run-parallel`, `rebaseline-inventory`,
-  `rehearse-held`, the delivery-matrix and gap tools `matrix-gaps`, `delivery-owners`, `delivery-agent-items`, `gap-*`); write a
-  short procedure document for stamp, Linux single runs, inventory rebaseline and matrix remeasure; propose one `CLAUDE.md` line
-  ("Where things live" plus "reusable scripts never stay in scratch/") for the PO's approval; check whether the other PC already
-  has its own stamp script before duplicating.
+**Session cut (2026-10-22 night; read this first, it wins over every older block below):**
+- At the cut: branch `feat/sprint-alfred`; stamp `9355151ff` (`0.7.0+<runner>.20261022204428.79cda46`); `approve-push` route fix `ec1c22db2`
+  (signature-mode approve-push runs its proof-verified legacy route while the session-authority catalogue exists; PO option A); checkpoint
+  commit `57aa08996` carries `Checkpoint-Intent`. Gates there: boundary check 0 violations, capability inventory PASS, case-completion
+  registry valid (356). Not a Full Verify. Evidence: `specs/sprint-alfred-epic/evidence/linux-single-verifys-2026-10-22.md`,
+  `gap-readers-2026-10-22/` (unverified verdicts).
+- Push DONE: `0913fa941..57aa08996` reached `origin/feat/sprint-alfred` (feature checkpoint, PO signature, `approve-push` run from the repo
+  script because the installed plugin copy lacked the fix; the fix is proven live). Later commits, this handover included, are not pushed.
+- F1 to F3 (signing ceremony, first-anchor recovery `BTR-RECOVERED`, prompt fix `98a53938e`): PO statement 2026-10-22: proven.
+- Install: the PO installs the stamp and syncs later commits by rsync; the stamp need not be the last HEAD. No agent runs in the background;
+  `scratch/clones/k5*` are disposable.
+- After the PO's resume, the PO away, in this order: (1) scripts consolidation (K53, `scratch/briefing-k53.md`, no commit yet): move the
+  reusable helpers from untracked `scratch/` to the tracked `scripts/` (stamp with the 7-char hash, `run-parallel`, `run-in`,
+  `run-onboarding-full`, `rebaseline-inventory`, `rehearse-held`, `matrix-gaps`, `delivery-owners`, `delivery-agent-items`, `gap-*`) with
+  usage headers, add `docs/operating-tools.md`, propose a `CLAUDE.md` line for the PO; check first whether the other PC has its own
+  stamp script; find why `run-parallel --src` misses uncommitted changes (counted 8 of 9 once); (2) fresh delivery-matrix remeasure on
+  the final HEAD (replaces `delivery-status-current.md`, last at `9a12beab7`); (3) all content work the agent can do alone (`agent`
+  clauses; re-verify "still open" first, K50/K51 found 8 already done); (4) PO topics only in the separate PO list, never blocking.
+- PO list: chat-mode `approve-push` with a catalogue still has no shell route and its refusal names an empty `inspect`;
+  `TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE` should name the missing home directory; WINACL001 possible product defect; orphan node.exe;
+  MFHS023/028 cross-process ownership (post-0.7.0); stale "still open" backlog item texts.
+- Open before any acceptance: independent Critic batch, Full Verify (WSL, then Windows per D133), Reader 2+1 course (D140), native
+  Windows and installed-host clauses, PO acceptance. Greenfield tests start on the installed candidate.
 
 **Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
 Read these three files first, in this order, before any other work:
