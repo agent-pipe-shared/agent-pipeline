@@ -1,0 +1,493 @@
+{
+  "schema": "pipeline.required-evidence-accepted-debt.v1",
+  "entries": [
+    {
+      "source": "evidence/alf-scanner-prep-terminal-reconciliation.json",
+      "path": "evidence/dispatch-record-ALF-SCANNER-PREP.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-B-INSTALLER-ATTESTATION-RUNNER-PARITY-1.json",
+      "path": "backlog/evidence/2026-09-12-installer-parity-review-bundle-tests.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-1.json",
+      "path": "evidence/NVA-B-XPORTFIX-1-check-consumer-safe-paths-test.txt",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-1.json",
+      "path": "evidence/NVA-B-XPORTFIX-1-green-codex-critic-host-test.txt",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-1.json",
+      "path": "evidence/NVA-B-XPORTFIX-1-red-codex-critic-host-test.txt",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-2.json",
+      "path": "evidence/NVA-B-XPORTFIX-2-cases-108-109-red-pre-70287f72.txt",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-2.json",
+      "path": "evidence/NVA-B-XPORTFIX-2-check-consumer-safe-paths-test.txt",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-2.json",
+      "path": "evidence/NVA-B-XPORTFIX-2-green-codex-critic-host-test.txt",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-2.json",
+      "path": "evidence/NVA-B-XPORTFIX-2-red-codex-critic-host-test.txt",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-BL-32.json",
+      "path": "evidence/security-latest.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-BL-32.json",
+      "path": "evidence/security-latest.v2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/dispatch-record-NVA-R18-SCANBOOT.json",
+      "path": "plugins/pipeline-core/config/security/semgrep-default-rules.yml",
+      "code": "REQ-EVIDENCE-UNTRACKED",
+      "reason": "The referrer names evidence that is neither tracked nor ignored and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-01V4.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-02V4.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-03V4.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-04.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-05.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-06.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-07.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-08.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-09.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-10.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC1R3.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC3.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC4R2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC5.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC6.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AUTHORITY-THREE.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-CALIBRATION-R2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-MISSING-THREE-R2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-R1.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-CALIBRATION-DESIGN-R2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-PROMOTION-MAP.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-PROMOTION-Q0.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
+      "path": "evidence/dispatch-record-NVA-B-PUSH-LIFECYCLE-DESIGN-R3.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-ALF-SCANNER-PREP.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-01V4.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-02V4.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-03V4.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-04.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-05.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-06.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-07.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-08.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-09.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-10.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC1R3.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC3.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC4R2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC5.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC6.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-AUTHORITY-THREE.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-CALIBRATION-R2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-MISSING-THREE-R2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-AUDIT-R1.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-CALIBRATION-DESIGN-R2.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-PROMOTION-MAP.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-PROMOTION-Q0.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    },
+    {
+      "source": "evidence/legacy-dispatch-reconcile-index.json",
+      "path": "evidence/dispatch-record-NVA-B-PUSH-LIFECYCLE-DESIGN-R3.json",
+      "code": "REQ-EVIDENCE-IGNORED",
+      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
+      "owner": "Elephant",
+      "due": "2026-11-30"
+    }
+  ]
+}
