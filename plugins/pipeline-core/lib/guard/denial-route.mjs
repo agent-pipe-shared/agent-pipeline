@@ -87,7 +87,7 @@ export function blocked(
         // other status keeps the two-line message above, unchanged.
         `A narrow diagnosis lane stays admitted while status is partial: creating the `
           + `repository's own ${PARTIAL_LIFECYCLE_SCRATCH_DIR} directory and writing exactly `
-          + `${PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH} via Write or Edit.`,
+          + `${PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH.replaceAll("\\", "/")} via Write or Edit.`,
       ]
       : INTAKE_LIFECYCLE_STATUSES.has(typedLifecycleStatus)
         ? [

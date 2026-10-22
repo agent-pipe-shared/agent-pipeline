@@ -385,7 +385,7 @@ export function isOutsideRootReadOnlyAndChain(command, root) {
   if (!parts) return false;
   if (isBoundedReadOnlyAndChain(command, root)) return false;
   const scopeLifted = parts.flatMap((part) => {
-    const parsedPart = parseGuardCommand(part, root);
+    const parsedPart = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
     if (parsedPart.parseStatus !== "accepted" || parsedPart.segments.length !== 1) return [];
     return parsedPart.segments[0].argv
       .filter((token) => typeof token === "string" && token !== "" && !token.includes("\0"))

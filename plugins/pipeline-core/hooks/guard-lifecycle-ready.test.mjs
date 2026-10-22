@@ -18,8 +18,8 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { delimiter, dirname, join, relative } from "node:path";
+import { homedir, tmpdir as osTmpdir } from "node:os";
+import { delimiter, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -226,6 +226,47 @@ function claudeMemorySessionFixture() {
 // own fixtures must stay inside the repository rather than merely stand in for one, unlike the
 // pre-existing MEMPATH-1 session fixtures above which model Claude Code's own session dir).
 const SCRATCH_ROOT = fileURLToPath(new URL("../../../scratch/", import.meta.url));
+
+// ALF-K31 (backlog pipeline.guard-suite-fails-60-tests-on-native-windows): fixtures that were written
+// against a POSIX host. Nothing below changes behaviour on Linux or macOS.
+// The Claude Bash tool is parsed with the POSIX grammar on every host (shell-grammar.mjs,
+// CLAUDE_BASH_SHELL_DIALECT_PLATFORM), so a fixture that feeds a POSIX command line to
+// parseGuardCommand() directly must say so instead of inheriting process.platform.
+const POSIX_PARSE = { platform: "linux" };
+// A directory link is a junction on native Windows (no privilege needed); a symlink elsewhere.
+function dirLink(target, path) {
+  symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
+}
+// A FILE symlink needs SeCreateSymbolicLinkPrivilege (Developer Mode) on native Windows and has no
+// unprivileged substitute. A case whose claim IS a file link carries this typed host-limit reason as
+// its skip, so the gap is PO-visible; it is false (the case runs) wherever the link can be made.
+const FILE_LINK_HOST_LIMIT = (() => {
+  if (process.platform !== "win32") return false;
+  const probeDir = mkdtempSync(join(osTmpdir(), "file-link-probe-"));
+  try {
+    writeFileSync(join(probeDir, "target"), "x");
+    symlinkSync(join(probeDir, "target"), join(probeDir, "link"), "file");
+    return false;
+  } catch (error) {
+    if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+    return "host-limit: native Windows without SeCreateSymbolicLinkPrivilege (Developer Mode off) cannot create a file symlink, and a junction only covers directories";
+  } finally { rmSync(probeDir, { recursive: true, force: true }); }
+})();
+// The OS temp root of a native Windows account sits under %LOCALAPPDATA%, which the guard rightly treats
+// as a protected credential root with a non-private ancestor DACL (backlog
+// pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures). Fixtures
+// there cannot exercise the cases they were written for, so on win32 the fixture temp root moves to the
+// repository's own ignored scratch directory; elsewhere this is exactly os.tmpdir().
+function tmpdir() {
+  const base = osTmpdir();
+  const localAppData = process.platform === "win32" ? (process.env.LOCALAPPDATA ?? "") : "";
+  if (localAppData === "" || !resolve(base).toLowerCase().startsWith(resolve(localAppData).toLowerCase())) return base;
+  // A sibling of the checkout: exactly as private as the checkout's own ancestors, which the guard already has to accept.
+  const root = join(dirname(resolve(SCRATCH_ROOT, "..")), ".pipeline-fixture-tmp");
+  mkdirSync(root, { recursive: true });
+  return root;
+}
+const VAR_TMP = process.platform === "win32" ? tmpdir() : "/var/tmp";
 
 /**
  * A fake home directory rooted under SCRATCH_ROOT, standing in for `os.homedir()` via the
@@ -684,7 +725,7 @@ test("governed consumer edits cannot escape their physical project root", () => 
   try {
     markGovernedFixture(path);
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    symlinkSync(outside, join(path, "linked-outside"));
+    dirLink(outside, join(path, "linked-outside"));
     assert.equal(isProjectWritePath("src/local.mjs", path), true);
     for (const filePath of [
       join(outside, "pipeline-source.mjs"),
@@ -1118,7 +1159,7 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
     mkdirSync(join(path, "specs"), { recursive: true });
     writeFileSync(join(path, "specs", "hotfix.md"), "hotfix\n");
     mkdirSync(join(path, "plugins"), { recursive: true });
-    symlinkSync(outside, join(path, "linked-outside"));
+    dirLink(outside, join(path, "linked-outside"));
     assert.equal(isReadOnlyDiagnosticCommand("git fetch origin refs/heads/main:refs/remotes/origin/main", path), false, "a refspec argument names more than a plain remote or ref and stays out of the lane");
     for (const command of [
       "pwd -P",
@@ -1676,7 +1717,7 @@ test("NVA-R15-ROOTADMIT: a symlinked parent resolving to the exact same project 
   const linkParent = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-link-parent-"));
   const link = join(linkParent, "consumer-link");
   try {
-    symlinkSync(path, link);
+    dirLink(path, link);
     const command = `node '${ONBOARDING_SCRIPT}' inspect --root '${link}' --intent session`;
     // The guard's own `root` here is already the real, non-symlinked path (mirroring how
     // evaluateLifecycleReadyGuard's own realpathSync(resolve(...)) pre-resolves it); the
@@ -1736,7 +1777,7 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
       "rg -n -S lifecycle plugins | rg guard",
       "rg -l '^status: open' backlog/items | sort",
     ]) {
-      const parsed = parseGuardCommand(command, path);
+      const parsed = parseGuardCommand(command, path, POSIX_PARSE);
       assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
@@ -1747,7 +1788,7 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
       "rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180",
       "rg --files -uu . | rg 'guard|deny|permission|settings'",
     ]) {
-      assert.equal(isBoundedReadOnlyPipeline(parseGuardCommand(command, path), path), false, command);
+      assert.equal(isBoundedReadOnlyPipeline(parseGuardCommand(command, path, POSIX_PARSE), path), false, command);
       assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
     }
@@ -1802,8 +1843,8 @@ test("single and piped rg share trusted recursive roots and unconditional exclus
   mkdirSync(approved); mkdirSync(sibling);
   writeFileSync(join(approved, "readme.md"), "needle\n");
   writeFileSync(join(sibling, "readme.md"), "needle\n");
-  const pipeline = command => parseGuardCommand(`${command} | head -n 5`, project);
-  const directArgs = command => parseGuardCommand(command, project).segments[0].argv;
+  const pipeline = command => parseGuardCommand(`${command} | head -n 5`, project, POSIX_PARSE);
+  const directArgs = command => parseGuardCommand(command, project, POSIX_PARSE).segments[0].argv;
   for (const command of [`rg --files '${approved}'`, `rg -n needle '${approved}'`]) {
     // D96 (PO decision 2026-10-22; the 2026-09-10 correction in docs/adr/draft-read-scope-containment-boundary.md;
     // QG-04 restatement): these two assertions said "false" only because the directory lay outside the repository
@@ -1832,10 +1873,13 @@ test("single and piped rg share trusted recursive roots and unconditional exclus
   const escape = join(approved, "escape");
   symlinkSync(sibling, escape, process.platform === "win32" ? "junction" : "dir");
   const secret = join(sibling, "po-private.pem"), alias = join(approved, "ordinary.md");
-  writeFileSync(secret, "synthetic fixture\n"); symlinkSync(secret, alias, "file");
+  writeFileSync(secret, "synthetic fixture\n");
+  // The file-alias sub-case needs a file symlink; where the host cannot make one (FILE_LINK_HOST_LIMIT names why)
+  // only that sub-case is dropped, every other denial below still runs.
+  if (!FILE_LINK_HOST_LIMIT) symlinkSync(secret, alias, "file");
   const denied = [
     `rg --files '${sibling}'`, `rg --files '${escape}'`,
-    `rg -n needle '${secret}'`, `rg -n needle '${alias}'`,
+    `rg -n needle '${secret}'`, ...(FILE_LINK_HOST_LIMIT ? [] : [`rg -n needle '${alias}'`]),
     `rg --hidden -n needle '${approved}'`, `rg -uu -n needle '${approved}'`,
     `rg --no-ignore -n needle '${approved}'`, `rg -g '*.md' needle '${approved}'`,
     `rg --pre sh needle '${approved}'`, `rg --output output needle '${approved}'`,
@@ -1876,7 +1920,7 @@ test("bounded rg pipeline admits self-inspection reads of the plugin's own insta
       [`rg --files ${hooksDir} | rg 'guard-lifecycle-ready'`, true],
       [`rg -n "isBoundedReadOnlyPipeline" ${grammarFile} | head -n 5`, true],
     ]) {
-      const parsed = parseGuardCommand(command, path);
+      const parsed = parseGuardCommand(command, path, POSIX_PARSE);
       assert.equal(isBoundedReadOnlyPipeline(parsed, path), genericExpected,
         `${command} (SEC-11 exact file or separately bounded recursive directory)`);
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
@@ -1904,7 +1948,7 @@ test("bounded rg-to-head pipeline accepts both head -n N and combined head -N", 
   const path = root();
   try {
     for (const command of ["rg -n lifecycle . | head -40", "rg -n lifecycle . | head -500"]) {
-      const parsed = parseGuardCommand(command, path);
+      const parsed = parseGuardCommand(command, path, POSIX_PARSE);
       assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
     }
     for (const command of [
@@ -1912,7 +1956,7 @@ test("bounded rg-to-head pipeline accepts both head -n N and combined head -N", 
       "rg -n lifecycle . | head -501",
       "rg -n lifecycle . | head -0500",
     ]) {
-      const parsed = parseGuardCommand(command, path);
+      const parsed = parseGuardCommand(command, path, POSIX_PARSE);
       assert.equal(isBoundedReadOnlyPipeline(parsed, path), false, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
@@ -2307,7 +2351,7 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
   try {
     markGovernedFixture(path);
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    const quoted = parseGuardCommand("node -e 'console.log(\"a>b\")'", path);
+    const quoted = parseGuardCommand("node -e 'console.log(\"a>b\")'", path, POSIX_PARSE);
     assert.equal(quoted.parseStatus, "accepted");
     assert.equal(quoted.redirects.length, 0);
     for (const [command, code] of [
@@ -2924,7 +2968,7 @@ test("OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("LND-5 admits only canonical session Critic prelaunch and finalization requests under the project scratch root", () => {
+test("LND-5 admits only canonical session Critic prelaunch and finalization requests under the project scratch root", { skip: FILE_LINK_HOST_LIMIT }, () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "session-critic-finalizer-outside-"));
   try {
@@ -6211,7 +6255,7 @@ test("NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning returns a non-p
     // "cross-repository-target"; NOVA-XREPO-HGO-6 pins that new contract.)
     const crossRoot = hgoGitFixture("signature");
     roots.push(crossRoot);
-    symlinkSync(outside, join(crossRoot, "escape"), "dir");
+    dirLink(outside, join(crossRoot, "escape"));
     const cross = evaluateLifecycleReadyGuard(
       bash(`rg -n lifecycle ${join(crossRoot, "escape", "notes.txt")} | tee output.txt`),
       { projectDir: crossRoot },
@@ -6387,7 +6431,7 @@ test("MEMPATH-1: a symlink planted inside the derived memory directory cannot re
   try {
     markGovernedFixture(path);
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    symlinkSync(outside, join(memoryDir, "escape"));
+    dirLink(outside, join(memoryDir, "escape"));
     const escapedTarget = join(memoryDir, "escape", "evil.md");
     assert.equal(isClaudeSessionMemoryWritePath(escapedTarget, { transcript_path: transcriptPath }), false);
     const result = evaluateLifecycleReadyGuard(editWithTranscript(escapedTarget, transcriptPath), {
@@ -6593,7 +6637,7 @@ test("MACHPATH-1: a symlinked .agent-pipeline ancestor cannot redirect the write
   try {
     markGovernedFixture(path);
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    symlinkSync(outside, dirname(target));
+    dirLink(outside, dirname(target));
     assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), false);
     const result = evaluateLifecycleReadyGuard(edit(target), {
       projectDir: path,
@@ -6626,7 +6670,7 @@ test("MACHPATH-1: a symlinked .agent-pipeline that redirects INSIDE the same hom
   try {
     markGovernedFixture(path);
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    symlinkSync(insideElsewhere, dirname(target));
+    dirLink(insideElsewhere, dirname(target));
     assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), true);
     assert.deepEqual(evaluateLifecycleReadyGuard(edit(target), {
       projectDir: path,
@@ -6643,7 +6687,7 @@ test("MACHPATH-1: a symlinked .agent-pipeline that redirects INSIDE the same hom
 // already existing as a symlink is refused unconditionally, whatever it points at -- the
 // shared containment walk alone cannot catch this (it only climbs when the candidate does not
 // yet exist), so isMachinePlaneWritePath() checks the leaf explicitly before that walk runs.
-test("MACHPATH-1: machine.json planted as a symlink to another existing file inside the same home directory is refused -- closed, not pinned", () => {
+test("MACHPATH-1: machine.json planted as a symlink to another existing file inside the same home directory is refused -- closed, not pinned", { skip: FILE_LINK_HOST_LIMIT }, () => {
   const path = root();
   const { home, target } = machinePlaneHomeFixture();
   mkdirSync(dirname(target), { recursive: true });
@@ -6670,7 +6714,7 @@ test("MACHPATH-1: machine.json planted as a symlink to another existing file ins
   }
 });
 
-test("MACHPATH-1: machine.json planted as a symlink to a path outside the home directory is refused -- closed, not pinned", () => {
+test("MACHPATH-1: machine.json planted as a symlink to a path outside the home directory is refused -- closed, not pinned", { skip: FILE_LINK_HOST_LIMIT }, () => {
   const path = root();
   const { home, target } = machinePlaneHomeFixture();
   mkdirSync(dirname(target), { recursive: true });
@@ -7071,8 +7115,9 @@ test("NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter
 function readScopeFixture() {
   const projectDir = hgoGitFixture("signature");
   markGovernedFixture(projectDir);
-  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-read-scope-outside-"));
-  const outsideFile = join(outside, "pipeline-greenfield-review.md");
+  // The Claude Bash tool is POSIX: a native Windows path typed into its command line uses forward slashes (Git Bash accepts D:/x).
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-read-scope-outside-")).replaceAll("\\", "/");
+  const outsideFile = join(outside, "pipeline-greenfield-review.md").replaceAll("\\", "/");
   writeFileSync(outsideFile, "# User report\nOverall pass\n");
   writeFileSync(join(projectDir, "verify-latest.json"), "{\"Overall\":\"pass\"}\n");
   return { projectDir, outside, outsideFile };
@@ -7095,7 +7140,7 @@ function bashWithTranscript(command, transcriptPath) {
   return { tool_name: "Bash", tool_input: { command }, transcript_path: transcriptPath };
 }
 
-test("registered plugin diagnostic scope admits bounded reads but rejects private paths and aliases", () => {
+test("registered plugin diagnostic scope admits bounded reads but rejects private paths and aliases", { skip: FILE_LINK_HOST_LIMIT }, () => {
   const { projectDir } = readScopeFixture();
   const pluginRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-registered-plugin-read-"));
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-registered-plugin-outside-"));
@@ -7132,10 +7177,10 @@ test("registered plugin diagnostic scope admits bounded reads but rejects privat
     rmSync(movingLink);
     symlinkSync(outsideFile, movingLink);
     assert.equal(read(movingLink).exitCode, 2);
-    symlinkSync(pluginRoot, outsideAlias);
+    dirLink(pluginRoot, outsideAlias);
     assert.equal(grep(outsideAlias).exitCode, 2);
     const symlinkRoot = join(outside, "registered-root-alias");
-    symlinkSync(pluginRoot, symlinkRoot);
+    dirLink(pluginRoot, symlinkRoot);
     const aliasedRootDeps = { ...deps, registeredPluginReadScopeRootsFn: () => [symlinkRoot] };
     assert.equal(evaluateLifecycleReadyGuard({ tool_name: "Grep", tool_input: { path: symlinkRoot } }, aliasedRootDeps).exitCode, 2);
   } finally {
@@ -7145,9 +7190,9 @@ test("registered plugin diagnostic scope admits bounded reads but rejects privat
   }
 });
 
-test("Claude task output is an exact session-bound passive read file, never a directory or executable scope", () => {
+test("Claude task output is an exact session-bound passive read file, never a directory or executable scope", { skip: FILE_LINK_HOST_LIMIT }, () => {
   const { projectDir, outside } = readScopeFixture();
-  const taskDirectory = mkdtempSync(join("/var/tmp", "guard-lifecycle-task-output-"));
+  const taskDirectory = mkdtempSync(join(VAR_TMP, "guard-lifecycle-task-output-"));
   const taskId = "task_123";
   const sessionId = "session_current";
   const toolUseId = "toolu_123";
@@ -7211,7 +7256,7 @@ test("Claude task output is an exact session-bound passive read file, never a di
   }
 });
 
-test("standalone head and tail accept only bounded counts and passive file operands", () => {
+test("standalone head and tail accept only bounded counts and passive file operands", { skip: FILE_LINK_HOST_LIMIT }, () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   const missing = join(outside, "missing-report.md");
   const credential = join(outside, "id_ed25519");
@@ -7312,7 +7357,7 @@ test("host-provided transcript, memory and sibling paths share passive read beha
 });
 
 test("PASSIVE-READ-ROOT-INTEROP: exact transcript files and memory directories agree across read routes under active enrollment", (t) => {
-  const fixture = mkdtempSync(join("/var/tmp", "passive-read-root-interop-"));
+  const fixture = mkdtempSync(join(VAR_TMP, "passive-read-root-interop-"));
   t.after(() => rmSync(fixture, { recursive: true, force: true }));
   const projectDir = join(fixture, "repo"), homeDir = join(fixture, "home");
   const sessionDir = join(fixture, "session"), memoryDir = join(sessionDir, "memory");
@@ -7467,7 +7512,7 @@ test("a sibling transcript path follows the same passive read policy", () => {
   }
 });
 
-test("passive reads accept leading tilde and symlink paths", () => {
+test("passive reads accept leading tilde and symlink paths", { skip: FILE_LINK_HOST_LIMIT }, () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   const linkPath = join(projectDir, "linked-outside.json");
   symlinkSync(outsideFile, linkPath);
@@ -7511,7 +7556,7 @@ test("passive reads accept host-resolved symlink-plus-dotdot paths", () => {
   mkdirSync(siblingDir);
   writeFileSync(secret, "outside\n");
   const link = join(projectDir, "linked-outside");
-  symlinkSync(targetDir, link);
+  dirLink(targetDir, link);
   const escaped = link + "/../sibling/secret.txt";
   try {
     for (const command of [
@@ -8956,7 +9001,7 @@ test("greenfield passive PowerShell and native reads accept host-visible paths",
     writeFileSync(join(path, "in-root.md"), "safe\n");
     mkdirSync(join(path, "scratch"));
     writeFileSync(join(outside, "pipeline-greenfield-review.md"), "fixture\n");
-    symlinkSync(outside, join(path, "escape"));
+    dirLink(outside, join(path, "escape"));
     const deps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
     const ps = (command) => evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { command } }, deps);
     assert.equal(ps("Get-Content -LiteralPath in-root.md").exitCode, 0);
@@ -9080,7 +9125,7 @@ test("NVA-B-GREENFIELD-SCRATCH-1: bootstrap-binding-required admits only contain
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     outside = mkdtempSync(join(tmpdir(), "bootstrap-binding-scratch-outside-"));
     mkdirSync(join(path, "scratch"));
-    symlinkSync(outside, join(path, "scratch", "outside-link"));
+    dirLink(outside, join(path, "scratch", "outside-link"));
     const bindingDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
 
     for (const input of [
@@ -9182,17 +9227,17 @@ test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: intended pre-plan scratch lanes re
       mkdirSync(join(path, "src"));
       mkdirSync(join(path, ".claude"), { recursive: true });
       external = mkdtempSync(join(tmpdir(), "physical-scratch-external-"));
-      symlinkSync(join(path, "src"), join(path, "scratch", "to-product"), "dir");
+      dirLink(join(path, "src"), join(path, "scratch", "to-product"));
       assert.equal(isPhysicalScratchTarget("scratch/to-product/escaped.mjs", { rootDir: path, liveRoots: [] }), false);
-      symlinkSync(join(path, ".claude"), join(path, "scratch", "to-authority"), "dir");
-      symlinkSync(external, join(path, "scratch", "to-external"), "dir");
-      symlinkSync(join(path, "src", "not-yet-created.mjs"), join(path, "scratch", "dangling-product.mjs"), "file");
+      dirLink(join(path, ".claude"), join(path, "scratch", "to-authority"));
+      dirLink(external, join(path, "scratch", "to-external"));
+      if (!FILE_LINK_HOST_LIMIT) symlinkSync(join(path, "src", "not-yet-created.mjs"), join(path, "scratch", "dangling-product.mjs"), "file");
 
       for (const input of [
         write("scratch/to-product/escaped.mjs"),
         edit(join(path, "scratch", "to-authority", "escaped.json")),
         write("scratch/to-external/escaped.md"),
-        write("scratch/dangling-product.mjs"),
+        ...(FILE_LINK_HOST_LIMIT ? [] : [write("scratch/dangling-product.mjs")]),
         bash("mkdir -p scratch/to-product/nested"),
       ]) {
         const result = evaluateLifecycleReadyGuard(input, deps);
@@ -9201,7 +9246,7 @@ test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: intended pre-plan scratch lanes re
       }
 
       rmSync(join(path, "scratch"), { recursive: true, force: true });
-      symlinkSync(join(path, "src"), join(path, "scratch"), "dir");
+      dirLink(join(path, "src"), join(path, "scratch"));
       for (const input of [write("scratch/root-escape.mjs"), bash("mkdir -p scratch/nested")]) {
         const result = evaluateLifecycleReadyGuard(input, deps);
         assert.equal(result.exitCode, 2, `${status}/symlinked scratch root/${input.tool_name}`);
@@ -9256,7 +9301,7 @@ test("NVA-I-GRAMMAR DoD 1: quoted operator-looking characters are read as data, 
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     // Repro 1: a ternary inside a quoted `node -e` script.
     const ternary = `node -e 'const x = 1; console.log(x ? "yes" : "no")'`;
-    const ternaryParsed = parseGuardCommand(ternary, path);
+    const ternaryParsed = parseGuardCommand(ternary, path, POSIX_PARSE);
     assert.equal(ternaryParsed.parseStatus, "accepted", ternary);
     assert.equal(ternaryParsed.operators.length, 0, ternary);
     assert.equal(ternaryParsed.redirects.length, 0, ternary);
@@ -9271,7 +9316,7 @@ test("NVA-I-GRAMMAR DoD 1: quoted operator-looking characters are read as data, 
     mkdirSync(join(path, "some"), { recursive: true });
     writeFileSync(join(path, "some", "file.mjs"), "const X = 1;\n");
     const alternation = `grep -n "^const X\\|^export function Y" some/file.mjs`;
-    const alternationParsed = parseGuardCommand(alternation, path);
+    const alternationParsed = parseGuardCommand(alternation, path, POSIX_PARSE);
     assert.equal(alternationParsed.parseStatus, "accepted", alternation);
     assert.equal(alternationParsed.operators.length, 0, alternation);
     assert.equal(isReadOnlyDiagnosticCommand(alternation, path), true, alternation);
@@ -10893,14 +10938,14 @@ test('proposed marker quotation permits native and translated inert scratch acro
     }
   }
 });
-test('proposed marker quotation still refuses real authority, aliases and traversal',t=>{
+test('proposed marker quotation still refuses real authority, aliases and traversal',{skip:FILE_LINK_HOST_LIMIT},t=>{
   const root=markerQuotationFixture(t);
   mkdirSync(join(root,'specs','onboarding-abcd1234'),{recursive:true});
   const authority=join(root,'specs','onboarding-abcd1234','prd_onboarding-abcd1234.md');
   writeFileSync(authority,'authority\n');
   symlinkSync(authority,join(root,'scratch','symlink.txt'));
   linkSync(authority,join(root,'scratch','hardlink.txt'));
-  symlinkSync(join(root,'specs'),join(root,'scratch','directory'));
+  dirLink(join(root,'specs'),join(root,'scratch','directory'));
   for(const path of ['specs/onboarding-abcd1234/prd_onboarding-abcd1234.md',
     'project/pipeline-state.json','scratch/symlink.txt','scratch/hardlink.txt',
     'scratch/directory/new.md','scratch/../project/pipeline-state.json']){

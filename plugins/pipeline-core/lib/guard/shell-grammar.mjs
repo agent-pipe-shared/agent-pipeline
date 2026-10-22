@@ -759,7 +759,7 @@ function isBoundedReadOnlyNewlineChain(command, root, extraRoots = []) {
 
 export function isChainSegmentAdmitted(part, root, extraRoots = []) {
   if (isReadOnlyDiagnosticCommand(part, root, extraRoots)) return true;
-  const parsedPart = parseGuardCommand(part, root);
+  const parsedPart = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   return parsedPart.parseStatus === "accepted"
     && parsedPart.segments.length === 1
     && parsedPart.operators.length === 0
@@ -800,7 +800,7 @@ function rejectedAndChainSegment(command, root) {
  * implemented.
  */
 function simpleWordsAllowingTrailingStderrDevNullRedirect(command, root) {
-  const parsed = parseGuardCommand(command, root);
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   if (parsed.parseStatus !== "accepted"
     || parsed.segments.length !== 1
     || parsed.operators.length !== 0
