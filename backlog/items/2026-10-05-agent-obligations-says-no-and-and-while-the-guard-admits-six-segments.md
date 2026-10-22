@@ -43,3 +43,17 @@ claims that only `rg` pipelines are admitted (the guard also admits `grep`, `cat
 generated copies were regenerated. Pin cases AP8 and AP9 in
 `plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs` fail
 against the previous generator and pass now.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1. Superseded sentences above, kept as history:
+
+- Description, "No `&&` ... section 1 states": the generated section 1 now reads that chaining with `&&` is admitted
+  only as up to 6 segments and only when every segment is an admitted read-only shape (the always-safe-write allowlist
+  aside), matching the guard. Fixed by `7b1b4083b` (Triage Rationale).
+- Proposal, "Better: export the grammar bounds from the guard so the section is derived": done, see the Follow-up
+  2026-10-22 above. The generator reads `MAX_AND_CHAIN_SEGMENTS` exported from
+  `plugins/pipeline-core/lib/guard/grammar-denials.mjs`; the generated file's own comment names that source. The rest
+  of section 1 stays hand-maintained because no component exports the whole grammar as data, as the comment states.
+- The remeasure rows that list the "better" option as open are stale; nothing remains to implement. Status stays `open`
+  until the 0.7.0 candidate host checklist, as the Triage Decision says.

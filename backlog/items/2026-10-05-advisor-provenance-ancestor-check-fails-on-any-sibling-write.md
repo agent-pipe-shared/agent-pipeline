@@ -52,10 +52,10 @@ non-authoritative `cause` field instead of discarding it at
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
+- **Decision:** D65 / AC-104 (2026-10-20, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`): accepted.
+- **Rationale:** the ancestor identity narrows to `dev`/`ino`/`mode` plus the realpath, directory and not-symlink checks, with the original cause kept as a non-authoritative field and a security read in the Critic batch.
 - **Assignment (if accepted):**
-- **Date:**
+- **Date:** 2026-10-23 (filled by the text sweep; the decision itself dates from 2026-10-20).
 
 ### Blocker analysis 2026-10-22
 
@@ -63,3 +63,18 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **NOT-BLOCKED** — PO decision on the security-predicate change (drop mtimeNs/size/nlink for ancestors) is missing
   The decision exists: D65 (2026-10-20, specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md line 92, AC-104) narrows the ancestor identity to dev/ino/mode plus realpath/directory/not-symlink checks, keeps the original cause as a non-authoritative cause field, and requires a security read in the Critic batch. The item's empty Triage block is stale; the remaining work is agent implementation plus a Critic security read.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1. Superseded sentences above, kept as history:
+
+- Description, "compares `mtimeNs`, `size` and `nlink`" for every ancestor: true only for the target file now.
+  `readAdvisorPhysicalBytes` re-checks ancestors with `parentIdentity` (`dev`, `ino`, `mode`) plus the realpath,
+  directory and not-symlink checks; the full `identity` (with `nlink`/`size`/`mtimeNs`) applies to the file itself.
+  Source: `plugins/pipeline-core/lib/design-advisor-provenance.mjs` lines 13-15 and 39 (landed in the checkpoint
+  commit `d02409a8a`, after the bounded retry `92b4e15ce`).
+- Pin evidence: `plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs`
+  covers sibling file/subdirectory create and delete in every ancestor, symlinked or replaced ancestors still refused,
+  and the non-authoritative original cause kept under the `DWP2-PHYSICAL-OR-GIT` relabel. (Not re-run by this sweep.)
+- The empty Triage block and the Blocker-analysis claim that implementation is still to do: the Triage now carries D65 /
+  AC-104. What remains is the Critic security read that D65 requires and PO acceptance, not agent implementation.

@@ -75,3 +75,23 @@ The closed shell grammar admits `git show HEAD:<path> | head -n 3` but refuses
 refused in `draft`/`approved`: `rg -o --no-filename ...`, `rg -c "<pattern>" <file>` and
 `ls -la <path>` inside the project, while `rg -n ...` passes. The refusal message does not
 name the flag or operator that triggered it.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1. The Triage Decision and the Measurement 2026-10-22 section above stay as history;
+three sentences in them are superseded:
+
+- "Still refused ... `rg -c`, `rg --count`, `rg --no-filename` (also `-I`, `-H`, `--with-filename`)": these six spellings
+  are admitted now. Commit `d3bc82194` added them to `SEARCH_BOOLEAN` in `hooks/guard-command-grammar.mjs` (PO call D90,
+  2026-10-22); `-h` stays refused because it is the ripgrep help flag.
+- "Refused on purpose today ... `git -C <repo> show <rev>:<path> | head -n N`": admitted now for the read forms
+  (`show`, `log`, `diff`, `ls-files`, `cat-file`) with the `-C` target and the requested files passing the same credential
+  and root screen as any read. Decision D114 (2026-10-22, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`);
+  the `todo` marker of that case was removed by the pin's QG-04 note.
+- "Counted result ... 6 todo" and the Triage Decision "partly fixed and partly open": the pin
+  `plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs` counted 174 cases, 174 pass,
+  0 fail, 0 skipped, 0 todo (run alone on 2026-10-23, `node --test` over the pin file). No todo case is left.
+
+Still true: `git show <rev>:<path>` combined with extra tokens such as `--format=` stays refused where the AP11 contract
+of the Windows read pin says so; the refusal text naming the single triggering flag (`read-command-diagnosis.mjs`) is
+a separate delivered piece and unchanged here.

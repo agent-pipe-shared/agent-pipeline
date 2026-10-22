@@ -51,3 +51,18 @@ Pin the agreement with a test that runs the recommended spelling through the gua
   0 fail, 0 skipped, 0 todo (`node --test harness/scripts/generate-agent-obligations.test.mjs`, run alone).
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-22.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1. Two sentences still read as open work and are superseded:
+
+- The Proposal's "Until one of them lands, the obligations text must not recommend a refused spelling" and any
+  remeasure line asking to "run `generate-agent-obligations.test.mjs` serially and commit its counted result": the
+  first cheap option landed (commits `afe6b7f61`, `80c5a9922`, `a34415842`, the three contract cases named in the Triage
+  Rationale) and the counted result is already recorded in that Rationale (13 cases, 13 pass, 0 fail, 0 skipped,
+  0 todo, 2026-10-22). No further run is owed for this text.
+- What the generated file says now: `templates/prompts/agent-obligations.md` section 1 ("A provenance-bearing commit")
+  names the `-F <msgfile>` spelling with separate `git add -- <paths>` and states that `-m` with `--trailer` and a
+  parenthesised `Dispatch: <ID> (goldfish)` value is refused by guard-push. TR-C-F was not widened (the second option).
+
+Still open, unchanged: the host checklist of the 0.7.0 candidate that the Triage Decision names as the closing condition.

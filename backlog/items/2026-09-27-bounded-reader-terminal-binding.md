@@ -158,3 +158,20 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **NOT-BLOCKED** — Triage decision and owner-policy source for the terminal correction are still pending
   The decision is on record: D66 (2026-10-20, po-decisions-2026-10-18.md line 93, AC-118) takes a report-bound adjudicated-no-change disposition form for the seven phase-two adjudications, corrects the two remaining findings by documentation commits, and allows no fifth Reader and no inferred owner acceptance; the owner-policy source is the documentation-owner 2+2 decision of 2026-09-27 named in the item. The Triage 'pending' text is stale; remaining work is agent implementation and binding.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1 (item text only; the two documentation fixes and the course itself are other work).
+Superseded sentences above, kept as history:
+
+- Terminal record attempt 2026-10-22, "The next step needs a PO decision on points 2 and 3 (re-baseline the course on a
+  freshly reviewed state, or bound the post-course changes)": answered by D140 (2026-10-22, PO tiles,
+  `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md` line 156). The record is built on a FRESHLY reviewed
+  state: the planned 2+1 Reader course at content freeze reads the then-current state, the terminal record uses the
+  adjudicated form for the no-change findings, and no historical state is bent. Points 2 (nine unread covered commits)
+  and 3 (inventory transitions after the fourth reviewed commit) therefore fall away with the re-baseline.
+- Blocker analysis 2026-10-22 bullet naming the Triage decision and owner-policy source as pending: the Triage
+  Decision already records D66; D140 now settles the sequencing.
+- Point 1 of the attempt stays accurate and is still owed as documentation commits before the course (round 1
+  finding 7, Codex host contract relocation; round 4 finding 4, retained README availability passage), as D66 and D140
+  require. Owner acceptance and the policy-transition field stay unset for the PO. The item stays open.
