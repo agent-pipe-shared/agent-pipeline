@@ -63,7 +63,8 @@ import {
   reconstructOnboardingKickoffPlan,
   reconstructOnboardingKickoffPromotionPlan,
 } from "./onboarding-continuity.mjs";
-import { resolveInitialAnswersState } from "./onboarding-initial-answers-state.mjs";
+import { AUTHOR_IDENTITY_FIELD_MAX_BYTES, gitIdentityProvenance, initialAnswersReceipt, intakeGitAuthor, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA, unresolvedAuthorIdentityKeys } from "./project-onboarding-v3-author-identity.mjs";
+export { PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA, intakeGitAuthor };
 import { CLAUDE_INITIAL_PROMPT_REFERENCE_SCHEMA, readClaudeInitialPromptPointerAfterConsent } from "./claude-initial-prompt-pointer.mjs";
 import { CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA, readClaudeIntakePromptCapture } from "./claude-intake-prompt-capture.mjs";
 import { inspectConfirmedIntakeLanguageProjection } from "./onboarding-later-language.mjs";
@@ -143,7 +144,6 @@ const SCHEMA = "pipeline.project-onboarding.v4";
 // interpolation convention and never itself accepted by pipeline-state.mjs.
 export const PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER = "<PO_VERIFY_COMMAND>";
 export const PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH = ".git/agent-pipeline/onboarding-initial-answers.json";
-export const PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA = "pipeline.onboarding-initial-answers.v1";
 const LEGACY_SCHEMA = "pipeline.project-onboarding.v3";
 const PLAN_SCHEMA = "pipeline.project-onboarding-plan.v3";
 const REMOTE_ADOPTION_PLAN_SCHEMA = "pipeline.project-onboarding-remote-adoption-plan.v1";
@@ -5721,110 +5721,6 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   return plan;
 }
 
-/**
- * Ask — never invent — the repository's commit author when it is unresolved.
- *
- * BOTH 2026-08-09 greenfield runs lost a PO turn to `Author identity unknown` at
- * their first commit: onboarding initialized the repository and never looked at
- * whether anything could commit into it. The agent then hit it several steps
- * later, mid-implementation, where only the human could answer. A warn-only
- * diagnostic (2026-08-09) fixed the discovery timing but not the interruption:
- * it sat as one passive entry in the generic `diagnostics` array, next to dozens
- * of unrelated diagnostic kinds, easy to miss and never blocking or asking
- * anything (backlog: 2026-08-10-git-identity-warn-only-diagnostic-does-not-meet-
- * po-expectation.md). This asks instead, at the exact same point, using the same
- * `collect-input` shape `collectGoalAction()` already uses for the kickoff goal.
- *
- * This deliberately still does NOT set `user.name`/`user.email` itself. An
- * author identity is a claim about who a human is; a seed inventing one would
- * put a fabricated name in permanent history, which is worse than the stop it
- * prevents — that safety property carries over unchanged; only the delivery
- * mechanism (ask, not warn) changed.
- *
- * 2026-08-17 refinement (backlog: 2026-08-17-git-identity-must-be-set-
- * immediately-before-first-commit-not-at-setup-time.md): a live Codex
- * happy-path restart test showed the calling agent asking early as intended,
- * then also running `git config` immediately, before onboarding readiness --
- * the guidance below now explicitly defers the `git config` write until
- * immediately before the repository's first commit; the ask itself is
- * unchanged.
- *
- * Non-fatal by construction: an unreadable Git, a host-managed mount this seed
- * does not own, or any probe failure resolves to "nothing missing" rather than
- * a false alarm.
- */
-function unresolvedAuthorIdentityKeys(root, hostManaged, fs) {
-  if (hostManaged) return [];
-  // A complete root-bound answer is durable consent to hold these values,
-  // not evidence that Git config has already been written. Use this same
-  // reader for the initial side-channel ask AND the later intake ask.
-  const receipt = initialAnswersReceipt(root, fs);
-  if ([receipt?.gitAuthorName, receipt?.gitAuthorEmail].every((value) => typeof value === "string"
-    && value.trim().length > 0 && value.length <= 320 && !/[\r\n\0]/u.test(value))) return [];
-  const configured = (key) => {
-    try {
-      // Only repository-local identity satisfies this check.  A global or
-      // system value is surfaced separately as a proposed candidate with
-      // provenance; it is never treated as repository consent.
-      const probe = fs.spawnSync("git", ["config", "--get", "--local", key], { cwd: root, encoding: "utf8" });
-      return isSuccessfulSpawn(probe) && String(probe.stdout ?? "").trim().length > 0;
-    } catch {
-      return true; // Unprobeable is not "missing" -- never ask on evidence we do not have.
-    }
-  };
-  return ["user.name", "user.email"].filter((key) => !configured(key));
-}
-
-// Read-only provenance for the identity a future commit would inherit. Git's
-// author environment overrides author.* config, which overrides user.* config.
-// A proposed value is never the PO's consent, even when it is repository-local.
-function gitIdentityProvenance(root, fs) {
-  const result = {};
-  for (const key of ["user.name", "user.email"]) {
-    let selected = null;
-    let unreadable = false;
-    const environmentKey = key === "user.name" ? "GIT_AUTHOR_NAME" : "GIT_AUTHOR_EMAIL";
-    const environmentValue = fs.environment?.[environmentKey];
-    if (typeof environmentValue === "string" && environmentValue.length > 0) {
-      const value = environmentValue.trim();
-      selected = value.length > 0 && value.length <= AUTHOR_IDENTITY_FIELD_MAX_BYTES && !/[\r\n\0]/u.test(value)
-        ? { value, source: "environment", scope: environmentKey }
-        : { value: null, source: "unknown", scope: environmentKey };
-    }
-    for (const configKey of [key.replace(/^user\./u, "author."), key]) {
-      if (selected !== null) break;
-      for (const scope of ["local", "global", "system"]) {
-        try {
-          const probe = fs.spawnSync("git", ["config", `--${scope}`, "--get", configKey], { cwd: root, encoding: "utf8" });
-          if (probe?.status === 0 && String(probe.stdout ?? "").trim().length > 0) {
-            selected = { value: String(probe.stdout).trim(), source: "git-config", scope, configKey };
-            break;
-          }
-          if (probe?.error) unreadable = true;
-        } catch {
-          unreadable = true;
-        }
-      }
-    }
-    if (selected === null && key === "user.email" && typeof fs.environment?.EMAIL === "string"
-      && fs.environment.EMAIL.length > 0) {
-      const value = fs.environment.EMAIL.trim();
-      selected = value.length > 0 && value.length <= AUTHOR_IDENTITY_FIELD_MAX_BYTES && !/[\r\n\0]/u.test(value)
-        ? { value, source: "environment", scope: "EMAIL" }
-        : { value: null, source: "unknown", scope: "EMAIL" };
-    }
-    if (selected === null) {
-      selected = { value: null, source: unreadable ? "unknown" : "absent", scope: null };
-    }
-    result[key] = selected;
-  }
-  return result;
-}
-
-// A generous single-line bound for a real name or email address -- the same
-// role KICKOFF_GOAL_MAX_BYTES plays for the kickoff goal, kept local here
-// rather than imported so this stays independent of onboarding-continuity.mjs.
-const AUTHOR_IDENTITY_FIELD_MAX_BYTES = 320;
 const INITIAL_GIT_AUTHOR_NAME_PLACEHOLDER = "<PO_GIT_AUTHOR_NAME>";
 const INITIAL_GIT_AUTHOR_EMAIL_PLACEHOLDER = "<PO_GIT_AUTHOR_EMAIL>";
 const INITIAL_PUSH_APPROVAL_PLACEHOLDER = "<signature|chat>";
@@ -5979,23 +5875,6 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint, machineDefault)
       : `this repository's shared human-approval policy (gates.human_approval and gates.push_approval in pipeline.user.yaml) is pre-filled from this machine's remembered preference, "${machineDefault}" (machine-plane.mjs). This is a per-repository confirmation, not a one-time machine question -- it is asked again for every new repository, seeded with the machine default so the PO can confirm in one short turn rather than re-typing it from scratch. Ask the PO to confirm "${machineDefault}" for THIS repository, or type the other value ("signature" or "chat") to override it for this repository only -- an override here does not change the machine's own remembered default in machine-plane.mjs, and pipeline.user.yaml is already seeded with the pre-filled value, so only an override needs a further edit to the shared policy. Accept exactly "signature" or "chat" as the answer, never invent one.`,
     expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
   };
-}
-
-function initialAnswersReceipt(root, fs, repositoryCapability = "local") {
-  try {
-    const path = resolveInitialAnswersState(root, repositoryCapability).receipt;
-    if (!fs.existsSync(path)) return null;
-    const stat = fs.lstatSync(path);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return null;
-    const parsed = JSON.parse(fs.readFileSync(path, "utf8"));
-    if (parsed?.schema !== PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
-      || parsed.root !== root
-      || !["signature", "chat"].includes(parsed.pushApprovalPreference)
-      || (parsed.language !== undefined && parsed.language !== null && !["de", "en"].includes(parsed.language))) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
 }
 
 function hostManagedFirstAnswersAction(root, runner, repository, fs) {

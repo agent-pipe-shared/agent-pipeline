@@ -123,7 +123,7 @@ import {
 } from "../lib/critical-human-proof-policy.mjs";
 import {
   PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
-  shellWord,
+  shellWord, intakeGitAuthor,
 } from "../lib/project-onboarding-v3.mjs";
 import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
 import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
@@ -902,7 +902,6 @@ export function applyInitialOnboardingAnswers({
     && value.trim().length > 0 && value.length <= 320 && !/[\r\n\0]/u.test(value)))) {
     return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-INVALID" };
   }
-
   const sourcePath = join(root, "pipeline.user.yaml");
   const manifestPath = join(root, "project", "pipeline.yaml");
   let receiptPath;
@@ -929,6 +928,7 @@ export function applyInitialOnboardingAnswers({
     pendingPath = answerState.pending;
     priorIntake = readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: repository.mode });
   } catch { return { ok: false, code: "INITIAL-ANSWERS-INTAKE-UNAVAILABLE" }; }
+  if (gitAuthorName === null && gitAuthorEmail === null) ({ name: gitAuthorName = null, email: gitAuthorEmail = null } = intakeGitAuthor(priorIntake) ?? {}); // D98: flags win, nothing invented
   if (hostManaged && gitAuthorName === null) {
     return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-REQUIRED" };
   }

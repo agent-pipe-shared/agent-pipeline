@@ -113,6 +113,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/po-gate-profile-publisher.mjs`, `lib/private-boundary.mjs`,
   `lib/project-authority.mjs`,
   `lib/project-onboarding-ready-gate.mjs`, `lib/project-onboarding-v3.mjs`,
+  `lib/project-onboarding-v3-author-identity.mjs`,
   `lib/protected-test-paths.mjs`, `lib/publication-authority.mjs`,
   `lib/publication-bundle.mjs`, `lib/publication-bundle-v2.mjs`,
   `lib/publication-capability-preflight.mjs`, `lib/rebase-authority.mjs`,

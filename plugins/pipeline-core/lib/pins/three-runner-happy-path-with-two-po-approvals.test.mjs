@@ -533,9 +533,9 @@ test("AC-264 added (D64): the answers live in one typed intake record, the first
   assert.deepEqual(JSON.parse(child.stdout), { status: "present", values: intakeAnswers, consent: true, material: 1 });
 });
 
-test("AC-264 added (D64): the next session does not ask again for an answer the intake record already holds", {
-  todo: "BLOCKED-NEEDS-DECISION (owner Coordinator, due 2026-10-31; measured on this head): the intake record keeps the language and the pending-ask computation honours it, but it still publishes gitAuthorName and gitAuthorEmail as pending asks after the record holds the Git author. lib/project-onboarding-v3.mjs sits exactly on its architecture line bound (7807 lines), so a fix there must first move code out of that file.",
-}, () => {
+// Delivered by PO decision D98: the pending asks honour the Git author held by the intake record, and
+// scripts/onboarding-init.mjs takes the receipt's author from that record when no author flags are given.
+test("AC-264 added (D64): the next session does not ask again for an answer the intake record already holds", () => {
   const root = codexOnboardedRoot();
   applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });
   const inspected = inspectProjectOnboardingV3({ rootDir: root, deps: machineDeps, runner: "codex" });

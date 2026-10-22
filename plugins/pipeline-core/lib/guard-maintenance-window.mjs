@@ -834,7 +834,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/advisor-prohibition-binding.mjs",
   "plugins/pipeline-core/lib/dispatch-briefing-route-record.mjs",
   "plugins/pipeline-core/lib/fanout-ledger.mjs",
-  "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs",
+  "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

@@ -1021,6 +1021,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       };
 
       let first = freshDriver(path, runner, env, privateKey);
+      let intakeHoldsAuthor = false;
       if (runner === "codex" && first.outcome === "collect-input") {
         assert.deepEqual(first.collectInput.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "language", "profile", "projectDescription"]);
         assert.equal(first.collectInput.applyAction.argv.includes("scratch/onboarding-intake.txt"), true);
@@ -1034,14 +1035,19 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         ]), path, env);
         assert.equal(firstIntake.json.status, "applied", JSON.stringify(firstIntake.json));
         assertCapturedOriginal();
+        intakeHoldsAuthor = true;
         first = freshDriver(path, runner, env, privateKey);
       }
       assert.equal(first.outcome, "pending-asks", `${runner}: ${JSON.stringify(first)}`);
       assert.equal(first.pendingAsks.length, 1, `${runner}: initial PO round must be one action`);
       const initialAsk = first.pendingAsks[0];
       assert.equal(initialAsk.applyAction?.kind, "command");
+      // D98 / QG-04 (ALF-K2-GITAUTHOR): once the intake record holds the Git author (the Codex path just applied the
+      // intake with it), the initial round no longer asks it again; the receipt takes it from the record (asserted
+      // below). Negative control: where no intake record holds an author, the author is still asked, as before.
+      const authorAsked = intakeHoldsAuthor ? [] : ["gitAuthorName", "gitAuthorEmail"];
       assert.deepEqual(initialAsk.inputs.map((input) => input.name), runner === "codex"
-        ? ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent"]
+        ? [...authorAsked, "humanApprovalMode", "advisorExportConsent"]
         : ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
       const initial = invokeAction(initialAsk.applyAction, new Map([
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],

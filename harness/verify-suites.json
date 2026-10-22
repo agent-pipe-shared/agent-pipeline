@@ -1969,6 +1969,12 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/project-onboarding-v3-answers-file.test.mjs"
     },
     {
+      "name": "onboarding-init-intake-author-tests",
+      "file": "plugins/pipeline-core/scripts/onboarding-init-intake-author.test.mjs",
+      "invariantPinned": "D98: a Git author the intake record holds is not asked again and the first-answers receipt takes it from the record; explicit flags win; a one-sided record is still asked",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/onboarding-init-intake-author.test.mjs"
+    },
+    {
       "name": "role-route-preflight-tests",
       "file": "plugins/pipeline-core/lib/role-route-preflight.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/role-route-preflight.test.mjs",
