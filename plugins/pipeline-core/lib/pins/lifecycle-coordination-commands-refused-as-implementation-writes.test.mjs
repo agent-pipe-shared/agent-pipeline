@@ -136,4 +136,10 @@ test('AC-207 point 4: the F6 recovery checker and repair map are reachable witho
   assert.equal(admittedByClosedArgv(`node ${q(join(root, 'harness/scripts/check-observation-governance.mjs'))}`), true);
 });
 
-test('AC-207 point 5: design-course end-to-end on Git Bash reaches present-plan with zero overrides', { skip: 'held: needs the Windows Git Bash end-to-end run; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)' }, () => {});
+// Typed conditional skip: the case is the native Windows Git Bash end-to-end run, which no host has implemented yet.
+// The reason names the host class, so a reader sees what is missing instead of an empty body.
+test('AC-207 point 5: design-course end-to-end on Git Bash reaches present-plan with zero overrides', (t) => {
+  t.skip(process.platform === 'win32'
+    ? 'not implemented: the native Windows Git Bash end-to-end run still has to be written on this host class (AC-207 point 5, owner Coordinator, PO decision K7)'
+    : `host-limitation: the Git Bash end-to-end run needs a native Windows host with Git for Windows; this host is ${process.platform} (owner Coordinator, PO decision K7). The POSIX admission of every prescribed verb is pinned by catalogue-admit-prescribed-lifecycle-verbs.test.mjs.`);
+});
