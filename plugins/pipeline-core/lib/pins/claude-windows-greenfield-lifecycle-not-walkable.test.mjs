@@ -31,7 +31,10 @@
 //         Typed gaps (no fake record is written for any of them):
 //         V-10 Critic and unrelated-role dispatches are not recorded (critic-review.md carries no Slice line): open, owner Coordinator, due 2026-10-31
 //         V-10 a dynamically built Workflow script (not statically resolvable, fail-open in the guard) has no admission point: open, owner Coordinator, due 2026-10-31
-//         V-10 Codex/Antigravity runner registration of guard-dispatch (outside this repository scope: hooks.json matches Task|Agent|Workflow only): open, owner Coordinator, due 2026-10-31
+//         (The former gap "Codex/Antigravity runner registration of guard-dispatch" is closed at this head and is pinned by the
+//         source-scan case "V-10 runner registration": hooks/codex-hooks.json registers guard-dispatch.mjs on the spawn_agent
+//         matcher, and hooks/antigravity-pretool-guard.mjs runs it for every Task/Agent entry, once per Subagents array element.
+//         That case reads the shipped files; it does not prove a live Codex or Antigravity host fires the hook.)
 //         V-10 role-dispatch-preflight records the direct transport only; the other transports are recorded by the guard,
 //         because a Workflow digest is taken over the script literal the guard extracts, not over packet.prompt: by design
 //         The caller set below is pinned by a source scan; when a caller is added or removed this header must be
@@ -767,6 +770,34 @@ describe("V-10 admission wiring: the guard records the route digest of the brief
     // records without provenance: the admission record is not distinguishable from a producer record
     let bare = null;
     assert.throws(() => checkV10Wiring({ send: (text) => { bare = record(text); return ok; }, read: () => bare, produce: () => {}, prompt, sliceId }));
+  });
+});
+
+describe("V-10 runner registration: the shipped Codex and Antigravity routes reach guard-dispatch", () => {
+  const dispatchCommands = (manifest, matcher) => (manifest.hooks?.PreToolUse ?? [])
+    .filter((entry) => entry.matcher === matcher)
+    .flatMap((entry) => entry.hooks ?? [])
+    .map((hook) => `${hook.command ?? ""} ${hook.commandWindows ?? ""}`);
+
+  test("V-10 runner registration: codex-hooks.json runs guard-dispatch.mjs on spawn_agent and the Antigravity adapter runs it for Task and Agent per Subagents element", () => {
+    const codex = JSON.parse(readFileSync(join(PLUGIN_ROOT, "hooks", "codex-hooks.json"), "utf8"));
+    const commands = dispatchCommands(codex, "spawn_agent");
+    assert.ok(commands.length > 0, "codex-hooks.json has no spawn_agent PreToolUse entry");
+    assert.ok(commands.every((c) => /hooks\/guard-dispatch\.mjs/u.test(c)), `spawn_agent must run guard-dispatch.mjs: ${JSON.stringify(commands)}`);
+    const adapter = stripComments(readFileSync(join(PLUGIN_ROOT, "hooks", "antigravity-pretool-guard.mjs"), "utf8"));
+    assert.match(adapter, /toolName === "Task" \|\| toolName === "Agent"\s*\?\s*\["guard-dispatch\.mjs"\]/u);
+    assert.match(adapter, /guardName === "guard-dispatch\.mjs" && multiSubagentDispatch/u);
+  });
+
+  test("V-10 runner registration RED proof: a manifest without the spawn_agent entry, or one that runs another script there, fails the same check", () => {
+    const check = (manifest) => {
+      const commands = dispatchCommands(manifest, "spawn_agent");
+      assert.ok(commands.length > 0);
+      assert.ok(commands.every((c) => /hooks\/guard-dispatch\.mjs/u.test(c)));
+    };
+    assert.throws(() => check({ hooks: { PreToolUse: [] } }));
+    assert.throws(() => check({ hooks: { PreToolUse: [{ matcher: "spawn_agent", hooks: [{ command: "node hooks/codex-slicing-hint.mjs" }] }] } }));
+    check({ hooks: { PreToolUse: [{ matcher: "spawn_agent", hooks: [{ command: "node hooks/guard-dispatch.mjs" }] }] } });
   });
 });
 

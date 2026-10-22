@@ -58,3 +58,19 @@ Remaining Claude/Windows-specific frictions:
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Agent measurement (2026-10-22)
+
+`plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs` now has 36 cases (35 pass, 0 fail, 1 skipped).
+
+- V-9, V-12, V-13: covered by the existing pin cases, unchanged and green.
+- V-10: the route digest is bound to the inline briefing, the producer and the guard admission step record it, and the caller set is pinned.
+  The header listed three typed gaps. One is stale: Codex registers `guard-dispatch.mjs` on the `spawn_agent` matcher in
+  `hooks/codex-hooks.json`, and the Antigravity adapter runs it for every Task/Agent entry, once per Subagents element. That is now a
+  source-scan case with a RED proof. It reads the shipped files and does not prove a live host fires the hook. The other two gaps are
+  still open and are not fixable from an unprotected file: a Critic or unrelated-role dispatch carries no Slice line, so there is
+  nothing to bind, and a dynamically built Workflow script cannot be resolved statically by `hooks/guard-dispatch.mjs` (protected). Both
+  need a route-policy decision about what a route record means for a dispatch without a slice.
+- The CAS/"missing" failure: not reproduced and not located. It needs the Windows run, and no code or message text from the report is
+  available here. Searching the library for CAS-style codes returns many unrelated hits, so naming one would be a guess. It stays open.
+- The two-approval happy path (implementation and push) stays a skipped native case that needs a live interactive Claude/Windows session.
