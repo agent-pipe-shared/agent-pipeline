@@ -30,6 +30,14 @@
   (no catalogue removal, no legacy fallback). Builder K52 (clone `scratch/clones/k52`, briefing `scratch/briefing-k52.md`) diagnoses
   and, if safe, delivers a protected diff for `pipeline-state.mjs`; the PO applies it as operator. The signature of
   `79cda4601` is spent and must be repeated on the final HEAD (`push-prepare.mjs --checkpoint`, then `authorize-critical`).
+- Order after the push and the PO's install (PO call 2026-10-22, the PO is then away): (1) the scripts consolidation below (K53,
+  briefing `scratch/briefing-k53.md`, stopped before its first commit); (2) a fresh delivery-matrix remeasure on the final HEAD
+  (replaces `delivery-status-current.md`; last measured at `9a12beab7`); (3) work autonomously through everything content-wise the
+  agent can do alone (the `agent` clauses of the matrix, stale-claim re-checks first); (4) collect every PO topic separately in
+  the PO list and never block on it.
+- `approve-push` fix: PO chose Option A (2026-10-22): signature-mode `approve-push` runs the legacy route under the PF-54 in-flight
+  gate while a catalogue exists, proof verification unchanged; builder K52 delivers a protected diff for `pipeline-state.mjs`
+  that the PO applies as operator, then a new push signature on the final HEAD.
 - First work block after the install (PO-agreed 2026-10-22): move the reusable helpers out of untracked `scratch/` into the tracked
   `scripts/` folder with usage headers (stamp with the 7-character hash, isolated runner `run-parallel`, `rebaseline-inventory`,
   `rehearse-held`, the delivery-matrix and gap tools `matrix-gaps`, `delivery-owners`, `delivery-agent-items`, `gap-*`); write a
