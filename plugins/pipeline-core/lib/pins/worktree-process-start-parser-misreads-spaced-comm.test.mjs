@@ -22,7 +22,7 @@
 //             1e2592108): this file, 7 cases, 6 pass, 0 fail, 1 skip, 0 todo. L-1 and L-2 executed and passed (not skipped);
 //             the one skip is H-1, a typed Linux-only skip ("/proc is readable on Linux"; the unreadable-stat path is S-3).
 //   owner   : Coordinator
-//   due     : 2026-10-19 (met by the recorded run above)
+//   due     : 2026-10-19 (the recorded run is dated 2026-10-22, three days after the due date; the date was not kept)
 //   decision: PO decision K7
 // The native-Windows skip of L-1 and L-2 stays by design: S-1..S-4 run on every host and carry A1, A2 and A4 at source level.
 

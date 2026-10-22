@@ -314,7 +314,9 @@ test("P6: a hard link planted at the review path is refused and its other name i
     const decoy = join(item.repoRoot, "scratch", "decoy.txt");
     writeFileSync(decoy, "decoy\n");
     linkSync(decoy, join(item.repoRoot, "scratch", name));
-    assert.throws(() => item.sign(), /single-link regular artifact/u);
+    // Two independent layers refuse a multi-link review file (the publisher's own custody check and the shared
+    // physical-file reader); either typed refusal is the contract, a successful signing is not.
+    assert.throws(() => item.sign(), /single-link regular artifact|DAB-SIGN-FILE-UNSAFE/u);
     assert.equal(readFileSync(decoy, "utf8"), "decoy\n", "the decoy sharing the inode was not written through");
   } finally { item.cleanup(); }
 });
