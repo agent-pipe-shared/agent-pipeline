@@ -263,6 +263,11 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
 }
 
 // ---- TP-09: fail-open baselines -- no state, no active feature, unreadable spec -------
+// NOTE: TP-09a-c use UNGOVERNED fixture directories (freshDir), so they exit 0 at the
+// governance-scope admission before any state is read. They pin "an ungoverned repository is
+// never touched", not the governed no-state/no-feature/no-spec paths; those governed paths
+// are pinned in lib/pins/agy-el01-write-authorization-gap.test.mjs (no state and no feature
+// still allow; an unresolvable or unreadable spec now fails closed, D86).
 {
   const dir = freshDir("fail-open-no-state");
   check("TP-09a ALLOW: no state file at all", "Edit", "src/foo.mjs", ALLOW, { projectDir: dir, stderrEmpty: true });
@@ -282,11 +287,17 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
   check("TP-09c ALLOW: activeFeature present but its spec.md cannot be found", "Edit", "src/foo.mjs", ALLOW, { projectDir: dir, stderrEmpty: true });
 }
 {
-  const dir = freshGovernedDir("warn-invalid-state-json");
+  // QG-04 restatement (PO decision D86, 2026-10-22: the EL-01 tripwire must not fail open):
+  // this case used to pin the fail-open itself -- exit 1, "skipped (fail-open)", write
+  // allowed -- for a governed repository whose state file is corrupt. It now pins the
+  // fail-closed contract: refused, naming the cause ("invalid JSON") and a repair. The
+  // governed-repository contract for the other unreadable-evidence conditions is pinned in
+  // lib/pins/agy-el01-write-authorization-gap.test.mjs.
+  const dir = freshGovernedDir("block-invalid-state-json");
   writeJson(join(dir, "project", "pipeline-state.json"), "{not valid json");
-  check("TP-09d WARN: state file present but not valid JSON", "Edit", "src/foo.mjs", WARN, {
+  check("TP-09d BLOCK: state file present but not valid JSON -- fails closed (was WARN, D86)", "Edit", "src/foo.mjs", BLOCK, {
     projectDir: dir,
-    stderrIncludes: ["WARN", "invalid JSON"],
+    stderrIncludes: ["BLOCKED (guard-el01-tripwire", "invalid JSON", "Repair:"],
   });
 }
 
