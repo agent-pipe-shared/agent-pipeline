@@ -378,7 +378,7 @@ import {
   writeSync,
 } from "node:fs";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
-import { createAcceptedDeliveryContractEnvelope, verifyAcceptedDeliveryContract, prepareAcceptedContractCapture } from "../lib/critic-accepted-contract.mjs";
+import { createAcceptedDeliveryContractEnvelope, verifyAcceptedDeliveryContract, prepareAcceptedContractCapture, inspectSpecCriterionRows } from "../lib/critic-accepted-contract.mjs";
 import { resolveCanonicalArtifactIdentity as acceptedContractArtifactIdentity } from "../lib/feature-package-topology.mjs";
 import { verifyAgainstTrustAnchors as verifyAcceptedTrustAnchors } from "../lib/critical-human-proof-policy.mjs";
 import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
@@ -10975,6 +10975,15 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);
       let approvalRequestPath = null, approvalReview = null;
       if (requiresWorkflowPackage) {
+        // D64: every acceptance-criterion row the Spec states must be one the registration/dispatch parser locates; an unsupported
+        // shape or id is refused HERE, before the PO is asked to sign, not first at dispatch preparation. Scoped to Specs that carry
+        // such rows (a Spec with none is the deferred delivery hand-off concern, D85) and fail-open on an unreadable Spec, which the
+        // input check below refuses with its own typed code.
+        const specFile = physicalRebindFile(dir, submitted.specPath);
+        let specText = null;
+        try { specText = specFile ? new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(specFile.bytes) : null; } catch { specText = null; }
+        const criteria = specText === null ? { ok: true } : inspectSpecCriterionRows(specText);
+        if (!criteria.ok) { console.error(`Error: present-plan refused (${criteria.code}); ${criteria.message}`); return 2; }
         const inputs = readDesignApprovalInputs(dir, submitted, reviewPaths);
         if (!inputs.ok) { console.error(`Error: present-plan refused (${inputs.code}); use present-plan --review-receipt.`); return 2; }
         const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});

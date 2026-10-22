@@ -101,6 +101,11 @@ function sameSources(a, b) {
 
 const isFeatureId = (value) => isString(value) && FEATURE_ID.test(value);
 const isRef = (value) => isObject(value) && hasExactKeys(value, ["path", "sha256"]) && isString(value.path) && isSha256(value.sha256);
+/** A report reference: path and published digest, plus (D64, a sanitized report) the digest of its unpublished original. */
+const isReportShape = (value) => isObject(value) && isString(value.path) && isSha256(value.sha256)
+  && (hasExactKeys(value, ["path", "sha256"]) || hasExactKeys(value, ["originalSha256", "path", "sha256"]));
+/** The pair is well-formed when absent, or when the original digest is a digest that differs from the published one. */
+const reportPairIsValid = (report) => !Object.hasOwn(report, "originalSha256") || (isSha256(report.originalSha256) && report.originalSha256 !== report.sha256);
 const isReviewer = (value) => isObject(value) && hasExactKeys(value, ["model", "runner"]) && isString(value.runner) && RUNNER.test(value.runner) && isString(value.model) && MODEL.test(value.model);
 const isSourcesShape = (value) => isObject(value) && hasExactKeys(value, ["companions", "prd", "spec"]) && isRef(value.prd) && isRef(value.spec) && Array.isArray(value.companions) && allOf(value.companions, isRef);
 const isStringList = (value) => Array.isArray(value) && allOf(value, isString);
@@ -151,11 +156,12 @@ function receiptRefusal(receipt) {
     && (previousReceiptSha256 === null || isSha256(previousReceiptSha256))
     && isSourcesShape(sources)
     && isReviewer(receipt.reviewer)
-    && isRef(report)
+    && isReportShape(report)
     && (receipt.verdict === "pass" || receipt.verdict === "open-findings")
     && isStringList(receipt.openFindingIds)
     && isReviewedAt(receipt.reviewedAt);
   if (!shapeOk) return "DRR-SHAPE";
+  if (!reportPairIsValid(report)) return "DRR-REPORT-PAIR";
   const companionPaths = sources.companions.map((companion) => companion.path);
   if (!pathsAreAcceptable(report.path, sources.prd.path, sources.spec.path, companionPaths, previousReceiptPath)) return "DRR-PATH";
   if (!sourcesAreAcceptable(sources.prd.path, sources.spec.path, companionPaths)) return "DRR-SOURCES";
@@ -305,10 +311,11 @@ export function createDesignReviewReceipt(input) {
     && (previous === null || isPreviousInput(previous))
     && isSourcesShape(sources)
     && isReviewer(reviewer)
-    && isRef(report)
+    && isReportShape(report)
     && isStringList(openFindingIds)
     && isReviewedAt(reviewedAt);
   if (!shapeOk) return refuse("DRR-SHAPE");
+  if (!reportPairIsValid(report)) return refuse("DRR-REPORT-PAIR");
 
   const companions = sources.companions.map(({ path, sha256 }) => ({ path, sha256 })).sort((a, b) => compareUnits(a.path, b.path));
   const normalized = {
@@ -360,7 +367,7 @@ export function createDesignReviewReceipt(input) {
     previousReceiptSha256,
     sources: normalized,
     reviewer: { runner: reviewer.runner, model: reviewer.model },
-    report: { path: report.path, sha256: report.sha256 },
+    report: Object.hasOwn(report, "originalSha256") ? { path: report.path, sha256: report.sha256, originalSha256: report.originalSha256 } : { path: report.path, sha256: report.sha256 },
     verdict: ids.length === 0 ? "pass" : "open-findings",
     openFindingIds: ids,
     reviewedAt,

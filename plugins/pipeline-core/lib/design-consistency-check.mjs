@@ -228,7 +228,9 @@ function assertSummary(summary) {
     fail("a review receipt summary kind must be initial or delta");
   }
   assertSourceSet(summary.sources, "a review receipt summary sources", false);
-  if (!hasExactKeys(summary.report, ["path", "sha256"]) || typeof summary.report.path !== "string" || !isSha(summary.report.sha256)) fail("a review receipt summary report is malformed");
+  // D64: a sanitized report carries the digest of its unpublished original beside the published digest (a distinct, well-formed pair).
+  const pairedReport = hasExactKeys(summary.report, ["path", "sha256", "originalSha256"]) && isSha(summary.report.originalSha256) && summary.report.originalSha256 !== summary.report.sha256;
+  if (!(hasExactKeys(summary.report, ["path", "sha256"]) || pairedReport) || typeof summary.report.path !== "string" || !isSha(summary.report.sha256)) fail("a review receipt summary report is malformed");
   if (summary.verdict !== "pass" && summary.verdict !== "open-findings") fail("a review receipt summary verdict is malformed");
   const findings = summary.openFindingIds;
   if (!Array.isArray(findings) || findings.length > FINDING_IDS_MAX || !findings.every(isRequirementId) || new Set(findings).size !== findings.length) fail("a review receipt summary openFindingIds is malformed");

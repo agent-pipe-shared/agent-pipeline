@@ -39,7 +39,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
 
 const USAGE = "Usage: design-review-receipt.mjs create --repo <repo-root> --feature <feature-id> --report <critic-report> --prd <prd> --spec <spec> "
-  + "[--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] --out <receipt>\n"
+  + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] --out <receipt>\n"
   + "Every path is repo-relative. The review time, runner and all digests are derived, never supplied. The observed identity is "
   + "recorded only when you supply a direct observation of the concrete review dispatch; otherwise it is `unknown`.";
 
@@ -51,7 +51,7 @@ const REQUESTED_ROUTE_PATTERN = /^[\x21-\x7e]{1,128}$/u;
 const SINGLE_FLAGS = new Map([
   ["repo", "repo"], ["feature", "featureId"], ["report", "reportPath"], ["prd", "prdPath"],
   ["spec", "specPath"], ["previous", "previousPath"], ["out", "outPath"],
-  ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
+  ["original-report", "originalReportPath"], ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
 ]);
 const REPEATED_FLAGS = new Map([["companion", "companionPaths"], ["open-finding", "openFindingIds"]]);
 const REQUIRED = ["repo", "feature", "report", "prd", "spec", "out"];
@@ -136,6 +136,7 @@ export function createReceiptFromDisk(input, deps = {}) {
   const companionPaths = request.companionPaths ?? [];
   const openFindingIds = request.openFindingIds ?? [];
   const previousPath = request.previousPath ?? null;
+  const originalReportPath = request.originalReportPath ?? null;
   const requestedRoute = request.requestedRoute ?? null;
   const observedIdentity = request.observedIdentity ?? null;
   const isStrings = (value) => Array.isArray(value) && value.every((entry) => typeof entry === "string");
@@ -153,6 +154,7 @@ export function createReceiptFromDisk(input, deps = {}) {
   const named = [["report", request.reportPath], ["PRD", request.prdPath], ["Spec", request.specPath], ["output", request.outPath]];
   companionPaths.forEach((path) => named.push(["companion", path]));
   if (previousPath !== null) named.push(["previous receipt", previousPath]);
+  if (originalReportPath !== null) named.push(["original report", originalReportPath]);
   for (const [role, path] of named) {
     if (!isSafePath(path)) return refuse("DRC-PATH-UNSAFE", `the ${role} path is not a safe repo-relative path: ${JSON.stringify(path)}`);
   }
@@ -184,6 +186,13 @@ export function createReceiptFromDisk(input, deps = {}) {
   }
   const reportRead = readBound(repoReal, request.reportPath, "report");
   if (!reportRead.ok) return reportRead;
+  // D64: a sanitized report. The unpublished original is read only to derive its digest; the receipt binds both digests.
+  let originalSha256 = null;
+  if (originalReportPath !== null) {
+    const originalRead = readBound(repoReal, originalReportPath, "original report");
+    if (!originalRead.ok) return originalRead;
+    originalSha256 = sha256Of(originalRead.bytes);
+  }
   let previous = null;
   if (previousPath !== null) {
     const previousRead = readBound(repoReal, previousPath, "previous receipt");
@@ -203,7 +212,7 @@ export function createReceiptFromDisk(input, deps = {}) {
     previous,
     sources,
     reviewer: { runner, model },
-    report: { path: request.reportPath, sha256: sha256Of(reportRead.bytes) },
+    report: { path: request.reportPath, sha256: sha256Of(reportRead.bytes), ...(originalSha256 === null ? {} : { originalSha256 }) },
     openFindingIds,
     reviewedAt: clock.toISOString(),
     specBytes,
@@ -261,7 +270,7 @@ function parseArgv(argv) {
   }
   const missing = REQUIRED.find((name) => !single.has(name));
   if (missing !== undefined) return refuse("DRC-USAGE", `missing --${missing}\n${USAGE}`);
-  const request = { ...repeated, previousPath: null, requestedRoute: null, observedIdentity: null };
+  const request = { ...repeated, previousPath: null, originalReportPath: null, requestedRoute: null, observedIdentity: null };
   for (const [name, key] of SINGLE_FLAGS) if (single.has(name)) request[key] = single.get(name);
   return { ok: true, request };
 }

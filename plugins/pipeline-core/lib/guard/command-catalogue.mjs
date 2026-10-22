@@ -176,6 +176,7 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
       },
       optionalValue: {
         "--previous": input,
+        "--original-report": input,
         "--requested-route": (value) => REQUESTED_ROUTE.test(value),
         "--observed-identity": (value) => OBSERVED_IDENTITY.test(value),
       },

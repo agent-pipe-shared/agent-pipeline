@@ -141,6 +141,10 @@ export function commitAcceptedContractCapture({capture,persistEnvelope,publishSt
   } catch { return {...no(retained ? 'CAC-CAPTURE-PUBLICATION' : 'CAC-CAPTURE-READBACK'),committed:false,envelopeRetained:retained}; }
 }
 
+// Normative and excluded heading vocabulary of the criterion scan (shared with `inspectSpecCriterionRows`).
+const NORMATIVE_HEADING = /\b(?:acceptance\s+(?:criteria|requirements)|abnahmekriterien|akzeptanzkriterien|abnahmeanforderungen)\b/iu;
+const EXCLUDED_HEADING = /\b(?:examples?|notes?|commentary|beispiele?|hinweise?|anmerkung(?:en)?|kommentare?)\b/iu;
+
 /**
  * The ordered criterion-row scan of the host parser, exported unchanged so other readers (plan-readiness
  * hand-off, lib/plan-handoff-readiness.mjs) see exactly the rows `parseAcceptedCriticCriterion` selects from.
@@ -153,9 +157,7 @@ export function scanAcceptedCriterionRows(source) {
     for (const raw of source.split(/(?<=\n)/u)) {
       lines.push({text:raw.replace(/\r?\n$/u,''),byteOffset}); byteOffset += Buffer.byteLength(raw);
     }
-    // Normative and excluded heading vocabulary, shared by the table and the clause scanners below.
-    const NORMATIVE_HEADING = /\b(?:acceptance\s+(?:criteria|requirements)|abnahmekriterien|akzeptanzkriterien|abnahmeanforderungen)\b/iu;
-    const EXCLUDED_HEADING = /\b(?:examples?|notes?|commentary|beispiele?|hinweise?|anmerkung(?:en)?|kommentare?)\b/iu;
+    // Normative and excluded heading vocabulary, shared by the table and the clause scanners below (module level).
     // Two-column acceptance table: a number cell, then a criterion cell. Rows `n` and `R-n` map to `AC-n`.
     const TWO_COLUMN_NUMBER = /^(?:#|nr\.?|id)$/iu;
     const TWO_COLUMN_CRITERION = /^(?:kriterium|kriterien|abnahmekriterium|anforderung|criterion|requirement)$/iu;
@@ -273,6 +275,66 @@ export function scanAcceptedCriterionRows(source) {
       }
     }
     return rows;
+}
+
+/** The criterion shapes the host parser locates, as named in a refusal (D64: the repair is stated where the refusal is). */
+export const SUPPORTED_CRITERION_SHAPES = Object.freeze([
+  'a three-column table with the header `| # | Criterion | Evidence |` and the id (AC-<n>) in the first cell',
+  'a two-column table with the header `| # | Criterion |` (or `| Nr. | Kriterium |`) whose first cell is `n`, `R-n` or `AC-n`',
+  'a heading `AC-<n>` followed by one paragraph',
+  'a bullet `- **AC-<n>:** text` or a numbered item `1. **AC-<n>:** text`',
+]);
+export const CRITERION_ID_RULE = 'an id is AC-<n> (n without a leading zero) or AC-E<epic>-<story>-<nn>';
+const CRITERION_CANDIDATE_TOKEN = 'AC-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*';
+const TABLE_CANDIDATE = new RegExp(`^\\s*\\|\\s*(?:\\*\\*|\`)?(${CRITERION_CANDIDATE_TOKEN})(?:\\*\\*|\`)?\\s*\\|`, 'u');
+const ITEM_CANDIDATE = new RegExp(`^\\s*(?:[-+*]|[0-9]+[.)])\\s+(?:\\*\\*|\`)?(${CRITERION_CANDIDATE_TOKEN})(?:\\*\\*|\`)?[:.)]?(?:\\s|$|\\*)`, 'u');
+const HEADING_CANDIDATE = new RegExp(`^ {0,3}#{1,6}\\s+(${CRITERION_CANDIDATE_TOKEN})(?:\\s+#+)?\\s*$`, 'u');
+
+/**
+ * D64 (present-plan): is every acceptance-criterion row of the Spec one the registration and dispatch parser locates?
+ * Reuses `scanAcceptedCriterionRows` for what is located; the only addition is the list of CANDIDATE rows under a
+ * normative acceptance heading (a line that starts with an `AC-` token in a table cell, list item or heading), so a
+ * row the scan silently ignores -- the four-column table, a leading-zero id -- is named instead of first failing at
+ * dispatch preparation. A Spec with no candidate row is outside this check (the delivery hand-off, which also wants
+ * a row to exist, is a separate and deferred concern, PO decision D85). `source` is the strictly decoded Spec text.
+ * @returns {{ok: true, located: string[]} | {ok: false, code: 'CAC-CRITERION-UNSUPPORTED', located: string[], unsupported: {id: string, line: number, reason: string}[], message: string}}
+ */
+export function inspectSpecCriterionRows(source) {
+  const rows = scanAcceptedCriterionRows(source);
+  const counts = new Map();
+  for (const row of rows) if (row.normative) counts.set(row.id, (counts.get(row.id) ?? 0) + 1);
+  const located = [...new Set(rows.filter(row => row.normative && row.valid !== false).map(row => row.id))];
+  const unsupported = [];
+  for (const row of rows) {
+    if (!row.normative) continue;
+    if (row.valid === false) unsupported.push({id: row.id, line: 0, reason: 'shape'});
+    else if (counts.get(row.id) > 1 && !unsupported.some(entry => entry.id === row.id && entry.reason === 'duplicate')) unsupported.push({id: row.id, line: 0, reason: 'duplicate'});
+  }
+  const headings = []; let comment = false, fence = null;
+  const lines = source.split(/\r?\n/u);
+  for (let index = 0; index < lines.length; index++) {
+    const text = lines[index];
+    if (comment || text.includes('<!--')) { if (text.includes('<!--')) comment = true; if (text.includes('-->')) comment = false; continue; }
+    const marker = text.match(/^ {0,3}(`{3,}|~{3,})(.*)$/u);
+    if (fence) { if (marker && marker[1][0] === fence.char && marker[1].length >= fence.length && marker[2].trim() === '') fence = null; continue; }
+    if (marker) { fence = {char: marker[1][0], length: marker[1].length}; continue; }
+    if (/^(?: {0,3}>| {4}|\t)/u.test(text)) continue;
+    const heading = text.match(/^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/u);
+    if (heading) {
+      while (headings.length && headings.at(-1).level >= heading[1].length) headings.pop();
+      headings.push({level: heading[1].length, text: heading[2]});
+    }
+    if (!headings.some(entry => NORMATIVE_HEADING.test(entry.text)) || headings.some(entry => EXCLUDED_HEADING.test(entry.text))) continue;
+    const token = (heading ? text.match(HEADING_CANDIDATE) : text.match(TABLE_CANDIDATE) ?? text.match(ITEM_CANDIDATE))?.[1];
+    if (!token) continue;
+    if (!isCriterionId(token)) unsupported.push({id: token, line: index + 1, reason: 'id'});
+    else if (!located.includes(token)) unsupported.push({id: token, line: index + 1, reason: 'shape'});
+  }
+  if (unsupported.length === 0) return {ok: true, located};
+  const why = {id: `not a criterion id (${CRITERION_ID_RULE}; a leading zero is not allowed)`, shape: 'row shape the parser does not locate', duplicate: 'stated more than once'};
+  const named = unsupported.slice(0, 8).map(entry => `${entry.id}${entry.line ? ` (line ${entry.line}` : ' ('}${entry.line ? ', ' : ''}${why[entry.reason]})`).join('; ');
+  return {ok: false, code: 'CAC-CRITERION-UNSUPPORTED', located, unsupported,
+    message: `acceptance criterion rows the registration and dispatch parser cannot locate: ${named}${unsupported.length > 8 ? '; ...' : ''}. Supported shapes: ${SUPPORTED_CRITERION_SHAPES.join('; ')}. ${CRITERION_ID_RULE}; a leading zero is not allowed. Re-render the row; the criterion text itself need not change.`};
 }
 
 /** Pure original-byte interpretation only. Locators and parser success confer no authority. */

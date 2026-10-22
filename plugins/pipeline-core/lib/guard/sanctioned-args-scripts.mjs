@@ -407,6 +407,9 @@ export function sanctionedPipelineStateArgs(args, root) {
     });
   }
   if (args[0] === "materialize-architecture") return args.length === 1;
+  // D64: the next action `inspect` renders once a plan is approved. The verb takes no flags and writes one governed template
+  // file (it refuses when that file exists), the same class as materialize-architecture just above.
+  if (args[0] === "materialize-push-threat-model") return args.length === 1;
   const validBy = (value) => typeof value === "string"
     && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
   if (args[0] === "plan-legacy-v2-revocation-recovery") {
