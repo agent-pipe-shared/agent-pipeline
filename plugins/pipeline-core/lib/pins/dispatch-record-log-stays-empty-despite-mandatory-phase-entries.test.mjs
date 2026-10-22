@@ -114,6 +114,38 @@ test("control: a new terminal v3 record with one log entry is written", () => {
   assert.equal(existsSync(join(root, target(record))), true);
 });
 
+// Added acceptance (0.7.0, F-06): "a dispatch record and a design review can be started from a generated, valid skeleton
+// with the digests pre-filled; the agent fills judgment fields only". The dispatch-record half is pinned by
+// scripts/dispatch-briefing.test.mjs ("init-dispatch-record prints a valid opening v4 record ..."). The design-review half
+// is the receipt producer: it takes the review's judgment (open finding ids, an observed identity) and derives every
+// digest, the time and the runner itself. This case drives the real producer and the real receipt parser.
+test("ACCEPTANCE: a design review receipt is generated with every digest derived from disk; the caller supplies only judgment", async () => {
+  const { createReceiptFromDisk } = await import("../../scripts/design-review-receipt.mjs");
+  const { parseDesignReviewReceipt } = await import("../design-review-receipt.mjs");
+  const { createHash } = await import("node:crypto");
+  const { writeFileSync } = await import("node:fs");
+  const digest = (text) => createHash("sha256").update(text).digest("hex");
+  const repo = mkdtempSync(join(tmpdir(), "pin-log-receipt-"));
+  mkdirSync(join(repo, "specs/f/review"), { recursive: true });
+  const files = { "specs/f/prd.md": "# PRD\n", "specs/f/spec.md": "# Spec\n", "specs/f/review/report.md": "# Report\n" };
+  for (const [path, text] of Object.entries(files)) writeFileSync(join(repo, path), text);
+  const request = { repo, featureId: "feat-x", reportPath: "specs/f/review/report.md", prdPath: "specs/f/prd.md",
+    specPath: "specs/f/spec.md", outPath: "specs/f/review/receipt.json", openFindingIds: ["F-TWO", "F-ONE"] };
+  const result = createReceiptFromDisk(request, { env: { CLAUDECODE: "1" }, now: () => new Date("2026-10-18T09:30:00.000Z") });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const parsed = parseDesignReviewReceipt(readFileSync(join(repo, request.outPath)));
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.receipt.sources.prd.sha256, digest(files["specs/f/prd.md"]));
+  assert.equal(parsed.receipt.sources.spec.sha256, digest(files["specs/f/spec.md"]));
+  assert.equal(parsed.receipt.report.sha256, digest(files["specs/f/review/report.md"]));
+  assert.equal(parsed.receipt.reviewedAt, "2026-10-18T09:30:00.000Z");
+  assert.equal(parsed.receipt.reviewer.runner, "claude");
+  assert.deepEqual(parsed.receipt.openFindingIds, ["F-ONE", "F-TWO"]);
+  assert.equal(parsed.receipt.verdict, "open-findings");
+  // A digest cannot be supplied by hand: the request shape has no field for one.
+  assert.equal(Object.keys(request).some((key) => /sha|digest|hash/iu.test(key)), false);
+});
+
 test("control: the completed-undelivered v4 observation keeps its empty-log exception at read and at write", () => {
   const record = undelivered();
   assert.deepEqual(validateDispatchRecord(record).log, []);
