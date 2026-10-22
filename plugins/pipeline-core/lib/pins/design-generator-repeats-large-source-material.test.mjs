@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { main, summarizeOnboardingIntakeGeneratePlan } from "../../scripts/project-onboarding-v3.mjs";
 import { mkdtempTestScratch } from "../test-tmpdir.mjs";
 import {
@@ -247,4 +248,54 @@ test("[pendingAsks compaction] routine inspect repeats no request text and is si
   assert.ok(bytes(l.out) < bytes(text), "inspect is smaller than even the small input");
   assert.ok(Math.abs(bytes(l.out) - bytes(s.out)) < 256, "inspect size does not scale with the source size");
   assert.ok(bytes(asksOf(l.out)) <= bytes(asksOf(s.out)) + 256, "pendingAsks size does not scale with the source size");
+});
+
+// Populated pendingAsks (the case the test above explicitly does not exercise). The onboarding
+// driver prints a published ask ONCE. Measured on a fresh repository with the codex runner
+// (outcome "collect-input", one ~3.1 KB bundled initial-answers ask), before the fix:
+// 23,033 bytes with the ask serialized 3 times (top-level pendingAsks, collectInput.pendingAsks,
+// final.nextAction.pendingAsks); the "pending-asks" outcome (claude runner) already printed it once
+// (10,906 bytes). After: each ask once and the output below the bound.
+const ONBOARDING_INIT_CLI = fileURLToPath(new URL("../../scripts/onboarding-init.mjs", import.meta.url));
+const COLLECT_INPUT_OUTPUT_BOUND = 19_000;
+
+function driverOutput(runner) {
+  const root = mkdtempTestScratch("alf-k15-root-");
+  const home = mkdtempTestScratch("alf-k15-home-");
+  const run = spawnSync(process.execPath, [ONBOARDING_INIT_CLI, "--root", root, "--runner", runner], {
+    encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024,
+    env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
+  });
+  rmSync(root, { recursive: true, force: true });
+  rmSync(home, { recursive: true, force: true });
+  assert.equal(run.status, 0, run.stderr);
+  return { stdout: run.stdout, parsed: JSON.parse(run.stdout) };
+}
+
+function assertAsksPrintedOnce({ stdout, parsed }, label) {
+  assert.ok(Array.isArray(parsed.pendingAsks) && parsed.pendingAsks.length > 0, `${label}: fixture must carry real asks`);
+  for (const ask of parsed.pendingAsks) {
+    assert.equal(countOf(stdout, JSON.stringify(ask)), 1, `${label}: an ask is serialized more than once`);
+  }
+  assert.equal(parsed.final?.nextAction?.pendingAsks, undefined, `${label}: ask repeated inside final.nextAction`);
+  assert.equal(parsed.collectInput?.pendingAsks, undefined, `${label}: ask repeated inside collectInput`);
+}
+
+test("[pendingAsks compaction] the driver prints each published ask once for the collect-input outcome and stays within its size bound", () => {
+  const codex = driverOutput("codex");
+  assert.equal(codex.parsed.outcome, "collect-input", "fixture sanity: the codex first stop is a collect-input outcome with sibling asks");
+  assertAsksPrintedOnce(codex, "codex/collect-input");
+  // The primary question stays resolvable in both places existing consumers read it.
+  assert.equal(codex.parsed.collectInput.kind, "collect-input");
+  assert.equal(codex.parsed.final.nextAction.kind, "collect-input");
+  assert.ok(bytes(codex.stdout) <= COLLECT_INPUT_OUTPUT_BOUND, `driver output ${bytes(codex.stdout)} exceeds ${COLLECT_INPUT_OUTPUT_BOUND}`);
+  const claude = driverOutput("claude");
+  assert.equal(claude.parsed.outcome, "pending-asks");
+  assertAsksPrintedOnce(claude, "claude/pending-asks");
+});
+
+test("RED mirror: the once-only assertion fails for an output that repeats an ask in collectInput", () => {
+  const ask = { kind: "collect-input", applyAction: { argv: ["x"] } };
+  const parsed = { outcome: "collect-input", collectInput: { kind: "collect-input", pendingAsks: [ask] }, pendingAsks: [ask], final: { nextAction: { kind: "collect-input" } } };
+  assert.throws(() => assertAsksPrintedOnce({ stdout: JSON.stringify(parsed), parsed }, "mirror"), /serialized more than once|repeated inside/u);
 });

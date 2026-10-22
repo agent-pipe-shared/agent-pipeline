@@ -100,3 +100,27 @@ elaborating them before binding; and each draft embedded the full source materia
 (about 87 KB, so three copies in total). The verbatim-copy half is addressed by commit
 38e1758a4 (`design-input.md` is now a provenance record). The header contradiction
 ("do not hand-edit" versus "elaborate before binding") remains open.
+
+## Extension 2026-10-22: pendingAsks envelopes printed once (ALF-K15)
+
+Re-verified live before building: the stored-duplication half is closed (the pin
+asserts 0 copies of the request in design-input, PRD and Spec), and plain
+`project-onboarding-v3.mjs inspect` already carries each ask exactly once
+(measured: one 3,785-byte ask, 11,638-byte output). The remaining repetition sat in the
+`onboarding-init.mjs` driver output: for the `collect-input` outcome (codex first stop) the
+one 3,085-byte bundled ask was serialized three times (top-level `pendingAsks`,
+`collectInput.pendingAsks`, `final.nextAction.pendingAsks`); the `pending-asks` outcome
+already printed it once.
+
+Measured, fresh repository, 3 runs identical: BEFORE 23,033 bytes, AFTER 16,829 bytes
+(-6,204 bytes, -26.9%); the `pending-asks` outcome stays at 10,906 bytes. The driver now
+drops a sibling copy only when it is canonically equal to the top-level `pendingAsks`, so
+nothing is lost; the primary action stays in `collectInput` and `final.nextAction`.
+Pin: `[pendingAsks compaction]` cases in
+`lib/pins/design-generator-repeats-large-source-material.test.mjs` (each ask once, bound 19,000 bytes).
+
+Still open, needs a contract decision (not guessed): the primary collect-input action is
+printed twice (`collectInput` and `final.nextAction`, about 3 KB each) because existing
+consumers read both; and a separate stateless call cannot know an ask was already shown,
+so cross-call compaction would need a persisted shown-digest. The header contradiction above
+also remains open.
