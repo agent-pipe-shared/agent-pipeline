@@ -1,0 +1,610 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 049e6690f..4c0700fe1 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -20,7 +20,7 @@ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-ho
+ import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority } from "./native-goldfish-host-state.mjs";
+ import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
+ import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
+-import { readyAndLive, SLICE_QUEUE_MAX_BYTES } from "./slice-queue.mjs";
++import { readyAndLive, SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "./slice-queue.mjs";
+ import { runCli, writeQueueAtomic } from "../scripts/slice-queue.mjs";
+ import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
+ import { createAgyAuthorityJournalOwner } from "./agy-host-observed-store.mjs";
+@@ -786,7 +786,7 @@ const cases = [
+     const held=prepare('ITEM-AC-2');
+     assert.equal(held.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(held));assert.match(held.reason,/held on ITEM-AC-1 .*the queue was not written$/u);assert.match(held.repair,/slice-queue\.mjs cancel <slice id>/u);
+     assert.equal(readFileSync(queuePath,'utf8'),before,'a held dependency leaves the queue untouched');
+-    const cancel=(sliceId,reason='never started')=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId,reason}));
++    const cancel=(sliceId,reason='never started')=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId,reason,cancelClass:'superseded'}));
+     assert.equal(cancel('ITEM-AC-1','').code,'SQ-ITEM-CANCEL-INPUT');assert.equal(cancel('NOPE').code,'SQ-NOT-FOUND');
+     const cancelled=cancel('ITEM-AC-1');assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));assert.deepEqual(cancelled.released,[]);
+     assert.equal(cancel('ITEM-AC-1').code,'SQ-ITEM-CANCEL-ALREADY');
+@@ -998,7 +998,7 @@ const cases = [
+     git('checkout','-q','--','.gitignore');
+     // A never-started slice is cancelled from an unbound shell (D51 (3)).
+     assert.equal(runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-0'),candidate:original.candidate,writeScope:['src/change.mjs']})).status,'required');
+-    const unbound=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-0',reason:'not needed'});
++    const unbound=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-0',reason:'not needed',cancelClass:'superseded'});
+     assert.equal(unbound.status,'cancelled',JSON.stringify(unbound));
+     assert.equal(dispatch('ITEM-AC-1','DELIVER-AC-1','native-tool-one',original.candidate).ok,true);
+     // The Goldfish delivered and the orchestrator committed it by hand: the commit evidence releases the item (D40, D51 (2)).
+@@ -1006,11 +1006,11 @@ const cases = [
+     const candidate={commit:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}')};
+     const second=dispatch('ITEM-AC-2','DELIVER-AC-2','native-tool-two',candidate);
+     assert.equal(second.ok,true,JSON.stringify(second));
+-    assert.equal(runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-1',reason:'delivered'})).code,'SQ-ITEM-CANCEL-INTEGRATED');
++    assert.equal(runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-1',reason:'delivered',cancelClass:'integrated-elsewhere'})).code,'SQ-ITEM-CANCEL-INTEGRATED');
+     // A started slice whose Goldfish no longer runs is cancelled from an unbound shell on the caller's word.
+-    const started=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped'});
+-    assert.equal(started.code,'SQ-ITEM-CANCEL-STARTED',JSON.stringify(started));assert.match(started.repair,/slice-queue\.mjs cancel ITEM-AC-2 --started --reason/u);
+-    const cancelled=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped',started:true});
++    const started=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped',cancelClass:'budget'});
++    assert.equal(started.code,'SQ-ITEM-CANCEL-STARTED',JSON.stringify(started));assert.match(started.repair,/slice-queue\.mjs cancel ITEM-AC-2 --started --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>/u);
++    const cancelled=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped',started:true,cancelClass:'budget'});
+     assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));assert.equal(cancelled.started,true);assert.equal(row('ITEM-AC-2').state,'cancelled');
+     const third=dispatch('ITEM-AC-3','DELIVER-AC-3','native-tool-three',candidate);
+     assert.equal(third.ok,true,JSON.stringify(third));assert.deepEqual(row('ITEM-AC-3').dependsOn,['ITEM-AC-1']);
+@@ -1028,7 +1028,7 @@ const cases = [
+     const basis={association:{state:'unbound',target:null},candidate:repository.candidate,operationNonce:'a'.repeat(64),itemDelivery:{itemId:'AC-1',sliceId:'ITEM-AC-1',queuePath:'specs/unit/slice-queue.json',queueSha256:'b'.repeat(64),writeScope:['src/change.mjs']}};
+     const entry={schema:'pipeline.agy-authority-lifetime.v2',producerId:'agy-family-dispatch',repositorySha256:nativeManagedDigest({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir}),operationId:'a'.repeat(32),basis,bindingSha256:nativeManagedDigest(basis),phase:'armed',terminal:null,terminalEvidence:null,sourcePaths:[]};
+     writeFileSync(join(journal,`op.${entry.operationId}.1.json`),JSON.stringify(entry),{mode:0o600});
+-    const cancel=(sliceId,started=false)=>cancelUnstartedGovernedItemSlice({root,sliceId,reason:'its AGY run stopped',started});
++    const cancel=(sliceId,started=false)=>cancelUnstartedGovernedItemSlice({root,sliceId,reason:'its AGY run stopped',started,cancelClass:'budget'});
+     const absent=cancel('ITEM-AC-1');
+     assert.equal(absent.code,'SQ-ITEM-CANCEL-STARTED',JSON.stringify(absent));assert.match(absent.reason,/unreleased AGY reservation/u);assert.match(absent.repair,/slice-queue\.mjs cancel ITEM-AC-1 --started/u);
+     assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized');
+@@ -1040,6 +1040,36 @@ const cases = [
+     assert.equal(prepare('ITEM-AC-2').status,'required');assert.equal(cancel('ITEM-AC-2').status,'cancelled');
+   })},
+ 
++  { id: "NGHS39", name: "a cancel needs a reason class: a missing or unknown class is refused SQ-CANCEL-CLASS with a repair and leaves the queue untouched, a valid class is stored in row.cancelClass, a legacy row reads as unclassified, the repairs teach --class (D75)", run: () => fixture(({ root }) => {
++    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
++    const original=prepareApprovedItemCourseFixture({root});
++    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
++    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
++    const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
++    assert.equal(prepare('ITEM-AC-1').status,'required');
++    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
++    const classes=['budget','wrong-premise','review-defect','integrated-elsewhere','superseded'];
++    const held=prepare('ITEM-AC-2');
++    assert.equal(held.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(held));
++    assert.match(held.repair,/slice-queue\.mjs cancel <slice id> --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>/u);
++    const cancel=cancelClass=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-1',reason:'wrong base',...(cancelClass===undefined?{}:{cancelClass})}));
++    for(const bad of [undefined,'','whatever','unclassified',7,null]){
++      const refused=cancel(bad);
++      assert.equal(refused.status,'refused',`${String(bad)}: ${JSON.stringify(refused)}`);assert.equal(refused.code,'SQ-CANCEL-CLASS',String(bad));
++      for(const name of classes){assert.ok(refused.reason.includes(name),`reason names ${name}`);assert.ok(refused.repair.includes(name),`repair names ${name}`);}
++      assert.equal(readFileSync(queuePath,'utf8'),before,'a refused class leaves the queue untouched');
++    }
++    const cancelled=cancel('wrong-premise');
++    assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));
++    const stored=JSON.parse(readFileSync(queuePath,'utf8'));
++    assert.equal(stored.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass,'wrong-premise');
++    assert.equal(validateSliceQueue(stored).queue.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass,'wrong-premise');
++    // A row cancelled before D75 carries no class and is reported unclassified, never as classified.
++    const legacy=structuredClone(stored);delete legacy.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass;
++    const legacyResult=validateSliceQueue(legacy);assert.equal(legacyResult.ok,true,JSON.stringify(legacyResult.errors));
++    assert.equal(legacyResult.queue.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass,'unclassified');
++  })},
++
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+diff --git a/plugins/pipeline-core/lib/slice-queue.test.mjs b/plugins/pipeline-core/lib/slice-queue.test.mjs
+index d1241c27d..0d836e001 100644
+--- a/plugins/pipeline-core/lib/slice-queue.test.mjs
++++ b/plugins/pipeline-core/lib/slice-queue.test.mjs
+@@ -10,6 +10,9 @@ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { DEFAULT_STALE_AFTER_MINUTES as LEDGER_STALE_MINUTES } from "./fanout-ledger.mjs";
+ import {
++  CANCEL_CLASSES,
++  UNCLASSIFIED_CANCEL,
++  checkCancelClass,
+   DEFAULT_MAX_ATTEMPTS,
+   DEFAULT_STALE_AFTER_MINUTES,
+   loadSliceQueue,
+@@ -691,7 +694,64 @@ check("v2 unbound legacy migration is readable and held; forged readiness and cr
+   const folded=queue([slice('ITEM-A',['src/Thing.mjs'],{delivery:delivery('AC-1')}),slice('ITEM-B',['src/thing.mjs'],{delivery:delivery('AC-2')})]);folded.schema='pipeline.slice-queue.v2';
+   assert.equal(validateSliceQueue(folded,WIN).ok,false);assert.equal(validateSliceQueue(folded,MAC).ok,false);
+ });
+-assert.equal(cases.length, 37,"the complete slice-queue corpus must be registered before execution begins");
++check("D75 cancel class: the five classes are accepted on a cancelled slice, a legacy cancelled row is reported unclassified, a live row carries none", () => {
++  assert.deepEqual([...CANCEL_CLASSES], ["budget", "wrong-premise", "review-defect", "integrated-elsewhere", "superseded"]);
++  assert.equal(UNCLASSIFIED_CANCEL, "unclassified");
++  for (const cancelClass of CANCEL_CLASSES) {
++    const result = validateSliceQueue(queue([slice("A", ["lib/a.mjs"], { state: "cancelled", holdReason: "dropped", cancelClass })]), LINUX);
++    assert.equal(result.ok, true, `${cancelClass}: ${JSON.stringify(result.errors)}`);
++    assert.equal(result.queue.slices[0].cancelClass, cancelClass);
++  }
++  const mixed = validateSliceQueue(queue([
++    slice("LEGACY", ["lib/a.mjs"], { state: "cancelled", holdReason: "dropped before D75" }),
++    slice("LIVE", ["lib/b.mjs"]),
++  ]), LINUX);
++  assert.equal(mixed.ok, true, JSON.stringify(mixed.errors));
++  assert.equal(mixed.queue.slices[0].cancelClass, "unclassified", "a cancelled row without a class is never silently treated as classified");
++  assert.equal(mixed.queue.slices[1].cancelClass, null);
++});
++
++check("D75 cancel class: an unknown, non-string or misplaced class is refused SQ-CANCEL-CLASS and the message names the five classes; a missing class is refused by checkCancelClass", () => {
++  const refused = (extra) => validateSliceQueue(queue([slice("A", ["lib/a.mjs"], extra)]), LINUX);
++  for (const [label, extra] of [
++    ["unknown class", { state: "cancelled", holdReason: "dropped", cancelClass: "whatever" }],
++    ["empty class", { state: "cancelled", holdReason: "dropped", cancelClass: "" }],
++    ["non-string class", { state: "cancelled", holdReason: "dropped", cancelClass: 3 }],
++    ["the reserved word unclassified", { state: "cancelled", holdReason: "dropped", cancelClass: "unclassified" }],
++    ["class on a ready slice", { cancelClass: "budget" }],
++    ["class on a held slice", { state: "hold-po", holdReason: "PO", cancelClass: "budget" }],
++  ]) {
++    const result = refused(extra);
++    assert.equal(result.ok, false, label);
++    const found = result.errors.find((error) => error.code === "SQ-CANCEL-CLASS");
++    assert.ok(found, `${label}: ${JSON.stringify(result.errors)}`);
++    assert.ok(!result.errors.some((error) => error.code === "SQ-SCHEMA" && /unknown key/u.test(error.message)), `${label}: cancelClass is a known key`);
++    for (const cancelClass of CANCEL_CLASSES) assert.ok(found.message.includes(cancelClass), `${label}: message names ${cancelClass}`);
++  }
++  assert.deepEqual(checkCancelClass("budget"), { ok: true, cancelClass: "budget" });
++  for (const bad of [undefined, null, "", "nope", 7, "unclassified"]) {
++    const result = checkCancelClass(bad);
++    assert.equal(result.ok, false, String(bad));
++    assert.equal(result.code, "SQ-CANCEL-CLASS");
++    for (const cancelClass of CANCEL_CLASSES) assert.ok(result.reason.includes(cancelClass) && result.repair.includes(cancelClass), `${String(bad)}: reason and repair name ${cancelClass}`);
++  }
++});
++
++check("D75 cancel class: readyAndLive reports the class of a cancelled slice, `unclassified` for a legacy row", () => {
++  const raw = queue([
++    slice("A", ["lib/a.mjs"], { state: "cancelled", holdReason: "wrong base", cancelClass: "wrong-premise" }),
++    slice("B", ["lib/b.mjs"], { state: "cancelled", holdReason: "dropped before D75" }),
++    slice("C", ["lib/c.mjs"]),
++  ]);
++  const result = readyAndLive({ queue: raw, now: NOW }, LINUX);
++  assert.equal(result.valid, true, JSON.stringify(result.errors));
++  assert.equal(find(result, "A").cancelClass, "wrong-premise");
++  assert.equal(find(result, "B").cancelClass, "unclassified");
++  assert.equal(find(result, "C").cancelClass, undefined, "only a cancelled slice carries a class");
++  assert.equal(result.counts.cancelled, 2);
++});
++
++assert.equal(cases.length, 40,"the complete slice-queue corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 1d7eaf009..a08659814 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -58,6 +58,7 @@ import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
+ import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
+ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
++import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
+ import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+ import * as sessionAuthorityRegistry from "../lib/session-authority-registry.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+@@ -475,7 +476,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     const scope = [...(row.writeScope ?? [])].sort();
+     if (JSON.stringify(scope) !== JSON.stringify(allowedPaths)) {
+       const checks = scope.filter((path) => /\.test\.(?:mjs|cjs|js)$/u.test(path));
+-      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" first when it still holds a successor)`);
++      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
+     }
+   }
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 3d01b5fe7..ac1467273 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -273,6 +273,18 @@ test("a dispatch id that names a governed queue row must match its write scope,
+   assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { queueRow: () => ({ ...wider, state: "deferred", delivery: { status: "unbound-legacy" } }) })).ok, true, "a legacy row is rebound by the course writer");
+ });
+ 
++test("a scope drift names the cancel with its class argument and teaches each class (D75 S5)", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { CANCEL_CLASS_HELP, CANCEL_CLASSES } = await import("../lib/slice-queue.mjs");
++  const fx = makeFixture();
++  const first = runDispatchBriefing(argvOf(fx), depsOf(fx));
++  const row = { id: "ALF-T1", state: "ready", writeScope: [...first.binding.allowedPaths, "plugins/x/extra.mjs"], delivery: { itemId: first.binding.itemDelivery.itemId } };
++  const drift = runDispatchBriefing(argvOf(fx), depsOf(fx, { queueRow: () => row }));
++  assert.equal(drift.code, "DBG-QUEUE-ROW-DRIFT");
++  assert.match(drift.message, /slice-queue\.mjs cancel ALF-T1 --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>/u, drift.message);
++  for (const name of CANCEL_CLASSES) assert.ok(drift.message.includes(`${name} = ${CANCEL_CLASS_HELP[name]}`), `${name} is taught: ${drift.message}`);
++});
++
+ const REFUSALS = [
+   ["a missing acceptance row names the slug", { "--item": "absent-slug" }, [], {}, "DBG-AC-ROW-MISSING", "absent-slug"],
+   ["an unknown agent type", { "--agent-type": "goldfish-wizard" }, [], {}, "DBG-AGENT-TYPE-UNKNOWN", "goldfish-wizard"],
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.mjs b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+index c836c1949..f1d4dd0d2 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ //
+-// session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root> [--no-goldfish-running | --no-pipeline-running | --no-other-session-running] [--from <session>] [--reason "<why>"] [--timeout <seconds>]
++// session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root> [--no-goldfish-running | --no-pipeline-running | --no-other-session-running] [--from <session>] [--reason "<why>"] [--class <budget|wrong-premise|review-defect|integrated-elsewhere|superseded>] [--timeout <seconds>]
+ //
+ // D52 (2), PF-55: the general repair every SDC-AUTHORITY-* refusal names. None of the verbs needs a bound
+ // session, so each runs from the agent's shell and from the PO's terminal alike.
+@@ -28,7 +28,8 @@
+ //               is gone, so a loop waits instead of retrying blind.
+ //   take-over   Q13 (a), D57: frees every item operation the named session --from started and did not settle, so
+ //               this session can dispatch those slices again. Whether that session still lives cannot be observed,
+-//               so this rests on the caller's word (--no-other-session-running) and --reason. Each such slice is
++//               so this rests on the caller's word (--no-other-session-running), --reason and --class (D75: why
++//               the slices end, one class for all of them; the same vocabulary as slice-queue.mjs cancel). Each such slice is
+ //               cancelled through the ordinary started cancel (its reservation stops blocking, nothing of it is
+ //               delivered), and the decision is retained under session-authority-abandoned like move-aside. It
+ //               rewrites no other session's binding and does not transfer the continuity cleanup slot, which
+@@ -45,11 +46,15 @@ import { createSessionAuthorityParticipantPorts } from "../lib/session-authority
+ import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
+ import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
+ import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
++import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass } from "../lib/slice-queue.mjs";
+ 
+ const SCHEMA = "pipeline.session-authority-repair.v1";
+ const SELF = fileURLToPath(import.meta.url);
+ const SLICE_QUEUE = fileURLToPath(new URL("./slice-queue.mjs", import.meta.url));
+ const IN_FLIGHT = new Set(["armed", "running"]);
++// D75: the class every cancel names, and one teaching line per class, read from the queue library's vocabulary.
++const CLASS_ARGUMENT = `--class <${CANCEL_CLASSES.join("|")}>`;
++const CLASS_TEACHING = `Pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")}`;
+ 
+ const sorted = (value) => Array.isArray(value) ? value.map(sorted)
+   : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, sorted(value[key])])) : value;
+@@ -63,7 +68,7 @@ export function sessionAuthorityRepairCommand(root, verb = "inspect") {
+ 
+ // Each verb's own assertion flag and value flags (FB3-PF-55: release-lock, wait).
+ const ASSERTION = { "move-aside": "no-goldfish-running", "release-lock": "no-pipeline-running", "take-over": "no-other-session-running" };
+-const VALUES = { inspect: ["root"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"], "take-over": ["root", "from", "reason"] };
++const VALUES = { inspect: ["root"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"], "take-over": ["root", "from", "reason", "class"] };
+ const validReason = (reason) => typeof reason === "string" && reason.trim() !== "" && reason.length <= 500 && !/[\u0000-\u001f\u007f]/u.test(reason);
+ const validSession = (session) => typeof session === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(session);
+ 
+@@ -85,7 +90,9 @@ function parse(argv) {
+   if (verb === "release-lock" && (flags["no-pipeline-running"] !== true || !validReason(flags.reason)))
+     return { error: "release-lock needs --no-pipeline-running (you assert that no Pipeline process runs for this repository) and --reason \"<one line>\"" };
+   if (verb === "take-over" && (flags["no-other-session-running"] !== true || !validSession(flags.from) || !validReason(flags.reason)))
+-    return { error: "take-over needs --from <session id>, --no-other-session-running (you assert that the named session and its Goldfish no longer run) and --reason \"<one line>\"" };
++    return { error: `take-over needs --from <session id>, --no-other-session-running (you assert that the named session and its Goldfish no longer run), --reason "<one line>" and ${CLASS_ARGUMENT}` };
++  // D75: every cancel names why the slice ends; take-over cancels each slice it frees, so it carries one class for all of them.
++  if (verb === "take-over") { const verdict = checkCancelClass(flags.class); if (!verdict.ok) return { error: `take-over needs ${CLASS_ARGUMENT}: ${verdict.reason}. ${verdict.repair}` }; }
+   if (verb === "wait") {
+     const timeout = flags.timeout === undefined ? 60 : Number(flags.timeout);
+     if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600) return { error: "--timeout needs whole seconds from 1 to 600" };
+@@ -192,12 +199,12 @@ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
+   const held = lockStep(root, lock);
+   if (held) next.push(held);
+   const open = reservations.filter((row) => row.sliceId && row.settled === null);
+-  const cancelCommand = (sliceId) => `node ${SLICE_QUEUE} cancel ${sliceId} --started --reason "<why>"`;
+-  for (const row of open) next.push({ why: `slice ${row.sliceId} still holds its item reservation; if it delivered, commit its work with the trailer "Dispatch: ${row.sliceId} (goldfish)"; if its Goldfish no longer runs, cancel it`, command: cancelCommand(row.sliceId) });
++  const cancelCommand = (sliceId) => `node ${SLICE_QUEUE} cancel ${sliceId} --started --reason "<why>" ${CLASS_ARGUMENT}`;
++  for (const row of open) next.push({ why: `slice ${row.sliceId} still holds its item reservation; if it delivered, commit its work with the trailer "Dispatch: ${row.sliceId} (goldfish)"; if its Goldfish no longer runs, cancel it. ${CLASS_TEACHING}`, command: cancelCommand(row.sliceId) });
+   // Q13 (a): every slice of a session other than this one is freed at once with take-over.
+   const here = scratchSessionId(scratch?.env ?? {});
+   for (const from of [...new Set(open.map((row) => row.sessionId).filter((id) => validSession(id) && id !== here))].sort())
+-    next.push({ why: `session ${from} started ${open.filter((row) => row.sessionId === from).map((row) => row.sliceId).join(", ")}; if that session and its Goldfish no longer run, free them all for this session`, command: `${sessionAuthorityRepairCommand(root, "take-over")} --from ${from} --no-other-session-running --reason "<why>"` });
++    next.push({ why: `session ${from} started ${open.filter((row) => row.sessionId === from).map((row) => row.sliceId).join(", ")}; if that session and its Goldfish no longer run, free them all for this session. ${CLASS_TEACHING}`, command: `${sessionAuthorityRepairCommand(root, "take-over")} --from ${from} --no-other-session-running --reason "<why>" ${CLASS_ARGUMENT}` });
+   const drifted = registry.producers.filter((row) => row.status === "drifted");
+   const broken = registry.producers.filter((row) => ["unreadable", "reconcile-refused", "missing"].includes(row.status));
+   // A catalogue another plugin version wrote is migrated on the next boundary entry (PF-52), which heal performs.
+@@ -239,18 +246,18 @@ function lockRefusal(error, root) {
+ }
+ 
+ /** Q13 (a): cancels, on the caller's word, every unsettled item slice the named session started, and retains the decision. */
+-function takeOver(repository, root, from, reason) {
++function takeOver(repository, root, from, reason, cancelClass) {
+   const owned = reservationReport(repository, root).filter((row) => row.sessionId === from && row.sliceId && row.settled === null);
+   const slices = [...new Set(owned.map((row) => row.sliceId))].sort();
+   if (!slices.length) return { status: "nothing-to-take-over", from, reason: `no unsettled item operation of session ${from} is recorded` };
+   const cancelled = [], refused = [];
+   for (const sliceId of slices) {
+-    const result = cancelUnstartedGovernedItemSlice({ root, sliceId, reason: `take-over from session ${from}: ${reason}`, started: true });
+-    (result.status === "cancelled" ? cancelled : refused).push({ sliceId, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
++    const result = cancelUnstartedGovernedItemSlice({ root, sliceId, reason: `take-over from session ${from}: ${reason}`, started: true, cancelClass });
++    (result.status === "cancelled" ? cancelled : refused).push({ sliceId, code: result.code, ...(result.reason ? { reason: result.reason } : {}), ...(result.status === "cancelled" ? { cancelClass: result.cancelClass } : {}) });
+   }
+   const dir = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", `${new Date().toISOString().replace(/[^0-9]/gu, "")}-${randomBytes(4).toString("hex")}-take-over`);
+   mkdirSync(dir, { recursive: true, mode: 0o700 });
+-  writeFileSync(join(dir, "take-over.json"), `${JSON.stringify({ schema: "pipeline.session-authority-take-over.v1", from, reason, at: new Date().toISOString(), assertion: "no-other-session-running", cancelled, refused }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
++  writeFileSync(join(dir, "take-over.json"), `${JSON.stringify({ schema: "pipeline.session-authority-take-over.v1", from, reason, cancelClass, at: new Date().toISOString(), assertion: "no-other-session-running", cancelled, refused }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+   return { status: refused.length ? "refused" : "taken-over", ...(refused.length ? { code: "SAR-TAKE-OVER-INCOMPLETE" } : {}), from, cancelled, refused,
+     note: "the cancelled slices no longer hold their item reservations; queue new slices for those items from this session" };
+ }
+@@ -283,7 +290,7 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
+   if (parsed.verb === "take-over") {
+     const before = new Set(markers(repository));
+     let taken;
+-    try { taken = takeOver(repository, root, parsed.flags.from, parsed.flags.reason.trim()); }
++    try { taken = takeOver(repository, root, parsed.flags.from, parsed.flags.reason.trim(), parsed.flags.class); }
+     catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: short(error) }, 2); }
+     return emit({ ...taken, retained: markers(repository).filter((name) => !before.has(name)), ...inspect(repository, root, { scratch }) }, taken.status === "refused" ? 2 : 0);
+   }
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index cea66f97f..f4e37afbf 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -7,10 +7,10 @@ import { existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync
+ import { createHash } from "node:crypto";
+ import { devNull, hostname } from "node:os";
+ import { observeLinuxProcess } from "../lib/native-platform-process-observer.mjs";
+-import { join } from "node:path";
++import { join, resolve } from "node:path";
+ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { runSessionAuthorityRepair } from "./session-authority-repair.mjs";
+-import { cancelUnstartedGovernedItemSlice, checkpointNativeGoldfishItemDelivery, prepareGovernedItemQueue, prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
++import { cancelUnstartedGovernedItemSlice, checkpointNativeGoldfishItemDelivery, prepareGovernedItemQueue, prepareNativeGoldfishHostState, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
+ import { run as runState } from "./pipeline-state.mjs";
+ import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+@@ -21,6 +21,7 @@ import { initializeSessionAuthorityRegistry } from "../lib/session-authority-reg
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
+ import { prepareApprovedItemCourseFixture, nativeContractFixtureParent } from "../lib/test-item-approved-course-fixture.mjs";
++import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
+ 
+ function fixture(run) {
+   const parent = nativeContractFixtureParent();
+@@ -53,6 +54,12 @@ function course(root) {
+   };
+   return { original, repository, runtime, dispatch };
+ }
++// The stored row of a slice in the governed item queue (D75: a cancelled row carries its cancelClass).
++function governedRow(root, sliceId) {
++  const governed = resolveGovernedItemQueue({ root });
++  assert.equal(governed.status, "required", JSON.stringify(governed));
++  return JSON.parse(readFileSync(resolve(root, governed.path), "utf8")).slices.find((row) => row.id === sliceId);
++}
+ function repair(...argv) {
+   let text = "";
+   const code = runSessionAuthorityRepair(argv, (chunk) => { text += chunk; });
+@@ -108,7 +115,11 @@ const cases = [
+     assert.deepEqual(found.reservations.filter((row) => row.settled === null).map((row) => row.sliceId), ["ITEM-AC-1"]);
+     assert.ok(found.next.some((row) => /slice-queue\.mjs cancel ITEM-AC-1 --started --reason/u.test(row.command)), JSON.stringify(found.next));
+     assert.ok(found.next.some((row) => / move-aside --root .* --no-goldfish-running --reason/u.test(row.command)), JSON.stringify(found.next));
+-    assert.equal(cancelUnstartedGovernedItemSlice({ root, sliceId: "ITEM-AC-1", reason: "its Goldfish stopped", started: true }).status, "cancelled");
++    // D75: the named cancel carries the class argument and teaches every class from the step's own text.
++    const cancelStep = found.next.find((row) => /slice-queue\.mjs cancel ITEM-AC-1 --started --reason/u.test(row.command));
++    assert.match(cancelStep.command, /--reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>$/u, cancelStep.command);
++    for (const name of CANCEL_CLASSES) assert.ok(cancelStep.why.includes(`${name} = ${CANCEL_CLASS_HELP[name]}`), `${name} is taught: ${cancelStep.why}`);
++    assert.equal(cancelUnstartedGovernedItemSlice({ root, sliceId: "ITEM-AC-1", reason: "its Goldfish stopped", started: true, cancelClass: "budget" }).status, "cancelled");
+     const moved = repair("move-aside", "--root", root, "--no-goldfish-running", "--reason", "the native namespace changed under a stopped slice");
+     assert.equal(moved.code, 0, JSON.stringify(moved.result)); assert.equal(moved.result.status, "moved-aside");
+     const aside = moved.result.retained.find((name) => name.endsWith("-repair-move-aside"));
+@@ -299,18 +310,53 @@ const cases = [
+     assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+     const named = repair("inspect", "--root", root).result.next.find((row) => / take-over --root /u.test(row.command));
+     assert.match(named?.command ?? "", / take-over --root \S+ --from native-session-one --no-other-session-running --reason /u, JSON.stringify(named));
++    // D75: the named take-over carries the class argument and teaches every class.
++    assert.match(named.command, /--reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>$/u, named.command);
++    for (const name of CANCEL_CLASSES) assert.ok(named.why.includes(`${name} = ${CANCEL_CLASS_HELP[name]}`), `${name} is taught: ${named.why}`);
++    // Without a valid class the take-over is refused before it cancels anything, naming every class.
++    for (const extra of [[], ["--class", "bogus"], ["--class", "unclassified"]]) {
++      const noClass = repair("take-over", "--root", root, "--from", "native-session-one", "--no-other-session-running", "--reason", "the old session ended", ...extra);
++      assert.equal(noClass.result.code, "SAR-ARGS", JSON.stringify(extra));
++      for (const name of CANCEL_CLASSES) assert.ok(noClass.result.reason.includes(name) && noClass.result.reason.includes(CANCEL_CLASS_HELP[name]), `${name} is taught in the refusal: ${noClass.result.reason}`);
++    }
++    assert.deepEqual(repair("inspect", "--root", root).result.reservations.filter((row) => row.settled === null).map((row) => row.sliceId), ["ITEM-AC-1"], "a refused take-over cancels nothing");
+     for (const argv of [["take-over", "--root", root, "--from", "native-session-one", "--reason", "x"], ["take-over", "--root", root, "--no-other-session-running", "--reason", "x"],
+       ["take-over", "--root", root, "--from", "../x", "--no-other-session-running", "--reason", "x"]]) assert.equal(repair(...argv).result.code, "SAR-ARGS", JSON.stringify(argv));
+-    assert.equal(repair("take-over", "--root", root, "--from", "another-session", "--no-other-session-running", "--reason", "x").result.status, "nothing-to-take-over");
+-    const taken = repair("take-over", "--root", root, "--from", "native-session-one", "--no-other-session-running", "--reason", "the old session ended");
++    assert.equal(repair("take-over", "--root", root, "--from", "another-session", "--no-other-session-running", "--reason", "x", "--class", "superseded").result.status, "nothing-to-take-over");
++    const taken = repair("take-over", "--root", root, "--from", "native-session-one", "--no-other-session-running", "--reason", "the old session ended", "--class", "budget");
+     assert.equal(taken.code, 0, JSON.stringify(taken.result)); assert.equal(taken.result.status, "taken-over");
+     assert.deepEqual(taken.result.cancelled.map((row) => row.sliceId), ["ITEM-AC-1"]);
++    assert.deepEqual(taken.result.cancelled.map((row) => row.cancelClass), ["budget"], "the class reaches the cancelled row's result");
++    assert.equal(governedRow(root, "ITEM-AC-1").cancelClass, "budget", "and into the governed queue row");
+     const record = taken.result.retained.find((name) => name.endsWith("-take-over"));
+     const kept = JSON.parse(readFileSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", record, "take-over.json"), "utf8"));
+-    assert.equal(kept.from, "native-session-one"); assert.equal(kept.reason, "the old session ended");
++    assert.equal(kept.from, "native-session-one"); assert.equal(kept.reason, "the old session ended"); assert.equal(kept.cancelClass, "budget", "the retained decision names the class");
+     assert.equal(taken.result.next.some((row) => / take-over /u.test(row.command)), false, "nothing of that session is left to free");
+     assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1B", "native-tool-two").ok, false, "the cancelled slice is not re-dispatched under its old row");
+   }) },
++  { id: "SAR11", name: "the queue CLI's cancel on a governed item queue needs --class, refuses before any write and stores the class on the row (D75 S5)", run: () => fixture(({ root }) => {
++    const { original, runtime } = course(root);
++    const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-0", itemId: "AC-1", criterionLocator: original.criterionLocator, checks: [{ id: "criterion-one", path: "src/change.test.mjs", dependencies: ["src/change.mjs", "src/change.test.mjs"] }] };
++    assert.equal(runtime.run(() => prepareGovernedItemQueue({ root, itemDelivery, candidate: original.candidate, writeScope: ["src/change.mjs"] })).status, "required");
++    const before = readFileSync(resolve(root, resolveGovernedItemQueue({ root }).path));
++    const cwd = process.cwd();
++    process.chdir(root);
++    try {
++      leaveClaudeHookSessionOwner();
++      assert.equal(enterSessionOwnerFromEnvironment({ CLAUDE_CODE_SESSION_ID: "abcdef12-0000-4000-8000-000000000002" }, root), true);
++      for (const extra of [[], ["--class", "bogus"]]) {
++        const refused = runCli(["cancel", "ITEM-AC-0", "--reason", "not needed", ...extra]);
++        assert.equal(refused.exit, 2, JSON.stringify(refused.output)); assert.equal(refused.output.code, "SQ-CANCEL-CLASS");
++        for (const name of CANCEL_CLASSES) assert.ok(refused.output.repair.includes(name) && refused.output.repair.includes(CANCEL_CLASS_HELP[name]), `${name} is taught: ${refused.output.repair}`);
++      }
++      assert.ok(readFileSync(resolve(root, resolveGovernedItemQueue({ root }).path)).equals(before), "a refused cancel writes nothing");
++      const cancelled = runCli(["cancel", "ITEM-AC-0", "--reason", "not needed", "--class", "superseded"]);
++      assert.equal(cancelled.exit, 0, JSON.stringify(cancelled.output));
++      assert.equal(cancelled.output.cancelClass, "superseded");
++    } finally { leaveClaudeHookSessionOwner(); process.chdir(cwd); }
++    assert.equal(governedRow(root, "ITEM-AC-0").cancelClass, "superseded");
++    assert.equal(governedRow(root, "ITEM-AC-0").state, "cancelled");
++  }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+diff --git a/plugins/pipeline-core/scripts/slice-queue.mjs b/plugins/pipeline-core/scripts/slice-queue.mjs
+index e33c6bc58..f925c097c 100644
+--- a/plugins/pipeline-core/scripts/slice-queue.mjs
++++ b/plugins/pipeline-core/scripts/slice-queue.mjs
+@@ -7,6 +7,8 @@
+  *
+  *   slice-queue.mjs <verb> [<id> [<dep>]] --queue <path> [flags]
+  *   verbs: validate | next | add | defer | hold | depend | cancel | pause | reap | finish | report
++ *   cancel <id> --reason "<why>" --class <budget|wrong-premise|review-defect|integrated-elsewhere|superseded> [--started]
++ *     (D75: the class is required; `report` counts cancelled slices per class under queue.cancelClasses)
+  *
+  * `--queue` is explicit outside an approved course. Within a governed approved
+  * course it resolves to the active feature directory, matching authenticated admission. Stdout is ONE JSON document;
+@@ -41,7 +43,7 @@ import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mj
+ import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
+ import { sessionAuthorityRepairCommand } from "./session-authority-repair.mjs";
+ import { appendEvent, FANOUT_FINISH_HOWS, FanoutLedgerError, liveSlices, readEvents } from "../lib/fanout-ledger.mjs";
+-import { COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_SCHEMA, SLICE_TIERS, validateSliceQueue } from "../lib/slice-queue.mjs";
++import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass, COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_SCHEMA, SLICE_TIERS, UNCLASSIFIED_CANCEL, validateSliceQueue } from "../lib/slice-queue.mjs";
+ 
+ export const CLI_SCHEMA = "pipeline.slice-queue-cli.v1";
+ export const EXIT = Object.freeze({ OK: 0, USAGE: 2, INVALID: 3, NOT_FOUND: 4, IO: 5 });
+@@ -75,7 +77,7 @@ const VERBS = {
+   hold: { positional: 1, flags: [...COMMON, ...LEDGER, "po-question", "external-reason"], repeatable: [] },
+   depend: { positional: 2, flags: [...COMMON], repeatable: [] },
+   // D51 (3): --started cancels a started slice whose Goldfish no longer runs; the caller asserts that.
+-  cancel: { positional: 1, flags: [...COMMON, "reason", "started"], repeatable: [], booleans: ["started"] },
++  cancel: { positional: 1, flags: [...COMMON, "reason", "class", "started"], repeatable: [], booleans: ["started"] },
+   pause: { positional: 0, flags: [...COMMON, ...LEDGER, "by", "reason", "until"], repeatable: [] },
+   reap: { positional: 1, flags: [...COMMON, ...LEDGER, "reason"], repeatable: [] },
+   finish: { positional: 1, flags: [...COMMON, ...LEDGER, "how"], repeatable: [] },
+@@ -374,26 +376,31 @@ function verbDepend({ positional, flags }) {
+ 
+ // PF-45: a never-started slice is cancelled and every slice waiting on it is released. An item queue goes
+ // through the authenticated course writer; a plain queue is edited like the other declarations.
++// D75: --class says why the slice ends (one of CANCEL_CLASSES); a later re-dispatch is decided from it. It is checked
++// before any queue read, so a refused call touches nothing, and the refusal teaches every class from its own text.
+ function verbCancel({ positional, flags }) {
+   const reason = requireText(flags, "reason", "cancel");
++  const verdict = checkCancelClass(flags.class);
++  if (!verdict.ok) throw new CliError(verdict.code, EXIT.USAGE, `cancel: --class is required. ${verdict.reason}`, { repair: verdict.repair, classes: CANCEL_CLASS_HELP });
+   const path = resolve(flags.queue);
+   const loaded = loadRaw(path);
+   if (loaded.status !== "valid") throw invalidQueue(loaded);
+   if (loaded.raw.schema === "pipeline.slice-queue.v2") {
+     const governed = resolveGovernedItemQueue({ root: process.cwd() });
+     if (governed.status !== "required" || resolve(process.cwd(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
+-    const result = cancelUnstartedGovernedItemSlice({ root: process.cwd(), sliceId: positional[0], reason, started: flags.started === true });
++    const result = cancelUnstartedGovernedItemSlice({ root: process.cwd(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
+     if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
+-    return { sliceId: result.sliceId, state: "cancelled", released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
++    return { sliceId: result.sliceId, state: "cancelled", cancelClass: result.cancelClass, released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
+   }
+   const raw = structuredClone(loaded.raw);
+   const entry = findSlice(raw, positional[0]);
+   if (entry.state === "cancelled") throw new CliError("SQ-ITEM-CANCEL-ALREADY", EXIT.INVALID, `slice ${entry.id} is already cancelled`);
+   entry.state = "cancelled";
+   entry.holdReason = reason;
++  entry.cancelClass = verdict.cancelClass;
+   const released = [];
+   for (const other of raw.slices) if ((other.dependsOn ?? []).includes(entry.id)) { other.dependsOn = other.dependsOn.filter((id) => id !== entry.id); released.push(other.id); }
+-  return commit(path, raw, { sliceId: entry.id, state: "cancelled", released });
++  return commit(path, raw, { sliceId: entry.id, state: "cancelled", cancelClass: verdict.cancelClass, released });
+ }
+ 
+ function verbPause({ flags }) {
+@@ -472,7 +479,9 @@ function verbReport({ flags }) {
+     const read = readEvents(target.commonDir, target.runner, target.sessionId);
+     return { skippedLines: read.skipped, ...summariseLedger(read.events, now) };
+   });
+-  return { queue: { feature: loaded.queue.feature, size: loaded.queue.slices.length, counts: status.counts, ready: status.ready.length }, ledger };
++  // D75: how many slices ended for which reason; a slice cancelled before classes existed is counted `unclassified`.
++  const cancelClasses = Object.fromEntries([...CANCEL_CLASSES, UNCLASSIFIED_CANCEL].map((name) => [name, loaded.queue.slices.filter((entry) => entry.state === "cancelled" && entry.cancelClass === name).length]));
++  return { queue: { feature: loaded.queue.feature, size: loaded.queue.slices.length, counts: status.counts, ready: status.ready.length, cancelClasses }, ledger };
+ }
+ 
+ const HANDLERS = { validate: verbValidate, next: verbNext, add: verbAdd, defer: verbDefer, hold: verbHold, depend: verbDepend, cancel: verbCancel, pause: verbPause, reap: verbReap, finish: verbFinish, report: verbReport };
+diff --git a/plugins/pipeline-core/scripts/slice-queue.test.mjs b/plugins/pipeline-core/scripts/slice-queue.test.mjs
+index fb1b0520c..956fc985a 100644
+--- a/plugins/pipeline-core/scripts/slice-queue.test.mjs
++++ b/plugins/pipeline-core/scripts/slice-queue.test.mjs
+@@ -11,6 +11,7 @@ import { openSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { appendEvent, readEvents } from "../lib/fanout-ledger.mjs";
++import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
+ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+@@ -187,9 +188,9 @@ check("defer / hold / depend: usage errors exit 2, unknown ids exit 4, a depende
+ check("cancel: a cancelled slice stops holding the slices that waited on it (PF-45)", () => {
+   const dir = sandbox();
+   const path = writeQueue(dir, [slice("A", ["a.mjs"]), slice("B", ["b.mjs"], { dependsOn: ["A"] }), slice("C", ["c.mjs"], { dependsOn: ["A", "B"] })]);
+-  assert.equal(cli(dir, ["cancel", "A", "--queue", REL]).status, 2, "cancel needs --reason");
+-  assert.equal(cli(dir, ["cancel", "NOPE", "--queue", REL, "--reason", "x"]).status, 4);
+-  const cancelled = cli(dir, ["cancel", "A", "--queue", REL, "--reason", "never started"]);
++  assert.equal(cli(dir, ["cancel", "A", "--queue", REL, "--class", "superseded"]).status, 2, "cancel needs --reason");
++  assert.equal(cli(dir, ["cancel", "NOPE", "--queue", REL, "--reason", "x", "--class", "superseded"]).status, 4);
++  const cancelled = cli(dir, ["cancel", "A", "--queue", REL, "--reason", "never started", "--class", "superseded"]);
+   assert.equal(cancelled.status, 0, cancelled.stdout + cancelled.stderr);
+   assert.deepEqual(cancelled.json.released, ["B", "C"]);
+   const byId = Object.fromEntries(JSON.parse(readFileSync(path, "utf8")).slices.map((item) => [item.id, item]));
+@@ -198,7 +199,7 @@ check("cancel: a cancelled slice stops holding the slices that waited on it (PF-
+   assert.deepEqual(byId.B.dependsOn, []);
+   assert.deepEqual(byId.C.dependsOn, ["B"]);
+   assert.deepEqual(cli(dir, ["next", "--queue", REL, "--now", NOW]).json.ready, ["B"]);
+-  assert.equal(cli(dir, ["cancel", "A", "--queue", REL, "--reason", "again"]).status, 3, "an already cancelled slice is refused");
++  assert.equal(cli(dir, ["cancel", "A", "--queue", REL, "--reason", "again", "--class", "superseded"]).status, 3, "an already cancelled slice is refused");
+ });
+ 
+ check("pause: records a hashed pause event, refuses a window over 4 hours and a missing session", () => {
+@@ -284,18 +285,63 @@ check("cancel: --started is a flag without a value, given at most once (D51)", (
+   const dir = sandbox();
+   const path = writeQueue(dir, [slice("A", ["a.mjs"])]);
+   const before = readFileSync(path);
+-  for (const args of [["cancel", "A", "--queue", REL, "--reason", "x", "--started=yes"], ["cancel", "A", "--queue", REL, "--reason", "x", "--started", "--started"]]) {
++  for (const args of [["cancel", "A", "--queue", REL, "--reason", "x", "--class", "budget", "--started=yes"], ["cancel", "A", "--queue", REL, "--reason", "x", "--class", "budget", "--started", "--started"]]) {
+     const result = cli(dir, args);
+     assert.equal(result.status, 2, JSON.stringify(args));
+     assert.equal(result.json.code, "SQ-USAGE");
+     assert.ok(readFileSync(path).equals(before));
+   }
+-  const cancelled = cli(dir, ["cancel", "A", "--started", "--queue", REL, "--reason", "no longer runs"]);
++  const cancelled = cli(dir, ["cancel", "A", "--started", "--queue", REL, "--reason", "no longer runs", "--class", "budget"]);
+   assert.equal(cancelled.status, 0, cancelled.stdout + cancelled.stderr);
+   assert.equal(JSON.parse(readFileSync(path, "utf8")).slices[0].state, "cancelled");
+ });
+ 
+-assert.equal(cases.length, 16, "the complete CLI corpus must be registered before execution begins");
++// D75 S5: the cancel class. These cases fail on a CLI that accepts a cancel without --class.
++check("cancel: --class is required and refused with the five classes and one teaching line each; the queue stays byte for byte (D75)", () => {
++  const dir = sandbox();
++  const path = writeQueue(dir, [slice("A", ["a.mjs"])]);
++  const before = readFileSync(path);
++  for (const extra of [[], ["--class", "bogus"], ["--class", "unclassified"], ["--class=BUDGET"]]) {
++    const result = cli(dir, ["cancel", "A", "--queue", REL, "--reason", "x", ...extra]);
++    assert.equal(result.status, 2, JSON.stringify(extra));
++    assert.equal(result.json.code, "SQ-CANCEL-CLASS", JSON.stringify(extra));
++    assert.match(result.json.message, /--class is required/u);
++    for (const name of CANCEL_CLASSES) {
++      assert.ok(result.json.message.includes(name) || result.json.repair.includes(name), `${name} is named: ${JSON.stringify(extra)}`);
++      assert.ok(result.json.repair.includes(CANCEL_CLASS_HELP[name]), `the teaching line of ${name} is in the repair`);
++    }
++    assert.deepEqual(result.json.classes, CANCEL_CLASS_HELP, "the refusal carries the vocabulary as data too");
++    assert.ok(readFileSync(path).equals(before), "a refused cancel writes nothing");
++  }
++  assert.equal(cli(dir, ["cancel", "A", "--queue", REL, "--class", "budget"]).json.code, "SQ-USAGE", "a missing --reason is still the usage error");
++});
++
++check("cancel: every class is accepted, stored on the slice and echoed (D75)", () => {
++  const dir = sandbox();
++  const path = writeQueue(dir, CANCEL_CLASSES.map((name) => slice(name, [`${name}.mjs`])));
++  for (const name of CANCEL_CLASSES) {
++    const result = cli(dir, ["cancel", name, "--queue", REL, "--reason", `ends as ${name}`, "--class", name]);
++    assert.equal(result.status, 0, result.stdout + result.stderr);
++    assert.equal(result.json.cancelClass, name);
++  }
++  const stored = JSON.parse(readFileSync(path, "utf8")).slices;
++  assert.deepEqual(stored.map((item) => item.cancelClass), [...CANCEL_CLASSES]);
++  assert.equal(cli(dir, ["validate", "--queue", REL]).status, 0, "the stored queue validates");
++});
++
++check("report: queue.cancelClasses counts cancelled slices per class and counts a legacy cancelled row as unclassified (D75)", () => {
++  const dir = sandbox();
++  writeQueue(dir, [slice("A", ["a.mjs"]), slice("B", ["b.mjs"]), slice("C", ["c.mjs"]), slice("D", ["d.mjs"]),
++    slice("OLD", ["old.mjs"], { state: "cancelled", holdReason: "cancelled before classes existed" })]);
++  const empty = cli(dir, ["report", "--queue", REL, "--now", NOW]);
++  assert.equal(empty.status, 0, empty.stdout + empty.stderr);
++  assert.deepEqual(empty.json.queue.cancelClasses, { budget: 0, "wrong-premise": 0, "review-defect": 0, "integrated-elsewhere": 0, superseded: 0, unclassified: 1 });
++  for (const [id, name] of [["A", "budget"], ["B", "budget"], ["C", "superseded"]]) assert.equal(cli(dir, ["cancel", id, "--queue", REL, "--reason", "x", "--class", name]).status, 0);
++  const counted = cli(dir, ["report", "--queue", REL, "--now", NOW]);
++  assert.deepEqual(counted.json.queue.cancelClasses, { budget: 2, "wrong-premise": 0, "review-defect": 0, "integrated-elsewhere": 0, superseded: 1, unclassified: 1 });
++});
++
++assert.equal(cases.length, 19, "the complete CLI corpus must be registered before execution begins");
+ process.on("exit", () => {
+   for (const dir of sandboxes) rmSync(dir, { recursive: true, force: true });
+ });
