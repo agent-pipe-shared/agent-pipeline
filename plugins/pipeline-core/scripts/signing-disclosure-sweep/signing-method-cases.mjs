@@ -46,8 +46,15 @@ export function signingMethodCases(configuration) {
         if(path===join(fixture.keys,'po-private.pem'))privateReads++;
         return readFileSync(path,...args);
       };
-      assert.throws(()=>fixture.run(),error=>Array.isArray(error.findings)&&error.findings.some(finding=>finding.findingId==='trust-anchor-match'&&finding.status!=='ok'));
-      assert.equal(requestReads,0,'actual anchor failure precedes scratch request/describer');
+      let disclosed=0;
+      assert.throws(()=>capture(()=>fixture.run(),()=>{disclosed++;}),error=>Array.isArray(error.findings)&&error.findings.some(finding=>finding.findingId==='trust-anchor-match'&&finding.status!=='ok'));
+      // QG-04 restatement (PO tile decision 2026-10-22; ALF-C-SIGN-ORDER2, ab5fefbbc). The earlier claim
+      // that the anchor failure precedes any request read is obsolete: with --request, sign-intent now
+      // validates the request first (exactly one read) and runs the readiness check after every
+      // request-specific refusal, still before material publication, disclosure, confirmation,
+      // passphrase and any key-using spawn. All of those "before" claims stay asserted below.
+      assert.equal(requestReads,1,'the request is read exactly once, by the request validation that now precedes readiness');
+      assert.equal(disclosed,0,'no disclosure is shown before readiness');
       assert.equal(privateReads,0,'unmatched public anchor cannot open private key');assert.equal(fixture.signingSpawns(),0);
       assert.equal(readdirSync(join(fixture.f.dir,'scratch')).filter(name=>name.startsWith('review-')).length,0,'no material publication before readiness');
     }},
