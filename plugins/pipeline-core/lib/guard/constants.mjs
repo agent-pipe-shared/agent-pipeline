@@ -178,6 +178,13 @@ export const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../s
 
 export const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../scripts/pipeline-state.mjs", import.meta.url));
 
+// D64 (catalogue-admit-prescribed-lifecycle-verbs): fixed installed entry points the Pipeline prescribes before the
+// first implementation dispatch. Their closed argument grammars live in command-catalogue.mjs.
+export const MODEL_ROLE_DISPATCH_SELECT_SCRIPT = fileURLToPath(new URL("../../scripts/model-role-dispatch-select.mjs", import.meta.url));
+export const DESIGN_REVIEW_RECEIPT_SCRIPT = fileURLToPath(new URL("../../scripts/design-review-receipt.mjs", import.meta.url));
+export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scripts/register-feature-package.mjs", import.meta.url));
+export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
+
 export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
 
 export const SETTINGS_ALLOWLIST_MERGE_SCRIPT = fileURLToPath(new URL("../../scripts/settings-allowlist-merge.mjs", import.meta.url));

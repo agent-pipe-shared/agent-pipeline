@@ -354,3 +354,150 @@ test("AC-123 continuity-* writers are not catalogue-admitted lifecycle verbs of 
     }
   });
 });
+
+
+// ---- D64 (0.7.0, blocker): every fixed installed entry point the Pipeline prescribes before the first implementation
+// dispatch is admitted, in its documented closed argument forms, in the lifecycle state that prescribes it ----
+const scriptsDir = join(pluginRoot, "scripts");
+const selectScript = join(scriptsDir, "model-role-dispatch-select.mjs");
+const receiptScript = join(scriptsDir, "design-review-receipt.mjs");
+const registerScript = join(scriptsDir, "register-feature-package.mjs");
+const baselineScript = join(scriptsDir, "architecture-baseline.mjs");
+const bootstrapScript = join(scriptsDir, "model-role-bootstrap.mjs");
+const scriptAction = (script, ...argv) => node([script, ...argv]);
+// Both the catalogue verdict and the real guard (no readiness, no override) must agree.
+function bothAdmit(action, f, label) {
+  assert.equal(admitted(action, f), true, `${label}: catalogue`);
+  assert.equal(guardCode(action, f), 0, `${label}: real guard`);
+}
+function bothRefuse(action, f, label) {
+  assert.equal(admitted(action, f), false, `${label}: catalogue`);
+  assert.equal(guardCode(action, f), 2, `${label}: real guard`);
+}
+
+test("D64 pipeline-state documented help and readback forms are admitted", () => {
+  withFixture("feature", f => {
+    for (const word of ["--help", "-h", "help"]) bothAdmit(stateAction(word), f, word);
+    bothAdmit(stateAction("inspect"), f, "inspect");
+    bothRefuse(stateAction("--help", "--extra"), f, "help with an extra argument");
+    bothRefuse(stateAction("help", "inspect"), f, "help with a topic");
+  });
+});
+
+test("D64 route selection: the documented closed forms are admitted, near-misses are not", () => {
+  withFixture("feature", f => {
+    const select = (...rest) => scriptAction(selectScript, "--repo-root", f.root, ...rest);
+    for (const runner of ["codex", "claude"]) bothAdmit(select("--runner", runner, "--task-route", "profile.critic.review"), f, runner);
+    bothAdmit(select("--runner", "codex", "--task-route", "duty.advisory.fallback"), f, "duty route");
+    bothAdmit(select("--runner", "antigravity", "--task-route", "profile.critic.review", "--host-session-id", "hook-session-1"), f, "antigravity");
+    const refusals = [
+      ["foreign root", scriptAction(selectScript, "--repo-root", join(f.root, ".."), "--runner", "codex", "--task-route", "duty.x")],
+      ["relative root", scriptAction(selectScript, "--repo-root", ".", "--runner", "codex", "--task-route", "duty.x")],
+      ["unknown runner", select("--runner", "other", "--task-route", "duty.x")],
+      ["antigravity without a host session id", select("--runner", "antigravity", "--task-route", "duty.x")],
+      ["codex with a host session id", select("--runner", "codex", "--task-route", "duty.x", "--host-session-id", "s1")],
+      ["route with a path separator", select("--runner", "codex", "--task-route", "../x")],
+      ["route starting with a dash", select("--runner", "codex", "--task-route", "--help")],
+      ["extra flag", select("--runner", "codex", "--task-route", "duty.x", "--extra", "1")],
+      ["swapped flag order", scriptAction(selectScript, "--runner", "codex", "--repo-root", f.root, "--task-route", "duty.x")],
+      ["missing route", select("--runner", "codex")],
+    ];
+    for (const [label, action] of refusals) bothRefuse(action, f, label);
+  });
+});
+
+function receiptFixture(f) {
+  mkdirSync(join(f.root, "specs", f.featureId, "review"), { recursive: true });
+  const report = `specs/${f.featureId}/review/design-review-1.md`;
+  const report2 = `specs/${f.featureId}/review/design-review-2.md`;
+  writeFileSync(join(f.root, report), "# Critic report\n\nVerdict: PASS\n");
+  writeFileSync(join(f.root, report2), "# Critic report round 2\n\nVerdict: PASS\n");
+  writeFileSync(join(f.root, `specs/${f.featureId}/review/receipt-1.json`), "{}\n");
+  return { report, report2, prd: f.sources.prd.path, spec: f.sources.spec.path, out: `specs/${f.featureId}/review/receipt-new.json` };
+}
+const receiptCreate = (f, r, over = {}) => {
+  const flags = { "--repo": f.root, "--feature": f.featureId, "--report": r.report, "--prd": r.prd, "--spec": r.spec, "--out": r.out, ...over };
+  return scriptAction(receiptScript, "create", ...Object.entries(flags).flatMap(([flag, value]) => (value === null ? [] : [flag, value])));
+};
+
+test("D64 design-review receipt production: the documented forms are admitted, derived-value flags and unsafe paths are not", () => {
+  withFixture("feature", f => {
+    const r = receiptFixture(f);
+    bothAdmit(receiptCreate(f, r), f, "initial round");
+    bothAdmit(scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report2, "--prd", r.prd, "--spec", r.spec,
+      "--previous", `specs/${f.featureId}/review/receipt-1.json`, "--open-finding", "F-1", "--open-finding", "F-2", "--companion", f.sources.design.path,
+      "--requested-route", "claude-sonnet-5-5", "--observed-identity", "claude-sonnet-5-5", "--out", r.out), f, "delta round with companions and findings");
+    const refusals = [
+      ["a flag that supplies a derived value", receiptCreate(f, r, { "--reviewed-at": "2026-10-22T00:00:00.000Z" })],
+      ["a digest flag", receiptCreate(f, r, { "--sha256": "a".repeat(64) })],
+      ["foreign repo", receiptCreate(f, r, { "--repo": join(f.root, "..") })],
+      ["missing --out", receiptCreate(f, r, { "--out": null })],
+      ["out outside specs, evidence and docs", receiptCreate(f, r, { "--out": "src/receipt.json" })],
+      ["out that is not json", receiptCreate(f, r, { "--out": `specs/${f.featureId}/review/receipt-new.js` })],
+      ["out traversal", receiptCreate(f, r, { "--out": "specs/../src/receipt.json" })],
+      ["absolute report", receiptCreate(f, r, { "--report": join(f.root, r.report) })],
+      ["traversal in the report", receiptCreate(f, r, { "--report": "specs/feature-test/../../outside.md" })],
+      ["report that does not exist", receiptCreate(f, r, { "--report": `specs/${f.featureId}/review/absent.md` })],
+      ["unknown subcommand", scriptAction(receiptScript, "verify", "--repo", f.root)],
+      ["a duplicated single flag", scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report, "--report", r.report2, "--prd", r.prd, "--spec", r.spec, "--out", r.out)],
+      ["a duplicated companion", scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report, "--prd", r.prd, "--spec", r.spec, "--companion", r.prd, "--companion", r.prd, "--out", r.out)],
+      ["an open finding that is a flag", scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report, "--prd", r.prd, "--spec", r.spec, "--open-finding", "--out", "--out", r.out)],
+    ];
+    for (const [label, action] of refusals) bothRefuse(action, f, label);
+  });
+});
+
+test("D64 design-review receipt production: a linked input or a linked output directory is never admitted", (t) => {
+  return withFixture("feature", f => {
+    const r = receiptFixture(f);
+    const link = `specs/${f.featureId}/review/linked-report.md`;
+    try {
+      symlinkSync(join(f.root, r.report), join(f.root, link), "file");
+      symlinkSync(join(f.root, "specs", f.featureId, "review"), join(f.root, "specs", "review-alias"), "dir");
+    } catch (error) { t.skip(`${HOST_LIMITATION} (${error?.code ?? "unknown"})`); return; }
+    bothRefuse(receiptCreate(f, r, { "--report": link }), f, "file link as report");
+    bothRefuse(receiptCreate(f, r, { "--out": "specs/review-alias/receipt-new.json" }), f, "output below a linked directory");
+  });
+});
+
+test("D64 feature-package registration: exactly the documented forms are admitted", () => {
+  withFixture("feature", f => {
+    bothAdmit(scriptAction(registerScript, "--root", f.root), f, "register");
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
+    for (const [label, argv] of [["foreign root", ["--root", join(f.root, "..")]], ["no root", []], ["extra flag", ["--root", f.root, "--force"]],
+      ["review unit before root", ["--add-review-unit", "--root", f.root]], ["double review unit", ["--root", f.root, "--add-review-unit", "--add-review-unit"]]]) {
+      bothRefuse(scriptAction(registerScript, ...argv), f, label);
+    }
+  });
+});
+
+test("D64 architecture baseline diagnosis: the read-only assessment forms and --help are admitted; the writing and file-reading forms are not", () => {
+  withFixture("feature", f => {
+    const base = (...rest) => scriptAction(baselineScript, "--root", f.root, ...rest);
+    bothAdmit(base(), f, "assessment");
+    bothAdmit(base("--format", "json"), f, "json");
+    bothAdmit(base("--diff", "HEAD~1", "--format", "text"), f, "diff");
+    bothAdmit(base("--from", "a".repeat(40), "--through", "b".repeat(40)), f, "range");
+    bothAdmit(scriptAction(baselineScript, "--help"), f, "--help");
+    bothAdmit(scriptAction(baselineScript, "-h"), f, "-h");
+    for (const [label, action] of [
+      ["compile-summary writes project/architecture-decisions.compiled.json", base("--compile-summary")],
+      ["validate reads an arbitrary path", scriptAction(baselineScript, "--validate", "docs/adr/0001.md")],
+      ["foreign root", scriptAction(baselineScript, "--root", join(f.root, ".."))],
+      ["unknown format", base("--format", "yaml")],
+      ["diff value that is a flag", base("--diff", "--compile-summary")],
+      ["diff together with a range", base("--diff", "main", "--from", "a".repeat(40), "--through", "b".repeat(40))],
+      ["half a range", base("--from", "a".repeat(40))],
+      ["help with a root", base("--help")],
+      ["repeated flag", base("--format", "json", "--format", "text")],
+    ]) bothRefuse(action, f, label);
+  });
+});
+
+test("D64 model-role bootstrap admits a host session and is a decision, not an admission: it stays refused here", () => {
+  withFixture("feature", f => {
+    // model-role-bootstrap.mjs ADMITS the session's role receipt into the host store after readback; whether the
+    // guard may pre-admit that write for the agent is a product decision (see the D64 report), so it is pinned refused.
+    bothRefuse(scriptAction(bootstrapScript, "--repo-root", f.root, "--runner", "codex"), f, "bootstrap");
+  });
+});

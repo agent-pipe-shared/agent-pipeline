@@ -389,6 +389,8 @@ export function sanctionedPipelineStateArgs(args, root) {
   // `inspect` is a pure read of the current working tree and intentionally has no
   // `--root` override; the caller must run it from the repository it is inspecting.
   if (args[0] === "inspect") return args.length === 1;
+  // D64: `--help`, `-h` and `help` only print the command list (pipeline-state.mjs "--help" case) and write nothing.
+  if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") return args.length === 1;
   // Closed canonical enrollment routes; the writer owns all CAS, consent and lock checks.
   if (args[0] === "inspect-enrollment-retirement") {
     return exactRoot(args, root, 1) && args.length === 3;

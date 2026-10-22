@@ -11,8 +11,8 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
-import { APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
-import { exactRoot, simpleWords } from "./shell-grammar.mjs";
+import { ARCHITECTURE_BASELINE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
 import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
 
@@ -123,9 +123,91 @@ function sanctionedDesignCourseArgs(args, root) {
   } catch { return false; }
 }
 
+// D64 (catalogue-admit-prescribed-lifecycle-verbs): closed argument grammars for the fixed installed entry points the
+// Pipeline prescribes before the first implementation dispatch. Each grammar mirrors the script's OWN argv parser, pins
+// the root to the observed root, bounds every value, and admits nothing the script would not accept; a producer-derived
+// value flag (a time, a digest, a runner, a model) is never admitted. Inputs must be physical regular files, an output
+// must be a new .json under specs/, evidence/ or docs/, so none of these is a general write primitive.
+const MODEL_ROLE_ROUTE = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
+const NATIVE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const RECEIPT_OUT = /^(?:specs|evidence|docs)\/[A-Za-z0-9._/-]{1,200}\.json$/u;
+const FINDING_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
+const REQUESTED_ROUTE = /^[A-Za-z0-9][\x21-\x7e]{0,127}$/u;
+const OBSERVED_IDENTITY = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,127}$/u;
+const GIT_REVISION = /^[A-Za-z0-9][A-Za-z0-9._/~^@-]{0,127}$/u;
+const GIT_OBJECT_ID = /^[a-f0-9]{7,64}$/u;
+
+function sanctionedModelRoleDispatchSelectArgs(args, root) {
+  const antigravity = args.length === 8;
+  if (args.length !== 6 && !antigravity) return false;
+  if (args[0] !== "--repo-root" || args[1] !== root || args[2] !== "--runner" || args[4] !== "--task-route") return false;
+  if (!["codex", "claude", "antigravity"].includes(args[3]) || (args[3] === "antigravity") !== antigravity) return false;
+  return MODEL_ROLE_ROUTE.test(args[5])
+    && (!antigravity || (args[6] === "--host-session-id" && NATIVE_SESSION_ID.test(args[7])));
+}
+
+function sanctionedRegisterFeaturePackageArgs(args, root) {
+  return exactRoot(args, root, 0) && (args.length === 2 || (args.length === 3 && args[2] === "--add-review-unit"));
+}
+
+function sanctionedDesignReviewReceiptArgs(args, root) {
+  try {
+    if (args[0] !== "create") return false;
+    const companions = [], findings = [], remainder = [];
+    for (let index = 1; index < args.length; index += 1) {
+      if (args[index] === "--companion" || args[index] === "--open-finding") {
+        if (args[index + 1] === undefined) return false;
+        (args[index] === "--companion" ? companions : findings).push(args[index + 1]);
+        index += 1;
+      } else remainder.push(args[index]);
+    }
+    if (companions.length > 8 || findings.length > 64
+      || new Set(companions).size !== companions.length || new Set(findings).size !== findings.length) return false;
+    const input = (path) => physicalDesignCoursePath(root, path, { required: true });
+    if (!companions.every(input) || !findings.every((id) => FINDING_ID.test(id))) return false;
+    return matchFlagSpec(remainder, {
+      requiredValue: {
+        "--repo": (value) => value === root,
+        "--feature": (value) => DESIGN_COURSE_ID.test(value),
+        "--report": input,
+        "--prd": input,
+        "--spec": input,
+        "--out": (value) => RECEIPT_OUT.test(value) && physicalDesignCoursePath(root, value),
+      },
+      optionalValue: {
+        "--previous": input,
+        "--requested-route": (value) => REQUESTED_ROUTE.test(value),
+        "--observed-identity": (value) => OBSERVED_IDENTITY.test(value),
+      },
+    });
+  } catch { return false; }
+}
+
+// Read-only assessment forms and the documented help only. --compile-summary writes
+// project/architecture-decisions.compiled.json and --validate reads an arbitrary path: neither is admitted here.
+function sanctionedArchitectureBaselineArgs(args, root) {
+  if (args.length === 1) return args[0] === "--help" || args[0] === "-h";
+  const matched = matchFlagSpec(args, {
+    requiredValue: { "--root": (value) => value === root },
+    optionalValue: {
+      "--format": (value) => value === "json" || value === "text",
+      "--diff": (value) => GIT_REVISION.test(value) && !value.includes(".."),
+      "--from": (value) => GIT_OBJECT_ID.test(value),
+      "--through": (value) => GIT_OBJECT_ID.test(value),
+    },
+  });
+  if (!matched) return false;
+  const has = (flag) => args.includes(flag);
+  return !(has("--diff") && (has("--from") || has("--through"))) && has("--from") === has("--through");
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
+  if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);
+  if (script === DESIGN_REVIEW_RECEIPT_SCRIPT) return sanctionedDesignReviewReceiptArgs(args, root);
+  if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
+  if (script === ARCHITECTURE_BASELINE_SCRIPT) return sanctionedArchitectureBaselineArgs(args, root);
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
   // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every
