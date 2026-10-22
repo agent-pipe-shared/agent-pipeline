@@ -878,10 +878,23 @@ export async function runSecurityScan({
   // Defaulting to the real imported functions keeps every production code path identical.
   assessTrustedExecutablePath: assessTrustedExecutablePathOverride,
   resolveTrustedSystemExecutable: resolveTrustedSystemExecutableOverride,
+  // D102: "shared-tree" (default, unknown values included) refuses a dirty working tree.
+  // "snapshot" scans HEAD's committed bytes from a disposable detached worktree and leaves
+  // the caller's dirty tree untouched; the evidence still binds HEAD's commit and tree.
+  scanMode = "shared-tree",
 } = {}) {
   const assessPath = assessTrustedExecutablePathOverride ?? assessTrustedExecutablePath;
   const resolveSystemExec = resolveTrustedSystemExecutableOverride ?? resolveTrustedSystemExecutable;
-  const candidateBefore = observeCandidate(rootDir);
+  const snapshotMode = scanMode === "snapshot";
+  // In snapshot mode the dirt of the caller's tree is not part of the scanned subject, so it
+  // must not make the candidate uncertain either; every other status stays as observed.
+  const observeSubject = (root) => {
+    const observed = observeCandidate(root);
+    return snapshotMode && observed.status === "dirty"
+      ? { ...observed, status: "clean", reason: null, worktreeDirty: true }
+      : observed;
+  };
+  const candidateBefore = observeSubject(rootDir);
   const snapshot = materializeCandidate(rootDir, candidateBefore);
   // Non-Git callers retain a diagnostic-only compatibility report. Such
   // evidence can never satisfy an exact-candidate consumer. A Git candidate
@@ -1000,7 +1013,7 @@ export async function runSecurityScan({
   const hasErrorClass = scanners.some((s) => s.status === "ERROR");
   const hasBlockingFinding = findings.some((f) => blockOnSet.has(f.severity));
   const snapshotAfter = scanRoot ? observeCandidate(scanRoot) : null;
-  const candidateAfter = observeCandidate(rootDir);
+  const candidateAfter = observeSubject(rootDir);
   const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
     && sameCandidate(candidateBefore, snapshotAfter);
   const candidateUncertain = candidateBefore.status !== "unavailable" && !candidateBound;
@@ -1136,6 +1149,11 @@ function parseArgs(argv) {
       opts.root = argv[++i];
     } else if (a === "--timeout-ms") {
       opts.timeoutMs = Number(argv[++i]);
+    } else if (a === "--scan-mode") {
+      opts.scanMode = argv[++i];
+      if (opts.scanMode !== "snapshot" && opts.scanMode !== "shared-tree") {
+        throw new Error(`--scan-mode must be "snapshot" or "shared-tree", got: ${opts.scanMode}`);
+      }
     } else {
       throw new Error(`unknown argument: ${a}`);
     }
@@ -1163,7 +1181,11 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  const { evidence, exitCode, evidenceV2, verdictV2 } = await runSecurityScan({ rootDir, timeoutMs: opts.timeoutMs });
+  const { evidence, exitCode, evidenceV2, verdictV2 } = await runSecurityScan({
+    rootDir,
+    timeoutMs: opts.timeoutMs,
+    ...(opts.scanMode ? { scanMode: opts.scanMode } : {}),
+  });
   printSummary(evidence);
   console.log(`Evidence written: ${join(rootDir, "evidence", "security-latest.json")}`);
   if (evidenceV2) {
