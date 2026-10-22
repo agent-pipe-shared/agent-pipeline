@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a5bc8f5aa10cd5860e6b8aa7128818fe3937102a6200478b22280c7c09722af0"
+    "transitionHead": "bafed581403d7ff1bf1771a0339a979b32d72c953e3544a45803d6af6292a668"
   },
   "counts": {
-    "open": 269,
+    "open": 270,
     "in_progress": 0,
     "closed": 673,
     "rejected": 3,
@@ -4947,6 +4947,16 @@
       "source": "PO decision #27, 2026-10-16: an emitter/consumer for the Goldfish briefing 'quick' field is a backlog item after 0.7.0; the template field is the 0.7.0 delivery.",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-22",
+      "source": "Original Alfred item (AC-187); original body lost, restated 2026-10-22 per D111 from the pin, the code and the portable requirement record.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.governance-product-verify-suites-deregistered",

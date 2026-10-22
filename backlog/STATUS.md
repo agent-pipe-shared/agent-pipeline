@@ -395,6 +395,7 @@
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.goldfish-mechanic-is-not-routed-to-the-haiku-tier | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.goldfish-quick-field-has-no-emitter | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
+| pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes | open | defect | pipeline | alfred | 2026-10-22 | — | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.governance-scope-rejects-readonly-host-git-control | open | defect | pipeline | alfred | 2026-09-29 | — | — |
@@ -964,7 +965,7 @@
 
 ## Counts
 
-- open: 269
+- open: 270
 - in_progress: 0
 - closed: 673
 - rejected: 3
