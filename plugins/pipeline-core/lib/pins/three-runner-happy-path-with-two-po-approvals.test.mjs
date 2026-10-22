@@ -39,7 +39,9 @@ import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "..
 import { scanAcceptedCriterionRows } from "../critic-accepted-contract.mjs";
 import { validateItemDeliveryBriefing } from "../native-goldfish-host-return.mjs";
 import { resolveGovernedItemQueue } from "../native-goldfish-host-state.mjs";
-import { inspectPlanDeliveryHandoff } from "../plan-handoff-readiness.mjs";
+import * as planHandoffModule from "../plan-handoff-readiness.mjs";
+// Namespace import: a missing export fails its own case with a typed message instead of aborting the loading of this whole file.
+const { inspectPlanDeliveryHandoff, PLAN_HANDOFF_CODES, planHandoffRefusal } = planHandoffModule;
 import { applyProjectOnboardingV3, inspectProjectOnboardingV3, planProjectOnboardingLifecycleV4, planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { fakeDeps as machineDeps } from "../project-onboarding-v3.test.mjs";
 import { nativeContractFixtureParent } from "../test-item-approved-course-fixture.mjs";
@@ -490,14 +492,35 @@ function lifecycleHandler(source, verb) {
   return source.slice(start, next < 0 ? source.length : next);
 }
 const pipelineStateSource = readFileSync(join(PLUGIN, "scripts", "pipeline-state.mjs"), "utf8");
-const handoffWired = ["submit-plan", "present-plan"].every((verb) => lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"));
-test("AC-264 added (P0-1): submit-plan and present-plan call the plan-readiness hand-off inspection, so the failure cannot first appear after approval", {
-  todo: handoffWired ? false : "deferred to 0.7.x by PO decision D85 (owner Coordinator, due 2026-10-31): the call sites in scripts/pipeline-state.mjs (protected) are not built; lib/plan-handoff-readiness.mjs is delivered and covered above but has no caller, so plan readiness does not yet enforce the hand-off.",
-}, () => {
+// Strict since PO decision 2026-10-22 pulled the formerly deferred D85 clause into 0.7.0 (it was a typed todo before).
+test("AC-264 added (P0-1): submit-plan and present-plan call the plan-readiness hand-off inspection, so the failure cannot first appear after approval", () => {
   for (const verb of ["submit-plan", "present-plan"]) {
-    assert.ok(lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"), `${verb} must call inspectPlanDeliveryHandoff before the PO is asked to sign`);
+    const handler = lifecycleHandler(pipelineStateSource, verb);
+    assert.ok(handler.includes("inspectPlanDeliveryHandoff"), `${verb} must call inspectPlanDeliveryHandoff before the PO is asked to sign`);
+    assert.ok(handler.includes("planHandoffRefusal"), `${verb} must refuse through the typed, self-describing refusal text`);
   }
   assert.equal(lifecycleHandler(pipelineStateSource, "approve-plan").includes("inspectPlanDeliveryHandoff"), false, "never at approval: a refusal there would burn the signature");
+  const submit = lifecycleHandler(pipelineStateSource, "submit-plan");
+  assert.ok(submit.indexOf("inspectPlanDeliveryHandoff") < submit.indexOf("writeState("), "submit-plan inspects BEFORE any state write, so a refusal leaves no state");
+  const present = lifecycleHandler(pipelineStateSource, "present-plan");
+  assert.ok(present.indexOf("inspectPlanDeliveryHandoff") < present.indexOf("writeDesignWorkflowApprovalRequest("), "present-plan inspects BEFORE the approval request file is written");
+});
+
+test("AC-264 added (P0-1): the hand-off refusal text names the cause and one runnable repair per typed code, and a ready or skipped verdict is silent", () => {
+  assert.equal(typeof planHandoffRefusal, "function", "lib/plan-handoff-readiness.mjs must export planHandoffRefusal");
+  assert.equal(planHandoffRefusal("submit-plan", { ok: true, skipped: true, code: "PLR-NO-GOVERNANCE" }), null, "an ungoverned project is never refused");
+  assert.equal(planHandoffRefusal("present-plan", { ok: true, code: "PLR-HANDOFF-READY", admittedCriteria: ["AC-1"], checks: [] }), null);
+  for (const code of PLAN_HANDOFF_CODES.filter((entry) => !["PLR-NO-GOVERNANCE", "PLR-HANDOFF-READY"].includes(entry))) {
+    for (const verb of ["submit-plan", "present-plan"]) {
+      const text = planHandoffRefusal(verb, { ok: false, code, message: "cause text", path: "tests/x.test.js" });
+      assert.match(text, new RegExp(`^Error: ${verb} refused \\(${code}\\); cause text`, "u"), `${code}: names verb, code and cause`);
+      assert.match(text, /Repair: /u, `${code}: carries a repair`);
+      assert.match(text, /submit-plan/u);
+    }
+  }
+  assert.match(planHandoffRefusal("present-plan", { ok: false, code: "PLR-HANDOFF-NO-CRITERION", message: "m" }), /cancel-submitted-plan/u, "after submission the repair includes withdrawing the bound submission");
+  assert.equal(/cancel-submitted-plan/u.test(planHandoffRefusal("submit-plan", { ok: false, code: "PLR-HANDOFF-NO-CRITERION", message: "m" })), false, "before submission there is nothing to withdraw");
+  assert.match(planHandoffRefusal("submit-plan", { ok: false, code: "PLR-HANDOFF-UNKNOWN-CODE", message: "m" }), /Repair: /u, "an unknown code still gets a repair (fail closed)");
 });
 
 /** A fresh Codex onboarding root through the real portable apply (the shared fakeDeps answers only the machine facts). */

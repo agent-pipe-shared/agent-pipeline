@@ -88,6 +88,35 @@ function checkState(root, path) {
   return 'present';
 }
 
+// One runnable repair per not-ready code. Every repair is an edit the author can make plus the command to re-run.
+const HANDOFF_REPAIRS = Object.freeze({
+  'PLR-HANDOFF-NO-CRITERION': 'add a normative acceptance-criterion table to the Spec (header row, then rows such as `| AC-1 | WHEN <trigger>, THE system <behaviour> | <test file> |`, or numbered `1` / `R-2` rows under an acceptance-criteria heading), commit it',
+  'PLR-HANDOFF-SPEC-UNREADABLE': 'restore the Spec as a regular, non-symlink UTF-8 file at its recorded path under specs/<feature>/ with the bytes the plan was bound to (check `git status` for an uncommitted edit), commit it',
+  'PLR-HANDOFF-CHECK-UNADMITTED': 'correct the named test path in the Spec to a normalized repository-relative .test.mjs/.test.cjs/.test.js path, or remove the mention if it is not a deliverable test of this project, commit it',
+  'PLR-HANDOFF-CHECK-NOT-TRACKABLE': 'move the named test path to a location git does not ignore (`git check-ignore -v <path>` names the rule), or edit the Spec to name a trackable path, commit it',
+  'PLR-HANDOFF-UNAVAILABLE': 'confirm `git --version` and `git status` succeed in the project root and the governance observation is readable, then retry; this check fails closed on any fault',
+});
+
+/**
+ * Self-describing refusal text for a not-ready hand-off verdict at submit-plan / present-plan, or null when the plan may proceed
+ * (ready, or skipped because the project is not governed). Names the verb, typed code and cause, then one runnable repair.
+ * After submission the Spec bytes are bound to the submission, so the repair also withdraws it (`cancel-submitted-plan`).
+ * @param {'submit-plan'|'present-plan'} verb
+ * @param {ReturnType<typeof inspectPlanDeliveryHandoff>} verdict
+ * @returns {string|null}
+ */
+export function planHandoffRefusal(verb, verdict) {
+  if (verdict?.ok === true) return null;
+  const code = typeof verdict?.code === 'string' ? verdict.code : 'PLR-HANDOFF-UNAVAILABLE';
+  const cause = typeof verdict?.message === 'string' ? verdict.message : 'the plan hand-off could not be inspected; fail closed';
+  const where = typeof verdict?.path === 'string' ? ` (${verdict.path})` : '';
+  const repair = HANDOFF_REPAIRS[code] ?? HANDOFF_REPAIRS['PLR-HANDOFF-UNAVAILABLE'];
+  const rerun = verb === 'present-plan' && code !== 'PLR-HANDOFF-UNAVAILABLE'
+    ? 'then withdraw the bound submission with `cancel-submitted-plan` and run `submit-plan` and `present-plan` again'
+    : `then run ${verb === 'present-plan' ? 'present-plan' : 'submit-plan'} again`;
+  return `Error: ${verb} refused (${code}); ${cause}${where}. No state was written and no signature was requested. Repair: ${repair}, ${rerun}. (submit-plan, present-plan and the delivery briefing read the same hand-off; approve-plan never re-checks it.)`;
+}
+
 /**
  * @param {{rootDir: string, specPath: string, expectedSpecSha256: string}} input
  * @param {{observeScope?: (options: {rootDir: string}) => {requiresEnforcement: boolean}}} [deps]
