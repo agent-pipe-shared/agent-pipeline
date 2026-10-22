@@ -60,3 +60,18 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **DEFERRED** — Admitting the export to governed agents needs a signature-bound guard patch
   Whole item deferred past the 0.7.0 candidate by PO decision 2026-10-16 (item Triage, dated 2026-10-17; AC-175 not counted). The held guard patch (signature) is only needed once the item is scheduled for the next sprint.
+
+## Reconciled 2026-10-23
+
+Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
+
+- Triage "Partial groundwork already committed" sentence "Admitting the export to governed agents needs a held guard
+  patch", and the Blocker analysis DEFERRED bullet "Admitting the export to governed agents needs a signature-bound guard
+  patch" / "The held guard patch (signature) is only needed once the item is scheduled": the admission is already
+  committed. Commit `0824e528e` (`feat(pipeline-core): admit the runner transcript export to governed agents`) adds the
+  export operation to the sanctioned-arguments table in `plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs`
+  (read flag plus `--runner` codex, claude or antigravity and `--session-id`). No guard patch is held for this part.
+- Unchanged and still true: child sessions and turn boundaries are not reported by the export, Antigravity stays typed
+  unavailable, and the rest of the Acceptance list (continuity digest drift, executable Verify contract, generated audit
+  index) is not built. The whole item stays deferred past 0.7.0 by the PO decision of 2026-10-16 (Triage, dated
+  2026-10-17).

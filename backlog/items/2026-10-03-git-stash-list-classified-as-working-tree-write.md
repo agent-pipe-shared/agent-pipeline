@@ -65,3 +65,25 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **DEFERRED** — Triage defers the item past the 0.7.0 candidate (2026-10-17); confirm whether it counts for this delivery
   Already answered by the recorded PO decision of 2026-10-16 (item Triage, 2026-10-17): deferred past 0.7.0, AC-181 is not counted against the candidate. No new decision is needed.
+
+## Reconciled 2026-10-23
+
+Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
+
+- Triage "deferred past the 0.7.0 candidate ... The item stays open", Description ("`git stash list` is classified as a
+  working-tree write") and Proposal: both defects named here are fixed in the source tree although the item itself is
+  still `open` for acceptance. The PO deferral decision of 2026-10-16 is a statement about the candidate scope and is not
+  withdrawn; it no longer describes the state of the code.
+  - Stash reader: `git stash list`, `git stash show` and `git stash show <ref>` are classified read-only, every
+    mutating verb (pop, drop, apply, push, save, clear, branch, create, store) and every output or hostile spelling stay
+    outside the reader. Evidence: `plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs` (GSR001-GSR034, introduced
+    in the transfer checkpoint `d02409a8a`), re-run in a clean clone on 2026-10-23: 34 tests, 34 pass, 0 fail, 0 skip.
+  - sed target (the PF-16 symptom of the Observed 2026-10-18 section and the "mangled sed expression" in the
+    Description): commit `3bbdb7c12` (`fix(guard): name the real file operand of a sed -i write target (PF-16)`) makes the
+    draft-phase denial name the real file operand instead of the script, and also closes a fail-open for `sed -i.bak` and
+    `sed --in-place=.bak`. The pin `plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs`
+    was added in `b09dddc88` (33 of 73 cases fail without the fix, 73 of 73 with it; the commit message records that it
+    documents the contract and needs the protected fix).
+  - Residuals recorded by `3bbdb7c12`, still open: an `&&` chain after a writer is outside the closed grammar and still
+    reports every word as a conservative candidate; `perl -i.bak` and `ruby -i.bak` are not detected in the parsed lane.
+- The Blocker analysis DEFERRED bullet is unchanged and still true as to the decision.

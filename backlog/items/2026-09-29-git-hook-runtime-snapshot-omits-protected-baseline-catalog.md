@@ -105,3 +105,20 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **NOT-BLOCKED** — Counted Linux/WSL run of the onboarding suite
   Already done: item section 'Counted runs 2026-10-22' records project-onboarding-v3.test.mjs 216 PASS / 0 fail in 467 s, git-hook-runtime-snapshot.test.mjs 8/8 and pre-commit-hook-install.test.mjs 59/59 on Linux/WSL2 at f3a9f02cb. Remaining item work (Full Verify, Critic, PO acceptance) is outside this clause.
+
+## Reconciled 2026-10-23
+
+Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
+
+- "Intake status": "The full original184 onboarding suite and final candidate qualification remain pending": the suite
+  part is superseded by the section "Counted runs 2026-10-22" (216 PASS, 0 fail, skip, cancel or timeout; the earlier
+  149-passed attempt stopped at 900 s). Final candidate qualification (Full Verify and the candidate-bound closure checks)
+  is still pending.
+- "Intake status": "This item is not committed or registered yet because the current product commit is held at the
+  normal protected-path backstop": the correction is committed. Commit `26fef9e7d` (`feat(pipeline): integrate 0.7
+  greenfield remediation`) carries the snapshot producer and admission changes
+  (`plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs`, `lib/git-hook-snapshot-admission.mjs`,
+  `scripts/pre-commit-hook-install.mjs` and its test), and the Triage rationale below already cites it.
+- "The original hook suite passes 55/55": 59/59 in the counted run; the 55/55 figure is the count at intake time.
+- Still open and not agent work: Full Verify and the candidate-bound closure checks on the host, the independent Critic
+  read, and PO acceptance. The status stays `open`; the Triage block is already filled (2026-10-08).

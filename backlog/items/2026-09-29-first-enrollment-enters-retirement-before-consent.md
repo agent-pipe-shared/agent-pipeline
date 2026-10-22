@@ -89,3 +89,19 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **LINUX-RUN** — Run that case on Linux/WSL, where directory symlinks and mode bits exist
   The pin's HL physical-history case skips only when symlinkSync fails (typed host-limitation, PO decision K7), which does not happen on Linux. Run `node scratch/run-in.mjs <clone> <label> plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs`; closes on 0 skip, 0 fail. The item's other open parts (OBC298 label, installed-candidate qualification) are separate host work.
+
+## Reconciled 2026-10-23
+
+Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
+
+- Blocker analysis 2026-10-22, LINUX-RUN bullet ("Run that case on Linux/WSL ... closes on 0 skip, 0 fail"), and the
+  premise that the HL physical-history case is an empty skipped stub: commit `18c06f27b` replaced the stub with four
+  cases (file and directory links at retained-history paths, refused by code `KICKOFF-PATH-UNSAFE` or
+  `ER-HISTORY-UNSAFE`, link targets asserted untouched). The skip is now a typed conditional host-limitation skip taken
+  only when the host cannot create a link. Measured again in a clean clone on Linux/WSL2 on 2026-10-23:
+  `plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs` reports 9 tests, 9 pass,
+  0 fail, 0 skip (the commit message records 8 pass, 1 skip before the change). The run is done; it is not work to do.
+- Triage "2026-10-08 close-out check: not closable - OBC298 label absent": the pin case "AC6 the committed onboarding
+  suite declares OBC298 and FRB001-FRB004, and OBC298 passes" passes in the same 9-case run.
+- Still open and not agent work: qualification of the installed candidate on a host, and PO acceptance. The status stays
+  `open`; the Triage block carries no Decision field and no recorded decision settles it, so it is left as it is.
