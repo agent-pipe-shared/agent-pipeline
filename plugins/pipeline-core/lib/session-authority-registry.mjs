@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes } from 'node:crypto';
-import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hostname } from 'node:os';
@@ -153,6 +153,34 @@ function observeLock(repo,judge=judgeSessionAuthorityLockOwner){
     acquiredAt:acquiredAt??new Date(stat.mtimeMs).toISOString(),ageSeconds:Math.max(0,Math.round((Date.now()-since)/1000)),
     sha256:hash(bytes),dev:String(stat.dev),ino:String(stat.ino)};
 }
+// K12: a taker of the registry lock waits for a live holder, bounded. A hook runs under a 10 s host timeout
+// (hooks/hooks.json, the shortest relevant one) and still has its own work to do once it holds the lock, and
+// retryWhileSessionAuthorityLockHeld (native-goldfish-host-state.mjs) already loops around this call, so the
+// bound is short: a holder normally keeps the lock for milliseconds, 1.5 s covers a slow disk or a busy
+// machine and leaves the hook more than 8 s for its own work.
+export const SESSION_AUTHORITY_LOCK_WAIT_MS=1500;
+const SESSION_AUTHORITY_LOCK_POLL_MS=50;
+const lockSleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);
+// K12: retired registry locks (`<stamp>-<hex>-registry-lock`, holding only the lock and its retire.json) are kept
+// for forensics, newest SESSION_AUTHORITY_RETIRED_LOCKS_KEPT only. Observed 2026-10-21: ~70 in 1.5 days, one per
+// killed hook, each identical in kind; the last 20 keep roughly the latest half-day of churn, which is what a
+// forensic read of "who died holding the lock" needs, and bound the directory. Directories of any other kind
+// (drift-heal, move-aside, take-over, source-update, ...) hold registry content or decisions and are never swept.
+export const SESSION_AUTHORITY_RETIRED_LOCKS_KEPT=20;
+function sweepRetiredLocks(repo){
+  try{
+    const base='agent-pipeline/session-authority-abandoned',dir=safePath(repo,base);
+    const names=readdirSync(dir).filter(name=>/^\d{14,}-[0-9a-f]{8}-registry-lock$/.test(name)).sort();
+    for(const name of names.slice(0,Math.max(0,names.length-SESSION_AUTHORITY_RETIRED_LOCKS_KEPT))){
+      const abs=safePath(repo,`${base}/${name}`),stat=lstatSync(abs);
+      if(stat.isSymbolicLink()||!stat.isDirectory())continue;
+      const inner=readdirSync(abs);
+      if(inner.some(file=>file!=='registry.lock'&&file!=='retire.json'))continue;
+      for(const file of inner)unlinkSync(safePath(repo,`${base}/${name}/${file}`));
+      rmdirSync(abs);
+    }
+  }catch{/* best effort: a sweep that fails leaves the forensic copies, never the lock */}
+}
 /** Moves exactly the observed lock aside. A lock created after it was observed is put back, never removed. */
 function retireLock(repo,observed,cause){
   const dir=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-registry-lock`;
@@ -166,14 +194,16 @@ function retireLock(repo,observed,cause){
   }
   syncDirectory(dirname(lockAbs));
   try{writeFileSync(safePath(repo,`${dir}/retire.json`),canonical({schema:'pipeline.session-authority-lock-retirement.v1',cause,owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,retiredAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});}catch{}
+  sweepRetiredLocks(repo);
   return dir;
 }
 function lockHeldFault(repo,observed,reason){
   const root=repo.primaryRoot,who=observed.pid===null?'an owner it does not record':`pid ${observed.pid}`;
   const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-LOCK-HELD';error.reason=reason;
-  error.lock=freeze({owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,ageSeconds:observed.ageSeconds});
+  const waitedMs=observed.waitedMs??0;
+  error.lock=freeze({owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,ageSeconds:observed.ageSeconds,waitedMs,waitBoundMs:SESSION_AUTHORITY_LOCK_WAIT_MS});
   error.repair=observed.owner==='live'
-    ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s). Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
+    ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s)${waitedMs>0?` and did not clear within the ${waitedMs}ms bounded wait; retry the operation, or wait longer`:''}. Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
     :`the registry lock is held by ${who} for ${observed.ageSeconds}s, and that owner cannot be confirmed alive or gone. If no Pipeline process runs for this repository: node ${REPAIR_SCRIPT} release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
   throw error;
 }
@@ -181,16 +211,22 @@ function lockHeldFault(repo,observed,reason){
 function acquireRegistryLock(repo,lockSchema,heldReason){
   privateDirectories(repo,LOCK_PATH);
   const abs=safePath(repo,LOCK_PATH);
-  for(let attempt=0;;attempt+=1){
+  // K12: `retired` counts retirements of a dead holder (a few at most); `races` counts lost create races; a live
+  // or unjudgeable holder is waited for until SESSION_AUTHORITY_LOCK_WAIT_MS, then refused typed. An unjudgeable
+  // holder is waited for too: a taker creates the file exclusively and writes its owner bytes a moment later, and
+  // a reader in that gap sees an owner-less file, which is not a legacy lock.
+  const started=Date.now();let retired=0,races=0;
+  for(;;){
     const bytes=Buffer.from(canonical({schema:lockSchema,repositorySha256:repoDigest(repo),nonce:randomBytes(32).toString('hex'),owner:lockOwner()}));
     let fd,nativeLock;
     try{if(process.platform==='win32')nativeLock=nativeLockCreate(abs,bytes);else fd=openSync(abs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);}
     catch(error){
-      if(attempt>=2||(process.platform!=='win32'&&error?.code!=='EEXIST'))fail('SDC-LOCK-HELD',heldReason);
-      const observed=observeLock(repo);
-      if(observed.status==='absent')continue;
-      if(observed.owner==='dead'){retireLock(repo,observed,'the recorded owner process is gone');continue;}
-      lockHeldFault(repo,observed,heldReason);
+      if(retired>=2||races>=64||(process.platform!=='win32'&&error?.code!=='EEXIST'))fail('SDC-LOCK-HELD',heldReason);
+      const observed=observeLock(repo),waitedMs=Date.now()-started;
+      if(observed.status==='absent'){races+=1;continue;}
+      if(observed.owner==='dead'){retireLock(repo,observed,'the recorded owner process is gone');retired+=1;continue;}
+      if(waitedMs<SESSION_AUTHORITY_LOCK_WAIT_MS){lockSleep(Math.min(SESSION_AUTHORITY_LOCK_POLL_MS,SESSION_AUTHORITY_LOCK_WAIT_MS-waitedMs));continue;}
+      lockHeldFault(repo,{...observed,waitedMs},heldReason);
     }
     if(process.platform!=='win32'){try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}}
     return {abs,nativeLock};
