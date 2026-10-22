@@ -42,6 +42,13 @@ their activation assumptions).
 - Keep a recorded baseline count so a later change can be attributed without a
   staging experiment.
 
+## Recorded baseline 2026-10-22
+
+The second Proposal bullet (a recorded baseline count) is met for Linux/WSL2:
+`specs/sprint-alfred-epic/evidence/guard-lifecycle-ready-suite-baseline-2026-10-22.md` records 392 cases, 389 pass,
+0 fail, 3 skipped (typed native-Windows skips) at commit `f3a9f02cb`. Open: the native-Windows count at the current
+commit, and the classification of the 60 failures reported on 2026-10-04 (273 cases then; 392 now).
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
