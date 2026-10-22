@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.adoption-state.v1",
-  "state": "deferred",
+  "state": "approved-scoped",
   "scope": [
     "specs/sprint-alfred-epic/"
   ],
-  "decidedAt": "2026-09-20T14:11:56.000Z",
+  "decidedAt": "2026-10-22T18:00:00.000Z",
   "expiresAt": null,
-  "reviewDate": "2026-10-20",
-  "decisionRef": "po-0.7.0-release-defer-2026-09-20",
-  "rationale": "PO defers architecture adoption until after the 0.7.0 release; the current candidate and its bound planning package are bounded repair work.",
+  "reviewDate": "2026-11-30",
+  "decisionRef": "po-0.7.0-adopt-2026-10-22",
+  "rationale": "PO decision 2026-10-22: adopt the staged architecture proposal for the Alfred epic scope as the D4 dogfood decision for AC-9",
   "coverageClass": "evaluated",
   "confidence": "measured",
-  "by": "André",
+  "by": "PO",
   "authority": {
     "mode": "signature",
     "request": {
@@ -22,45 +22,45 @@
           "schema": "pipeline.po-approval-intent.v1",
           "kind": "architecture-adoption",
           "featureId": "architecture-adoption",
-          "planSha256": "1c100487a78c103b7075fb50bc7c8f068fb86bf5a3f04a0faa4e9edd51c721ef",
+          "planSha256": "aba3345eed5d3548d532083e44e503ac16cd9b265ccfedb5b299d500a0bb818e",
           "specSha256": "a3e84c723b1b8c920f34bec1cdb8d195b6b007ac6ccec19f00d25fe432a64c06",
           "candidate": {
-            "commit": "297d5d06959f29fb36d8c68c5e675298be364dce",
-            "tree": "d9cefd58629f9de5248af258def756dba8bfceee"
+            "commit": "540e96f7137996da1310c38e52a56077556901b0",
+            "tree": "7be0a60fd63bd1b1445e196562fe4c69bcc28fb7"
           },
           "policyRevision": "adoption-authority-v1",
-          "subjectSha256": "8838c8507ae7567da0f05453b7f65351ee5eed64b197039151a16a08dc0da17a",
-          "decision": "deferred"
+          "subjectSha256": "265f4bf98a87a8fed004b32fbb36574685637ef0ffebe4ce4890e873afac0ea5",
+          "decision": "approved-scoped"
         },
-        "sha256": "9d63189d9c1dba62bbca4f2c7487013eaa43ea0a014005edb5a84c38011c01fb"
+        "sha256": "03c98952520d7113adede5ad1b336ae487fef96792bbf72ef04e572d39afee71"
       },
       "subject": {
-        "repositoryFingerprint": "7d3e1210c7f22b6e7c83c214083c8c844098c049f46b796e116c214acf6fb5d3",
-        "decision": "deferred",
+        "repositoryFingerprint": "302ed2e35840718b1e4b1bd215e8dd61bbe6e92a17ed28d2694741e5d4509353",
+        "decision": "approved-scoped",
         "scope": [
           "specs/sprint-alfred-epic/"
         ],
-        "rationale": "PO defers architecture adoption until after the 0.7.0 release; the current candidate and its bound planning package are bounded repair work.",
-        "decidedAt": "2026-09-20T14:11:56.000Z",
+        "rationale": "PO decision 2026-10-22: adopt the staged architecture proposal for the Alfred epic scope as the D4 dogfood decision for AC-9",
+        "decidedAt": "2026-10-22T18:00:00.000Z",
         "expiresAt": null,
-        "reviewDate": "2026-10-20",
-        "decisionRef": "po-0.7.0-release-defer-2026-09-20",
+        "reviewDate": "2026-11-30",
+        "decisionRef": "po-0.7.0-adopt-2026-10-22",
         "candidate": {
-          "commit": "297d5d06959f29fb36d8c68c5e675298be364dce",
-          "tree": "d9cefd58629f9de5248af258def756dba8bfceee"
+          "commit": "540e96f7137996da1310c38e52a56077556901b0",
+          "tree": "7be0a60fd63bd1b1445e196562fe4c69bcc28fb7"
         },
         "profileSha256": "03102ea369d0300ff2aca3ec42f2e7ec55c44784faf45b3d51ee2632f3e2d6b8",
-        "modelSha256": "6ea3d36c4553f4e7979dfdfbbd55ac862e3aaa5801d24a2a36e5ce5cb0db6406",
-        "moduleSnapshotSha256": "02d52b4f14562050068ed49e66bf77e573611b078990b64018893bd6faa5eabb"
+        "modelSha256": "c3861faaa1a70988556233712e6027dbb9b5cf64551d5bfb990a06c4b9e9d763",
+        "moduleSnapshotSha256": "e576f5b585fb0e8a747af9f1be3a63aa1dff3238337da799bfcb4a8d7ac4b3f5"
       },
-      "subjectSha256": "8838c8507ae7567da0f05453b7f65351ee5eed64b197039151a16a08dc0da17a"
+      "subjectSha256": "265f4bf98a87a8fed004b32fbb36574685637ef0ffebe4ce4890e873afac0ea5"
     },
     "proof": {
       "schema": "pipeline.po-approval-proof.v1",
-      "intentSha256": "9d63189d9c1dba62bbca4f2c7487013eaa43ea0a014005edb5a84c38011c01fb",
+      "intentSha256": "03c98952520d7113adede5ad1b336ae487fef96792bbf72ef04e572d39afee71",
       "keyReference": "local-po-key",
       "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
-      "signatureBase64": "A+8MrF9/03MN8gmldhLdDZ3cJ8seKb7nY5A9Euebql5Xu+60W8TL5qoBEm/VcisYZs+GrcvVps7gK1h6a65CAA=="
+      "signatureBase64": "16TArvH7pm2fzjrn8wQUwqbAGQYt2QYRHu48QYXjrlzgpsr3Ex4qKNMvVdGZ1/TYwOChNQmwBACvkVaNgvGvBg=="
     },
     "signer": {
       "keyReference": "local-po-key",
