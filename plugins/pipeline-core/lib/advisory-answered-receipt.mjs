@@ -58,6 +58,7 @@ export function verifyAnsweredAdvisoryReceipt({ receipt, execution, answer, dema
     || execution.dutyReceipt?.status !== "answered") return refuse("advisory_answered_execution_missing", "execution");
   if (!same(receipt.dispatch, dispatch) || !same(demand?.dispatch, dispatch)
     || execution.dispatch?.candidateCommit !== dispatch?.candidateCommit
+    || execution.dispatch?.candidateTree !== dispatch?.candidateTree
     || execution.dispatch?.queueRevision !== dispatch?.queueRevision) return refuse("advisory_answered_candidate_mismatch", "dispatch");
   const configured = receipt.configuredRoute;
   const observed = receipt.observed.identity;

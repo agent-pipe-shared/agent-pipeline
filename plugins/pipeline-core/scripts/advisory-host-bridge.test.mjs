@@ -62,7 +62,7 @@ function selectedAdvisory(model = ADVISORY_MODEL) {
   }).requestSha256;
   return {
     schema: "pipeline.codex-sandbox-selection.v1", selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", repoFingerprint: "c".repeat(64), duty: "advisory",
-    dispatch: { queueRevision: 1, candidateCommit, candidateTree: "b".repeat(40), referenceSetSha256, requestSha256 },
+    dispatch: { queueRevision: 1, candidateCommit, candidateTree, referenceSetSha256, requestSha256 },
     toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), observedHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
     host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: "3".repeat(64) },
     profile: { id: "codex-critic-intermediate.v1", sha256: "4".repeat(64), base: ":read-only", network: { enabled: true }, writableRootClass: "coordinator-scratch-only", scratchRootSha256: "5".repeat(64) },

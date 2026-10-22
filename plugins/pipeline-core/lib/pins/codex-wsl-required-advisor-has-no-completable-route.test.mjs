@@ -335,6 +335,12 @@ test("AC-135: each binding mismatch is refused with its typed code and a runner-
     ["candidate commit", "advisory_answered_candidate_mismatch", (p) => ({ dispatch: { ...p.dispatch, candidateCommit: "d".repeat(40) } })],
     ["candidate tree", "advisory_answered_candidate_mismatch", (p) => ({ dispatch: { ...p.dispatch, candidateTree: "e".repeat(40) } })],
     ["execution queue revision", "advisory_answered_candidate_mismatch", (p) => withExecution(p, { dispatch: { ...p.execution.dispatch, queueRevision: 9 } })],
+    ["execution candidate commit", "advisory_answered_candidate_mismatch", (p) => withExecution(p, { dispatch: { ...p.execution.dispatch, candidateCommit: "d".repeat(40) } })],
+    ["execution candidate tree", "advisory_answered_candidate_mismatch", (p) => withExecution(p, { dispatch: { ...p.execution.dispatch, candidateTree: "e".repeat(40) } })],
+    ["execution candidate tree absent", "advisory_answered_candidate_mismatch", (p) => {
+      const { candidateTree: _omitted, ...rest } = p.execution.dispatch;
+      return withExecution(p, { dispatch: rest });
+    }],
     ["route model", "advisory_answered_route_mismatch", (p) => ({ route: { ...p.route, model: "other-model" } })],
     ["route effort", "advisory_answered_route_mismatch", (p) => ({ route: { ...p.route, effort: "high" } })],
     ["requested route", "advisory_answered_route_mismatch", (p) => withExecution(p, { requested: { runner: "codex", model: "other-model" } })],
