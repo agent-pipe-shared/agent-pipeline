@@ -14,6 +14,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { observeGovernanceScope } from "../governance-scope.mjs";
 import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
 import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+import { firstUnadmittedFlag } from "../read-command-diagnosis.mjs";
 import { isProjectWritePath } from "./path-containment.mjs";
 import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
 import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
@@ -380,7 +381,12 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       );
       outsideRoot = isOutsideRootSingleCommandRead(rejected, root) || qp4OperandResolvesOutsideRoot(rejected, root);
     } catch { outsideRoot = false; }
-    return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, []));
+    // Name the one flag the grammar objects to when a single flag is the whole reason (null otherwise; nothing is granted).
+    let flag = null;
+    if (!outsideRoot) {
+      try { flag = firstUnadmittedFlag(input.tool_input.command ?? input.tool_input.CommandLine, root); } catch { flag = null; }
+    }
+    return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", flag === null ? null : `the flag "${flag}"`));
   }
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return withLifts(lifts, verdict(0));

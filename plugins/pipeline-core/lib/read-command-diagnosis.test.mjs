@@ -59,7 +59,7 @@ test("RCD8: the unsupported-read refusal is the typed code today", async () => {
 });
 
 test("RCD9: the refusal names the flag it objects to",
-  { todo: "needs a protected guard file: lib/guard/evaluate.mjs does not pass the diagnosed flag as the rejected element (patch h1-patch-03)" },
+  { todo: false },
   async () => {
     const result = await refusal("rg --hidden needle README.md");
     assert.match(String(result.stderr), /Rejected element: the flag "--hidden"\./u);

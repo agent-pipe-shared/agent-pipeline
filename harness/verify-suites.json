@@ -350,6 +350,12 @@
       "nonOverlapNote": "The operator-facing source registry writer is distinct from read-only source admission"
     },
     {
+      "name": "read-command-diagnosis-tests",
+      "file": "plugins/pipeline-core/lib/read-command-diagnosis.test.mjs",
+      "invariantPinned": "The unsupported-read refusal can name the single flag the closed shell grammar objects to, and never grants or blames an operand",
+      "nonOverlapNote": "Distinct from the grammar admission suites: this one pins only the diagnosis helper and the refusal's Rejected element line"
+    },
+    {
       "name": "goldfish-commit-command-flow-tests",
       "file": "plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs",
       "invariantPinned": "Read-only exact-path Goldfish Git command rendering, quoting and real trailer readback",
@@ -2356,6 +2362,18 @@
       "file": "plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs"
+    },
+    {
+      "name": "dispatch-model-enforcement-tests",
+      "file": "plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs",
+      "invariantPinned": "A Claude Task/Agent dispatch must name a model that a configured duty route selects: no model and an unrouted model are refused with a typed finding, a duty mismatch is a warning, an unreadable route source gives no opinion",
+      "nonOverlapNote": "Pins the pure decision module; the hook wiring is pinned by guard-dispatch-model-tests"
+    },
+    {
+      "name": "guard-dispatch-model-tests",
+      "file": "plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs",
+      "invariantPinned": "hooks/guard-dispatch.mjs refuses a Claude Task/Agent dispatch with no model or with a model no configured duty route selects, and admits one that names a configured model",
+      "nonOverlapNote": "Hook-level D84 cases kept apart from the guard-dispatch corpus, which sits at its accepted line bound"
     },
     {
       "name": "dispatch-briefing-route-record-tests",
