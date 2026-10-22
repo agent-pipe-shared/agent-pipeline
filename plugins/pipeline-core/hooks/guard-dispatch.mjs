@@ -84,7 +84,7 @@ import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../
 import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
-import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -662,6 +662,9 @@ if (isDirectInvocation(import.meta.url)) {
   // T6-A: a Claude Task/Agent call binds this hook process to its own hook-observed session owner.
   if (["Task", "Agent"].includes(input?.tool_name)) {
     enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
+  } else if (input?.tool_name === "spawn_agent") {
+    // GDW01: a Codex governed item dispatch binds its hook-observed owner the same way (runner-neutral).
+    enterCodexHookSessionOwner({ root: input.cwd ?? process.cwd(), input });
   }
 
   // The subagent tool is `Task` in Claude Code and `Agent` in some runners; both are accepted

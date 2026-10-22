@@ -28,6 +28,8 @@ import { loadSessionDescriptor, startSessionDescriptor } from "./worktree-lifecy
 // ('physical-readback' | 'controlled-unit-method'); the descriptor is a physical readback, so the
 // owner reports 'physical-readback' and carries this label separately as `ownerSource`.
 export const CLAUDE_HOOK_SESSION_OWNER_SOURCE = "claude-hook-session-descriptor";
+// GDW01 (PO 2026-10-21): the same fallback for a Codex `spawn_agent` hook input, labelled as its own source.
+export const CODEX_HOOK_SESSION_OWNER_SOURCE = "codex-hook-session-descriptor";
 const CLAUDE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9-]{7,71}$/u;
 
 let entered = null;
@@ -39,10 +41,20 @@ export function claudeHookDescriptorSessionId(sessionId) {
 
 /** Enter the scope from a parsed Claude hook input. Returns whether a usable id was bound. */
 export function enterClaudeHookSessionOwner({ root, input } = {}) {
+  return enterHookSessionOwner(root, claudeHookDescriptorSessionId(input?.session_id), CLAUDE_HOOK_SESSION_OWNER_SOURCE);
+}
+
+/** Enter the scope from a parsed Codex hook input (`spawn_agent`). Returns whether a usable id was bound. */
+export function enterCodexHookSessionOwner({ root, input } = {}) {
+  const sessionId = input?.session_id;
+  const descriptorSessionId = typeof sessionId === "string" && CLAUDE_SESSION_ID.test(sessionId) ? `codex-${sessionId}` : null;
+  return enterHookSessionOwner(root, descriptorSessionId, CODEX_HOOK_SESSION_OWNER_SOURCE);
+}
+
+function enterHookSessionOwner(root, descriptorSessionId, ownerSource) {
   entered = null;
-  const descriptorSessionId = claudeHookDescriptorSessionId(input?.session_id);
   if (!descriptorSessionId || typeof root !== "string" || root === "") return false;
-  try { entered = { primaryRoot: realpathSync(resolve(root)), descriptorSessionId }; } catch { entered = null; }
+  try { entered = { primaryRoot: realpathSync(resolve(root)), descriptorSessionId, ownerSource }; } catch { entered = null; }
   return entered !== null;
 }
 
@@ -70,7 +82,7 @@ export function readClaudeHookSessionOwner({ repository } = {}) {
   }
   if (loaded.repo?.commonDir !== repository.commonDir) return null;
   return Object.freeze({ sessionId: loaded.sessionId, descriptorSha256: loaded.descriptorSha256,
-    ownerNonceSha256: ownerNonceDigest(loaded.ownerNonce), ownerSource: CLAUDE_HOOK_SESSION_OWNER_SOURCE });
+    ownerNonceSha256: ownerNonceDigest(loaded.ownerNonce), ownerSource: entered.ownerSource });
 }
 
 function ownerNonceDigest(nonce) { return createHash("sha256").update(Buffer.from(nonce)).digest("hex"); }
