@@ -45,3 +45,12 @@ release candidate.
 - **Rationale:** a runner surface the PO uses must be verified, and an unprotected surface must be named, not discovered.
 - **Assignment (if accepted):** final host verification of the 0.7.0 candidate; docs slice for the WSL warning.
 - **Date:** 2026-10-07
+
+### Agent measurement of the docs slice (2026-10-22)
+
+The docs slice is already delivered and pinned: `plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs` has 15 cases
+(10 pass, 0 fail, 5 skipped). The maintained runner-support doc states that Desktop WSL sessions carry no pipeline protection and are not
+for governed repositories, that PO and signing commands run in the integrated or an external terminal, that the Desktop surface is
+unverified and names this item, and that Desktop loads no PowerShell profiles; four RED cases mutate that text and are detected. The four
+live-host checks (bootstrap line, guard denial with plugin-supplied hooks, background Goldfish, statusLine identity) are skipped as
+`native: pending` and need the real Desktop app. This item stays open for that host verification only.
