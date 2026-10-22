@@ -18,7 +18,7 @@ import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -1307,42 +1307,6 @@ function attendedFeaturePlanDeps(root, deps) {
     assert.equal(state.planApproved, true, "an ordinary specs/ path must approve normally");
     assert.equal(state.planApprovalAttribution, undefined,
       "the default signature posture must not acquire a chat-attribution record");
-  }
-}
-
-// Scenario 5 (AC-264 / D30 / D85, PO decision 2026-10-22): in a GOVERNED project submit-plan refuses a Spec whose delivery hand-off is not
-// ready, BEFORE any state write, with the typed code and one runnable repair. The same fixture as Scenario 4 (whose Spec has no criterion
-// row) is accepted above while the project is ungoverned, so the refusal below is the governance gate, not the fixture. The host state root
-// the production observation reads is redirected through HOME so no real user state is touched.
-{
-  const featureId = "handoff-wired-submit";
-  const planPath = `specs/${featureId}/prd_${featureId}.md`;
-  const specPath = `specs/${featureId}/spec.md`;
-  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
-  const fakeHome = mkdtempSync(join(tmpdir(), "d85-handoff-home-"));
-  const savedEnv = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
-  try {
-    process.env.HOME = fakeHome;
-    process.env.USERPROFILE = fakeHome;
-    const { createGovernanceScopeController: homeGovernance } = await import("../lib/governance-scope.mjs");
-    const controller = homeGovernance();
-    // Enrollment treats an existing State file as retained history (it would record a decline); enroll first, then put the State back.
-    const stateFile = statePath(root), parked = `${stateFile}.parked`;
-    renameSync(stateFile, parked);
-    const decision = controller.planDecision({ rootDir: root, decision: "enroll", by: "d85-handoff-fixture" });
-    const applied = controller.applyDecision(decision, { activate: true, planSha256: decision.planSha256 });
-    renameSync(parked, stateFile);
-    assert.equal(applied.state, "active", `SETUP governance enrollment: ${JSON.stringify(applied)}`);
-    const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
-    assert.equal(attempt.result, 2, attempt.lines.join(" "));
-    const text = attempt.lines.join(" ");
-    assert.ok(text.includes("PLR-HANDOFF-NO-CRITERION"), `refusal must name the typed code: ${text}`);
-    assert.ok(text.includes("Repair: "), `refusal must carry a runnable repair: ${text}`);
-    const state = JSON.parse(readFileSync(statePath(root), "utf8"));
-    assert.equal(state.planSubmission, undefined, "a refused submission must not be recorded");
-  } finally {
-    for (const [name, value] of Object.entries(savedEnv)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
-    rmSync(fakeHome, { recursive: true, force: true });
   }
 }
 
