@@ -2124,7 +2124,16 @@ function custodyHeadIsUnborn(repo) {
   } catch { return false; }
 }
 
+const CUSTODY_OID_LINE = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u;
+
 function custodyCandidate(repo) {
+  // One `git rev-parse` answers both revisions (one process instead of two), so the commit and the tree it names
+  // come from the same read of HEAD. Anything but exactly two object ids -- an unborn HEAD, a failure, an
+  // unexpected shape -- takes the original pair of calls below, which keep their exact outcomes and errors.
+  try {
+    const lines = gitText(repo.primaryRoot, ["rev-parse", "HEAD", "HEAD^{tree}"]).split("\n");
+    if (lines.length === 2 && lines.every((line) => CUSTODY_OID_LINE.test(line))) return { commit: lines[0], tree: lines[1] };
+  } catch { /* falls through to the unchanged sequence */ }
   let commit;
   try { commit = gitText(repo.primaryRoot, ["rev-parse", "HEAD"]); } catch (error) {
     if (error?.code === "WT-GIT-FAILED" && custodyHeadIsUnborn(repo)) return { commit: CUSTODY_UNBORN_COMMIT, tree: CUSTODY_UNBORN_TREE };
@@ -2133,8 +2142,38 @@ function custodyCandidate(repo) {
   return { commit, tree: gitText(repo.primaryRoot, ["rev-parse", "HEAD^{tree}"]) };
 }
 
+// The repository's TOPOLOGY (physical start, common directory, primary root, object format and the primary-worktree
+// proof) is observed once per registry boundary entry instead of on every custody inspection: the boundary callback
+// runs synchronously under the registry lock and nothing inside it re-homes the repository, while the part that does
+// change inside a boundary -- the HEAD commit and tree, moved by a host commit -- is read from git on EVERY
+// inspection, never memoized. A memoized topology is re-validated against the filesystem on each use and dropped
+// (full rediscovery, which throws as before) the moment its directories are no longer the physical ones observed.
+let custodyTopologyScope = null;
+export function withCustodyTopologyScope(operation) {
+  if (custodyTopologyScope !== null) return operation();
+  custodyTopologyScope = new Map();
+  try { return operation(); } finally { custodyTopologyScope = null; }
+}
+
+function custodyTopology(startPath) {
+  const scope = custodyTopologyScope;
+  if (scope === null) return discoverRepository(startPath);
+  const start = assertExistingDirectoryPhysical(startPath, "repository path");
+  const memo = scope.get(start);
+  if (memo) {
+    try {
+      assertExistingDirectoryPhysical(memo.commonDir, "git common directory");
+      assertExistingDirectoryPhysical(memo.primaryRoot, "primary checkout");
+      return memo;
+    } catch { scope.delete(start); }
+  }
+  const repo = discoverRepository(start);
+  scope.set(start, repo);
+  return repo;
+}
+
 export function inspectSignedDescriptorCustodyRepository(startPath) {
-  const repo = discoverRepository(startPath);
+  const repo = custodyTopology(startPath);
   return { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir, candidate: custodyCandidate(repo) };
 }
 
