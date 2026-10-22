@@ -218,8 +218,8 @@
     {
       "rule": "over-line-bound",
       "path": "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
-      "maxLines": 2070,
-      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+      "maxLines": 2084,
+      "reason": "over the bound when the check was adopted on 2026-10-20 (2070 lines); raised to 2084 by PO decision D88 (2026-10-22) for the data lines the transitive kernel-closure rule adds to NEVER_LIFTABLE_KERNEL_PATHS (operator patches 25, 32, 33, 44), no logic. Owner: PO, expires with the 0.7.1 release: move NEVER_LIFTABLE_KERNEL_PATHS into its own kernel module and lower this entry back to the default bound"
     },
     {
       "rule": "over-line-bound",
