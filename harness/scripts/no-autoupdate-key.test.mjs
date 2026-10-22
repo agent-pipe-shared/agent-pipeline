@@ -320,9 +320,14 @@ if (trackedPaths.length === 0) {
     const marketplaceBound =
       marketplaceSource?.source === "github" && marketplaceSource?.repo === PUBLIC_PIPELINE_REPOSITORY;
     const pushPreallowed = settings.permissions?.allow?.includes("Bash(git push *)") === true;
+    // Decision AS (commit 485f0bd32, PO call D94 2026-10-22): the project file may carry NO binding at all
+    // (both maps empty) because the host registers the plugin locally; a partial or wrong binding still fails.
+    const bindingAbsentByDecision =
+      Object.keys(settings.enabledPlugins ?? {}).length === 0 &&
+      Object.keys(settings.extraKnownMarketplaces ?? {}).length === 0;
     record(
-      `SCAN  ${PROJECT_SETTINGS} binds ${PUBLIC_PIPELINE_PLUGIN} to the public marketplace`,
-      pluginEnabled && marketplaceBound,
+      `SCAN  ${PROJECT_SETTINGS} binds ${PUBLIC_PIPELINE_PLUGIN} to the public marketplace or carries no binding (decision AS)`,
+      (pluginEnabled && marketplaceBound) || bindingAbsentByDecision,
       `enabled=${pluginEnabled}; marketplace=${JSON.stringify(marketplaceSource ?? null)}`,
     );
     record(
