@@ -162,7 +162,9 @@ try {
     // Stops the class returning one guard at a time: a bare file_path read is blind to
     // NotebookEdit, and blindness here means fail-open.
     for (const name of ["guard-testpath.mjs", "guard-devplan.mjs", "guard-gate-strength.mjs", "guard-lifecycle-ready.mjs"]) {
-      const source = code(readFileSync(join(HOOKS, name), "utf8"));
+      const GUARD_LIB = join(HOOKS, "..", "lib", "guard");
+      const source = code(readFileSync(join(HOOKS, name), "utf8")
+        + (name === "guard-lifecycle-ready.mjs" ? readdirSync(GUARD_LIB).filter((f) => f.endsWith(".mjs") && !f.endsWith(".test.mjs")).map((f) => readFileSync(join(GUARD_LIB, f), "utf8")).join("\n") : ""));
       assert.ok(source.includes("writeTargetPath"), `${name} does not use the shared write-target reader`);
       assert.doesNotMatch(source, /tool_input\?\.file_path|tool_input\.file_path/u,
         `${name} still reads tool_input.file_path directly`);
