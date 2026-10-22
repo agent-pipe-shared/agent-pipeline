@@ -558,6 +558,7 @@ import {
 } from "../lib/onboarding-continuity.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
+import { reopenDesignNextActionText } from "../lib/authority-restore.mjs";
 
 import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout, configureVerifyRepair } from "../lib/calibration-verify-commit-transition.mjs";
 
@@ -12663,9 +12664,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         // contract) previously received the rendered markdown prose here, which is
         // neither a `command` nor a `collect-input` action and carries unfilled
         // placeholders. `nextAction` is now RESERVED for that one protocol meaning;
-        // the prose keeps its own field, `nextActionText`, byte-identical to what it
-        // always was (`syncStateMdNextAction` writes the SAME prose into the
-        // handover -- unchanged).
+        // the prose keeps its own field, `nextActionText` (the same prose `syncStateMdNextAction`
+        // writes into the handover); a restorable edit adds the authority-restore command first.
         status: lifecycle.status,
         activeFeature: base.activeFeature ?? null,
         phase: base.activeFeature?.phase ?? null,
@@ -12677,7 +12677,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
         nextAction: buildInspectNextAction(dir, base, lifecycle, deps) ?? drift?.recovery ?? null,
         nextActionText: lifecycle.nextAction === "reopen-design"
-          ? "Current Plan/Spec authority is stale or unavailable. Use the returned sanctioned reopen-design action before resubmission or approval."
+          ? reopenDesignNextActionText(dir)
           : nextActionSection(base),
         continuityAuthorityDrift: drift,
       };

@@ -17,110 +17,17 @@
  * The bytes come from git (`HEAD` by default, or the commit named by --commit) and are written only
  * when their sha256 equals the approved digest. Any refusal carries one repair and writes nothing.
  */
-import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { renameSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { boundAuthorityDocumentPath } from "../lib/guard/denial-route.mjs";
+import { AUTHORITY_RESTORE_SCHEMA, planAuthorityRestore as planFromState, restoreRefusal as refusal, sha256 } from "../lib/authority-restore.mjs";
 
-export const AUTHORITY_RESTORE_SCHEMA = "pipeline.authority-restore.v1";
-const SHA256_RE = /^[a-f0-9]{64}$/u;
+export { AUTHORITY_RESTORE_SCHEMA };
+/** The restore itself uses the guard's own bound-document predicate. */
+export const planAuthorityRestore = (root, options = {}) =>
+  planFromState(root, { ...options, isBound: (_state, absolute) => boundAuthorityDocumentPath(root, absolute) !== null });
 const REV_RE = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
-const STATE_PATHS = [join(".claude", "pipeline-state.json"), join("project", "pipeline-state.json")];
-
-const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
-
-function refusal(code, message, repair) {
-  return { ok: false, schema: AUTHORITY_RESTORE_SCHEMA, status: "refused", code, message, repair, written: [] };
-}
-
-function readState(root) {
-  for (const rel of STATE_PATHS) {
-    let raw;
-    try { raw = readFileSync(join(root, rel), "utf8"); } catch { continue; }
-    try {
-      const state = JSON.parse(raw);
-      return state !== null && typeof state === "object" && !Array.isArray(state) ? state : null;
-    } catch { return null; }
-  }
-  return null;
-}
-
-function safeRelativePath(root, value) {
-  if (typeof value !== "string" || value === "" || isAbsolute(value) || /[\x00-\x1f\x7f\\]/u.test(value)) return null;
-  const absolute = resolve(root, value);
-  const rel = relative(root, absolute);
-  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return null;
-  return { rel: rel.split(/[\\/]/u).join("/"), absolute };
-}
-
-function workingBytes(absolute) {
-  try {
-    if (lstatSync(absolute).isSymbolicLink()) return { symlink: true };
-    return { bytes: readFileSync(absolute) };
-  } catch { return { missing: true }; }
-}
-
-function committedBytes(root, rev, rel) {
-  const result = spawnSync("git", ["-C", root, "cat-file", "blob", `${rev}:${rel}`], { maxBuffer: 64 * 1024 * 1024 });
-  return result.status === 0 ? result.stdout : null;
-}
-
-/** Read-only plan: what is bound, what is edited, and whether the approved bytes can be restored. */
-export function planAuthorityRestore(root, { commit = "HEAD" } = {}) {
-  const state = readState(root);
-  const authority = state?.continuity?.authority;
-  const entries = [["prd", authority?.prd], ["spec", authority?.spec]];
-  if (state === null || entries.some(([, e]) => typeof e?.path !== "string" || !SHA256_RE.test(e?.sha256 ?? ""))) {
-    return refusal("AUTHORITY-RESTORE-NOT-BOUND",
-      "Pipeline State records no approved PRD/Spec digest pair, so there are no approved bytes to restore.",
-      "Nothing to restore here. If the documents are being designed, edit them normally; otherwise run `inspect` of pipeline-state.mjs.");
-  }
-  const documents = [];
-  for (const [kind, entry] of entries) {
-    const target = safeRelativePath(root, entry.path);
-    if (target === null || boundAuthorityDocumentPath(root, target.absolute) === null) {
-      return refusal("AUTHORITY-RESTORE-NOT-BOUND",
-        `The ${kind} (${entry.path}) is not a currently bound, approved authority document (design is open or an invalidation is newer than the approval).`,
-        "The document is editable through the design route; restore applies only while the approval is current.");
-    }
-    const approved = entry.sha256;
-    // A recorded approval binding must agree with the continuity digest; a disagreement means State itself is the problem.
-    const gate = state.planApproval?.poGateAuthority;
-    const gateDigest = kind === "prd" ? gate?.planSha256 : gate?.specSha256;
-    if (typeof gateDigest === "string" && gateDigest !== approved) {
-      return refusal("AUTHORITY-RESTORE-STATE-INCONSISTENT",
-        `The approval binding (${gateDigest}) and the continuity digest (${approved}) of the ${kind} disagree.`,
-        "Run `inspect` of pipeline-state.mjs and follow its named PO-authority route; restoring bytes cannot repair a disagreeing binding.");
-    }
-    const working = workingBytes(target.absolute);
-    if (working.symlink) {
-      return refusal("AUTHORITY-RESTORE-UNSAFE-TARGET", `${target.rel} is a symbolic link.`,
-        "Replace the link with a regular file by hand, then run inspect again.");
-    }
-    const workingDigest = working.bytes === undefined ? null : sha256(working.bytes);
-    const edited = workingDigest !== approved;
-    const source = edited ? committedBytes(root, commit, target.rel) : null;
-    documents.push({
-      kind, path: target.rel, absolute: target.absolute, approvedSha256: approved, workingSha256: workingDigest, edited,
-      sourceRev: commit, sourceSha256: source === null ? null : sha256(source), sourceBytes: source,
-    });
-  }
-  const edited = documents.filter((d) => d.edited);
-  if (edited.length === 0) {
-    return refusal("AUTHORITY-RESTORE-NOTHING-EDITED",
-      "Every bound document already matches its approved digest; there is nothing to restore.",
-      "No action needed. To change an approved document, use the design route (`reopen-design`).");
-  }
-  const bad = edited.find((d) => d.sourceSha256 !== d.approvedSha256);
-  if (bad !== undefined) {
-    return refusal("AUTHORITY-RESTORE-SOURCE-MISMATCH",
-      `The bytes of ${bad.path} at ${commit} ${bad.sourceSha256 === null ? "cannot be read" : `hash to ${bad.sourceSha256}`}, not the approved ${bad.approvedSha256}.`,
-      `Name a commit that holds the approved bytes with --commit <full sha> (find it with: git log --format=%H -- ${bad.path}), or accept the edit through the design route (reopen-design, then submit-plan and approve-plan).`);
-  }
-  return { ok: true, schema: AUTHORITY_RESTORE_SCHEMA, status: "restorable", documents };
-}
 
 const publicDocument = ({ absolute, sourceBytes, ...rest }) => rest;
 

@@ -663,6 +663,12 @@ sealed host-owned executor, and it reports an answer only when
 only kernel paths and `lib/advisory-lifecycle-v2.mjs` and `lib/advisory-receipt-assurance.mjs`
 (both already kernel paths), and is itself one.
 
+ALF-K45 adds one more first-party module that a kernel file imports and that executes with kernel
+authority: `plugins/pipeline-core/lib/authority-restore.mjs` (the read-only plan of the typed restore
+of an edited, bound PRD/Spec; `scripts/pipeline-state.mjs inspect` calls it to name the
+`scripts/authority-restore.mjs` command as the first repair). It reads State and git blobs, writes
+nothing, and imports only node built-ins (no first-party module, so it adds no kernel import edge).
+
 ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
 and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
 (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
