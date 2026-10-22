@@ -617,6 +617,14 @@ tool-layer `model` of a subagent dispatch is one the configured routing selects,
 so it decides whether `hooks/guard-dispatch.mjs` lets a dispatch inherit the
 session model); the module imports only kernel paths and is itself one.
 
+Two further modules become kernel paths once the guard and the lifecycle script import them:
+`plugins/pipeline-core/lib/read-command-diagnosis.mjs` (re-asks the closed shell grammar and
+names the one flag whose removal makes a refused read admitted, so it shapes the text of a
+guard refusal that `lib/guard/evaluate.mjs` prints) and
+`plugins/pipeline-core/lib/plan-handoff-readiness.mjs` (decides whether a plan's delivery
+hand-off is ready, so `scripts/pipeline-state.mjs` refuses `submit-plan` and `present-plan` on
+its answer). Both import only modules that are already kernel paths or Node built-ins.
+
 Closure repair GMWKC01/GMWKC03 (2026-10-21) adds eight first-party modules that kernel
 files import and that were never listed; each executes with kernel authority:
 `plugins/pipeline-core/lib/advisory-answered-receipt.mjs` (the answered-Advisor
