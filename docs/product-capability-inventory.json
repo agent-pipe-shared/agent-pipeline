@@ -1085,6 +1085,7 @@
         "verify-phase:harness/scripts/verify.mjs:verify-selection-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-append-history-check",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-append-history-tests",
+        "verify-phase:harness/scripts/verify.mjs:required-evidence-not-ignored-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-append-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",

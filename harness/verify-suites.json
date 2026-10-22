@@ -3670,6 +3670,12 @@
       "file": "plugins/pipeline-core/hooks/guard-git-gg22.test.mjs",
       "invariantPinned": "GG-22 blocks a commit that leaves an earlier backlog status flip unreconciled, scopes a pathspec commit only when it is provably exclusive, and prints the reconcile-last remediation order",
       "nonOverlapNote": "Unique cases: the GG22-* cases, split out of hooks/guard-git.test.mjs with every case id unchanged and none repeated there"
+    },
+    {
+      "name": "required-evidence-not-ignored-tests",
+      "file": "harness/scripts/check-required-evidence-not-ignored.test.mjs",
+      "invariantPinned": "Evidence that a tracked index, manifest or check needs is never ignored, untracked or inside the git directory; each violation carries a typed REQ-EVIDENCE code (D101)",
+      "nonOverlapNote": "Unique test suite for harness/scripts/check-required-evidence-not-ignored.mjs"
     }
   ]
 }
