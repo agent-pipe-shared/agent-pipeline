@@ -39,7 +39,6 @@ import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { availableParallelism } from "node:os";
-import nodeTest from "node:test";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 
 import {
@@ -54,6 +53,7 @@ import {
   recordHumanGuardDenial,
 } from "./human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT_PATH = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
@@ -184,8 +184,15 @@ function assertDriftRefusal(root, result, label, driftedChecks, requestSha256 = 
 // the main thread only registers one node:test case per body and awaits that body's result. Every
 // assertion still executes, in the same code, against the same real module; a failure in a worker
 // is rethrown in the matching case with its message and stack. HGO_DISJOINT_WORKERS bounds the pool.
+//
+// Case completion. The main thread declares every case through registerTestCaseCompletion (at the end of this
+// file) under a stable id HGODnnn, assigned in registration order and never renumbered (append new cases at the
+// end). A worker thread re-enters this file only to run ONE body: it returns before the registration, so it never
+// declares cases, never writes the completion descriptor and never registers a node:test case of its own.
 // ---------------------------------------------------------------------------------------------
 
+const cases = [];
+const hgodId = (ordinal) => `HGOD${String(ordinal).padStart(3, "0")}`;
 const CASES = new Map();
 const WORKERS = Math.max(1, Number(process.env.HGO_DISJOINT_WORKERS) || Math.min(8, Math.max(2, availableParallelism())));
 const jobs = new Map();
@@ -205,7 +212,7 @@ function pump() {
       pump();
     };
     const worker = new Worker(fileURLToPath(import.meta.url), { workerData: { hgoCase: name } });
-    worker.once("message", finish);
+    worker.once("message", (result) => { finish(result); void worker.terminate(); });
     worker.once("error", (error) => finish({ ok: false, message: String(error?.stack ?? error) }));
     worker.once("exit", (code) => finish({ ok: false, message: `worker for "${name}" exited (${code}) without a result` }));
   }
@@ -216,19 +223,23 @@ function runCase(name) {
   return jobs.get(name);
 }
 
-function test(name, body) {
+function test(id, name, body) {
   assert.ok(!CASES.has(name), `duplicate case name: ${name}`);
   CASES.set(name, body);
   if (!isMainThread) return;
-  nodeTest(name, async (t) => {
-    const result = await runCase(name);
-    if (!result.ok) throw new Error(result.message);
-    if (result.skipped) t.skip(result.skipped);
+  cases.push({
+    id,
+    name,
+    run: async (context) => {
+      const result = await runCase(name);
+      if (!result.ok) throw new Error(result.message);
+      if (result.skipped) context.skip(result.skipped);
+    },
   });
 }
 
-for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInput]]) {
-  test(`${toolName}: three independently signed disjoint actions are delivered sequentially without re-signing`, () => {
+for (const [k, [toolName, build]] of [["Write", writeInput], ["apply_patch", patchInput]].entries()) {
+  test(hgodId(k * 6 + 1), `${toolName}: three independently signed disjoint actions are delivered sequentially without re-signing`, () => {
     const root = fixture();
     try {
       const files = ["one.md", "two.md", "three.md"];
@@ -246,7 +257,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: an unrelated worktree edit between arming and consumption does not invalidate`, () => {
+  test(hgodId(k * 6 + 2), `${toolName}: an unrelated worktree edit between arming and consumption does not invalidate`, () => {
     const root = fixture();
     try {
       signAndArm(root, { toolName, toolInput: build("target.md") });
@@ -258,7 +269,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: target byte, absence and ancestry drift still fail closed`, () => {
+  test(hgodId(k * 6 + 3), `${toolName}: target byte, absence and ancestry drift still fail closed`, () => {
     const root = fixture();
     try {
       signAndArm(root, { toolName, toolInput: build("existing-a.md") });
@@ -277,7 +288,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: symlink replacement of a signed target fails closed`, (t) => {
+  test(hgodId(k * 6 + 4), `${toolName}: symlink replacement of a signed target fails closed`, (t) => {
     const root = fixture();
     try {
       signAndArm(root, { toolName, toolInput: build("existing-b.md") });
@@ -292,7 +303,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: expiry, denial-set and tool-input drift still fail closed`, () => {
+  test(hgodId(k * 6 + 5), `${toolName}: expiry, denial-set and tool-input drift still fail closed`, () => {
     const root = fixture();
     try {
       signAndArm(root, { toolName, toolInput: build("exp.md") });
@@ -307,7 +318,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: HEAD/tree movement after arming still fails closed`, () => {
+  test(hgodId(k * 6 + 6), `${toolName}: HEAD/tree movement after arming still fails closed`, () => {
     const root = fixture();
     try {
       signAndArm(root, { toolName, toolInput: build("headbound.md") });
@@ -324,8 +335,8 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
 }
 
 // ALF-C-W1-05B: the remaining members of the original acceptance's drift matrix.
-for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInput]]) {
-  test(`${toolName}: ancestor replaced by a directory link fails closed`, (t) => {
+for (const [k, [toolName, build]] of [["Write", writeInput], ["apply_patch", patchInput]].entries()) {
+  test(hgodId(12 + k * 6 + 1), `${toolName}: ancestor replaced by a directory link fails closed`, (t) => {
     const root = fixture();
     try {
       mkdirSync(join(root, "sub", "dir"), { recursive: true });
@@ -341,7 +352,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: project guard-policy drift after arming fails closed`, () => {
+  test(hgodId(12 + k * 6 + 2), `${toolName}: project guard-policy drift after arming fails closed`, () => {
     const root = fixture();
     try {
       signAndArm(root, { toolName, toolInput: build("policy.md") });
@@ -352,7 +363,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: plugin (override machinery) drift after arming fails closed`, () => {
+  test(hgodId(12 + k * 6 + 3), `${toolName}: plugin (override machinery) drift after arming fails closed`, () => {
     const root = fixture();
     // The plugin identity binds the plugin root's location as well as its bytes, so the mirror is the
     // plugin root for the WHOLE flow: only its content differs between arming and consumption.
@@ -382,7 +393,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: lifecycle state drift after arming fails closed`, () => {
+  test(hgodId(12 + k * 6 + 4), `${toolName}: lifecycle state drift after arming fails closed`, () => {
     const root = fixture();
     try {
       signAndArm(root, { toolName, toolInput: build("state.md") });
@@ -393,7 +404,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: replay of a consumed capability and of its signed proof fails closed`, () => {
+  test(hgodId(12 + k * 6 + 5), `${toolName}: replay of a consumed capability and of its signed proof fails closed`, () => {
     const root = fixture();
     try {
       const { recorded, plan, proof, shared } = signAndArm(root, { toolName, toolInput: build("replay.md") });
@@ -414,7 +425,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: audit-integrity drift after arming fails closed`, () => {
+  test(hgodId(12 + k * 6 + 6), `${toolName}: audit-integrity drift after arming fails closed`, () => {
     const root = fixture();
     try {
       signAndArm(root, { toolName, toolInput: build("audit.md") });
@@ -437,7 +448,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
 // (Edit, Write, apply_patch). The loops above drive Write and apply_patch; this one drives Edit.
 // ---------------------------------------------------------------------------------------------
 
-test("Edit: three independently signed disjoint actions are delivered sequentially without re-signing", () => {
+test(hgodId(25), "Edit: three independently signed disjoint actions are delivered sequentially without re-signing", () => {
   const root = fixture();
   try {
     const files = ["README.md", "existing-a.md", "existing-b.md"];
@@ -453,7 +464,7 @@ test("Edit: three independently signed disjoint actions are delivered sequential
   }
 });
 
-test("Edit: an unrelated worktree edit does not invalidate, a target byte change fails closed", () => {
+test(hgodId(26), "Edit: an unrelated worktree edit does not invalidate, a target byte change fails closed", () => {
   const root = fixture();
   try {
     signAndArm(root, { toolName: "Edit", toolInput: editInput("README.md") });
@@ -473,8 +484,8 @@ test("Edit: an unrelated worktree edit does not invalidate, a target byte change
 // unrelated worktree edit before arming does not void a signature over a disjoint action.
 // ---------------------------------------------------------------------------------------------
 
-for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInput]]) {
-  test(`${toolName}: HEAD movement between signing and arming is refused at the arming boundary`, () => {
+for (const [k, [toolName, build]] of [["Write", writeInput], ["apply_patch", patchInput]].entries()) {
+  test(hgodId(26 + k * 3 + 1), `${toolName}: HEAD movement between signing and arming is refused at the arming boundary`, () => {
     const root = fixture();
     try {
       const signed = signAndArm(root, { toolName, toolInput: build("arming-head.md"), arm: false });
@@ -490,7 +501,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: target byte drift between signing and arming is refused at the arming boundary`, () => {
+  test(hgodId(26 + k * 3 + 2), `${toolName}: target byte drift between signing and arming is refused at the arming boundary`, () => {
     const root = fixture();
     try {
       const signed = signAndArm(root, { toolName, toolInput: build("existing-a.md"), arm: false });
@@ -504,7 +515,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
     }
   });
 
-  test(`${toolName}: an unrelated worktree edit between signing and arming still arms and consumes`, () => {
+  test(hgodId(26 + k * 3 + 3), `${toolName}: an unrelated worktree edit between signing and arming still arms and consumes`, () => {
     const root = fixture();
     try {
       const signed = signAndArm(root, { toolName, toolInput: build("arming-disjoint.md"), arm: false });
@@ -522,7 +533,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
 // Acceptance bullet 2: every Bash action and a plugin installation stay on the legacy contract.
 // ---------------------------------------------------------------------------------------------
 
-test("Bash: whole-repository binding -- an unrelated worktree edit between arming and consumption fails closed", () => {
+test(hgodId(33), "Bash: whole-repository binding -- an unrelated worktree edit between arming and consumption fails closed", () => {
   const root = fixture();
   try {
     const commands = ["node --version", "node --help", "node --v8-options"].map((command) => ({ command }));
@@ -557,7 +568,7 @@ function withClosedCodexRegistry(fn) {
   finally { process.env[key] = original; rmSync(dir, { recursive: true, force: true }); }
 }
 
-test("plugin installation: binding follows the attested install source, planned on the legacy v3 contract, never target-bound", () => {
+test(hgodId(34), "plugin installation: binding follows the attested install source, planned on the legacy v3 contract, never target-bound", () => {
   withClosedCodexRegistry(() => {
     const root = fixture({ pushApproval: "chat" });
     try {
@@ -605,7 +616,7 @@ test("plugin installation: binding follows the attested install source, planned 
 // Acceptance bullet 4: the signing preparer discloses the serial dependence of status-bound actions.
 // ---------------------------------------------------------------------------------------------
 
-test("AC-160 serial-dependence disclosure: status-bound Bash signing preparation discloses it, a native Write does not", () => {
+test(hgodId(35), "AC-160 serial-dependence disclosure: status-bound Bash signing preparation discloses it, a native Write does not", () => {
   const root = fixture();
   try {
     // The disclosure index is judged against the wall clock, so this case records with the real time.
@@ -659,7 +670,16 @@ if (!isMainThread) {
     }
   }
   parentPort.postMessage(message);
-} else if (!process.execArgv.some((arg) => arg.startsWith("--test-name-pattern") || arg.startsWith("--test-skip-pattern"))) {
+  // A worker's only job is the one body above. Parking here until the parent terminates this thread (see pump)
+  // keeps it from reaching the completion registration below: only the main thread declares the cases. The live
+  // listener keeps the thread from idling out (which would print an unsettled-await warning) before that.
+  parentPort.on("message", () => {});
+  await new Promise(() => {});
+}
+
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
+
+if (!process.execArgv.some((arg) => arg.startsWith("--test-name-pattern") || arg.startsWith("--test-skip-pattern"))) {
   // Start every body now so the pool overlaps them; with a name filter only the selected cases start (lazily).
   for (const name of CASES.keys()) void runCase(name);
 }

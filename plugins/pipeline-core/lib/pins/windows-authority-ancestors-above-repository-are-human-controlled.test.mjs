@@ -11,6 +11,7 @@
 // PIPELINE_ANCESTOR_PIN_CODE_ROOT is a replay seam only: it points the pin at a scratch mirror of an earlier source state
 // (layout <root>/lib and <root>/scripts) so the pin can be proven RED without editing production.
 import test from 'node:test';
+import {registerTestCaseCompletion} from '../test-case-completion.mjs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, rmdirSync, symlinkSync, writeFileSync, existsSync} from 'node:fs';
@@ -84,14 +85,25 @@ test.after(() => {
   rmSync(fixture.base, {recursive: true, force: true});
 });
 
-const winTest = (name, fn) => test(name, {skip: isWindows ? false : HOST_LIMITATION}, fn);
+// Cases are registered through the case-completion protocol (registerTestCaseCompletion at the end of this file).
+// Ids are stable and in registration order; never renumber, append new cases at the end. Off win32 each case is
+// declared and disposed as a skip carrying the HOST-LIMITATION reason, exactly as the former `skip` option did.
+const cases = [];
+const winTest = (id, name, fn) => cases.push({
+  id,
+  name,
+  run: async (context) => {
+    if (!isWindows) { context.skip(HOST_LIMITATION); return; }
+    await fn(context);
+  },
+});
 
-winTest('control: the fixture ancestor really grants a foreign principal write and the strict ancestor check refuses it', async () => {
+winTest('WAA001', 'control: the fixture ancestor really grants a foreign principal write and the strict ancestor check refuses it', async () => {
   const {backend} = await load();
   assert.throws(() => backend.observeWindowsAuthorityAncestor({path: fixture.base}), refusal('WIN-AUTH-ANCESTOR-MUTATION'));
 });
 
-winTest('an ancestor strictly above the repository root that grants a foreign principal write is accepted and its ACL stays bound into the facts', async () => {
+winTest('WAA002', 'an ancestor strictly above the repository root that grants a foreign principal write is accepted and its ACL stays bound into the facts', async () => {
   const {backend} = await load();
   const observed = backend.observeWindowsAuthorityAncestor({path: fixture.base, boundaryRoot: fixture.clean.root});
   assert.match(observed.nativeFacts, FACTS);
@@ -107,7 +119,7 @@ winTest('an ancestor strictly above the repository root that grants a foreign pr
   run(systemExe('icacls.exe'), [fixture.base, '/remove:g', '*S-1-1-0']);
 });
 
-winTest('the same foreign write grant at or below the repository root is still refused with the existing code', async () => {
+winTest('WAA003', 'the same foreign write grant at or below the repository root is still refused with the existing code', async () => {
   const {backend} = await load();
   for (const [path, boundaryRoot] of [
     [fixture.rootBad.root, fixture.rootBad.root], // the root itself
@@ -119,7 +131,7 @@ winTest('the same foreign write grant at or below the repository root is still r
   }
 });
 
-winTest('a reparse point or a non-directory ancestor above the root is still refused', async () => {
+winTest('WAA004', 'a reparse point or a non-directory ancestor above the root is still refused', async () => {
   const {backend} = await load();
   const target = join(fixture.base, 'target');
   const link = join(fixture.base, 'link');
@@ -131,7 +143,7 @@ winTest('a reparse point or a non-directory ancestor above the root is still ref
   assert.throws(() => backend.observeWindowsAuthorityAncestor({path: file, boundaryRoot: join(file, 'inner')}), refusal('WIN-AUTH-ALIAS'));
 });
 
-winTest('the boundary input is closed: unknown keys and relative or malformed roots are refused before any native call', async () => {
+winTest('WAA005', 'the boundary input is closed: unknown keys and relative or malformed roots are refused before any native call', async () => {
   const {backend} = await load();
   for (const input of [
     {path: fixture.base, boundaryRoot: 'relative\\root'},
@@ -141,7 +153,7 @@ winTest('the boundary input is closed: unknown keys and relative or malformed ro
   ]) assert.throws(() => backend.observeWindowsAuthorityAncestor(input), refusal(input.boundaryRoot === 'relative\\root' || input.boundaryRoot === 'D:\\x\\..\\y' ? 'WIN-AUTH-PATH' : 'WIN-AUTH-INPUT'));
 });
 
-winTest('the native helper re-proves the relation itself: a path that is not strictly above the root is refused even if the JS layer is bypassed', async () => {
+winTest('WAA006', 'the native helper re-proves the relation itself: a path that is not strictly above the root is refused even if the JS layer is bypassed', async () => {
   const {state} = await load();
   const executable = state.WINDOWS_POWERSHELL_PATHS.find((candidate) => existsSync(candidate));
   assert.ok(executable, 'Windows PowerShell');
@@ -155,7 +167,7 @@ winTest('the native helper re-proves the relation itself: a path that is not str
   assert.equal(ask({operation: 'ancestor-above-root', path: fixture.base, boundaryRoot: fixture.clean.root}).ok, true);
 });
 
-winTest('verify-journal registration (the Full Verify journal step) accepts a foreign-writable ancestor above the repository root', async () => {
+winTest('WAA007', 'verify-journal registration (the Full Verify journal step) accepts a foreign-writable ancestor above the repository root', async () => {
   const {journal} = await load();
   const common = fixture.clean.git;
   const runId = 'ancestor-pin-run';
@@ -171,7 +183,7 @@ winTest('verify-journal registration (the Full Verify journal step) accepts a fo
   assert.ok(existsSync(records));
 });
 
-winTest('verify-journal registration still refuses a foreign write grant at the repository root or below it', async () => {
+winTest('WAA008', 'verify-journal registration still refuses a foreign write grant at the repository root or below it', async () => {
   const {journal} = await load();
   for (const repository of [fixture.rootBad, fixture.belowBad]) {
     assert.throws(() => journal.registerRunRecordOwner({
@@ -182,3 +194,5 @@ winTest('verify-journal registration still refuses a foreign write grant at the 
     }), /VERIFY-CLEANUP-REGISTRATION-REQUIRED \(cause: WIN-AUTH-ANCESTOR-MUTATION\)/u, repository.root);
   }
 });
+
+registerTestCaseCompletion({cases, fd: 3, maxBytes: 65536});

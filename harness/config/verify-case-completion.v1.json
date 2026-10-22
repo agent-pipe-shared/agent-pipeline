@@ -681,8 +681,7 @@
     {
       "name": "git-null-device-sites-tests",
       "path": "plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "git-stash-readonly-tests",
@@ -832,8 +831,7 @@
     {
       "name": "human-guard-override-disjoint-tests",
       "path": "plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "human-role-label-tests",
@@ -1261,8 +1259,7 @@
     {
       "name": "pin-denial-names-a-diagnosis-it-refuses-tests",
       "path": "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "pin-devplan-lane-admits-the-producer-materialize-step-tests",
@@ -1272,8 +1269,7 @@
     {
       "name": "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
       "path": "plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "pipeline-start-v3-tests",
