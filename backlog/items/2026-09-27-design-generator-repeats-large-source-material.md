@@ -119,8 +119,15 @@ nothing is lost; the primary action stays in `collectInput` and `final.nextActio
 Pin: `[pendingAsks compaction]` cases in
 `lib/pins/design-generator-repeats-large-source-material.test.mjs` (each ask once, bound 19,000 bytes).
 
-Still open, needs a contract decision (not guessed): the primary collect-input action is
-printed twice (`collectInput` and `final.nextAction`, about 3 KB each) because existing
-consumers read both; and a separate stateless call cannot know an ask was already shown,
-so cross-call compaction would need a persisted shown-digest. The header contradiction above
-also remains open.
+PO decision (2026-10-22): the duplicated primary collect-input action is shortened too. On
+the wire `collectInput` is the single full copy and `final.nextAction` is
+`{ "kind": "collect-input", "see": "collectInput" }` when canonically equal to it;
+`resolvePrintedOnboardingInit()` (`lib/onboarding-driver-output.mjs`) resolves the reference
+and restores the asks for a consumer that needs the library shape. Readers checked: every
+consumer of the collect-input outcome (e2e tests, `measure-fresh-repo-onboarding-turns.mjs`)
+reads `collectInput`, none read the full action from `final.nextAction`, so no existing
+assertion changed. Measured, same fixture: 23,033 -> 16,829 -> 13,802 bytes (-9,231 bytes,
+-40.1%, ask and primary action each printed once).
+
+Still open: cross-call compaction (a separate stateless call cannot know an ask was already
+shown; it would need a persisted shown-digest) and the header contradiction above.

@@ -285,13 +285,54 @@ test("[pendingAsks compaction] the driver prints each published ask once for the
   const codex = driverOutput("codex");
   assert.equal(codex.parsed.outcome, "collect-input", "fixture sanity: the codex first stop is a collect-input outcome with sibling asks");
   assertAsksPrintedOnce(codex, "codex/collect-input");
-  // The primary question stays resolvable in both places existing consumers read it.
+  // The primary question stays reachable: in full in collectInput, by kind in final.nextAction.
   assert.equal(codex.parsed.collectInput.kind, "collect-input");
   assert.equal(codex.parsed.final.nextAction.kind, "collect-input");
   assert.ok(bytes(codex.stdout) <= COLLECT_INPUT_OUTPUT_BOUND, `driver output ${bytes(codex.stdout)} exceeds ${COLLECT_INPUT_OUTPUT_BOUND}`);
   const claude = driverOutput("claude");
   assert.equal(claude.parsed.outcome, "pending-asks");
   assertAsksPrintedOnce(claude, "claude/pending-asks");
+});
+
+// PO decision (tile, 2026-10-22): the primary collect-input action is printed once too. On the wire
+// final.nextAction is a short reference to collectInput; resolvePrintedOnboardingInit() gives a
+// consumer that needs the library shape the full action back. Measured on the same fixture: after the
+// asks were printed once the output was 16,829 bytes with the primary action (~3 KB) printed twice.
+const COLLECT_INPUT_REFERENCE_BOUND = 15_000;
+
+test("[pendingAsks compaction] the collect-input primary action is printed once; final.nextAction is a resolvable reference", async () => {
+  const codex = driverOutput("codex");
+  const { parsed, stdout } = codex;
+  assert.equal(parsed.outcome, "collect-input");
+  assert.equal(countOf(stdout, JSON.stringify(parsed.collectInput)), 1, "the full primary action is printed more than once");
+  assert.deepEqual(parsed.final.nextAction, { kind: "collect-input", see: "collectInput" });
+  assert.ok(bytes(stdout) <= COLLECT_INPUT_REFERENCE_BOUND, `driver output ${bytes(stdout)} exceeds ${COLLECT_INPUT_REFERENCE_BOUND}`);
+  const { resolvePrintedOnboardingInit } = await import("../onboarding-driver-output.mjs");
+  const resolved = resolvePrintedOnboardingInit(parsed);
+  assert.deepEqual(resolved.final.nextAction, resolved.collectInput, "the reference resolves to the full action");
+  assert.deepEqual(resolved.collectInput.pendingAsks, parsed.pendingAsks, "the resolved action carries the library-shape asks");
+  assert.equal(resolvePrintedOnboardingInit(resolved).final.nextAction, resolved.final.nextAction, "resolving a resolved result is the identity");
+});
+
+test("printed shape round-trips to the library shape for collect-input and pending-asks, and ignores other outcomes", async () => {
+  const { printOnboardingInitResult, resolvePrintedOnboardingInit } = await import("../onboarding-driver-output.mjs");
+  const ask = { kind: "collect-input", inputs: [{ name: "a" }], applyAction: { argv: ["x"] } };
+  const primary = { kind: "collect-input", input: { name: "p" }, guidance: "g" };
+  const collect = { outcome: "collect-input", collectInput: { ...primary, pendingAsks: [ask] }, pendingAsks: [ask], final: { status: "s", nextAction: { ...primary, pendingAsks: [ask] } } };
+  const printed = printOnboardingInitResult(collect);
+  assert.equal(countOf(JSON.stringify(printed), JSON.stringify(ask)), 1);
+  assert.equal(countOf(JSON.stringify(printed), JSON.stringify(primary)), 1);
+  assert.deepEqual(resolvePrintedOnboardingInit(printed), collect);
+  const command = { kind: "command", executable: "node", argv: ["x"] };
+  const pending = { outcome: "pending-asks", pendingAsks: [ask], final: { nextAction: { ...command, pendingAsks: [ask] } } };
+  assert.deepEqual(printOnboardingInitResult(pending).final.nextAction, command, "the pending-asks outcome keeps its command, without the repeated asks");
+  assert.deepEqual(resolvePrintedOnboardingInit(printOnboardingInitResult(pending)), pending);
+  // A divergent copy is never hidden, a non-equal primary action is never replaced by a reference.
+  const divergent = { ...collect, final: { status: "s", nextAction: { ...primary, guidance: "other", pendingAsks: [{ ...ask, kind: "other" }] } } };
+  assert.deepEqual(printOnboardingInitResult(divergent).final.nextAction, divergent.final.nextAction);
+  const ready = { outcome: "ready", final: { nextAction: null } };
+  assert.equal(printOnboardingInitResult(ready), ready);
+  assert.equal(resolvePrintedOnboardingInit(ready), ready);
 });
 
 test("RED mirror: the once-only assertion fails for an output that repeats an ask in collectInput", () => {
