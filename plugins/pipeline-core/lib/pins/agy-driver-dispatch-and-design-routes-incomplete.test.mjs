@@ -2,12 +2,16 @@
 // Pin for pipeline.agy-driver-dispatch-and-design-routes-incomplete (AC-108),
 // slice ALF-C-P20-12B: Antigravity bootstrap lock freshness and per-session isolation.
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, statSync, utimesSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { evaluateLifecycleReadyGuard } from "../guard/evaluate.mjs";
+import { registeredFunctionalTaskRoutes } from "../model-role-route-source.mjs";
+import { evaluateRoleRoutePreflight } from "../role-route-preflight.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../../../..");
@@ -211,4 +215,91 @@ test("AC-108: the start preflight reports a sandbox-unreachable node with a type
   assert.equal(unknown.status, "unknown");
   assert.equal(unknown.ready, false);
   assert.equal(observeNodeSandboxProbe({ execPath: "", spawn: () => ok }).status, "unknown");
+});
+
+// ---------------------------------------------------------------------------
+// Added 0.7.0 acceptance (2026-10-22 measurement): the main agent can update the calibrated handover
+// (docs/state.md) through an admitted route in every phase, and Critic, Advisor and Verify have an
+// Antigravity route or the recorded self-dispatch fallback.
+// ---------------------------------------------------------------------------
+const ADAPTER = join(REPO, "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs");
+
+/** A governed, high-risk project in a given phase. No dispatch record is open: the EL-01 tripwire's own refusal condition holds. */
+function phaseFixture({ planApproved, phase }) {
+  const root = mkdtempSync(join(tmpdir(), "agy-handover-pin-"));
+  for (const dir of [".claude", "project", ".agent-pipeline", "specs/feat-1", "docs"]) mkdirSync(join(root, dir), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: "test", verify: "node verify.mjs" }));
+  writeFileSync(join(root, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-10-02T00:00:00.000Z",
+  }));
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0", planApproved, activeFeature: { id: "feat-1", phase, planPath: "specs/feat-1/prd.md" },
+  }));
+  writeFileSync(join(root, "specs", "feat-1", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
+  writeFileSync(join(root, "docs", "state.md"), "# State\n");
+  return root;
+}
+function runAdapter(root, toolCall) {
+  const result = spawnSync(process.execPath, [ADAPTER], {
+    cwd: root, env: { ...process.env, CLAUDE_PROJECT_DIR: root }, input: JSON.stringify({ workspacePaths: [root], toolCall }),
+    encoding: "utf8", timeout: 60_000,
+  });
+  if (result.status === 2) return { decision: "deny", reason: String(result.stderr) };
+  assert.equal(result.status, 0, `adapter failed: ${result.stderr}`);
+  return { decision: "allow", reason: "" };
+}
+const handoverWrite = (root) => ({ name: "write_to_file", args: { TargetFile: join(root, "docs", "state.md"), CodeContent: "# State\nupdated\n" } });
+const codeWrite = (root) => ({ name: "write_to_file", args: { TargetFile: join(root, "src", "code.js"), CodeContent: "const a = 1;" } });
+
+for (const [name, fixture] of [["design phase before plan approval", { planApproved: false, phase: "design" }], ["implementation phase", { planApproved: true, phase: "implementation" }]]) {
+  test(`AC-108: ${name}: the only guard that can still refuse a docs/state.md write through the Antigravity adapter is lifecycle readiness (EL-01 and the dev-plan gate exempt docs/)`, () => {
+    const root = phaseFixture(fixture);
+    try {
+      const handover = runAdapter(root, handoverWrite(root));
+      assert.doesNotMatch(handover.reason, /guard-el01-tripwire|guard-devplan|guard-handover-size|guard-testpath|guard-gate-strength/u, handover.reason);
+      // Control: the same fixture refuses a production-code write for the EL-01 tripwire's own reason, so the exemption is what lets the handover through.
+      const code = runAdapter(root, codeWrite(root));
+      assert.equal(code.decision, "deny");
+      assert.match(code.reason, /guard-el01-tripwire|guard-devplan/u, code.reason);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
+test("AC-108: with project readiness satisfied the lifecycle guard admits the handover write for the antigravity runner whatever the feature phase", () => {
+  const ready = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  for (const [name, fixture] of [["design", { planApproved: false, phase: "design" }], ["implementation", { planApproved: true, phase: "implementation" }]]) {
+    const root = phaseFixture(fixture);
+    try {
+      for (const tool_name of ["Write", "Edit"]) {
+        const result = evaluateLifecycleReadyGuard({ tool_name, tool_input: { file_path: "docs/state.md" } },
+          { projectDir: root, runner: "antigravity", requireProjectOnboardingReadyFn() { return ready; } });
+        assert.deepEqual(result, { exitCode: 0, stderr: "" }, `${name}/${tool_name}`);
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+test("AC-108: Antigravity has a native route for the implementor and the plan verifier, and every other role resolves to a typed state, never a silent gap", () => {
+  const source = registeredFunctionalTaskRoutes();
+  assert.equal(source.ok, true);
+  const observed = (kind) => ({ kind, evidenceSha256: "a".repeat(64), hookRecordedStart: true, hookRecordedTerminal: true });
+  const roles = ["advisor", "critic", "goldfish.implement", "goldfish.mechanic", "goldfish.deep", "readiness", "plan-verifier"];
+  const result = evaluateRoleRoutePreflight({ source, runner: "antigravity", hostObservations: Object.fromEntries(roles.map((role) => [role, observed("native")])) });
+  assert.equal(result.roles["goldfish.implement"].state, "native");
+  assert.equal(result.roles["plan-verifier"].state, "native");
+  for (const role of roles) {
+    assert.ok(["native", "fallback-self-dispatch", "unavailable"].includes(result.roles[role].state), role);
+    assert.match(result.roles[role].reasonCode, /^RRP-/u, role);
+  }
+});
+
+test("AC-108: Critic and Advisor each have an Antigravity route or the recorded self-dispatch fallback", {
+  todo: "BLOCKED-NEEDS-DECISION (measured on this head): with a native host observation for every role, antigravity advisor, critic, readiness and the mechanic/deep implementors still resolve to unavailable with RRP-ROUTE-CELL-UNAVAILABLE (the registry cells are unavailable), and fallback-self-dispatch is legal only for the claude advisor. Registering the cells or admitting a fallback for Antigravity is a route-policy decision, not a code fix.",
+}, () => {
+  const source = registeredFunctionalTaskRoutes();
+  const observed = (kind) => ({ kind, evidenceSha256: "a".repeat(64), hookRecordedStart: true, hookRecordedTerminal: true });
+  const result = evaluateRoleRoutePreflight({ source, runner: "antigravity", hostObservations: { advisor: observed("native"), critic: observed("native") } });
+  for (const role of ["critic", "advisor"]) {
+    assert.ok(["native", "fallback-self-dispatch"].includes(result.roles[role].state), `${role}: ${result.roles[role].state} ${result.roles[role].reasonCode}`);
+  }
 });

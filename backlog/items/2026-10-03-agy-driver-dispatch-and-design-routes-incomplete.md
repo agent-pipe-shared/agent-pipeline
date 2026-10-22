@@ -90,3 +90,19 @@ Added acceptance (0.7.0, minor unless the PO raises it):
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Agent measurement of the open acceptance (2026-10-22)
+
+`plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs` now has 14 cases (13 pass, 0 fail, 1 typed todo):
+
+- Handover in every phase: through the Antigravity adapter on a governed high-risk project, a `docs/state.md` write is not refused by
+  the EL-01 tripwire, the dev-plan gate, the handover-size guard, the test-path guard or the gate-strength guard in the design phase
+  (before plan approval) or the implementation phase, while a production-code write in the same fixture is refused by EL-01 or the
+  dev-plan gate. The lifecycle guard has no phase input, and with readiness satisfied it admits the write for the `antigravity` runner
+  in both phases. Not measured: a native Antigravity session with a fully onboarded project (the adapter fixture is not ready, so
+  lifecycle readiness is the guard that still refuses there), and the 0.6.2-era report that `docs/state.md` stayed at its stage-0 text.
+- Critic and Advisor routes: not met. With a native host observation for every role, Antigravity advisor, critic, readiness and the
+  mechanic/deep implementors still resolve to `unavailable` with `RRP-ROUTE-CELL-UNAVAILABLE`, and the self-dispatch fallback is legal
+  only for the Claude advisor. Registering Antigravity route cells or admitting a fallback for Antigravity is a route-policy decision
+  (typed todo in the pin). The implementor and the plan verifier have a native route; every other role resolves to a typed state.
+- Verify: not measured as a route. The pin covers only the node-sandbox probe, the Antigravity prerequisite of running the project's verify command.
