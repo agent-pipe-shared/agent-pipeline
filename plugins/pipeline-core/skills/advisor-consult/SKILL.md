@@ -76,10 +76,22 @@ answer digests to that observation; an agent-supplied JSON result is never
 host execution proof. A route without a host-owned callback is unavailable,
 not an invitation to use the old selected-sandbox/App-Server adapter. A host
 export denial is terminal for this request, with no alternate egress.
-Until the host callback and its independent private execution readback are
-installed, Codex's ordinary route produces only the no-child unavailable
-record below, even if export admission is reported as available. Do not call
-that an answered Advisor run.
+Without a sealed host-owned executor installed on the host, Codex's ordinary
+route produces only the no-child unavailable record below
+(`ordinary-consult-host-callback-unavailable`), even if export admission is
+reported as available. Do not call that an answered Advisor run. With one, the
+bridge calls it only after the host reports `admitted`, never after a denied,
+declined, missing or unavailable decision, and reports an answer only when
+`verifyAnsweredAdvisoryReceipt` binds candidate, configured and observed route,
+question digest, evidence digest, the host execution record and the answer
+digest. A result that does not bind is reported with its typed
+`advisory_answered_*` code and repair, or as `advisor-host-execution-unavailable`
+when the executor failed or returned nothing; it is never an answer, and since
+an attempt may already have started it is not described as a no-child
+decision. The executor is a host dependency, never stdin input. Every
+no-child refusal carries a `repair` that names the alternative: continue
+without an Advisor, because an on-demand Advisor is optional and no design
+stage requires one (ADR-0085).
 
 The no-child path records a closed `pipeline.advisory-route-selection.v1`
 beside the sanitized receipt. It has `attemptCount: 0`, `childStarted: false`
@@ -106,6 +118,22 @@ ordinary consult as answered. No OS isolation or provider attestation follows
 from an ordinary fresh read-only role alone. The older
 `pipeline.host-advisor-status.v1` and selected-sandbox workspace observations
 describe only that separate transport and cannot attest the ordinary route.
+
+## Supported runner/platform matrix
+
+Each row is pinned by `codex-wsl-required-advisor-has-no-completable-route`;
+a row marked unverified has no tested route and must be reported as unavailable.
+
+| Runner and route | Platform | Tested outcome |
+| --- | --- | --- |
+| Codex ordinary consult (admission, then sealed host-owned executor) | Linux and WSL (WSL deferral does not apply to this route) | No-child unavailable by default; answered only through the executor and the answered-receipt verifier; exercised with a managed Node stand-in, no real model call |
+| Codex selected-sandbox/App-Server route | WSL | `advisory-unavailable-wsl-native-deferred`, typed, before any evidence or child work |
+| Codex selected-sandbox/App-Server route | native Linux | Host route, subject to the same admission and verifier |
+| Codex, native Windows | native Windows | unverified until a tested host capability is present |
+| Claude native Opus then consult | any | V3 route below |
+
+A real answered run on a given host still needs that host's own export approval;
+no test or fixture substitutes for it.
 
 ## Claude consultation
 

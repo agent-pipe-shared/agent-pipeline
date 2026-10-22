@@ -414,3 +414,220 @@ test("AC-135: the bridge returns no answer when the observed host result does no
   assert.equal(absent.advisoryResult.answer, null);
   assert.equal(absent.execution, null);
 });
+
+// --- AC-135 (ALF-K32): the admitted CLI path reaches the answered-receipt verifier ---
+// The host-owned executor is a sealed host dependency (never stdin input). The
+// stand-in for Codex is a closed, managed Node process that computes its answer
+// from the question it receives; no Codex CLI, model call or export runs.
+const MANAGED_FIXTURE = `"use strict";
+const { createHash } = require("node:crypto");
+let text = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => { text += chunk; });
+process.stdin.on("end", () => {
+  const { question, model, effort, transport } = JSON.parse(text);
+  const answer = "Managed fixture answer " + createHash("sha256").update(question).digest("hex").slice(0, 12);
+  process.stdout.write(JSON.stringify({
+    status: "answered", answer, fixturePid: process.pid, identity: { provider: "openai", modelId: model, effort },
+    sandboxExecution: {
+      schema: "pipeline.codex-sandbox-host-execution.v1", selectionId: transport.selectionId, selectionSha256: transport.selectionSha256,
+      repoFingerprint: transport.repoFingerprint, duty: "advisory", dispatch: transport.dispatch,
+      observed: { cliSha256: transport.cliSha256, profileSha256: transport.profileSha256, networkEnabled: true, scratchRootSha256: transport.scratchRootSha256 },
+      terminal: { childStarted: true, exitCode: 0, stdioStatus: "complete", cleanupStatus: "complete" },
+    },
+  }));
+});
+`;
+function routeDependencies() {
+  return {
+    resolveAdvisoryRoute: ({ candidateCommit: commit }) => ({
+      dutyId: "advisory", runner: "codex", model: ANSWER_MODEL, effort: "max", state: "default", sourceSha256: "a".repeat(64), candidateCommit: commit,
+    }),
+    selectModelRoleForTaskFn: () => { throw new Error("optional store unavailable"); },
+  };
+}
+/** Executor built from the managed Node fixture; `launches` records each real process it started. */
+function managedExecutor(dir, launches, options = {}) {
+  const fixturePath = join(dir, "managed-codex-fixture.cjs");
+  writeFileSync(fixturePath, MANAGED_FIXTURE);
+  return async ({ input }) => runSelectedAdvisoryHost(input, answeredTransport(input, {
+    ...options,
+    invoke: (sandboxTransport) => {
+      const run = spawnSync(process.execPath, [fixturePath], {
+        encoding: "utf8",
+        input: JSON.stringify({
+          question: input.question, model: ANSWER_MODEL, effort: "max",
+          transport: {
+            selectionId: sandboxTransport.selectionId, selectionSha256: sandboxTransport.selectionSha256, repoFingerprint: sandboxTransport.repoFingerprint,
+            dispatch: sandboxTransport.dispatch, cliSha256: sandboxTransport.toolchain.cliSha256, profileSha256: sandboxTransport.profile.sha256,
+            scratchRootSha256: sandboxTransport.profile.scratchRootSha256,
+          },
+        }),
+      });
+      assert.equal(run.status, 0, run.stderr);
+      const result = JSON.parse(run.stdout);
+      launches.push(result.fixturePid);
+      return result;
+    },
+  }));
+}
+const admitted = async () => ({ status: "admitted" });
+function admittedDependencies(executeAdmittedConsult, extra = {}) {
+  return {
+    readRepositoryConsent: () => "approved", admitOrdinaryConsult: admitted, hostObservation: WSL_RELEASE, ...routeDependencies(), executeAdmittedConsult,
+    // The decision-event journal writes into the repository; it is stubbed here and exercised by its own suite.
+    recordAdvisoryDecisionEvent: async () => ({ appended: false, code: "AGENT_DECISION_EVENT_STUBBED" }),
+    ...extra,
+  };
+}
+
+test("AC-135: an admitted CLI consult reaches the answered verifier through a host-owned executor, also on a WSL host", { skip: HOST_LIMITATION }, async () => {
+  const dir = scratchDir("wsl-pin-exec");
+  try {
+    const launches = [];
+    const run = await runCliBridge(dir, "answered", admittedDependencies(managedExecutor(dir, launches)));
+    assert.equal(run.code, 0, JSON.stringify(run.completed));
+    assert.equal(run.calls.fallback, 0, "no alternate route");
+    assert.equal(launches.length, 1, "exactly one real managed process ran");
+    assert.notEqual(launches[0], process.pid);
+    assert.equal(run.completed.ok, true);
+    assert.equal(run.completed.code, "answered");
+    assert.match(run.completed.answer, /^Managed fixture answer [a-f0-9]{12}$/u);
+    assert.equal(run.completed.answer, `Managed fixture answer ${sha256Hex("Which boundary is safest?").slice(0, 12)}`, "the answer was computed by the process from the question it received");
+    const receiptBytes = readFileSync(run.receiptPath);
+    const receipt = JSON.parse(receiptBytes.toString("utf8"));
+    assert.equal(validateAdvisoryReceipt(receipt).ok, true);
+    assert.equal(receipt.observed.status, "answered");
+    assert.equal(receipt.observed.identity.modelId, ANSWER_MODEL);
+    assert.equal(receipt.answerSha256, sha256Hex(run.completed.answer));
+    assert.equal(run.completed.sandboxBinding.dutyReceiptSha256, sha256Hex(JSON.stringify(receipt)), "the host duty-receipt digest binds the receipt on disk");
+    assert.equal(run.completed.consultationRecord.outcome, "answered");
+    assert.deepEqual(run.completed.attempts, [{ adapter: "host-consult", kind: "consult", runner: "codex", status: "answered" }]);
+    assert.equal(run.completed.routeSelectionPath ?? null, null, "an answered run writes no no-child route selection");
+    assert.equal(run.completed.agentDecisionEvent.code, "AGENT_DECISION_EVENT_STUBBED", "the verified answer reaches the decision-event journal");
+    assert.equal(run.events.some((e) => e.type === "dispatch.prepare"), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("AC-135: the executor is called only after an admitted decision; denied, unavailable, declined and absent stay no-child", { skip: HOST_LIMITATION }, async () => {
+  const dir = scratchDir("wsl-pin-noexec");
+  try {
+    const cases = [
+      ["denied", { admitOrdinaryConsult: async () => ({ status: "denied" }) }, "advisor-host-export-denied"],
+      ["unavailable", { admitOrdinaryConsult: async () => ({ status: "unavailable" }) }, "ordinary-consult-host-route-unavailable"],
+      ["declined", { readRepositoryConsent: () => "declined" }, "advisor-repository-export-declined"],
+      ["no-admission", { admitOrdinaryConsult: undefined }, "ordinary-consult-host-callback-unavailable"],
+    ];
+    for (const [name, patch, code] of cases) {
+      const launches = [];
+      let calls = 0;
+      const executor = async (value) => { calls += 1; return managedExecutor(dir, launches)(value); };
+      const run = await runCliBridge(dir, name, admittedDependencies(executor, patch));
+      assert.equal(calls, 0, `${name}: the executor must not be reached`);
+      assert.equal(launches.length, 0, `${name}: no process was started`);
+      assert.equal(run.code, 2);
+      assert.equal(run.completed.code, code);
+      assert.equal(run.completed.answer, null);
+      assert.equal(run.completed.modelCalls, 0);
+    }
+    // Admitted but with no sealed executor installed is the unchanged honest outcome.
+    const bare = await runCliBridge(dir, "bare", { readRepositoryConsent: () => "approved", admitOrdinaryConsult: admitted });
+    assert.equal(bare.completed.code, "ordinary-consult-host-callback-unavailable");
+    assert.equal(bare.completed.answer, null);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("AC-135: an executor result that does not bind is refused with its typed code and repair, never reported as an answer", { skip: HOST_LIMITATION }, async () => {
+  const dir = scratchDir("wsl-pin-unbound");
+  try {
+    const good = managedExecutor(dir, []);
+    const cases = [
+      // The host executed against a different candidate than the demand.
+      ["candidate", "advisory_answered_candidate_mismatch", managedExecutor(dir, [], { dispatchOverrides: { candidateCommit: "d".repeat(40) } })],
+      // Another route executed than the configured one.
+      ["route", "advisory_answered_route_mismatch", managedExecutor(dir, [], { requested: { runner: "codex", model: "other-model" } })],
+      // A JSON reply that claims an answer without any execution record.
+      ["no-execution", "advisory_answered_execution_missing", async (value) => ({ ...(await good(value)), execution: null })],
+      // The returned answer is not the answer the receipt digest binds.
+      ["answer", "advisory_answered_answer_mismatch", async (value) => {
+        const outcome = await good(value);
+        return { ...outcome, advisoryResult: { ...outcome.advisoryResult, answer: "A different answer than the one receipted." } };
+      }],
+      // The returned host binding names another duty receipt.
+      ["host-result", "advisory_answered_host_result_mismatch", async (value) => {
+        const outcome = await good(value);
+        return { ...outcome, sandboxBinding: { ...outcome.sandboxBinding, dutyReceiptSha256: "0".repeat(64) } };
+      }],
+    ];
+    for (const [name, code, executor] of cases) {
+      const run = await runCliBridge(dir, name, admittedDependencies(executor));
+      assert.equal(run.code, 2, `${name}: non-zero exit`);
+      assert.equal(run.completed.ok, false, `${name}: no answer`);
+      assert.equal(run.completed.code, code, `${name}: typed code`);
+      assert.equal(run.completed.answer, null, `${name}: the unverified answer is never emitted`);
+      assert.equal(run.completed.repair, ANSWERED_RECEIPT_REFUSALS[code], `${name}: the repair is named`);
+      assert.equal(run.completed.sandboxBinding ?? null, null);
+      const receipt = JSON.parse(readFileSync(run.receiptPath, "utf8"));
+      assert.equal(validateAdvisoryReceipt(receipt).ok, true);
+      assert.equal(receipt.observed.status, "unavailable", `${name}: the receipt claims no answered execution`);
+      assert.equal(receipt.answerSha256, null);
+      assert.equal(receipt.observed.identity, null);
+      assert.equal(run.completed.routeSelectionPath ?? null, null, `${name}: a possibly-started attempt is not described as a no-child decision`);
+    }
+    // An executor that throws or returns nothing is a typed unavailable outcome, not an answer.
+    for (const [name, executor] of [["throws", async () => { throw new Error("host executor failed"); }], ["nothing", async () => undefined]]) {
+      const run = await runCliBridge(dir, name, admittedDependencies(executor));
+      assert.equal(run.code, 2);
+      assert.equal(run.completed.ok, false);
+      assert.equal(run.completed.code, "advisor-host-execution-unavailable");
+      assert.equal(run.completed.answer, null);
+      assert.equal(typeof run.completed.repair, "string");
+      assert.equal(JSON.stringify(run.events).includes("host executor failed"), false, "no raw error text is reported");
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("AC-135: every no-child refusal names a repair or alternative the user can act on", { skip: HOST_LIMITATION }, async () => {
+  const dir = scratchDir("wsl-pin-repair");
+  try {
+    const cases = [
+      ["callback", { readRepositoryConsent: () => "approved" }, "ordinary-consult-host-callback-unavailable"],
+      ["route", { readRepositoryConsent: () => "approved", admitOrdinaryConsult: async () => ({ status: "unavailable" }) }, "ordinary-consult-host-route-unavailable"],
+      ["denied", { readRepositoryConsent: () => "approved", admitOrdinaryConsult: async () => ({ status: "denied" }) }, "advisor-host-export-denied"],
+      ["declined", { readRepositoryConsent: () => "declined" }, "advisor-repository-export-declined"],
+    ];
+    const seen = new Set();
+    for (const [name, deps, code] of cases) {
+      const run = await runCliBridge(dir, name, deps);
+      assert.equal(run.completed.code, code);
+      assert.equal(typeof run.completed.repair, "string", `${name}: a repair is named`);
+      assert.equal(run.completed.repair.length > 60, true, `${name}: actionable text`);
+      assert.match(run.completed.repair, /no model was called/iu, `${name}: states that nothing ran`);
+      assert.match(run.completed.repair, /continue without an advisor/iu, `${name}: names the alternative`);
+      seen.add(run.completed.repair);
+    }
+    assert.equal(seen.size, 4, "each outcome has its own repair");
+    const denied = await runCliBridge(dir, "denied-repair", { readRepositoryConsent: () => "approved", admitOrdinaryConsult: async () => ({ status: "denied" }) });
+    assert.match(denied.completed.repair, /do not retry/iu, "a denied export is not retried through another command or provider");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("AC-135: the skill states the tested route, its executor condition and the runner/platform matrix", () => {
+  const skill = readFileSync(join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "SKILL.md"), "utf8");
+  const flat = skill.replace(/\s+/gu, " ");
+  assert.match(flat, /sealed host-owned executor/iu);
+  assert.match(flat, /verifyAnsweredAdvisoryReceipt/u);
+  assert.match(flat, /ordinary-consult-host-callback-unavailable/u);
+  assert.match(flat, /advisory-unavailable-wsl-native-deferred/u);
+  assert.match(flat, /ADR-0085/u);
+  assert.equal(/produces only the no-child unavailable\s+record below, even if export admission is reported as available\. Do not call/iu.test(skill), false,
+    "the superseded 'always no-child' sentence must not remain once the seam exists");
+  const matrix = flat.slice(flat.indexOf("Supported runner/platform matrix"));
+  assert.notEqual(flat.indexOf("Supported runner/platform matrix"), -1, "the matrix section exists");
+  for (const row of [
+    /Codex[^|]*ordinary consult[^|]*\|[^|]*WSL/iu,
+    /Codex selected-sandbox\/App-Server route \| WSL \|[^|]*advisory-unavailable-wsl-native-deferred/iu,
+    /Codex, native Windows \| native Windows \|[^|]*unverified/iu,
+    /Claude native Opus then consult \| any \|/iu,
+  ]) assert.match(matrix, row);
+});
