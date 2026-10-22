@@ -1225,8 +1225,10 @@ export function executeSourceOwnedSessionAuthorityDomainTransition(input) {
   let result;
   try{
     domainTransitionOwned(input.transitionHandle,repo,pair.port);
+    // D113: a thenable result is the BEGIN ticket of an asynchronous phase. Only its synchronous prefix is bound and journalled here
+    // (the same inventory, member and baseline checks as any transition); the owner settles the promise through its own source-owned
+    // settle step, and the registry lock is released with this boundary instead of being held across the await.
     result=domainTransitionOwner.executeDomainAuthorityTransition(input.transitionHandle);
-    if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-HELD','domain-transition-async-phase-needs-settled-ticket');
     const terminal=domainTransitionOwner.observeDomainAuthorityTransitionTerminal(input.transitionHandle);
     exact(terminal,['entry','repositorySha256','producerId','producerPort','memberships','memberObservations','changedEntries','removedEntries','result','sourceContextSha256'],'domain-transition-terminal');
     if(terminal.entry!==plan.entry||terminal.repositorySha256!==plan.repositorySha256||terminal.producerId!==plan.producerId||terminal.producerPort!==pair.port||terminal.sourceContextSha256!==plan.sourceContextSha256||terminal.result!==result)fail('SDC-AUTHORITY-CAS','domain-transition-terminal-binding');

@@ -135,7 +135,7 @@ export function publishSourceOwnedAuthorityRoot({repository,producerId,rootPath,
   const file=join(repo.commonDir,'agent-pipeline',producerId,'external-roots',digest(rootPath)+'.json'),value={schema:'pipeline.source-owned-authority-root.v1',repositorySha256:digest({primaryRoot:repo.primaryRoot,commonDir:repo.commonDir}),rootPath,rootPathSha256:digest(rootPath),rootRecordSha256:digest(rootRecord)};
   const publishRoot=()=>{chain(dirname(file));privateParents(repo,file);try{const actual=readAuthoritySourceFile({namespaceId:'external-root',filePath:file,semantic:({value})=>value});if(!same(actual.value,value))authorityOwnerFailure('external-root-registration-CAS');return actual.sourceFact;}catch(e){if(e.code!=='ENOENT')throw e;publish(repo,file,value,null);return readAuthoritySourceFile({namespaceId:'external-root',filePath:file,semantic:({value})=>value}).sourceFact;}};
   const execution=transitionExecution.getStore();
-  if(execution?.repositorySha256===digest({primaryRoot:repo.primaryRoot,commonDir:repo.commonDir})&&execution.enrollment?.registrationPathSha256===digest(file)&&execution.enrollment.externalRootPathSha256===digest(rootPath))return publishRoot();
+  if(execution&&execution.closed!==true&&execution.repositorySha256===digest({primaryRoot:repo.primaryRoot,commonDir:repo.commonDir})&&execution.enrollment?.registrationPathSha256===digest(file)&&execution.enrollment.externalRootPathSha256===digest(rootPath))return publishRoot();
   authorityOwnerFailure('external-root-source-transition-required');
 }
 export function classifyAuthorityLifetime({value,relativePath},producerId,namespaceId,repository){
@@ -202,11 +202,13 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
   function reserve(identity){const handle=Object.freeze({}),binding=digest({producerId,repoSha,identity,nonce:randomBytes(32).toString('hex')}),operation={phase:'reserved',handle,identity:structuredClone(identity),binding,file:null,sha256:null,result:null,terminalFacts:null,effectFacts:[],beforeFacts:scan().memberships.flatMap(m=>m.sourceFacts)};handles.set(handle,operation);live.set(binding,operation);const reserved=withSessionAuthorityBoundary({repository:repo},boundary=>reserveSessionAuthorityMember({boundary,producerPort:port,association:{state:'unbound',target:null},operationHandle:handle}));operation.member=reserved;if(producerId==='local-worker-supervisor'&&identity?.enrollment===true){const initial=readInitialMember(operation);if(initial.sourceFact.sha256!==reserved.memberRef.sha256||initial.sourceFact.size!==reserved.memberRef.size||initial.value.phase!=='reserved'||initial.value.sourceFacts.length!==0)authorityOwnerFailure(producerId+':initial-reservation-CAS');operation.initialMember={value:structuredClone(initial.value),sourceFact:structuredClone(initial.sourceFact)};}operation.file=join(lifetimeRoot,binding+'.json');const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:binding,phase:'armed',identitySha256:digest(identity)};withSessionAuthorityBoundary({repository:repo},boundary=>{operation.sha256=publish(repo,operation.file,record,null);operation.phase='armed';if(operation.initialMember){operation.initialLifetimeFact=initialLifetimeRead(operation).sourceFact;if(initialLifetimeWindow)authorityOwnerFailure(producerId+':initial-reservation-reentrant');initialLifetimeWindow={operation};}try{operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:reserved.memberHandle,expectedMemberRef:reserved.memberRef,operationHandle:handle})};}finally{if(initialLifetimeWindow?.operation===operation)initialLifetimeWindow=null;}});return handle;}
   function terminal(handle,result){const operation=handles.get(handle);if(!operation)authorityOwnerFailure(producerId+':unowned-terminal');const proof=terminalObservation(result,operation.identity);if(!proof?.sourceFacts?.length)return false;return withSessionAuthorityBoundary({repository:repo},boundary=>{operation.result=result;operation.terminalFacts=proof.sourceFacts;operation.phase='terminal-observed';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'terminal-observed',identitySha256:digest({terminal:proof.terminal,sourceFacts:proof.sourceFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256);operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,terminalHandle:handle});operation.member={...operation.member,...released};live.delete(operation.binding);return true;});}
   function observeEffects(handle){const operation=handles.get(handle);if(!operation||(operation.phase!=='armed'&&!(operation.phase==='running'&&activeTransitions.has(operation))))authorityOwnerFailure(producerId+':effect-handle');return withSessionAuthorityBoundary({repository:repo},boundary=>{const current=scan().memberships.flatMap(m=>m.sourceFacts);operation.effectFacts=current.filter(f=>f.pathSha256!==digest(operation.file)&&!operation.beforeFacts.some(prior=>same(prior,f)));operation.phase='running';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'running',identitySha256:digest({identity:operation.identity,effectFacts:operation.effectFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256);operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};});}
+  const asyncPhases=new Map();
   function effectTransition(handle,effect){
     const writer=handles.get(handle);if(!writer||!live.has(writer.binding)||!writer.member?.memberRef||typeof effect!=='function')authorityOwnerFailure(producerId+':transition-writer');
-    // Async native producers need their own source-owned settled journal phases.
-    // Reject a declared async closure before any invocation or physical effect.
-    if(effect.constructor?.name==='AsyncFunction')authorityOwnerFailure(producerId+':async-settled-phase-unavailable');
+    // D113: an asynchronous native producer gets a source-owned BEGIN ticket (this transition: the synchronous prefix of the effect
+    // is bound, inventoried and journalled under the registry lock) and a source-owned SETTLE step (settleAsyncPhase, run by run()
+    // when the promise settles). The boundary callback returns a wrapper because a boundary refuses a thenable result: the lock is
+    // released when this ticket closes and is never held across the await.
     return withSessionAuthorityBoundary({repository:repo},boundary=>{
       assertContext();actualAuthorityRepository(repo);
       const before=scan(),spec=transitionScope(writer.identity),sourceContextSha256=digest({repoSha,sourceContext,processId:process.pid,writerBinding:writer.binding});
@@ -232,11 +234,27 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
       try{
         const result=executeSourceOwnedSessionAuthorityDomainTransition({boundary,transitionHandle:ticket});
         if(state.observation)try{controlledModelAfterExecution(state,ticket,result);}catch{state.observation.incomplete=true;}
-        return result;
+        if(state.asyncPhase&&state.asyncPost)asyncPhases.set(handle,state.asyncPost);
+        return {settled:result};
       }finally{
         state.closed=true;
         if(state.observation)try{controlledModelAfterClose(state,ticket);}catch{state.observation.incomplete=true;}
       }
+    }).settled;
+  }
+  // D113 SETTLE step: runs under a fresh registry boundary after the effect's promise settled (resolved or rejected). It re-reads
+  // the physical namespace and refuses any change the BEGIN ticket's write scope does not admit: an existing source may change
+  // only when its path is mutable, a new source only inside a creation pattern or as an owner lifetime record (another operation
+  // of this producer may legitimately journal while this one is pending), and nothing outside the mutable set may vanish.
+  function settleAsyncPhase(handle){
+    const phase=asyncPhases.get(handle);if(!phase)return;asyncPhases.delete(handle);
+    withSessionAuthorityBoundary({repository:repo},()=>{
+      assertContext();actualAuthorityRepository(repo);
+      const prior=entryMap(phase.entries),post=entryMap(scan().entries),mutable=new Set(phase.mutablePathSha256s);
+      const lifetime=row=>row.path.startsWith(lifetimeRoot+sep);
+      for(const [path,row] of post){const before=prior.get(path);if(before&&same(before.sourceFact,row.sourceFact))continue;
+        if(before?!mutable.has(path)&&!lifetime(row):!lifetime(row)&&!phase.creations.some(c=>c.rootPathSha256===digest(row.rootPath)&&new RegExp(c.relativePattern).test(row.relativePath)))authorityOwnerFailure(producerId+':async-settle-unscoped-change');}
+      for(const [path,row] of prior)if(!post.has(path)&&!mutable.has(path)&&!lifetime(row))authorityOwnerFailure(producerId+':async-settle-unscoped-removal');
     });
   }
   function transitionExisting(handle,effect){
@@ -286,7 +304,7 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
     });
   }
 
-  function run(identity,effect,terminalProjection=null){if(typeof effect!=='function'||(terminalProjection!==null&&typeof terminalProjection!=='function'))authorityOwnerFailure('domain-effect');const current=operationScope.getStore();if(current?.owner===port)return effect();if(effect.constructor?.name==='AsyncFunction')authorityOwnerFailure(producerId+':async-settled-phase-unavailable');preflightActivation(identity);const handle=reserve(identity);const finish=result=>{observeEffects(handle);terminal(handle,terminalProjection?terminalProjection(result):result);return result;};return operationScope.run({owner:port,handle},()=>{let result;try{result=effectTransition(handle,effect);}catch(error){throw error;}return result&&typeof result.then==='function'?Promise.resolve(result).then(finish,error=>{observeEffects(handle);throw error;}):finish(result);});}
+  function run(identity,effect,terminalProjection=null){if(typeof effect!=='function'||(terminalProjection!==null&&typeof terminalProjection!=='function'))authorityOwnerFailure('domain-effect');const current=operationScope.getStore();if(current?.owner===port)return effect();preflightActivation(identity);const handle=reserve(identity);const finish=result=>{observeEffects(handle);terminal(handle,terminalProjection?terminalProjection(result):result);return result;};return operationScope.run({owner:port,handle},()=>{let result;try{result=effectTransition(handle,effect);}catch(error){asyncPhases.delete(handle);throw error;}return result&&typeof result.then==='function'?Promise.resolve(result).then(value=>{settleAsyncPhase(handle);return finish(value);},error=>{try{settleAsyncPhase(handle);}catch{}observeEffects(handle);throw error;}):finish(result);});}
   const owner=Object.freeze({port,reserve,terminal,observeEffects,transitionExisting,run,readCurrentInitialLifetime,currentHandle(){const current=operationScope.getStore();return current?.owner===port?current.handle:null;},repository:repo});
   controlledModelDomainOwners.set(owner,{port,producerId,repository:repo,assertContext});
   return owner;
@@ -303,8 +321,12 @@ export function executeDomainAuthorityTransition(handle){
   if(!same(state.before, state.scan()))authorityOwnerFailure('domain-transition-before-drift');
   state.executed=true;
   if(state.observation)state.observation.count+=1;
-  const result=transitionExecution.run({repositorySha256:state.plan.repositorySha256,enrollment:state.plan.writeScope.enrollment},state.effect);
-  if(result&&typeof result.then==='function')authorityOwnerFailure('domain-transition-async-effect-held');
+  const execution={repositorySha256:state.plan.repositorySha256,enrollment:state.plan.writeScope.enrollment,closed:false};
+  let result;try{result=transitionExecution.run(execution,state.effect);}finally{execution.closed=true;}
+  // D113 BEGIN ticket: a thenable result journals only the synchronous prefix here. The continuation runs after this ticket
+  // closed (execution.closed refuses its root publication) and is settled by the owner's own settle step in run(); an enrolment
+  // transition has no asynchronous phase because its external-root registration must be bound inside this ticket.
+  if(result&&typeof result.then==='function'){if(state.plan.writeScope.enrollment!==null)authorityOwnerFailure('domain-transition-async-enrollment');state.asyncPhase=true;}
   state.assertContext();actualAuthorityRepository(state.repository);
   const after=state.scan(),before=entryMap([...state.before.entries,...state.externalBefore]),post=entryMap(after.entries),changedEntries=[],removedEntries=[];
   const mutable=new Set(state.plan.writeScope.mutablePathSha256s),creations=state.plan.writeScope.creations;
@@ -323,6 +345,7 @@ export function executeDomainAuthorityTransition(handle){
   update(state.writer);for(const row of changedEntries)if(row.sourceFact.pathSha256!==digest(state.writer.file)&&!state.writer.effectFacts.some(f=>same(f,row.sourceFact)))state.writer.effectFacts.push(row.sourceFact);
   const observations=[state.writer,...state.retained].map(op=>({memberRef:op.member.memberRef,operationHandle:op.handle,...state.observe(op.handle)}));
   state.terminal={entry:state.plan.entry,repositorySha256:state.plan.repositorySha256,producerId:state.plan.producerId,producerPort:state.port,memberships:after.memberships,memberObservations:observations,changedEntries,removedEntries,result,sourceContextSha256:state.plan.sourceContextSha256};
+  if(state.asyncPhase)state.asyncPost={entries:after.entries,mutablePathSha256s:[...mutable],creations};
   return result;
 }
 export function observeDomainAuthorityTransitionTerminal(handle){const state=ownedTransition(handle);if(!state.executed||!state.terminal||!same(state.terminal.memberships,state.scan().memberships))authorityOwnerFailure('domain-transition-terminal-unavailable-or-drift');return state.terminal;}
