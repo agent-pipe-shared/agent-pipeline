@@ -1195,6 +1195,38 @@ export function applyOrphanDescriptorArchive({
   };
 }
 
+/**
+ * D112: a descriptor LISTED a moment ago may be retired by its owner before an inspector loads it. The listing
+ * already skips such a name; the inspectors' required load reports it as WT-SESSION-MISSING. That is a
+ * descriptor that is already removed, not an observation failure: it leaves the result. Every other failure
+ * (malformed, binding or digest mismatch) still throws, so a descriptor that is still present keeps its
+ * fail-closed verdict. The result arrays are index-aligned over the descriptors that remain.
+ */
+function inspectListedDescriptors(root, listed, { inspectRetirement, inspectExternal = null }) {
+  const skipIfRetired = (inspect) => {
+    try {
+      return inspect();
+    } catch (error) {
+      if (error?.code === "WT-SESSION-MISSING") return null;
+      throw error;
+    }
+  };
+  const options = (descriptor) => ({ expectedDescriptorSha256: descriptor.descriptorSha256 });
+  const retirements = listed.map((descriptor) => skipIfRetired(
+    () => inspectRetirement(root, descriptor.sessionId, options(descriptor)),
+  ));
+  const externals = listed.map((descriptor, index) => (retirements[index] === null || inspectExternal === null
+    ? undefined
+    : skipIfRetired(() => inspectExternal(root, descriptor.sessionId, options(descriptor)))));
+  const kept = listed.map((_, index) => index)
+    .filter((index) => retirements[index] !== null && externals[index] !== null);
+  return {
+    activeDescriptors: kept.map((index) => listed[index]),
+    orphanDescriptors: kept.map((index) => retirements[index]),
+    externalRetirements: kept.map((index) => externals[index]),
+  };
+}
+
 function planSessionCleanupRecoveryBase({
   rootDir,
   scriptPath = DEFAULT_SCRIPT,
@@ -1268,21 +1300,21 @@ function planSessionCleanupRecoveryBase({
         status: "not-needed",
       };
     }
-    const orphanDescriptors = activeDescriptors.map((descriptor) => inspectRetirement(
-      binding.root,
-      descriptor.sessionId,
-      { expectedDescriptorSha256: descriptor.descriptorSha256 },
-    ));
-    const inspectExternal = deps.inspectExternallyArchivedSessionFn
-      ?? inspectExternallyArchivedSession;
-    const externalRetirements = activeDescriptors.map((descriptor) => inspectExternal(
-      binding.root,
-      descriptor.sessionId,
-      { expectedDescriptorSha256: descriptor.descriptorSha256 },
-    ));
+    const inspected = inspectListedDescriptors(binding.root, activeDescriptors, {
+      inspectRetirement,
+      inspectExternal: deps.inspectExternallyArchivedSessionFn ?? inspectExternallyArchivedSession,
+    });
+    if (inspected.activeDescriptors.length === 0) {
+      return {
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        status: "not-needed",
+      };
+    }
+    const { orphanDescriptors, externalRetirements } = inspected;
+    const remainingDescriptors = inspected.activeDescriptors;
     const plan = planExactOrphanRetirement({
       binding,
-      activeDescriptors,
+      activeDescriptors: remainingDescriptors,
       orphanDescriptors,
       externalRetirements,
       scriptPath,
@@ -1292,7 +1324,7 @@ function planSessionCleanupRecoveryBase({
       return {
         schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
         status: "orphan-recovery-unavailable",
-        activeDescriptorCount: activeDescriptors.length,
+        activeDescriptorCount: remainingDescriptors.length,
       };
     }
     fail("WT-SESSION-RECOVERY-PLAN", "orphan retirement proof was not constructible");
@@ -1375,25 +1407,27 @@ function planSessionCleanupRecoveryBase({
     }, scriptPath);
   }
   if (binding.status === "unbound") {
-    const activeDescriptors = listDescriptors(binding.root);
+    const listedDescriptors = listDescriptors(binding.root);
+    if (listedDescriptors.length === 0) {
+      return {
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        status: "not-needed",
+      };
+    }
+    const {
+      activeDescriptors,
+      orphanDescriptors,
+      externalRetirements,
+    } = inspectListedDescriptors(binding.root, listedDescriptors, {
+      inspectRetirement,
+      inspectExternal: deps.inspectExternallyArchivedSessionFn ?? inspectExternallyArchivedSession,
+    });
     if (activeDescriptors.length === 0) {
       return {
         schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
         status: "not-needed",
       };
     }
-    const orphanDescriptors = activeDescriptors.map((descriptor) => inspectRetirement(
-      binding.root,
-      descriptor.sessionId,
-      { expectedDescriptorSha256: descriptor.descriptorSha256 },
-    ));
-    const inspectExternal = deps.inspectExternallyArchivedSessionFn
-      ?? inspectExternallyArchivedSession;
-    const externalRetirements = activeDescriptors.map((descriptor) => inspectExternal(
-      binding.root,
-      descriptor.sessionId,
-      { expectedDescriptorSha256: descriptor.descriptorSha256 },
-    ));
     if (activeDescriptors.length > 1 || externalRetirements.some((entry) => entry.status === "ready")) {
       const plan = planExactOrphanRetirement({
         binding,
@@ -1455,14 +1489,10 @@ function planSessionCleanupRecoveryBase({
       },
     };
   }
-  const activeDescriptors = listDescriptors(binding.root);
+  const inspectedBound = inspectListedDescriptors(binding.root, listDescriptors(binding.root), { inspectRetirement });
+  const activeDescriptors = inspectedBound.activeDescriptors;
   if (activeDescriptors.length !== 0) {
-    const orphanDescriptors = activeDescriptors
-      .map((descriptor) => inspectRetirement(
-        binding.root,
-        descriptor.sessionId,
-        { expectedDescriptorSha256: descriptor.descriptorSha256 },
-      ))
+    const orphanDescriptors = inspectedBound.orphanDescriptors
       .sort((left, right) => left.sessionId.localeCompare(right.sessionId));
     if (orphanDescriptors.some((descriptor) => descriptor.status !== "retirable")) {
       return {
