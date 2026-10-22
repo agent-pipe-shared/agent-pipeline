@@ -11,7 +11,7 @@ import { HOST_INIT_CROSS_VIEW_STATUSES, INTAKE_LIFECYCLE_STATUSES, LAUNCH_SCRIPT
 import { exactReadyReceipt, verdict } from "./verdict.mjs";
 import { blocked, externalRestartOnly } from "./denial-route.mjs";
 import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
-import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, minimumRigorObservation } from "./entry-gates.mjs";
+import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, fitnessModelQualificationObservation, minimumRigorObservation } from "./entry-gates.mjs";
 import { rootIdentityMismatch } from "./sanctioned-args-onboarding.mjs";
 import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
 import { isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
@@ -375,12 +375,19 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
       dependencies,
     );
     if (fitnessVerdict !== null) return fitnessVerdict;
+    const qualificationVerdict = fitnessModelQualificationObservation(
+      root,
+      input.tool_input.command ?? input.tool_input.CommandLine,
+      dependencies,
+    );
     const rigorVerdict = minimumRigorObservation(
       root,
       input.tool_input.command ?? input.tool_input.CommandLine,
       dependencies,
     );
-    if (rigorVerdict !== null) return rigorVerdict;
+    if (qualificationVerdict !== null || rigorVerdict !== null) {
+      return verdict(0, `${qualificationVerdict?.stderr ?? ""}${rigorVerdict?.stderr ?? ""}`);
+    }
   }
   if (ownsVerificationContext && !isSourceOwnedContinuityVerificationCommand(
     input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies,

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: SUL-1.0
 // Guard module "entry-gates" (layer 3), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { checkPlanningAdoptionDisposition } from "../../scripts/architecture-adoption.mjs";
-import { evaluateArchitectureFitness } from "../../scripts/architecture-fitness.mjs";
+import { evaluateArchitectureFitness, inspectFitnessModelMaterialization, runFitnessQualification } from "../../scripts/architecture-fitness.mjs";
 import { architectureTouchedContracts, greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
 import { deriveMinimumRigor, inferInputsFromRepo, isContractPath, isProtectedPath, loadPolicy } from "../../scripts/rigor-floor.mjs";
 import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
@@ -215,6 +217,48 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies 
       + `${ARCHITECTURE_FITNESS_DENIAL_CODE}: planning architecture fitness is ${status}.\n`
       + remedyGuidance
       + "Resolve new or worsened findings, record a valid exception, or repair the evaluator/profile evidence before requesting implementation authority.\n",
+  );
+}
+
+export const FITNESS_MODEL_NOT_QUALIFIED_CODE = "GUARD-FITNESS-MODEL-NOT-QUALIFIED";
+const FITNESS_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-fitness.mjs", import.meta.url));
+
+function currentHeadCommit(root) {
+  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+}
+
+/**
+ * AC-155 (PO decision 2026-10-22, report-only): at the implementation boundary a materialized fitness model is executed
+ * as a candidate check bound to HEAD. A model that did not qualify (never ran, unreadable, not bound to this candidate,
+ * not passing) is reported by name and is not counted as qualified; the transition is never blocked (exit 0). A project
+ * without a materialized model is untouched, and nothing is stored.
+ */
+export function fitnessModelQualificationObservation(root, command, dependencies = {}) {
+  if (!isImplementationAuthorityTransition(command, root, dependencies)) return null;
+  let result;
+  try {
+    const materialization = inspectFitnessModelMaterialization(root);
+    if (!materialization.materialized) return null;
+    let candidateCommit = null;
+    try {
+      const head = (dependencies.resolveHeadCommitFn ?? currentHeadCommit)(root);
+      candidateCommit = typeof head === "string" ? head.trim() : null;
+    } catch { candidateCommit = null; }
+    result = (dependencies.runFitnessQualificationFn ?? runFitnessQualification)({
+      rootDir: root,
+      mode: "candidate",
+      candidateCommit,
+      ...(dependencies.evaluateArchitectureFitnessFn ? { evaluate: dependencies.evaluateArchitectureFitnessFn } : {}),
+    });
+    if (result?.status === "qualified" || result?.status === "not-applicable") return null;
+    result = { ...result, candidateCommit };
+  } catch {
+    result = { code: "FITNESS-MODEL-EVALUATION-FAILED", candidateCommit: null };
+  }
+  const commit = /^[a-f0-9]{40}$/u.test(result.candidateCommit ?? "") ? result.candidateCommit : "<HEAD>";
+  return verdict(
+    0,
+    `WARNING (guard-lifecycle-ready): ${FITNESS_MODEL_NOT_QUALIFIED_CODE}: the materialized fitness model architecture/fitness-model.json is not counted as qualified (${result.code ?? "FITNESS-MODEL-NOT-QUALIFIED"}): no passing candidate run bound to ${commit} was observed. Repair: node ${FITNESS_SCRIPT} --qualify --root . --commit ${commit}. This observation does not block the transition.\n`,
   );
 }
 
