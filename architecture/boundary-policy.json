@@ -56,14 +56,14 @@
     {
       "rule": "over-line-bound",
       "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
-      "maxLines": 1015,
-      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+      "maxLines": 1099,
+      "reason": "over the bound when the check was adopted on 2026-10-20 (1015); raised to 1099 by PO decision D97 (2026-10-22) for the D87/D96 native read-tool gating, temporary: owner Elephant, expiry 2026-11-30, split the adapter in 0.7.1 and lower this entry"
     },
     {
       "rule": "over-line-bound",
       "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
-      "maxLines": 1468,
-      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+      "maxLines": 1492,
+      "reason": "over the bound when the check was adopted on 2026-10-20 (1468); raised to 1492 by PO decision D97 (2026-10-22) for the D87 native read-tool cases, temporary: owner Elephant, expiry 2026-11-30, split the test in 0.7.1 and lower this entry"
     },
     {
       "rule": "over-line-bound",
@@ -440,14 +440,14 @@
     {
       "rule": "over-line-bound",
       "path": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
-      "maxLines": 2367,
-      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+      "maxLines": 2406,
+      "reason": "over the bound when the check was adopted on 2026-10-20 (2367); raised to 2406 for the D91 custody-topology scope (PO decision D91, 2026-10-22), temporary: owner Elephant, expiry 2026-11-30, split the module in 0.7.1 and lower this entry"
     },
     {
       "rule": "over-line-bound",
       "path": "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs",
-      "maxLines": 1938,
-      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+      "maxLines": 2035,
+      "reason": "over the bound when the check was adopted on 2026-10-20 (1938); raised to 2035 for the D91-01..04 cases (PO decision D91, 2026-10-22), temporary: owner Elephant, expiry 2026-11-30, split the test in 0.7.1 and lower this entry"
     },
     {
       "rule": "over-line-bound",
@@ -638,8 +638,8 @@
     {
       "rule": "over-line-bound",
       "path": "plugins/pipeline-core/scripts/security-scan.mjs",
-      "maxLines": 1189,
-      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+      "maxLines": 1211,
+      "reason": "over the bound when the check was adopted on 2026-10-20 (1189); raised to 1211 for the scanMode option (PO decision D102, 2026-10-22), temporary: owner Elephant, expiry 2026-11-30, split the script in 0.7.1 and lower this entry"
     },
     {
       "rule": "over-line-bound",
