@@ -32,6 +32,7 @@ import {
 } from "../lib/advisory-lifecycle-v2.mjs";
 import { validateAdvisoryReceipt } from "../lib/advisory-receipt.mjs";
 import { verifyAnsweredAdvisoryReceipt } from "../lib/advisory-answered-receipt.mjs";
+import { ORDINARY_CONSULT_REPAIRS, finishAdmittedOrdinaryConsult } from "./advisory-admitted-consult.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
 import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
 import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
@@ -42,7 +43,7 @@ import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
 import { CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE, registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
-import { ROUTES, selectHostAdvisorRoute, selectHostAdvisorRouteForHost } from "./codex-host-advisor-route.mjs";
+import { ROUTES, WSL_PREFLIGHT_REPAIR, selectHostAdvisorRoute, selectHostAdvisorRouteForHost } from "./codex-host-advisor-route.mjs";
 import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
 import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
@@ -449,7 +450,7 @@ function disabledHostAdvisory(route) {
         : route === ROUTES.WSL_UNAVAILABLE
           ? "advisory_unavailable_wsl_native_deferred"
           : "advisory_disabled",
-      answer: null,
+      answer: null, ...(route === ROUTES.WSL_UNAVAILABLE ? { repair: WSL_PREFLIGHT_REPAIR } : {}),
       receipt: null,
       attempts: [],
     },
@@ -509,8 +510,8 @@ export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, tra
   }
   const routeInput = hostRouteInput(input);
   const route = transport.hostObservation === undefined
-    ? selectHostAdvisorRoute(routeInput)
-    : selectHostAdvisorRouteForHost(routeInput, transport.hostObservation);
+    ? selectHostAdvisorRoute(routeInput, transport.sandboxPreflight ?? null)
+    : selectHostAdvisorRouteForHost(routeInput, transport.hostObservation, transport.sandboxPreflight ?? null);
   if (route !== ROUTES.HOST) return disabledHostAdvisory(route);
   const root = transport.repoRoot ?? process.cwd();
   const advisoryRoute = resolvedAdvisoryRoute(
@@ -832,6 +833,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
             dispatch: structuredClone(input.dispatch), profile: input.profile,
             questionSha256: sha256(input.question), evidenceSha256: input.demand.evidenceSha256 })
           : null;
+        if (admission?.status === "admitted" && typeof dependencies.executeAdmittedConsult === "function") return await finishAdmittedOrdinaryConsult({ input, args, repositoryRoot, dependencies, consultationRecordPath, host: { resolveRoute: () => resolvedAdvisoryRoute(input, repositoryRoot, dependencies.resolveAdvisoryRoute ?? resolveV3DutyRoute, dependencies.selectModelRoleForTaskFn ?? selectModelRoleForTask, dependencies.modelRoleEnvironment ?? process.env), receiptFor, writeJsonAtomic, emit, resolvePath: resolve, recordAdvisoryDecisionEvent } });
         code = admission?.status === "denied" ? "advisor-host-export-denied"
           : admission?.status === "unavailable" ? "ordinary-consult-host-route-unavailable"
             : "ordinary-consult-host-callback-unavailable";
@@ -853,7 +855,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       if (!record.ok) throw new Error(record.code);
       writeJsonAtomic(consultationRecordPath, record.record);
       emit({ schema: "pipeline.advisory-host.v1", type: "advisory.completed",
-        ok: false, code, answer: null, receiptPath: resolve(args.receipt),
+        ok: false, code, repair: ORDINARY_CONSULT_REPAIRS[code], answer: null, receiptPath: resolve(args.receipt),
         directoryDurability: persisted?.directoryDurability ?? null,
         attempts: [], attemptTrailPath: null, routeSelectionPath,
         consultationRecord: record.record, consultationRecordPath,

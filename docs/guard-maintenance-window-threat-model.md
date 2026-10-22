@@ -654,6 +654,15 @@ consumers; it imports nothing and executes with kernel authority).
 This source closure does not establish protected-source delivery, independent
 review, native qualification or activation.
 
+ALF-K32 adds one further first-party module that a kernel file imports and that
+executes with kernel authority:
+`plugins/pipeline-core/scripts/advisory-admitted-consult.mjs` (the admitted half of
+the ordinary Codex consult; `scripts/advisory-host-bridge.mjs` hands it the result of a
+sealed host-owned executor, and it reports an answer only when
+`lib/advisory-answered-receipt.mjs` binds that result). It has no I/O of its own, imports
+only kernel paths and `lib/advisory-lifecycle-v2.mjs` and `lib/advisory-receipt-assurance.mjs`
+(both already kernel paths), and is itself one.
+
 ## Threats and controls
 
 | Threat | Control |

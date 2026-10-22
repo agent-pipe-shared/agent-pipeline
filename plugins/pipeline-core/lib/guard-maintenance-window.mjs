@@ -789,10 +789,10 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/project-calibration-identity.mjs",
   "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
   // Closure additions 2026-10-21 (GMWKC01): first-party imports of kernel paths that were never listed.
-  // lost-binding <- session-cleanup-recovery; observers <- native-goldfish-host-state; owned-files <- push/commit
-  // writers; orphan-member-step <- onboarding-continuity; budget-notice <- hooks/guard-dispatch-budget;
-  // answered-receipt <- scripts/advisory-host-bridge; sandbox-probe <- scripts/pipeline-start-preflight.
+  // lost-binding <- session-cleanup-recovery; observers <- native-goldfish-host-state; owned-files <- push/commit writers; orphan-member-step <- onboarding-continuity;
+  // budget-notice <- hooks/guard-dispatch-budget; answered-receipt <- scripts/advisory-host-bridge; sandbox-probe <- scripts/pipeline-start-preflight; admitted-consult (ALF-K32) <- scripts/advisory-host-bridge.
   "plugins/pipeline-core/lib/advisory-answered-receipt.mjs",
+  "plugins/pipeline-core/scripts/advisory-admitted-consult.mjs",
   "plugins/pipeline-core/lib/read-command-diagnosis.mjs",
   "plugins/pipeline-core/lib/dispatch-model-enforcement.mjs",
   "plugins/pipeline-core/lib/dispatch-briefing-build.mjs",

@@ -3,7 +3,9 @@
 
 /** Model-free route authority used only after a valid on-demand trigger. */
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { readFileSync } from "node:fs";
 import { release as osRelease } from "node:os";
+import { validatePreflightReceipt } from "./codex-sandbox-preflight.mjs";
 
 export const ROUTES = Object.freeze({
   HOST: "host-bound-consult",
@@ -46,9 +48,26 @@ function currentHostObservation() {
   };
 }
 
-export function selectHostAdvisorRouteForHost(input, hostObservation) {
+/** The one runnable repair for the WSL deferral: the existing sandbox preflight, which writes the receipt that lifts it. */
+export const WSL_PREFLIGHT_REPAIR = "node <plugin-root>/scripts/codex-sandbox-preflight.mjs --run --kind intermediate --codex <absolute-codex-path> --receipt <absolute-new-receipt-path>";
+export const WSL_PREFLIGHT_REASON = "wsl-sandbox-preflight-not-passed";
+
+/**
+ * True only for a valid, existing pipeline.codex-sandbox-preflight.v1 receipt that
+ * a real run on a WSL2 kernel reported as an intermediate "ok" with unchanged canaries.
+ * Anything else, including a malformed receipt, is false and keeps the deferral.
+ */
+export function isPassingWslSandboxPreflight(receipt) {
+  try {
+    validatePreflightReceipt(receipt);
+    return receipt.eligibility === "intermediate" && receipt.terminalCode === "ok"
+      && receipt.platform.kernelClass === "wsl2" && receipt.canaries.unchanged === true;
+  } catch { return false; }
+}
+
+export function selectHostAdvisorRouteForHost(input, hostObservation, sandboxPreflight = null) {
   const route = selectHostAdvisorRouteWithoutHost(input);
-  if (route === ROUTES.HOST && isWslHostObservation(hostObservation)) return ROUTES.WSL_UNAVAILABLE;
+  if (route === ROUTES.HOST && isWslHostObservation(hostObservation) && !isPassingWslSandboxPreflight(sandboxPreflight)) return ROUTES.WSL_UNAVAILABLE;
   return route;
 }
 
@@ -64,19 +83,24 @@ function selectHostAdvisorRouteWithoutHost(input) {
   return ROUTES.HOST;
 }
 
-export function selectHostAdvisorRoute(input) {
-  return selectHostAdvisorRouteForHost(input, currentHostObservation());
+export function selectHostAdvisorRoute(input, sandboxPreflight = null) {
+  return selectHostAdvisorRouteForHost(input, currentHostObservation(), sandboxPreflight);
 }
 
 // Compatibility name for callers that use the generic advisory terminology.
 export const selectAdvisoryRoute = selectHostAdvisorRoute;
 
-export function resolveHostAdvisorRoute(input) {
-  const route = selectHostAdvisorRoute(input);
+export function resolveHostAdvisorRouteForHost(input, hostObservation, sandboxPreflight = null) {
+  const route = selectHostAdvisorRouteForHost(input, hostObservation, sandboxPreflight);
   return {
     route,
     policy: route === ROUTES.HOST ? HOST_ADVISOR_POLICY : null,
+    ...(route === ROUTES.WSL_UNAVAILABLE ? { reason: WSL_PREFLIGHT_REASON, repair: WSL_PREFLIGHT_REPAIR } : {}),
   };
+}
+
+export function resolveHostAdvisorRoute(input, sandboxPreflight = null) {
+  return resolveHostAdvisorRouteForHost(input, currentHostObservation(), sandboxPreflight);
 }
 
 export function parseHostAdvisorRouteArgs(argv) {
@@ -94,8 +118,16 @@ export function parseHostAdvisorRouteArgs(argv) {
   return input;
 }
 
-function writeRoute(input, write) {
-  write(`${JSON.stringify(resolveHostAdvisorRoute(input))}\n`);
+function writeRoute(input, write, sandboxPreflight = null) {
+  write(`${JSON.stringify(resolveHostAdvisorRoute(input, sandboxPreflight))}\n`);
+}
+
+/** Optional trailing `--sandbox-preflight <receipt.json>`: the receipt a real preflight run wrote; unreadable means absent. */
+function splitPreflightArgs(argv) {
+  if (argv.length !== 8 || argv[6] !== "--sandbox-preflight") return { routeArgv: argv, sandboxPreflight: null };
+  let sandboxPreflight = null;
+  try { sandboxPreflight = JSON.parse(readFileSync(argv[7], "utf8")); } catch { sandboxPreflight = null; }
+  return { routeArgv: argv.slice(0, 6), sandboxPreflight };
 }
 
 if (isDirectInvocation(import.meta.url)) {
@@ -105,7 +137,8 @@ if (isDirectInvocation(import.meta.url)) {
       process.stdout.write(`${USAGE}\n`);
     } else {
       try {
-        writeRoute(parseHostAdvisorRouteArgs(argv), process.stdout.write.bind(process.stdout));
+        const { routeArgv, sandboxPreflight } = splitPreflightArgs(argv);
+        writeRoute(parseHostAdvisorRouteArgs(routeArgv), process.stdout.write.bind(process.stdout), sandboxPreflight);
       } catch {
         process.stderr.write(`${USAGE}\n`);
         process.exitCode = 2;
