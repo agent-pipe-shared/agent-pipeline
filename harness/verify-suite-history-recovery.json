@@ -11,5 +11,24 @@
       "priorSuiteCount": 87,
       "appendedSuiteCount": 21
     }
+  ],
+  "duplicateRepairs": [
+    {
+      "schema": "pipeline.verify-suite-duplicate-repair-entry.v1",
+      "addCommit": "5cc6b70066970d2b577a90b5c72f92d5ebf85602",
+      "addParent": "ec9ea2d4fbda5ac5a780498ca8c84184c48f6aa4",
+      "removeCommit": "6940723aea2bee0b29dd35660f609a981b9b4417",
+      "removeParent": "b1035fbe92f12b570dd138f1af45b930758184fe",
+      "addPreimageSha256": "61992ee3b781342fa0f303ed3a47505ba18ca1b31c1604c032e97d00f9231579",
+      "addPostimageSha256": "d5f5e607c099fa342ebe78a1efbd688f2e8d4c8d55594cc406d0f0baf20b9f50",
+      "removePreimageSha256": "d5f5e607c099fa342ebe78a1efbd688f2e8d4c8d55594cc406d0f0baf20b9f50",
+      "removePostimageSha256": "65ec4e28e9c7315ac7ae9a3a699fc4070b7ce2c5fd65a83ce489c971b8855ab7",
+      "duplicateName": "shell-grammar-capability-placement-tests",
+      "duplicateFile": "harness/scripts/shell-grammar-capability-placement.test.mjs",
+      "duplicateRowSha256": "d0fc96b5a6008d1e6317ac6248d05bf78123283e1fe5939967e155ff41f23c15",
+      "owner": "Elephant",
+      "signed": false,
+      "reason": "Historical, unsigned exception recorded by the Elephant (PO decision D107): the first commit added a second registry row repeating the name and file of an existing row, the second commit removed that row again. Narrow and not extendable: it is bound to these two commits and their registry bytes, so a third commit of the same shape stays refused."
+    }
   ]
 }
