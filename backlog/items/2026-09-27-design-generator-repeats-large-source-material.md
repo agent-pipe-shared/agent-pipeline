@@ -138,3 +138,24 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **HOST-SESSION-NEEDED** — The host response budget for the same large input needs a real host measurement
   Item states native token counts, host output budget and display truncation are unknown. Needs a real Codex (and Claude) host turn with the 14 KB input to observe truncation; the byte-level measurement (47,815 vs 2,153 bytes) is already done and is not the gap.
+
+## Reconciled 2026-10-23
+
+Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
+
+- "Controlled Codex CLI measurement (2026-09-28)": "Stored duplication and routine `pendingAsks` compaction remain open."
+  Both are closed: the stored-duplication half by commit `38e1758a4` (`fix(pipeline-core): keep raw intake material out of
+  tracked design files`; the pin asserts zero copies of the request in design-input, PRD and Spec), the `pendingAsks`
+  half by the "Extension 2026-10-22" section (driver output 23,033 to 13,802 bytes, each ask and the primary action
+  printed once). Pins: `plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs`
+  (history includes `0080379a7` each published ask once, `e82601a5b` collect-input primary action once).
+- "Producer-to-guard summary parity (2026-09-28)" ("No productive integration occurred", "source integration ...
+  remain pending"): statements of the preparation state of that date; whether the summary route has since been
+  integrated was not re-verified in this sweep, so these sentences are marked as dated history, not as current state.
+- Blocker analysis 2026-10-22 frames only the host gap (a real Codex/Claude host turn with the 14 KB input for output
+  budget and truncation). That remains the only open acceptance bullet ("The host response remains below its output
+  budget"), together with the two residues the 2026-10-22 extension already names: cross-call `pendingAsks` compaction
+  (needs a persisted shown-digest, a design decision not yet made) and the "do not hand-edit" versus "elaborate before
+  binding" header contradiction (not re-checked in this sweep).
+- Triage: the block under "## Triage" is a bare heading and no repository decision with an id settles this item, so it is
+  left as is. No status change is made here.

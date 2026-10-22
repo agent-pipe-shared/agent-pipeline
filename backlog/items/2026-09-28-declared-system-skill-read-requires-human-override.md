@@ -117,3 +117,24 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
   Deferred past the 0.7.0 candidate by PO decision of 2026-10-16 together with lifecycle-read-scope-blocks-host-declared-system-skill (AC-209); item triage 2026-10-17 says AC-147 is not counted against the 0.7.0 local test candidate. When taken up it needs an installed Codex session.
 - **DEFERRED** — The PO deferral past 0.7.0 stands; scope for the post-0.7.0 release is undecided
   Nothing blocks 0.7.0: the deferral is recorded (item triage 2026-10-17, PO decision 2026-10-16). The post-0.7.0 scope is a later planning decision, not a candidate blocker.
+
+## Reconciled 2026-10-23
+
+Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
+
+- Description ("The installed lifecycle guard refuses the ordinary read-only `cat` with `GUARD-READ-SCOPE-OUTSIDE-ROOT`
+  ... its only offered route requires a human signature") and Proposal ("Bind the exact physically verified skill
+  instruction files from the active host catalog into the session's read authorities"): the reading-outside-the-repository
+  premise changed after the 2026-10-17 triage. PO decision D96 (2026-10-22) makes reads outside the repository generally
+  allowed except credentials, runner-neutral; D108 keeps a private exception only for RECURSIVE directory searches over
+  `.codex/skills`, `.codex/sessions` and `.claude/projects` ("single files there read like any other file outside").
+  Built in commit `5b3990a37` (`passive-read-policy.mjs`, with the restated pins `passive-read-policy.test.mjs` and
+  `guard-lifecycle-ready.test.mjs`). So a single read of a declared `SKILL.md` outside the root is no longer a
+  `GUARD-READ-SCOPE-OUTSIDE-ROOT` refusal by policy; the pin case ALF-B8-AC147 in
+  `plugins/pipeline-core/lib/passive-read-policy.test.mjs` holds the skill file readable by its own physical name and
+  refused through a project-local or host alias. The catalog-bound authority described in the Proposal is therefore no
+  longer the only route to the read.
+- Triage "No repair or release acceptance is claimed": still true for the installed-host proof. Acceptance bullet 4
+  (installed host readback of the actual route) and the catalog-identity bullet 3 are not evidenced by D96 and stay
+  with the deferred Codex-host half (D57 Q3: native-host item after 0.7.0; D63 deferral of the catalog half of AC-147).
+  The item stays open on that basis; no status change is made here.

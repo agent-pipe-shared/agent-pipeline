@@ -28,10 +28,10 @@ approved feature whose approval cannot be re-verified must degrade to advisory, 
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted and built; the second half (PO decision BI, advisory degradation of an unverifiable approval) is decided by D117 (2026-10-22).
+- **Rationale:** D117 builds the advisory degradation now (`GUARD-DEVPLAN-APPROVAL-UNVERIFIED`), and the first half (every denial names an admitted command) is pinned per denial code in `lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs`; see "Reconciled 2026-10-23".
+- **Assignment (if accepted):** none open for the BI half; the "Not covered" residue in the 2026-10-22 extension stays a documented limit. Independent Critic read and PO acceptance pending.
+- **Date:** 2026-10-23 (filled from the 2026-10-22 extensions)
 
 ## Extension 2026-10-22: every other denial that names a command
 
@@ -74,3 +74,21 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **NOT-BLOCKED** — Triage the item and decide the scope of PO decision BI (degrade an unverifiable approval to advisory)
   The scope of BI is decided and built: item extension 2026-10-22 records PO decision D117 (only DWP-PACKAGE-PHYSICAL qualifies; GUARD-DEVPLAN-APPROVAL-UNVERIFIED advisory; hooks/guard-devplan-approval-unverified.test.mjs). Only the empty Triage block is left, which an agent can fill.
+
+## Reconciled 2026-10-23
+
+Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
+
+- Description and Proposal ("Running exactly that command is refused by the same guard" and "an approved feature whose
+  approval cannot be re-verified must degrade to advisory, never lock all execution"): both halves are built. The
+  advisory half is PO decision D117 (2026-10-22), commit `3b1649817` (`feat(guard): degrade an unverifiable design
+  approval to one advisory (D117)`), lane proof `plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs`.
+  The first half (denial names a command the guard refuses): the `push-init --checkpoint` spelling was admitted by
+  commit `cbfcc602e` (`fix(guard): admit push-init --checkpoint and print a runnable command in the checkpoint
+  denial`), and the pin `plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs` holds the source
+  inventory with the earlier `todo` cases now real (`todo: false`).
+- Triage ("Decision / Rationale / Assignment / Date" empty) and the Blocker-analysis line "Only the empty Triage block is
+  left": filled today from D117.
+- Still open, unchanged: the "Not covered" residue of the 2026-10-22 extension (denials not introduced by a
+  "Run"/"then run" phrasing; PO-run human-guard-override commands, attended by design). Independent Critic read and PO
+  acceptance of the D117 change remain pending; no status change is made here.

@@ -41,10 +41,10 @@ revision path:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** superseded in its acceptance by D125 (2026-10-22): ADR-0085 supersedes the Advisor-plus-readiness design course for this item.
+- **Rationale:** D125 restates the acceptance against the single-review route (fallback evidence goes to the present-plan review-receipt route); the `--run-v2` course now refuses with the typed retirement `DESIGN-COURSE-RETIRED`, so the documented-route defects no longer describe a live path. See "Reconciled 2026-10-23".
+- **Assignment (if accepted):** none for the retired course; any remaining revision-path check is judged against the single-review route.
+- **Date:** 2026-10-23 (filled from D125 of 2026-10-22)
 
 ### Blocker analysis 2026-10-22
 
@@ -52,3 +52,21 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **PO-DECISION** (decided: D125) — Decide whether retiring the course resolves the item (moot) or the revision path still needs a zero-override test
   Question: is the design course retired for 0.7.0 so the item is moot, or must the revision path (new authoring dispatch, resume after failed stage, Advisor fixture on Windows) still run with zero overrides?
+
+## Reconciled 2026-10-23
+
+Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
+
+- Description (K5-9, K5-8, K5-11, K3-16 and the revision-path gap) and Acceptance ("every course step ... runs from
+  emitted commands that the guard admits, with zero overrides"; "The Advisor host fixture runs on native Windows"): they
+  read as a live `--run-v2` defect. ADR-0085 (`docs/adr/0085-one-review-one-signature-design-approval.md`) retired the
+  Advisor-plus-readiness course behaviorally: `runDesignCourseV2` and the `--run-v2` CLI return the typed
+  `DESIGN-COURSE-RETIRED` (`plugins/pipeline-core/lib/retired-design-codes.mjs`) before parsing, state access, dispatch
+  or publication, so none of the listed refusals can occur. Evidence: the retargeted cases in
+  `plugins/pipeline-core/scripts/design-course-session.test.mjs` (`deepEqual(..., RETIRED)` for the function and the CLI)
+  and the sibling pins that name the same code.
+- Blocker-analysis question ("is the design course retired for 0.7.0 so the item is moot, or must the revision path ...
+  still run with zero overrides?"): answered by PO decision D125 (2026-10-22), which supersedes the design course for this
+  item and restates its acceptance against the single-review route. The Triage block is filled from D125 today.
+- Not decided here: whether the single-review route needs its own zero-override revision test; that is judged under the
+  restated acceptance, not under the retired course. No status change is made here.
