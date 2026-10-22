@@ -18,8 +18,10 @@
 // on-disk state: a separate OS process owns a real session descriptor in an onboarded fixture repository and
 // retires it at an exact point of the parent's real strict cleanup-recovery observation (AC6 starts real
 // parallel processes over one deterministic probe state). Not covered (named, not claimed): SKILL.md prose,
-// other concurrent writers than session descriptors, and a dense create/retire loop of sub-millisecond
-// descriptors, which the bounded re-observation does not absorb (see the backlog item).
+// other concurrent writers than session descriptors, and a timing-dependent dense create/retire stress loop.
+// PO decision D112 closes the residual that loop exposed: a descriptor that was listed and then retired before an
+// inspector loads it is treated as already removed (AC7b-AC7d, deterministic), no longer only absorbed by the bounded
+// re-observation; a descriptor that is still present keeps its fail-closed verdict (AC7e).
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -33,7 +35,13 @@ import { ProjectOnboardingReadyError } from "../project-onboarding-ready-gate.mj
 import { isSanctionedLifecycleCommand } from "../../hooks/guard-lifecycle-ready.mjs";
 import { partialCleanupRecoveryResultCore } from "../project-onboarding-v3.mjs";
 import { planSessionCleanupRecovery } from "../session-cleanup-recovery.mjs";
-import { listActiveSessionDescriptors, retireSessionDescriptor, startSessionDescriptor } from "../worktree-lifecycle.mjs";
+import {
+  inspectExternallyArchivedSession,
+  inspectSessionRetirement,
+  listActiveSessionDescriptors,
+  retireSessionDescriptor,
+  startSessionDescriptor,
+} from "../worktree-lifecycle.mjs";
 import { createLegacyLayoutFixture } from "../test-session-cleanup-requester-fixture.mjs";
 
 const CWD = resolve("/projects/current");
@@ -278,7 +286,7 @@ test("AC7a: a descriptor retired by another process between the directory read a
   });
 });
 
-test("AC7b: a descriptor retired by another process after it was listed, before it is inspected, is absorbed by the bounded re-observation", async () => {
+test("AC7b: a descriptor retired by another process after it was listed, before it is inspected, is treated as already removed (D112): ready on the first attempt, no re-observation", async () => {
   await withDescriptorOwnedByAnotherProcess(({ root, retireInOtherProcess }) => {
     let raced = false;
     const { result, planCalls } = observeStrict(root, () => ({
@@ -291,8 +299,62 @@ test("AC7b: a descriptor retired by another process after it was listed, before 
     assert.equal(raced, true, "the race really happened: the stale listing named a descriptor its owner had already retired");
     assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
     assert.ok(result === null);
-    assert.equal(planCalls, 2, "the plan was re-observed exactly once, then converged");
+    assert.equal(planCalls, 1, "the retired descriptor was skipped by the plan itself; no re-observation was needed");
   });
+});
+
+// AC7c/AC7d (PO decision D112): the same listed-then-retired race, made fully deterministic and in-process. The
+// descriptor is retired by its owner INSIDE the injected inspector seam, i.e. after the listing named it and before the
+// inspector loads it; the real inspector then throws WT-SESSION-MISSING for it. The plan treats that as already removed.
+function withDescriptorRetiredInsideInspector(inspectorSeam, run) {
+  const root = realpathSync(createLegacyLayoutFixture({ prefix: "pin-flap", name: "owner", goal: "Listed then retired pin" }));
+  try {
+    const handle = startSessionDescriptor(root, { ownerRuntime: null });
+    let retired = false;
+    const retireOnce = () => {
+      if (retired) return;
+      retired = true;
+      retireSessionDescriptor(root, { sessionId: handle.sessionId, ownerNonce: handle.ownerNonce, descriptorSha256: handle.descriptorSha256 });
+      assert.equal(existsSync(handle.path), false, "the owner retired its descriptor between listing and inspection");
+    };
+    run({ root, seam: inspectorSeam(retireOnce) });
+  } finally {
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+}
+
+test("AC7c: the retirement inspector's required load of a listed-then-retired descriptor does not make the observation partial", () => {
+  withDescriptorRetiredInsideInspector((retireOnce) => ({
+    inspectSessionRetirementFn: (rootDir, sessionId, options) => { retireOnce(); return inspectSessionRetirement(rootDir, sessionId, options); },
+  }), ({ root, seam }) => {
+    const { result, planCalls } = observeStrict(root, () => seam);
+    assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
+    assert.ok(result === null);
+    assert.equal(planCalls, 1, "no re-observation was needed");
+  });
+});
+
+test("AC7d: the external-archive inspector's required load of a listed-then-retired descriptor does not make the observation partial", () => {
+  withDescriptorRetiredInsideInspector((retireOnce) => ({
+    inspectExternallyArchivedSessionFn: (rootDir, sessionId, options) => { retireOnce(); return inspectExternallyArchivedSession(rootDir, sessionId, options); },
+  }), ({ root, seam }) => {
+    const { result, planCalls } = observeStrict(root, () => seam);
+    assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
+    assert.ok(result === null);
+    assert.equal(planCalls, 1, "no re-observation was needed");
+  });
+});
+
+test("AC7e (control): a descriptor that is present but malformed still fails closed; only a vanished name is treated as removed", () => {
+  const root = realpathSync(createLegacyLayoutFixture({ prefix: "pin-flap", name: "owner", goal: "Malformed descriptor control" }));
+  try {
+    startSessionDescriptor(root, { ownerRuntime: null });
+    const seam = { inspectSessionRetirementFn: () => { const e = new Error("session descriptor is malformed"); e.code = "WT-SESSION-DESCRIPTOR"; throw e; } };
+    const { result } = observeStrict(root, () => seam);
+    assert.ok(result !== null, "a present-but-invalid descriptor keeps the observation partial");
+  } finally {
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
 });
 
 // Typed-reason cases (AC-253, ALF-C-P1-01C). The preflight result carries an additive
