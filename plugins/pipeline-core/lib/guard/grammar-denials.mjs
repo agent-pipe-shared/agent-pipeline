@@ -51,7 +51,7 @@ export const READ_COMMAND_UNSUPPORTED_CODE = "GUARD-READ-COMMAND-UNSUPPORTED";
 
 export const READ_COMMAND_UNSUPPORTED_GUIDANCE = "The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).";
 
-export const READ_COMMAND_UNSUPPORTED_NOTE = "This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below, or use the Read, Glob or Grep tools for reads inside the project.";
+export const READ_COMMAND_UNSUPPORTED_NOTE = "This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.";
 
 // NVA-I-GRAMMAR (PO, 2026-08-28, backlog: 2026-08-27-shell-grammar-reads-quoted-content-as-
 // shell-syntax.md): "wichtig ist, dass der guard das erlaubte grammar immer auch sagt" -- the
