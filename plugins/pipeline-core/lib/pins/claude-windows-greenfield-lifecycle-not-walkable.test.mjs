@@ -31,6 +31,9 @@
 //         Typed gaps (no fake record is written for any of them):
 //         V-10 Critic and unrelated-role dispatches are not recorded (critic-review.md carries no Slice line): open, owner Coordinator, due 2026-10-31
 //         V-10 a dynamically built Workflow script (not statically resolvable, fail-open in the guard) has no admission point: open, owner Coordinator, due 2026-10-31
+//              (measured, ALF-K28: the Workflow CALL reaches guard-dispatch -- hooks.json matches Task|Agent|Workflow, "V-10 runner registration" --
+//              and a static agent() literal is recorded; a prompt built at run time (interpolation, a named const) is admitted and records no
+//              route, "V-10 typed gap, measured". Whether the host re-fires the hook per inner agent() is not observable here and not claimed.)
 //         (The former gap "Codex/Antigravity runner registration of guard-dispatch" is closed at this head and is pinned by the
 //         source-scan case "V-10 runner registration": hooks/codex-hooks.json registers guard-dispatch.mjs on the spawn_agent
 //         matcher, and hooks/antigravity-pretool-guard.mjs runs it for every Task/Agent entry, once per Subagents array element.
@@ -748,6 +751,47 @@ describe("V-10 admission wiring: the guard records the route digest of the brief
     assert.deepEqual(routeNames(), prior, "no Slice line, nothing recorded");
   });
 
+  // The dynamic-Workflow gap, measured (ALF-K28). The Workflow call itself DOES reach the hook (the matcher below) and a statically
+  // resolvable agent() literal is recorded (the workflow transport case above). What the hook cannot see is a prompt that only exists
+  // once the script runs: `extractWorkflowDispatches` skips it by design (fail-open), so the whole call is admitted and nothing is
+  // recorded. This case documents that boundary; it is the contract to update, together with the header, when the gap is closed.
+  const dynamicScript = (body) => ({ tool_use_id: `v10w-dyn-${process.pid}-${(sequence += 1)}`, tool_name: "Workflow", tool_input: { script: body } });
+  const staticCall = (prompt) => `await agent({ agentType: '${V10W_ROLE}', prompt: \`${prompt}\` });`;
+
+  /** The boundary as one reusable check: admitted, and no route recorded for the slice the script builds at run time. */
+  function checkDynamicWorkflowGap({ send, read }) {
+    const admitted = send();
+    assert.equal(admitted.code, 0, `a dynamically built Workflow prompt is admitted (fail-open): ${admitted.stderr.slice(0, 300)}`);
+    assert.equal(read(), null, "a prompt the hook cannot resolve statically records no route");
+  }
+
+  test("V-10 typed gap, measured: a Workflow script whose prompt is built at run time (interpolation, a named const) is admitted and records no route; a static call beside it is still recorded", () => {
+    const slice = "ALF-V10-WIRE-DYNAMIC";
+    const briefing = v10wBriefing(slice);
+    const templated = v10wBriefing("${sliceId}"); // interpolation: the slice id only exists at run time
+    const scripts = {
+      interpolation: `const sliceId = '${slice}';\nawait agent({ agentType: '${V10W_ROLE}', prompt: \`${templated}\` });`,
+      "named const": `const BRIEFING = \`${briefing}\`;\nawait agent({ agentType: '${V10W_ROLE}', prompt: BRIEFING });`,
+    };
+    for (const [name, script] of Object.entries(scripts)) {
+      assert.equal(script.includes(slice), true, name);
+      checkDynamicWorkflowGap({ send: () => runHook(dynamicScript(script)), read: () => readRoute(slice) });
+    }
+    // one call carrying both kinds: only the static literal is recorded, the dynamic one is not seen
+    const staticSlice = "ALF-V10-WIRE-DYNAMIC-STATIC";
+    const mixed = `${staticCall(v10wBriefing(staticSlice))}\n${scripts.interpolation}`;
+    assert.equal(runHook(dynamicScript(mixed)).code, 0);
+    assert.deepEqual(readRoute(staticSlice), { schema: V10W_ROUTE_SCHEMA, sliceId: staticSlice, briefingSha256: sha256Of(v10wBriefing(staticSlice)), origin: V10W_ORIGIN });
+    assert.equal(readRoute(slice), null);
+  });
+
+  test("V-10 typed gap RED proof: a guard that did record the run-time prompt, or one that refused it, fails the same check", () => {
+    const slice = "ALF-V10-WIRE-DYNAMIC-RED";
+    assert.throws(() => checkDynamicWorkflowGap({ send: () => ({ code: 0, stderr: "" }), read: () => ({ sliceId: slice }) }), /records no route/u);
+    assert.throws(() => checkDynamicWorkflowGap({ send: () => ({ code: 2, stderr: "DISPATCH-INCOMPLETE-BRIEFING" }), read: () => null }), /admitted/u);
+    checkDynamicWorkflowGap({ send: () => ({ code: 0, stderr: "" }), read: () => null });
+  });
+
   test("V-10 admission wiring RED proof: a guard that records nothing, one that never lets a later admission win, and one that admits a tampered briefing after a preflight record, fail the same check", () => {
     const sliceId = "ALF-V10-WIRE-RED";
     const prompt = v10wBriefing(sliceId);
@@ -787,6 +831,28 @@ describe("V-10 runner registration: the shipped Codex and Antigravity routes rea
     const adapter = stripComments(readFileSync(join(PLUGIN_ROOT, "hooks", "antigravity-pretool-guard.mjs"), "utf8"));
     assert.match(adapter, /toolName === "Task" \|\| toolName === "Agent"\s*\?\s*\["guard-dispatch\.mjs"\]/u);
     assert.match(adapter, /guardName === "guard-dispatch\.mjs" && multiSubagentDispatch/u);
+  });
+
+  // A Workflow call is a PreToolUse event of the Workflow tool: its script text reaches guard-dispatch. Whether the host fires the hook
+  // again for each agent() the running script launches is host behaviour this repository cannot observe and is NOT claimed here.
+  const claudeDispatchMatchers = (manifest) => (manifest.hooks?.PreToolUse ?? [])
+    .filter((entry) => (entry.hooks ?? []).some((hook) => /hooks\/guard-dispatch\.mjs/u.test(hook.command ?? "")))
+    .map((entry) => String(entry.matcher ?? "").split("|"));
+
+  test("V-10 runner registration: hooks.json runs guard-dispatch.mjs on the Workflow tool as well as Task and Agent", () => {
+    const hooks = JSON.parse(readFileSync(join(PLUGIN_ROOT, "hooks", "hooks.json"), "utf8"));
+    const matchers = claudeDispatchMatchers(hooks);
+    assert.ok(matchers.length > 0, "hooks.json has no PreToolUse entry for guard-dispatch.mjs");
+    assert.ok(matchers.some((tools) => ["Task", "Agent", "Workflow"].every((tool) => tools.includes(tool))),
+      `guard-dispatch.mjs must be matched on Task, Agent and Workflow: ${JSON.stringify(matchers)}`);
+  });
+
+  test("V-10 runner registration RED proof: a hooks.json whose dispatch matcher omits Workflow fails the same check", () => {
+    const covers = (manifest) => claudeDispatchMatchers(manifest).some((tools) => ["Task", "Agent", "Workflow"].every((tool) => tools.includes(tool)));
+    const entry = (matcher, script) => ({ hooks: { PreToolUse: [{ matcher, hooks: [{ command: `node "\${CLAUDE_PLUGIN_ROOT}/hooks/${script}"` }] }] } });
+    assert.equal(covers(entry("Task|Agent|Workflow", "guard-dispatch.mjs")), true);
+    assert.equal(covers(entry("Task|Agent", "guard-dispatch.mjs")), false);
+    assert.equal(covers(entry("Task|Agent|Workflow", "guard-dispatch-budget.mjs")), false);
   });
 
   test("V-10 runner registration RED proof: a manifest without the spawn_agent entry, or one that runs another script there, fails the same check", () => {
