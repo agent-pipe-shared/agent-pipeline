@@ -293,13 +293,30 @@ test("AC-108: Antigravity has a native route for the implementor and the plan ve
   }
 });
 
-test("AC-108: Critic and Advisor each have an Antigravity route or the recorded self-dispatch fallback", {
-  todo: "BLOCKED-NEEDS-DECISION (measured on this head): with a native host observation for every role, antigravity advisor, critic, readiness and the mechanic/deep implementors still resolve to unavailable with RRP-ROUTE-CELL-UNAVAILABLE (the registry cells are unavailable), and fallback-self-dispatch is legal only for the claude advisor. Registering the cells or admitting a fallback for Antigravity is a route-policy decision, not a code fix.",
-}, () => {
+// PO decision D122 (2026-10-22): the recorded self-dispatch fallback is admitted for the Antigravity Advisor and Critic with an
+// honest assurance label; native AGY route cells wait for an authenticated per-call carrier (D63/AC-109). Every other cell is unchanged.
+test("AC-108: Critic and Advisor each have an Antigravity route or the recorded self-dispatch fallback (D122: self-dispatch without an authenticated per-call carrier)", () => {
   const source = registeredFunctionalTaskRoutes();
   const observed = (kind) => ({ kind, evidenceSha256: "a".repeat(64), hookRecordedStart: true, hookRecordedTerminal: true });
-  const result = evaluateRoleRoutePreflight({ source, runner: "antigravity", hostObservations: { advisor: observed("native"), critic: observed("native") } });
+  const roles = ["advisor", "critic", "goldfish.implement", "goldfish.mechanic", "goldfish.deep", "readiness", "plan-verifier"];
+  const result = evaluateRoleRoutePreflight({ source, runner: "antigravity", hostObservations: Object.fromEntries(roles.map((role) => [role, observed("native")])) });
   for (const role of ["critic", "advisor"]) {
-    assert.ok(["native", "fallback-self-dispatch"].includes(result.roles[role].state), `${role}: ${result.roles[role].state} ${result.roles[role].reasonCode}`);
+    assert.deepEqual(result.roles[role], { state: "fallback-self-dispatch", reasonCode: "RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER", evidence: "a".repeat(64) }, role);
   }
+  // Every other antigravity cell is unchanged: an unavailable registry cell stays RRP-ROUTE-CELL-UNAVAILABLE, a native route stays native.
+  for (const role of ["goldfish.mechanic", "goldfish.deep", "readiness"]) {
+    assert.deepEqual(result.roles[role], { state: "unavailable", reasonCode: "RRP-ROUTE-CELL-UNAVAILABLE", evidence: "" }, role);
+  }
+  assert.equal(result.roles["goldfish.implement"].state, "native");
+  assert.equal(result.roles["plan-verifier"].state, "native");
+  // Without a native observation there is no evidence to rest the fallback on, and a Critic without a hook-recorded start and terminal stays unavailable.
+  const bare = evaluateRoleRoutePreflight({ source, runner: "antigravity", hostObservations: {} });
+  assert.equal(bare.roles.advisor.reasonCode, "RRP-ROUTE-CELL-UNAVAILABLE");
+  assert.equal(bare.roles.critic.reasonCode, "RRP-ROUTE-CELL-UNAVAILABLE");
+  const noHook = evaluateRoleRoutePreflight({ source, runner: "antigravity", hostObservations: { critic: { ...observed("native"), hookRecordedTerminal: false } } });
+  assert.equal(noHook.roles.critic.state, "unavailable");
+  // The Claude cells are unchanged: the native routes stay native, never relabelled as a no-carrier self-dispatch.
+  const claude = evaluateRoleRoutePreflight({ source, runner: "claude", hostObservations: { advisor: observed("native"), critic: observed("native") } });
+  assert.equal(claude.roles.advisor.state, "native");
+  assert.equal(claude.roles.critic.state, "native");
 });
