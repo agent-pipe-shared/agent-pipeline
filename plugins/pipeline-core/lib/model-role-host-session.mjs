@@ -36,9 +36,12 @@ export function prepareModelRoleHostBootstrap({ sessionId, candidateCommit, obse
       || observed.assurance !== expectedAssurance) {
       return fail("MODEL-ROLE-HOST-OBSERVATION-UNAVAILABLE");
     }
+    // A host that normalized its catalogue into family release records (the existing family discovery shape)
+    // may attach them to the observation; the resolver validates them. Absent = no in-family version following.
     routes.push({ runner: configured.runner, role: configured.role, effort: configured.effort,
       sessionId, candidateCommit, observedAt, policy: policies.get(key),
-      availableModelIds: observed.availableModelIds });
+      availableModelIds: observed.availableModelIds,
+      ...(observed.familyCatalogue === undefined ? {} : { familyCatalogue: observed.familyCatalogue }) });
   }
   const configuredRoutes = routeSource.configuredRoutes.map(({ runner, role, effort }) => ({ runner, role, effort }));
   const proposal = resolveModelRoleBootstrap({ sessionId, configuredRoutes, routes, previousReceipts });

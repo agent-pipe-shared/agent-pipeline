@@ -7,6 +7,7 @@
  */
 import { createHash } from "node:crypto";
 import { canonicalizeJson } from "./governance-event.mjs";
+import { compareModelFamilyVersions } from "./model-family-latest-selection.mjs";
 
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -16,6 +17,23 @@ const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 const ROLES = new Set(["frontier", "worker", "efficient"]);
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "not-applicable"]);
 const CATALOGUE_EFFORT = /^[a-z][a-z0-9-]{0,31}$/u;
+// Same family-token shape as the family authority / discovery modules. A family is only ever DECLARED (a signed
+// policy entry, a host-normalized catalogue record); no model id string is parsed for a family or a version.
+const FAMILY_ID = /^[a-z][a-z0-9-]{0,31}$/u;
+const ENTRY_KEYS = "compatibilityEvidenceSha256,efforts,modelId,rank";
+const FAMILY_ENTRY_KEYS = "compatibilityEvidenceSha256,efforts,familyId,modelId,rank,version";
+const RECEIPT_KEYS = "candidateAtBootstrap,compatibilityEvidenceSha256,effort,modelId,observedAt,policySha256,role,runner,schema,sessionId";
+const FAMILY_RECEIPT_KEYS = "candidateAtBootstrap,compatibilityEvidenceSha256,effort,familyId,modelId,observedAt,policySha256,role,runner,schema,sessionId,version";
+const RELEASE_KEYS = ["familyId", "groupingEvidenceSha256", "released", "releaseId", "variants", "version"];
+const VARIANT_KEYS = ["aliasEvidenceSha256", "canonicalModelId", "capabilityEvidenceSha256", "compatibilityBySlotSha256",
+  "efforts", "modelId", "selectable", "visible"];
+
+const hasKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
+  && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
+const validFamilyId = (value) => typeof value === "string" && FAMILY_ID.test(value);
+const validVersion = (value) => Array.isArray(value) && value.length >= 1 && value.length <= 8
+  && value.every((part) => Number.isSafeInteger(part) && part >= 0);
+const versionKey = (version) => { const parts = [...version]; while (parts.length > 1 && parts.at(-1) === 0) parts.pop(); return JSON.stringify(parts); };
 
 /**
  * Normalize the account-specific Codex app-server `model/list` response.
@@ -137,10 +155,16 @@ function utcTime(value) {
   return Number.isFinite(time) && new Date(time).toISOString() === value;
 }
 
+/**
+ * An approved entry optionally DECLARES its model family: `familyId` + `version` (an integer tuple, ordered
+ * numerically by compareModelFamilyVersions) are present together or not at all. An entry without the pair is the
+ * historic exact-ID approval and behaves exactly as before.
+ */
 function validEntry(entry) {
-  return entry !== null && typeof entry === "object" && !Array.isArray(entry)
-    && Object.keys(entry).sort().join(",") === "compatibilityEvidenceSha256,efforts,modelId,rank"
-    && id(entry.modelId)
+  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return false;
+  const keys = Object.keys(entry).sort().join(",");
+  if (keys !== ENTRY_KEYS && !(keys === FAMILY_ENTRY_KEYS && validFamilyId(entry.familyId) && validVersion(entry.version))) return false;
+  return id(entry.modelId)
     && Number.isSafeInteger(entry.rank) && entry.rank > 0
     && SHA.test(entry.compatibilityEvidenceSha256 ?? "")
     && Array.isArray(entry.efforts) && entry.efforts.length > 0
@@ -163,7 +187,89 @@ function validInputs(input) {
     || !policy.approved.every(validEntry)) return false;
   const ids = policy.approved.map((entry) => entry.modelId);
   const ranks = policy.approved.map((entry) => entry.rank);
-  return new Set(ids).size === ids.length && new Set(ranks).size === ranks.length;
+  // One family may not claim the same version twice (trailing zeros are the same version).
+  const declared = policy.approved.filter((entry) => entry.familyId !== undefined)
+    .map((entry) => `${entry.familyId}\0${versionKey(entry.version)}`);
+  return new Set(ids).size === ids.length && new Set(ranks).size === ranks.length
+    && new Set(declared).size === declared.length;
+}
+
+/**
+ * Validate a host-supplied family catalogue: the `records` of a normalized `pipeline.model-family-discovery.v1`
+ * (the repo's existing family declaration), with the same exact shapes and invariants. It proves membership and
+ * order only; it grants nothing. Returns null when the shape is not exactly that.
+ */
+function normalizeFamilyCatalogue(catalogue) {
+  if (!Array.isArray(catalogue) || catalogue.length === 0 || catalogue.length > 2048) return null;
+  const releaseIds = new Set();
+  const modelIds = new Set();
+  const versionsByFamily = new Map();
+  let variantCount = 0;
+  for (const record of catalogue) {
+    if (!hasKeys(record, RELEASE_KEYS) || !id(record.releaseId) || releaseIds.has(record.releaseId)
+      || !validFamilyId(record.familyId) || !validVersion(record.version) || typeof record.released !== "boolean"
+      || !SHA.test(record.groupingEvidenceSha256 ?? "")
+      || !Array.isArray(record.variants) || record.variants.length < 1 || record.variants.length > 256) return null;
+    releaseIds.add(record.releaseId);
+    const seen = versionsByFamily.get(record.familyId) ?? new Set();
+    if (seen.has(versionKey(record.version))) return null; // two releases of one family at one version: ambiguous order
+    seen.add(versionKey(record.version));
+    versionsByFamily.set(record.familyId, seen);
+    for (const variant of record.variants) {
+      variantCount += 1;
+      if (variantCount > 8192 || !hasKeys(variant, VARIANT_KEYS) || !id(variant.modelId) || modelIds.has(variant.modelId)
+        || !(variant.canonicalModelId === null || id(variant.canonicalModelId))
+        || !(variant.aliasEvidenceSha256 === null || SHA.test(variant.aliasEvidenceSha256 ?? ""))
+        || (variant.canonicalModelId === null) !== (variant.aliasEvidenceSha256 === null)
+        || typeof variant.visible !== "boolean" || typeof variant.selectable !== "boolean"
+        || (variant.selectable && (!variant.visible || !record.released))
+        || !(variant.efforts === null || (Array.isArray(variant.efforts) && variant.efforts.length <= 128
+          && variant.efforts.every((effort) => typeof effort === "string" && CATALOGUE_EFFORT.test(effort))
+          && new Set(variant.efforts).size === variant.efforts.length))
+        || !(variant.capabilityEvidenceSha256 === null || SHA.test(variant.capabilityEvidenceSha256 ?? ""))
+        || (variant.efforts !== null && variant.capabilityEvidenceSha256 === null)
+        || variant.compatibilityBySlotSha256 === null || typeof variant.compatibilityBySlotSha256 !== "object"
+        || Array.isArray(variant.compatibilityBySlotSha256)
+        || Object.keys(variant.compatibilityBySlotSha256).length > 512
+        || Object.entries(variant.compatibilityBySlotSha256).some(([key, value]) => key.length > 512
+          || !(value === null || SHA.test(value ?? "")))) return null;
+      modelIds.add(variant.modelId);
+    }
+  }
+  return catalogue;
+}
+
+/**
+ * D99: a newer VERSION inside the family the PO approved is followed without a new confirmation. Membership and
+ * order come only from the declared family (signed policy entry) and the host catalogue; an id that is not a
+ * released, visible, selectable, offered, effort-capable member of that family is never followed. A different
+ * family is never touched. Returns the followed variant (or null) and the ids the family rule has accounted for.
+ */
+function followApprovedFamily({ selected, effort, available, approvedIds, records }) {
+  let anchor = null;
+  for (const record of records) {
+    const variant = record.variants.find((item) => item.modelId === selected.modelId);
+    if (variant) anchor = record;
+  }
+  if (anchor === null) return { ok: true, follow: null, accounted: new Set() };
+  if (anchor.familyId !== selected.familyId || compareModelFamilyVersions(anchor.version, selected.version) !== 0) {
+    return { ok: false, code: "MODEL-ROLE-FAMILY-DECLARATION-MISMATCH" };
+  }
+  const members = records.filter((record) => record.familyId === selected.familyId && record.released);
+  const admissible = (record) => record.variants.filter((variant) => variant.visible && variant.selectable);
+  const newer = members.filter((record) => compareModelFamilyVersions(record.version, selected.version) > 0);
+  const followable = newer.map((record) => ({ record, variants: admissible(record).filter((variant) =>
+    available.has(variant.modelId) && !approvedIds.has(variant.modelId)
+    && Array.isArray(variant.efforts) && variant.efforts.includes(effort)) })).filter((item) => item.variants.length > 0);
+  let follow = null;
+  if (followable.length > 0) {
+    const best = followable.reduce((top, item) => compareModelFamilyVersions(item.record.version, top.record.version) > 0 ? item : top);
+    if (best.variants.length === 1) follow = { modelId: best.variants[0].modelId, version: [...best.record.version] };
+  }
+  const reached = follow === null ? selected.version : follow.version;
+  const accounted = new Set(members.filter((record) => compareModelFamilyVersions(record.version, reached) <= 0)
+    .flatMap((record) => admissible(record).map((variant) => variant.modelId)));
+  return { ok: true, follow, accounted };
 }
 
 function validReuseInput(input) {
@@ -175,7 +281,9 @@ function validReuseInput(input) {
 export function validateModelRoleSessionReceipt(receipt) {
   if (receipt === null || typeof receipt !== "object" || Array.isArray(receipt)) return false;
   const { receiptSha256, ...subject } = receipt;
-  return Object.keys(subject).sort().join(",") === "candidateAtBootstrap,compatibilityEvidenceSha256,effort,modelId,observedAt,policySha256,role,runner,schema,sessionId"
+  const keys = Object.keys(subject).sort().join(",");
+  // The family pair is present together or not at all; a receipt without it is the historic shape, digest included.
+  return (keys === RECEIPT_KEYS || (keys === FAMILY_RECEIPT_KEYS && validFamilyId(subject.familyId) && validVersion(subject.version)))
     && subject.schema === "pipeline.model-role-session.v1"
     && RUNNERS.has(subject.runner) && validSessionId(subject.sessionId)
     && ROLES.has(subject.role) && id(subject.modelId)
@@ -204,29 +312,47 @@ export function resolveModelRoleSession(input) {
     return { ok: true, code: "MODEL-ROLE-SESSION-REUSED", receipt: existingReceipt };
   }
   if (!validInputs(input)) return { ok: false, code: "MODEL-ROLE-INPUT-INVALID" };
+  const catalogue = input.familyCatalogue === undefined || input.familyCatalogue === null ? null
+    : normalizeFamilyCatalogue(input.familyCatalogue);
+  if (catalogue === null && input.familyCatalogue !== undefined && input.familyCatalogue !== null) {
+    return { ok: false, code: "MODEL-ROLE-FAMILY-CATALOGUE-INVALID" };
+  }
   const available = new Set(availableModelIds);
   const compatible = policy.approved
     .filter((entry) => available.has(entry.modelId) && entry.efforts.includes(effort))
     .sort((left, right) => right.rank - left.rank);
   if (compatible.length === 0) return { ok: false, code: "MODEL-ROLE-APPROVED-MODEL-UNAVAILABLE" };
   const selected = compatible[0];
+  // Selection stays rank-driven over the signed entries. Only when the selected entry DECLARES a family, and the
+  // host supplied a catalogue, may a strictly newer released member of that same family replace the model id.
+  let family = { follow: null, accounted: new Set() };
+  if (selected.familyId !== undefined && catalogue !== null) {
+    family = followApprovedFamily({ selected, effort, available,
+      approvedIds: new Set(policy.approved.map((entry) => entry.modelId)), records: catalogue });
+    if (!family.ok) return { ok: false, code: family.code };
+  }
   const subject = {
     schema: "pipeline.model-role-session.v1",
     runner,
     sessionId,
     role,
     effort,
-    modelId: selected.modelId,
+    modelId: family.follow?.modelId ?? selected.modelId,
     compatibilityEvidenceSha256: selected.compatibilityEvidenceSha256,
     policySha256: digest(policy),
     observedAt,
     candidateAtBootstrap: candidateCommit,
+    ...(selected.familyId === undefined ? {} : { familyId: selected.familyId,
+      version: [...(family.follow?.version ?? selected.version)] }),
   };
   return {
     ok: true,
     code: "MODEL-ROLE-SESSION-SELECTED",
     receipt: { ...subject, receiptSha256: digest(subject) },
-    unapprovedAvailableModelIds: availableModelIds.filter((id) => !policy.approved.some((entry) => entry.modelId === id)),
+    unapprovedAvailableModelIds: availableModelIds.filter((id) => !policy.approved.some((entry) => entry.modelId === id)
+      && !family.accounted.has(id)),
+    ...(family.follow === null ? {} : { familyFollow: { familyId: selected.familyId, fromModelId: selected.modelId,
+      toModelId: family.follow.modelId, fromVersion: [...selected.version], toVersion: [...family.follow.version] } }),
   };
 }
 
@@ -251,6 +377,16 @@ export function validateModelRoleDispatchBinding(request) {
     return { ok: false, code: "MODEL-ROLE-DISPATCH-MISMATCH" };
   }
   return { ok: true, code: "MODEL-ROLE-DISPATCH-BOUND", receiptSha256: request.receipt.receiptSha256 };
+}
+
+/**
+ * D99: under one UNCHANGED signed policy (same policySha256), a strictly newer version of the SAME declared family
+ * is not a change the human has to confirm. A different family, an equal or lower version, or a receipt that does
+ * not carry the declared pair on both sides is still a change.
+ */
+function familyUpgrade(before, after) {
+  return before.familyId !== undefined && before.familyId === after.familyId
+    && compareModelFamilyVersions(after.version, before.version) > 0;
 }
 
 /**
@@ -285,8 +421,8 @@ export function modelRoleBootstrapReadback({ sessionId, receipts, previousReceip
       receiptSha256: receipt.receiptSha256,
       previousModelId: before?.modelId ?? null,
       previousPolicySha256: before?.policySha256 ?? null,
-      change: before === undefined ? hadPrevious ? "added" : "initial" : before.modelId === receipt.modelId
-        && before.policySha256 === receipt.policySha256 ? "unchanged" : "changed",
+      change: before === undefined ? hadPrevious ? "added" : "initial" : before.policySha256 === receipt.policySha256
+        && (before.modelId === receipt.modelId || familyUpgrade(before, receipt)) ? "unchanged" : "changed",
     };
   }).sort((left, right) => routeKey(left).localeCompare(routeKey(right)));
   const removedMappings = previousReceipts.filter((receipt) => !currentKeys.includes(routeKey(receipt)))
