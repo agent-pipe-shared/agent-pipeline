@@ -45,10 +45,28 @@ Then fix the `git … | head` case, including `<rev>:<path>` arguments.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
+- **Decision:** the original defect (`git <read-only> ... | head`, including `<rev>:<path>`) is fixed and pinned; the 2026-10-18 addendum is partly fixed and partly open (see the measurement below).
+- **Rationale:** `plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs` pairs every advertised grammar example with an admission check and drives the real grammar.
 - **Assignment (if accepted):**
-- **Date:**
+- **Date:** 2026-10-22.
+
+## Measurement 2026-10-22 of the addendum shapes (current head)
+
+- Admitted now: `rg -o <pattern> <file>`, `ls -la <dir>`, `ls -la`, `rg -n ... | head -n N`.
+- Still refused, fix handed over as a patch for the protected grammar file (`hooks/guard-command-grammar.mjs`
+  `SEARCH_BOOLEAN`): `rg -c`, `rg --count`, `rg --no-filename` (also `-I`, `-H`, `--with-filename`). `rg -h` is not
+  added: in ripgrep it is the help flag.
+- Refused on purpose today, needs a guard-owner decision: `git -C <repo> show <rev>:<path> | head -n N`.
+  `isBoundedGitPipeline` excludes `-C` as a cross-repository reach, while the un-piped form admits `-C <dir inside the
+  roots>`. Also refused, by the AP11 contract of the Windows read pin: `git show <rev>:<path>` combined with any other
+  token (`--format=`, `--`, `--stat`), so `git show HEAD:<path> --format= -- | head` stays refused until that contract is
+  widened by a decision.
+- The refusal text does not name the triggering flag. `plugins/pipeline-core/lib/read-command-diagnosis.mjs` (new, with
+  its own suite) names the one flag whose removal makes the grammar admit the command; the call site is a protected guard
+  file, handed over as a patch. A value-taking bad flag, two bad flags and a bad operand are deliberately not diagnosed.
+
+Pin additions (same file as above) carry the admitted shapes as green cases and the three open shapes as `todo` cases that
+name their patch or decision. Counted result, run alone on 2026-10-22: 54 cases, 48 pass, 0 fail, 0 skipped, 6 todo.
 
 ## Observed 2026-10-18: real greenfield project, Claude on WSL (PF-17)
 

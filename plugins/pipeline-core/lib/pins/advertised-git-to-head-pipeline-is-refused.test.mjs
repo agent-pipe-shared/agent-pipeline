@@ -112,6 +112,41 @@ for (const command of [
   });
 }
 
+// ------------------------------------------------------------------ P5 (2026-10-18 addendum, PF-17)
+// The real-project observation listed four more refused shapes. Measured on 2026-10-22: `rg -o ...` and `ls -la <dir>` are admitted
+// now (green below); `rg -c`, `rg --count` and `rg --no-filename`/`-I`/`-H` are still refused because the rg option set in
+// hooks/guard-command-grammar.mjs (SEARCH_BOOLEAN) lacks them (todo, fix reported as patch h1-patch-02); `git -C <repo> ... | head`
+// is refused on purpose today (the generic git pipeline excludes -C as a cross-repository reach, see isBoundedGitPipeline), which is a
+// guard-owner decision, recorded as a todo and not guessed.
+for (const command of ["rg -o needle README.md", "rg -n needle README.md", "ls -la docs", "ls -la", "rg -n needle README.md | head -n 3"]) {
+  test(`P5 addendum shape admitted: ${command}`, () => {
+    assert.equal(guard(command), true);
+  });
+}
+
+for (const command of [
+  "rg -c needle README.md",
+  "rg --count needle README.md",
+  "rg --no-filename needle README.md",
+  "rg -o --no-filename needle README.md",
+  "rg -c needle README.md | head -n 3",
+]) {
+  test(`P5 addendum shape (needs the rg option set widened): ${command}`,
+    { todo: "needs a protected guard file: hooks/guard-command-grammar.mjs SEARCH_BOOLEAN lacks -c/--count/-I/--no-filename/-H/--with-filename (patch h1-patch-02)" },
+    () => { assert.equal(guard(command), true); });
+}
+
+test("P5 addendum shape (needs a guard-owner decision): git -C <repo> show <rev>:<path> | head",
+  { todo: "decision: isBoundedGitPipeline excludes -C on purpose (cross-repository reach); admitting -C <project dir> in the pipeline is a security trade, not made here" },
+  () => { assert.equal(guard("git -C . show HEAD:docs/state.md | head -n 3"), true); });
+
+test("P5 control: the other refused addendum rg flags and an escaping -C target stay refused", () => {
+  for (const command of ["rg --hidden needle README.md", "rg --pre cat needle README.md", "rg -c -c needle README.md",
+    "rg -c needle ../outside.txt", "git -C .. show HEAD:docs/state.md | head -n 3"]) {
+    assert.equal(guard(command), false, command);
+  }
+});
+
 // ------------------------------------------------------------------ P4 (RED against a mirror)
 function mirrorWithoutGitPipeline(name) {
   let source = readFileSync(join(guardDir, "shell-grammar.mjs"), "utf8");
