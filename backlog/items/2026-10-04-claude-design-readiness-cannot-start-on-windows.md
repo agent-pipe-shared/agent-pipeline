@@ -43,10 +43,22 @@ run:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted in part. The Acceptance clauses named below as superseded are dropped; every other
+  clause stays open and unchanged.
+- **Rationale:** PO decision D63 (2026-10-20, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`) confirms
+  that only the named clauses of AC-124 (R4-7, R4-9, R4-10) drop as superseded by the retirement in
+  [ADR-0085](../../docs/adr/0085-one-review-one-signature-design-approval.md) (the machinery it removes is
+  retired). Nothing else in the item is superseded by D63.
+- **Assignment (if accepted):** the retained clause stays with the Alfred sprint (`sprint: alfred`); the open
+  native Windows run is tracked in the blocker analysis below.
+- **Date:** 2026-10-22
+
+Acceptance annotation (the Acceptance text above is unchanged):
+
+- Clause 1 (Spec §21.4 R4-7, R4-9, R4-10): **superseded** by D63 / ADR-0085; these are exactly the three
+  clauses of AC-124 that D63 drops, so the whole clause is no longer an acceptance criterion.
+- Clause 2 (documented runner-CLI install locations trusted on every platform, no wrappers or non-executables):
+  **not superseded**, remains an acceptance clause.
 
 ### Blocker analysis 2026-10-22
 
