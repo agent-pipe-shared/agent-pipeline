@@ -52,3 +52,10 @@ armed. It also differs from an expired or tampered proof.
 
 Do not simply ignore `statusSha256`: the current capability does not bind
 target preimages, so dropping the comparison would also admit target drift.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-SIGNATURE** — Any change to the protected consume path lands only as a signature-bound patch
+  Changing consumeHumanGuardOverride/repositoryObservation in the protected human-guard-override.mjs needs a PO-signed patch (no commit-scoped override exists; PO commits as human operator). Agent can prepare the patch and tests; the signature is the PO's.

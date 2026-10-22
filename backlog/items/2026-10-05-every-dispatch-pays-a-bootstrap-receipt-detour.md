@@ -57,3 +57,10 @@ that way. GLREP-t2 reached its cap of 30 with zero slack partly because of it.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — The SubagentStart agent_id/agent_type contract was never verified live; confirm on an installed Claude host
+  Needs one real dispatch on an installed Claude host with a logging SubagentStart hook to observe agent_id and agent_type. Cannot be derived from docs or a Linux test.

@@ -40,3 +40,10 @@ nested shell's non-push git verbs never reach it. Pin both with tests.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-DECISION** (decided: D127) — Acknowledge that the Q12 option B refusal of nested-shell git replaces the item's original second clause as the effective acceptance
+  Question: does the shipped Q12 option B (a nested shell naming git stays fail-closed) replace the item's second proposal clause (non-push git verbs in a nested shell never reach guard-push) as the accepted behaviour? The pin already records the supersession (AC-195 point 2).

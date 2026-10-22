@@ -81,3 +81,12 @@ patch prepared in `scratch/design-trailer-consistency/`, unqualified).
   stage-0-labelled history: a documentation decision with no executable surface, still manual). Not verified here: a
   Windows host run of the commit-msg hook, and a path-based rejection of `design (elephant)` for production files
   (the pin asserts only the size bound, as the PO decision of 2026-10-16 admits the form without a path grant).
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-DECISION** (decided: D129) — Disposition of existing stage-0-labelled design commits as provenance debt (history is not rewritten)
+  Question: how are the existing stage-0-labelled design commits dispositioned, given history is never rewritten? This is the skipped fourth acceptance case, a documentation decision with no executable surface.
+- **HOST-SESSION-NEEDED** — Triage closes the item only after the 0.7.0 candidate host checklist
+  Closure is tied to the AC-32 install and host checklist of the 0.7.0 candidate: the PO installs the candidate and a Claude or Codex host commits with the printed `Dispatch: design (elephant)` example through the installed hooks. The Linux pin (12 pass, 1 skip) is already counted; a Windows commit-msg hook run is additionally possible via interop but does not replace the host checklist.

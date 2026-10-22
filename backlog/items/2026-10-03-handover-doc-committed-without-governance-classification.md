@@ -56,3 +56,10 @@ at the next bootstrap.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **NOT-BLOCKED** — Decide whether the pinned residual gap is accepted: a clone without installed hooks still commits an unclassified handover and only the bootstrap catches it later
+  The item is status closed (2026-10-22, closure commit 35455319), rejected as duplicate and merged into 2026-10-16-verify-does-not-run-the-observation-governance-checker.md, whose Verify second line carries the residual gap and its acceptance. The decision now lives there, not here.

@@ -38,3 +38,12 @@ test-first either way. Owner: pipeline; due before the 0.7.0 release candidate.
 - **Rationale:** Windows is a first-class platform; a case that never runs there is silent coverage loss.
 - **Assignment (if accepted):** read-only measurement dispatch, then test-first fix; 0.7.0 candidate.
 - **Date:** 2026-10-07
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — A native Windows run of the win32 cases (CRHS-INPUT measurement and the typed skip of RC12C001) is missing
+  Run plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs as one file with Windows node via cmd.exe on a /mnt/d clone; closes when RC12C001 reports the typed host-limitation skip and the measured CRHS-INPUT field is recorded. Single file, expected minutes.
+- **PO-DECISION** (decided: D126) — Decide whether the typed host-limitation skip on Windows resolves the item or the host store must work on Windows
+  Question: is a typed, measured host-limitation skip of RC12C001 on Windows acceptable, or must createCodexDesignReadinessHostStore work on native Windows?

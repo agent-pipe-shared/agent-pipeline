@@ -55,3 +55,12 @@ Critic guard false positives consumed about 40 % of the Critic budget. The
 observed classes: counter-lock-busy on parallel calls, rg/Glob/Grep refusals,
 no write route for critic-notes.md, and no CSPRNG primitive available to the
 Critic. Deferred from round 3 of the signed bundle (commit `866be2139`).
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-DECISION** (decided: D123) — Confirm Write/Edit as the only Critic notes route (the pin encodes it) and triage the item
+  Question: is Write/Edit on the guard-allocated critic-<agent-id>/critic-notes.md the one and only Critic notes route, with no bounded Bash form? The Triage block is empty.
+- **HOST-SESSION-NEEDED** — A live Critic dispatch with a security-class diff must complete and persist its notes on an installed host
+  Needs a real Critic subagent turn (authenticated model) on an installed Claude host; observe that the review completes within budget and critic-notes.md exists under scratch/dispatch/critic-<agent-id>/. Item itself says this is not producible by an agent test.

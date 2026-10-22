@@ -201,3 +201,16 @@ native-runner evidence.
   activation diagnostics with the Agy imported-snapshot item.
 - **Date:** 2026-09-28
 - **Scope record:** [Candidate scope intake](../evidence/2026-09-28-candidate-scope-intake.md).
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Run the full governance-scope suite (23 callbacks) in the permitted stable environment
+  Run the governance-scope controller suite (23 callbacks) serially on Linux with node scratch/run-in.mjs and a private TMPDIR, which is the stable environment (the shared-temp ancestor control varied before); closes at 23/23 pass.
+- **LINUX-RUN** — Triage reports only 21/23
+  Same run as the previous clause: replace the 21/23 report by a 23/23 receipt from the private-TMPDIR run.
+- **HOST-SESSION-NEEDED** — Capture real Codex and Antigravity hook payloads and run the inert contract on installed hosts (payloads are approximated
+  Real payload capture needs an installed Codex and Antigravity session with an authenticated model turn (even though codex and agy CLIs exist on WSL, no agent may make the call); observed: the actual hook payloads replacing the approximated shapes in lib/pins/pipeline-hooks-act-in-repositories-that-never-opted-in.test.mjs.
+- **WINDOWS-INTEROP-RUN** — Windows/PowerShell not probed)
+  Run the same pin with Windows node via cmd.exe on a /mnt/d clone to probe the inert contract on the Windows lane; no mode bits or symlinks needed by its cases (HOST_LIMITATION note, line 20). Minutes.

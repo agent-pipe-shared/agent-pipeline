@@ -34,3 +34,10 @@ Both guards should read the same (installed) definition, or the binding should r
 - **Rationale:** commit(s) `337492443`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — The item closes after the 0.7.0 candidate host checklist: a real installed-host dispatch with differing source and installed maxTurns is not shown
+  Needs the stamped candidate installed into a real Claude host, then a real Critic dispatch with differing source and installed maxTurns observed not refused with budget-tier-max-turns-conflict. Install plus dispatch is a host action after the operator sitting; the regression test already covers the logic.

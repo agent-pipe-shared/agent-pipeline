@@ -58,3 +58,12 @@ course cap. Directed execution7/7, private store10/10 and coordinator3/3 pass.
 Claude/Agy currently provide truthful zero-child unavailability, not a genuine
 answered initial invocation. Final integrated and installed-host qualification
 remain open; no Advisor PASS or backlog closure is claimed.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Final integrated and installed-host qualification
+  The item's own Progress text lists directed 7/7, store 10/10 and coordinator 3/3 as passing in source; what is left is qualification on a stamped installed candidate, which needs the PO stamp/install (D80: no stamp until the PO demands it) and a host session. A Linux re-run of those three suites adds nothing new.
+- **HOST-SESSION-NEEDED** — Claude and Agy give truthful zero-child unavailability, not a genuine answered initial invocation
+  A genuine answered Advisor invocation needs an authenticated model turn on Claude Desktop/CLI and on Antigravity; agents may not make a real model call. Observed would be an answered receipt bound to the initial course instead of a zero-child unavailable record.

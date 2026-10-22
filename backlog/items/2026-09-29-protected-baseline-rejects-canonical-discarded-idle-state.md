@@ -54,3 +54,10 @@ no Source delivery, alternate writer or override consumption is claimed.
   fixtures; preserve their assertions and the original failing trajectory.
 - Bind correction receipts and the fixed committed candidate. Installed
   acceptance remains separate; this item is open during correction.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Run both original positive guard CLI/fanout tests on actual canonical ready fixtures (Triage: host runs needed)
+  Run the two original guard-testpath CLI/fanout positives plus lib/pins/protected-baseline-rejects-canonical-discarded-idle-state.test.mjs serially on Linux with a private TMPDIR (they spawn the guard as a process, the earlier 'host run' blocker was the shared-temp authority issue); closes when both pass on canonical ready fixtures.

@@ -58,3 +58,10 @@ of `sed -i -e '<expr>' -e '<expr>' specs/<feature>/<file>.md` as the write targe
 "File: s/^..."), and refused it with `GUARD-DEVPLAN-SHELL`. The real target was under `specs/`,
 where draft-phase writes are allowed. The workaround was the Edit tool; no override was used.
 The path detection of the `write-command` classifier misparses sed arguments.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **DEFERRED** — Triage defers the item past the 0.7.0 candidate (2026-10-17); confirm whether it counts for this delivery
+  Already answered by the recorded PO decision of 2026-10-16 (item Triage, 2026-10-17): deferred past 0.7.0, AC-181 is not counted against the candidate. No new decision is needed.

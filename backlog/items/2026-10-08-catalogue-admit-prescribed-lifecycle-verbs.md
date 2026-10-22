@@ -72,3 +72,16 @@ Added acceptance (0.7.0, blocker, D64):
 - One integration test runs with the real guards from a fresh repository to the first
   implementation dispatch (route selection, review receipt, architecture materialization,
   registration) and needs zero human guard overrides.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **NOT-BLOCKED** — D64: admit route selection, design-review receipt production, architecture materialization and baseline diagnosis, registration and the documented help/readback forms in their prescribing state, absolute node path included
+  Item is closed as a duplicate (2026-10-22) of 2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md. The pin catalogue-admit-prescribed-lifecycle-verbs.test.mjs already has D64 cases for help/readback forms, route selection, receipt production, feature-package registration and architecture baseline diagnosis (lines 378-504); I did not verify the absolute-node-path spelling case and the canonical item carries the remainder.
+- **LINUX-RUN** — D64: one integration test with the real guards from a fresh repository to the first implementation dispatch needing zero human overrides
+  The pin has no fresh-repository end-to-end case (only per-verb admission cases). An agent can author and run it on Linux with node/git via node scratch/run-in.mjs <clone> <label> <test-file>; closes when route selection, review receipt, architecture materialization and registration all pass the real guards with zero overrides. Tracked in the canonical merged item.
+- **NOT-BLOCKED** — The receipt-alias symlink case in the pin is a skipped stub; it needs a real case on a Linux run
+  The pin has a real case 'AC-123 receipt aliases (directory/file symlink) never gain present-plan admission' (line 326) that creates real symlinks and skips only when the host cannot create a link (native Windows); on this Linux/WSL machine it runs for real.
+- **HOST-SESSION-NEEDED** — Re-run the Codex WSL greenfield on an installed candidate
+  Needs the PO-stamped candidate installed and a real Codex/WSL greenfield session with authenticated model turns (chat approval mode); observed is reaching the first implementation dispatch with no chat overrides.

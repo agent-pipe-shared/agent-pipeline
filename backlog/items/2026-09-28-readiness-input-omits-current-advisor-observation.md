@@ -86,3 +86,10 @@ physical author-dispatch binding remain mandatory. Earlier33 unaffected
 controls plus the final affected1/1 pass; no single final34 or long package
 PASS is claimed. These remain synthetic host controls. Owner evidence:
 `scratch/0.7-quality-readiness-pretransmission-provenance-20260929/pre-post.md`.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Re-run the actual independent Readiness review on an installed host once the declared Advisor context is available
+  The independent Readiness turn is a real native model call on an installed Codex or Claude/Agy host (bootstrap-to-host-to-fresh-verifier delivery); observed: no CURRENT_ADVISOR_BINDING_MISSING and the supplemental v2 observation reconstructed by the fresh reader. Agents must not make or fake it.

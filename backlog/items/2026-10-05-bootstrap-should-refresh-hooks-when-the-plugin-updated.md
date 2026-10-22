@@ -52,3 +52,10 @@ Sharpened proposal (enforcement, not advice; PO decision BJ: a strong preflight,
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Real hook apply on native Windows is refused with PB-WINDOWS-ASSURANCE; the Windows branch of P3 needs a native run
+  Run the item's pin under lib/pins/ natively through cmd.exe with Windows node on a --no-hardlinks clone under /mnt/d, expecting the typed PB-WINDOWS-ASSURANCE refusal and the stale-hook non-ready envelope with the exact refresh action; small file, minutes not hours. A real hook apply into the PO's actual Windows settings is not needed and not an agent action.

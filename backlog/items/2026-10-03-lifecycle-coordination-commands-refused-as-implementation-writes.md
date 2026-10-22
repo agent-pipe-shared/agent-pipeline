@@ -156,3 +156,10 @@ Added acceptance (0.7.0, blocker, D64):
 - One integration test runs with the real guards from a fresh repository to the first
   implementation dispatch (route selection, review receipt, architecture materialization,
   registration) and needs zero human guard overrides.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run the design-course end-to-end on Windows Git Bash to present-plan with zero overrides (point 5)
+  The pin's AC-207 point 5 case is a typed skip: on win32 it reads 'not implemented', so an agent first has to write the Git Bash end-to-end (fresh repo, real guards, stubbed hosts, no model call) and then run it with Windows node plus Git for Windows' bash via cmd.exe. Closes when it reaches present-plan with zero human overrides; POSIX admission is already pinned by catalogue-admit-prescribed-lifecycle-verbs.test.mjs. Authoring is real work and the run is slow (installed-hook commits 10-60 s).

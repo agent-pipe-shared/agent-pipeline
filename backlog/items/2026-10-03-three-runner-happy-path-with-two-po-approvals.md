@@ -162,3 +162,10 @@ Added acceptance (0.7.0, major, D64):
   none of them again.
 - The actor attribution that submission and presentation need is asked once, bundled with the
   other required answers where the policy allows; no name is taken from Git as PO authority.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — One end-to-end greenfield run each on Claude, Codex and Antigravity reaching a pushed branch with exactly two PO proofs is missing
+  Three authenticated host sessions (Claude Windows, Codex, Antigravity app) with the PO giving exactly the plan and push approvals; agents may not drive model turns or sign. Observed: pushed feature branch, two proofs, zero guard overrides. The 2026-10-17 Codex WSL P0-1 delivery-state defect must be fixed in source first.

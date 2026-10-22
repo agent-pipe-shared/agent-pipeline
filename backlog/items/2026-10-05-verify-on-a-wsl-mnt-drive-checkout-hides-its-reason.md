@@ -34,3 +34,10 @@ Matrix: WSL only. Native Linux and macOS have real modes; native Windows uses th
 - **Rationale:** commit(s) `dac8d1314`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — The item is WSL-only: a Verify run on a real /mnt/<drive> DrvFs checkout showing the typed hint is missing; the pin simulates permissive modes
+  This machine has real /mnt/d DrvFs: clone with --no-hardlinks under /mnt/d and run the verify-journal pin plus a Verify entry there, with a private TMPDIR. Closes when the output shows VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE in the cause chain and the typed hint naming the Linux-home clone workaround.

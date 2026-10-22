@@ -84,3 +84,10 @@ hotfix package for the installed copy was prepared under
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run the pin (win32 owner identity and the real-hook subagent case) on native Windows; the counted run was Linux/WSL
+  Run plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs and lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs natively via cmd.exe; closes when the 2 win32-only cases that skip on Linux pass (owner identity, real hook with a synthetic subagent payload, no model call). The 127-case guard suite may take long on Windows; filter with a name pattern to the win32 cases.

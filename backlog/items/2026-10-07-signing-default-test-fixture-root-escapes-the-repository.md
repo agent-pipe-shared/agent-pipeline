@@ -41,3 +41,10 @@ member order (the JSON key-reordering item's remaining gap). Owner: pipeline; du
 - **Rationale:** writing outside the repository is a containment defect; a suite that cannot import on a first-class platform is silent coverage loss.
 - **Assignment (if accepted):** CLOSEOUT-T3 (test-only), 0.7.0 candidate.
 - **Date:** 2026-10-07
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — The original import failure was on native Windows; the suite has no counted native-Windows run
+  Run plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs (cases RC21C001..RC21C005) natively with Windows node through cmd.exe on a /mnt/d clone. Small suite, expected minutes; closes when all five cases run past import and pass.

@@ -155,3 +155,12 @@ No canonical implementation was changed in this preparation batch. Architecture
 adoption, protected source integration, official kernel-closure and canonical
 tests, the real committed product-package readiness and final candidate gates
 remain required. The backlog item remains open.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **NOT-BLOCKED** — A live Codex/WSL readiness run and the authenticated turn after SIGKILL are not proven; 3 pin cases are typed host skips
+  The selected-sandbox readiness route and its child/adapter are retired (ADR-0085); the pin now asserts DESIGN-COURSE-RETIRED and tests only the retired child with a fake App Server peer. D63 (line 90) closes AC-131/AC-132 (E12, ADR-0085) as superseded, so a live run and SIGKILL turn are moot.
+- **NOT-BLOCKED** — Decide whether the retired selected-sandbox route (ADR-0085) makes the live-run and credential-custody clauses moot
+  Decided: D63 confirms AC-131 and AC-132 (E12, ADR-0085) as superseded, so the live-run and credential-custody clauses drop; only the item's Triage text needs the disposition recorded.

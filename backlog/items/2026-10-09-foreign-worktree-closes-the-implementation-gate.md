@@ -51,3 +51,10 @@ commit; one stray uncommitted line left in `pipeline-state.mjs`.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — The real WSL-registered /mnt foreign-worktree fixture is a typed skip with an empty body; run it on Linux/WSL
+  Pin line 205 is an unconditional skip with an empty body, so merely running it on Linux proves nothing. An agent on WSL can author the body (git worktree add with a gitdir under /mnt/d from WSL git, then evaluate the implementation gate and onboarding inspect) and run plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs; closes when the body asserts a typed environment condition, no reopen-design offer, and passes with 0 skip.

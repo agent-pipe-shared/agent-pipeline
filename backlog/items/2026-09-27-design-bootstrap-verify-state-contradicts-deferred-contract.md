@@ -48,3 +48,9 @@ without a misleading general PASS.
 
 ## Triage
 
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-DECISION** (decided: D124) — Decide whether the newer baseline-implementation policy replaces A2 (implementation authority rejects the deferred Verify state)
+  Question: does the newer baseline-implementation policy supersede contract A2, i.e. is a typed verify-deferred design state (verify: null) still the intended design-stage result, with implementation authority and release Verify rejecting it?

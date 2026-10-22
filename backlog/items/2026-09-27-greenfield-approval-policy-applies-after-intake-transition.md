@@ -102,3 +102,10 @@ stdin microreplay was never executed or rerouted. This preparation establishes
 the concrete language-bearing action's admission; historical ordering remains
 unconfirmed and the item stays open. A separately confirmed home dependency
 seam is recorded in `2026-09-28-onboarding-home-override-does-not-bind-machine-plane.md`.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Live Codex/WSL readback of a fresh greenfield project (item says live Codex readback is pending)
+  Needs the installed Codex host on WSL driving a fresh onboarding with a real authenticated model turn and the PO's approval answer; agents may not make a model call. Observed: pendingAsks applyAction admitted in the publishing phase, answered signature modes recorded, driver exit 0 with matching readback. The stubbed P6 replay in the pin already passes.

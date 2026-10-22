@@ -106,3 +106,14 @@ Added acceptance (0.7.0, minor unless the PO raises it):
   only for the Claude advisor. Registering Antigravity route cells or admitting a fallback for Antigravity is a route-policy decision
   (typed todo in the pin). The implementor and the plan verifier have a native route; every other role resolves to a typed state.
 - Verify: not measured as a route. The pin covers only the node-sandbox probe, the Antigravity prerequisite of running the project's verify command.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — An Antigravity greenfield run must complete the happy path
+  Needs a real Antigravity (agy) greenfield session with authenticated model turns on an installed candidate; the PO's AGY-WSL test. The agy CLI exists on WSL but an agent may not drive a model turn.
+- **HOST-SESSION-NEEDED** — F-05 parallel writes need a live AGY run
+  The item states it is not re-checked because it needs a live AGY Goldfish issuing parallel write_to_file calls (3 of 4 failed with 'permission check failed for write_file'); observed would be all parallel writes succeeding or the template forbidding parallel writes.
+- **PO-DECISION** (decided: D122) — Show Critic, Advisor and Verify routes on AGY (or the recorded self-dispatch fallback) and an admitted route for the main agent to update the handover in every phase
+  The 2026-10-22 pin measurement shows the handover write is admitted in design and implementation phases, but Antigravity advisor/critic/readiness/mechanic/deep still resolve to unavailable (RRP-ROUTE-CELL-UNAVAILABLE) and the self-dispatch fallback is legal only for the Claude advisor; registering AGY route cells or admitting a fallback is a route-policy decision (typed todo in the pin).

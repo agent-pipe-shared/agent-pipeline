@@ -53,3 +53,10 @@ done_when: manual
 - **Assignment (if accepted):** next sprint after 0.7.0; AC-175 is not counted against the 0.7.0 candidate.
 - **Date:** 2026-10-17
 - **Partial groundwork already committed:** 17067dca4 (ALF-C-N1-02C) adds a runner transcript export for Claude and Codex. Antigravity is typed unavailable, and child sessions and turn boundaries are not reported. Admitting the export to governed agents needs a held guard patch. Critic C6d F3 records these gaps; they stay with this deferred item.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **DEFERRED** — Admitting the export to governed agents needs a signature-bound guard patch
+  Whole item deferred past the 0.7.0 candidate by PO decision 2026-10-16 (item Triage, dated 2026-10-17; AC-175 not counted). The held guard patch (signature) is only needed once the item is scheduled for the next sprint.

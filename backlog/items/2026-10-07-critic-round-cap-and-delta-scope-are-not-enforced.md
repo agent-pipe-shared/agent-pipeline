@@ -115,3 +115,10 @@ Added acceptance (0.7.0, D62):
   enforcement is missing.
 - **Assignment (if accepted):** Alfred implementation, guard/dispatch slice.
 - **Date:** 2026-10-07
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — The review-unit route and the argument-gated critic-review skill (PF-34, PF-57) need a replay on an installed host
+  PF-57 is about the critic-review skill started in a real host session (no args must ask for Spec/range instead of forking) and PF-34 about a real Critic dispatch passing critic-dispatch-preflight after the review-unit route. Needs an installed Claude host and a model turn; the fixture pins can be run on Linux but do not replay the host.

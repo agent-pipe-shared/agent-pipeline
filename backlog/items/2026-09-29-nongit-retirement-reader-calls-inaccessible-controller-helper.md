@@ -40,3 +40,10 @@ defect explains every failure. No Source mutation or filtered retry occurred.
   qualify the actual Source corpus and complete original onboarding controller.
 - Reconcile remaining failures from the new actual receipts. The item remains
   open until the fixed candidate's combined acceptance.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Run the complete original onboarding controller and Source corpus on Linux/WSL and reconcile remaining failures
+  Run lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs plus the full original onboarding controller (184 cases, four shards) serially with node scratch/run-in.mjs and a private TMPDIR; the earlier 130 FAIL were largely SDC-AUTHORITY-UNAVAILABLE, now green this way. Closes when exit 0 with consistent counts, or remaining reds are reconciled to named items. Long run.

@@ -103,3 +103,10 @@ suite and Verify entry pass exact-preimage dry application. Existing complete
 record/ownership happy-path tests were not re-run and are not claimed.
 `scratch/codex-readiness-shared-parent-hardening-evidence.md` binds the scope.
 This separate patch is not yet part of aggregatecb817e20 or productive source.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Installed Codex replay and a productive Advisor integration run are recorded separately by the item and are still missing
+  Fixed in source (8b5dcf4fb; sanctioned mint then registration/store creation passes in fixtures, which the item says is not an Advisor receipt). A productive run needs the installed Codex candidate and an authenticated Advisor turn in a fresh repository.

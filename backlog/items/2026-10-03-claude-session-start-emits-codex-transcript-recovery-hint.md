@@ -55,3 +55,10 @@ that the Claude SessionStart output never names another runner.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Observe the real Claude SessionStart output on an installed Windows host
+  The SessionStart additional context only appears when Claude Code actually starts a session on Windows with the installed candidate; observed is that output never naming Codex or $CODEX_HOME. Hook wiring and script output can be source-scanned/run natively by an agent, but the real injected text is a host behaviour, and the item's Triage is also still empty.

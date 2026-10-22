@@ -87,3 +87,10 @@ issue belongs to `2026-09-27-scratch-must-remain-writable-across-lifecycle-state
 The pre-signature checker must validate physical hunk order with the real native
 engine, compare every postimage digest and report an unverified rehearsal
 before requesting a human signature. In-memory replay alone is insufficient.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Rehearse hunk order with the real native apply_patch engine against the installed guard; the pin uses real git, not the native engine
+  The native apply_patch engine is the Codex host tool and the installed guard sits in that host; a rehearsal needs a Codex session issuing apply_patch through the installed guard (no model call may be faked by an agent). Observed: an out-of-order hunk is rejected pre-signature by the real engine and postimage digests match. Whether a standalone apply_patch binary can run without a model turn is unverified.

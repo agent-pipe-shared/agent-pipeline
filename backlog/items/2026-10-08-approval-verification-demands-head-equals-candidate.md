@@ -59,3 +59,10 @@ the next stamp must carry it.
 - **Rationale:** blocks all work after any commit; reproduced; minimal fix known.
 - **Assignment (if accepted):** sprint-alfred wave 1, pins + fix dispatch.
 - **Date:** 2026-10-08
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Confirm on a stamped installed candidate that an approval stays verifiable after a commit past its candidate (the failure was seen on an installed build)
+  Item is fixed in source (pins for implementation-boundary vs presentation/approval, both Claude and Codex branches); confirming on an installed build needs the PO-stamped candidate installed (D80) and a host session that commits past the approved candidate, then onboarding inspect shows no DWP-READINESS-HOST-RECEIPT-INVALID. The v2 fixtures are Linux-only, so a Linux pin re-run is already the best agent-side evidence.

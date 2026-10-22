@@ -39,3 +39,10 @@ and add a test that runs the CLI as a child process and asserts it acts.
 - **Rationale:** commit(s) `c30c005d8`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Windows argv spellings are simulated on Linux; run the CLI on native Windows (0.7.0 host checklist)
+  Run plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs with Windows node via cmd.exe (it runs the CLI as a child process); short. Closes when the CLI acts with a drive-letter argv[1] and the test reports 0 skip.

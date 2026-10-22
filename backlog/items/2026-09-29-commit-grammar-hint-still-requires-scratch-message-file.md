@@ -39,3 +39,10 @@ Keep the closed shell grammar and provenance validation unchanged. Preserve
 - **Rationale:** commit(s) `15722ce6a`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — The 0.7.0 candidate host checklist (a real file-free commit on native Windows and the installed hosts) is still outstanding
+  Fixed in source (15722ce6a); closure waits for the candidate host checklist: a real file-free multi-paragraph commit with trailers under the lifecycle guard in installed Claude, Codex and Antigravity sessions and on native Windows. The commit-message-policy suite can run on Linux and natively via interop, but the guard-in-host behaviour needs the installed candidate.

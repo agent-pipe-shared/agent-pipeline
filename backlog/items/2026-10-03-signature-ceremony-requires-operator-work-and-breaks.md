@@ -54,3 +54,10 @@ command. In all three greenfield runs the PO had to do considerably more:
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-SIGNATURE** — The pin signs with an in-memory fixture key; a real PO terminal signature on WSL and PowerShell is not shown. The item also defers its end-to-end proof to the three-runner happy-path item
+  A real single-line signing command run by the PO in a WSL terminal and in PowerShell, with one signature per approval, cannot be performed or faked by an agent. It is also covered only by the three-runner happy-path end-to-end run, so it closes together with that item.

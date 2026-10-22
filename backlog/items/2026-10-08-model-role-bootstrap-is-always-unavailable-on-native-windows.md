@@ -44,3 +44,10 @@ read. A drive root (and a UNC root) is never a valid chain start on win32.
 - **Rationale:** commit(s) `4cead36e4`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run the bootstrap and the two win32-only realpath-casing cases on native Windows; 5e215c4a8 states the win32 branches were not run on a native host
+  Run plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs with Windows node via cmd.exe on a /mnt/d clone (P4 casing cases at lines 183 and 207 skip on non-win32) and `scripts/model-role-bootstrap.mjs --repo-root <root> --runner claude` natively (local read, no model call). Small file, minutes; closes when P4 cases pass and bootstrap reports inactive/activation instead of MODEL-FAMILY-GIT-COMMON-DIR-UNAVAILABLE.

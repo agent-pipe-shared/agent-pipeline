@@ -88,3 +88,10 @@ updated patch digest and unchanged proposed source bytes. This closes the
 provisional content-correction course, not the backlog item. Recheck after
 the full correction is committed; no provisional result is a production gate
 or release stamp.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Host-verified freshness and read-only evidence is exercised only through the injected verifier seam; a real host review of the package is missing
+  Needs a real tool-free host reviewer (Codex selected-sandbox route; WSL is typed unavailable for that route) producing a host-bound receipt, i.e. an authenticated model turn on an installed host. Only the injected verifier seam can be run by an agent.

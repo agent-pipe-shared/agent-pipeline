@@ -63,3 +63,10 @@ lifecycle); the shell write-target extraction in
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Counted run was POSIX only; run the win32 fixtures and a real plugin update refresh on native Windows
+  Run plugins/pipeline-core/lib/pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs natively on a Windows-drive clone (its P4 fixtures target win32; installed-hook commits take 10-60 s each, so expect tens of minutes). A genuine Claude Code plugin update refresh is a PO install act (hook upgrade rewrites Git hooks) and stays with the host checklist.

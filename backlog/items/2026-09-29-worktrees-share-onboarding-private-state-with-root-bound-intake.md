@@ -52,3 +52,10 @@ legacy state from foreign-root state before retirement and fresh intake.
 - **Related:** `2026-09-28-no-uninstall-path-for-a-repository-that-once-opted-in.md`.
 - **Status:** Inert implementation proposal in progress; Source delivery,
   integrated qualification and independent Critic remain pending.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — The 'preserve prior onboarding and uninstall behavior' clause rests on the other onboarding suites being green in a Full Verify
+  Run the other onboarding and uninstall suites (and the Verify journal) serially with a private TMPDIR on a Linux-home clone via scratch/run-in.mjs. Long but doable here; closes when all are green and the result is counted in a Full Verify receipt.

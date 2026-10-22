@@ -40,3 +40,10 @@ Kept as a verification item, not new work: after install, simulate a crash (kill
   descriptor's binding (goldfish-deep, Critic batch with the security read); the session-cleanup
   fixtures (K1c) and an owner option on the controlled-method fixture builder.
 - **Date:** 2026-10-20
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Kill a real Verify mid-run on a Windows host and confirm readiness stays ready with a warning and a typed archive route exists
+  Start the real Verify (harness/scripts/verify.mjs) with Windows node via cmd.exe on a Windows-drive clone, taskkill it mid-run, then run readiness and the plan-human-recovery/plan-archive-orphan verbs; the kill makes it minutes, not hours. The Linux pin (no skips) covers the logic; D70 recovery work for a lost binding must be in the clone head for the typed archive route to exist.

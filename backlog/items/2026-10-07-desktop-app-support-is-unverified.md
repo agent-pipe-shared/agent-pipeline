@@ -54,3 +54,10 @@ for governed repositories, that PO and signing commands run in the integrated or
 unverified and names this item, and that Desktop loads no PowerShell profiles; four RED cases mutate that text and are detected. The four
 live-host checks (bootstrap line, guard denial with plugin-supplied hooks, background Goldfish, statusLine identity) are skipped as
 `native: pending` and need the real Desktop app. This item stays open for that host verification only.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Open the repository in the Claude Desktop app (Windows path) and record the bootstrap line, a guard denial, a background Goldfish dispatch and the statusLine identity
+  Needs the Claude Desktop UI with real model turns; no UI automation exists here. The docs slice is already delivered and pinned (15 cases, 10 pass, 5 skipped as native: pending); only these four live checks remain.

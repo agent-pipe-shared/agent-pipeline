@@ -34,3 +34,10 @@ Preferred: tests create a hardened private temp root (owner-only, non-inheriting
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — The eight win32-only cases need a native-Windows run, and the item's check that the v3 suite failure count drops there
+  Run the eight win32-only cases and the v3 onboarding suite natively through cmd.exe on a /mnt/d clone; the v3 suite is large and will take hours. Closes when the eight cases pass and the v3 failure count falls from about 125.

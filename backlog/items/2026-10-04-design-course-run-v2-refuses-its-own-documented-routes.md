@@ -45,3 +45,10 @@ revision path:
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-DECISION** (decided: D125) — Decide whether retiring the course resolves the item (moot) or the revision path still needs a zero-override test
+  Question: is the design course retired for 0.7.0 so the item is moot, or must the revision path (new authoring dispatch, resume after failed stage, Advisor fixture on Windows) still run with zero overrides?

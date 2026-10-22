@@ -48,3 +48,12 @@ workspace path does not write the receipt.
 
 Accepted into the next local 0.7 candidate by PO instruction. Native Agy
 confirmation follows installation of that candidate.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Native fresh-runner observation of the first Agy session passing attestation without a manual repair step
+  Item Triage: 'Native Agy confirmation follows installation of that candidate'. Needs the stamped candidate installed and a fresh Antigravity session started in an empty project; observed is plugin attestation passing with no manual receipt repair.
+- **HOST-SESSION-NEEDED** — D79 (553342999): whether the real Antigravity host resolves a repo-relative entries[].path in the tracked registry is unverified
+  Only the real Antigravity host can show whether it resolves a repo-relative entries[].path in the tracked .agents/plugins.json (D79 option 2: tracked file repo-relative, machine binding in a machine-local file). Observed: a new agy session in a clean clone loads the plugin from that path; a negative result is a finding.

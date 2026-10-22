@@ -61,3 +61,10 @@ and complete-confirmed-findings mandate.
 - **Rationale:** commit(s) `26fef9e7d`, host run needed.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Complete the current full onboarding suite with consistent case counts, all child completions and exit 0 (criterion 4)
+  Run the full onboarding suite (216 cases, eight workers) on Linux/WSL via the serial private-TMPDIR runner and capture the completion-FD receipt; criterion 4 closes with consistent PASS/END counts, all child completions and exit 0. Long run, agent-doable.

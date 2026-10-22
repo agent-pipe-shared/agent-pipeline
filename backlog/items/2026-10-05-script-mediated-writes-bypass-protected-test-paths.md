@@ -37,3 +37,10 @@ another is not a guard.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — The original incident was on Windows; no counted native-Windows run of the pin exists
+  Run the codemod-shape regression pin (node script rewriting a protected test file is detected or refused) natively through cmd.exe on a /mnt/d clone. The pin itself is small; the surrounding guard suites are the multi-hour part, so run only the pin file.

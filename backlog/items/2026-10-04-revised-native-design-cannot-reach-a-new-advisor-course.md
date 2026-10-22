@@ -49,3 +49,10 @@ dispatch. The decision is derived from the continuity registration of the new au
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-DECISION** (decided: D125) — Decide whether acceptance bullet 1 is superseded by the ADR-0085 retirement or must be re-targeted to the present-plan review-receipt route
+  Item acceptance bullet 1 (Spec 21.5 R5-6/R5-8, one revision step rebinding sources) refers to an Advisor-course route that ADR-0085 may have retired; only the PO can say whether the bullet is dead or moves.

@@ -105,3 +105,16 @@ Added acceptance (0.7.0, D62):
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-SIGNATURE** — Implement the liveness readback for open dispatch records that the guard checks before admitting a second writer
+  The readback is delivered and pinned (lib/dispatch-record-liveness.test.mjs, D110: PID plus process start identity); wiring it into the guard-dispatch hook is a protected plugin source change that the PO applies and commits as human operator at the sitting (pin comment at lines 693-694).
+- **NOT-BLOCKED** — Add a pin that the producer runs for an older commit with a dirty checkout and leaves the checkout bytes unchanged, and one that the session-authority registry stays clean after a parallel Critic and Goldfish
+  Both exist in lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs: PARWORK-M4a (older commit, dirty checkout, registry untouched) and PARWORK-M5a (registry clean, no orphan lock); they skip only on win32 and run on Linux.
+- **DEFERRED** — Decide whether AGY isolated-worktree parallel preparation is pulled into 0.7.0 or stays post-0.7.0
+  Decided: PO decision D63 lists AC-224's AGY parallel worktrees among the deferrals past 0.7.0.
+- **HOST-SESSION-NEEDED** — A live parallel Critic plus Goldfish run on an installed host (and AGY worktree route if pulled in)
+  Needs real Critic and Goldfish dispatches (model turns) in an installed Claude or Codex session, then reading the session-authority registry (lock absent, read readable); the AGY worktree route is deferred (D63).

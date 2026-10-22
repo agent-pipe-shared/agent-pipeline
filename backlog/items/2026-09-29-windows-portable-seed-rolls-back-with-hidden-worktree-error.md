@@ -50,3 +50,10 @@ paths are not copied into this repository.
 
 Accepted into the next local 0.7 candidate by PO instruction. Native Windows
 runner confirmation remains a separate acceptance step after installation.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — A native-Windows run of the drive-letter case and an observation of the installed Claude candidate in a fresh Windows session (A5) are missing
+  The drive-letter fixture can run natively via cmd.exe, but acceptance requires the installed Claude candidate observed in a fresh Windows session (A5), a real host onboarding of a non-Git project. That session cannot be agent-driven.

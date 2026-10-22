@@ -108,3 +108,12 @@ was read, and no exceptional authorization was consumed.
   `declared-system-skill-read-requires-human-override` (AC-147) by PO decision
   of 2026-10-16. The item stays open; AC-209 is not counted against the 0.7.0
   local test candidate.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **DEFERRED** — An installed Codex readback of the declared skill read is needed; the host-catalog producer is Codex-held
+  Deferred past the 0.7.0 candidate by PO decision of 2026-10-16 together with lifecycle-read-scope-blocks-host-declared-system-skill (AC-209); item triage 2026-10-17 says AC-147 is not counted against the 0.7.0 local test candidate. When taken up it needs an installed Codex session.
+- **DEFERRED** — The PO deferral past 0.7.0 stands; scope for the post-0.7.0 release is undecided
+  Nothing blocks 0.7.0: the deferral is recorded (item triage 2026-10-17, PO decision 2026-10-16). The post-0.7.0 scope is a later planning decision, not a candidate blocker.

@@ -48,3 +48,9 @@ permission boundary needs a safe capability test with non-sensitive fixtures.
 
 ## Triage
 
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Installed native Windows enforcement and the live host permission boundary of Read/Grep/Glob are named in the pin as not claimed
+  The live permission boundary of native Read/Grep/Glob outside the root can only be observed in a real Claude host session on Windows (Claude Desktop/CLI turn); the pin (powershell-bypasses-onboarding-read-boundary.test.mjs line 15) explicitly does not claim it, and synthetic hook-as-process probes cannot show what the host itself permits.

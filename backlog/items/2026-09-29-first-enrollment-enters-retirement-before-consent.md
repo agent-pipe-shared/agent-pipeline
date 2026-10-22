@@ -82,3 +82,10 @@ These receipts do not close full onboarding, Verify or installed acceptance.
 ## Triage
 
 - **2026-10-08 close-out check:** not closable — OBC298 label absent; installed-candidate qualification needs host run.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Run that case on Linux/WSL, where directory symlinks and mode bits exist
+  The pin's HL physical-history case skips only when symlinkSync fails (typed host-limitation, PO decision K7), which does not happen on Linux. Run `node scratch/run-in.mjs <clone> <label> plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs`; closes on 0 skip, 0 fail. The item's other open parts (OBC298 label, installed-candidate qualification) are separate host work.

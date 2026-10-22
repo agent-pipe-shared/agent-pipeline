@@ -60,3 +60,12 @@ through the next signed package.
   acceptance line of the Node-v24 NUL item was already updated to require `GIT_NULL_DEVICE`. Not verified here: a real
   Git for Windows 2.56 run (the real-git cases ran against the Linux git; the Windows-version behaviour is shown by the
   upstream-regression stub only).
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run on native Windows with Git for Windows 2.56.0 to confirm the null-device value is accepted
+  Run plugins/pipeline-core/lib/git-null-device-sites.test.mjs (8 cases) and the R7-1a ratchet in worktree-lifecycle.test.mjs with Windows node via cmd.exe on a Windows-drive clone; minutes, not hours. Closes when the real-git cases pass against the Windows git; note the fixed build is 2.56.0.windows.2, so record the exact `git --version` of the Windows side.
+- **PO-SIGNATURE** — Protected sites go through the next signed package
+  The protected-site edits are already committed in source (12ac0a7af, 2532a96fe touch lib/ and scripts/, incl. po-gate-authority). What remains is the signed package of the 0.7.0 candidate, which is a PO stamp/sign ceremony, not agent work.

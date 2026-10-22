@@ -48,3 +48,10 @@ the disclosure; two of them then failed on a missing OpenSSL (see `pipeline.sign
 - **Rationale:** measured 563 s for a lookup that cannot succeed; PO request 2026-10-08.
 - **Assignment (if accepted):** first slice of the next signed package (the fix itself touches a protected path).
 - **Date:** 2026-10-08
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — The live HGO store sweep and the full sign-intent CLI ceremony need a Linux/WSL run with real private-directory modes
+  On a Linux-home clone seed a synthetic HGO request store (about 111 requests) and time sign-intent up to the disclosure/readiness stage; closes when the digest-keyed lookup returns in seconds and a missing openssl fails fast with its typed repair. The final passphrase signing of the ceremony is PO-only and not part of what an agent may run.

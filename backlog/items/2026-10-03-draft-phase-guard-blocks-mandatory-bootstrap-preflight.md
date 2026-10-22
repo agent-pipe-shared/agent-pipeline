@@ -76,3 +76,10 @@ bootstrap sequence to run to a ready confirmation without an override.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run the literal ${PIPELINE_PLUGIN_ROOT} spelling cases (point 4b and its control) on native Windows
+  Run the guard-lifecycle-ready test cases for point 4b and its control natively via cmd.exe with a name-pattern filter on a /mnt/d clone; the full guard suite takes hours, the two cases do not. Closes when the literal-variable spelling is admitted (or the typed refusal is pinned) on win32.

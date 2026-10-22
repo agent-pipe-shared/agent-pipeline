@@ -99,3 +99,10 @@ shell command that names `critical-human-proof.json`. The PO must therefore
 also run `apply` and `authorize-commit` by hand, a second PO step per package.
 That contradicts "the PO signs once per candidate". Deferred from round 3 of
 the signed bundle (commit `866be2139`).
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — A native-Windows run of the route and the skipped backslash-path case is missing
+  Run the signed-quality-package tests and the guard-lifecycle-ready backslash-path case (currently skipped off-Windows) natively via cmd.exe on a /mnt/d clone. The guard-lifecycle-ready suite is large, so expect hours; run just the quality-package and backslash cases if the runner allows. Closes when the skipped case passes natively.

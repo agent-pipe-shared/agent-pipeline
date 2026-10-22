@@ -42,3 +42,10 @@ injects a returned refusal. Due before the 0.7.0 release candidate.
 - **Rationale:** commit(s) `ddabe0ae3`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Triage closes the item only after the 0.7.0 candidate host checklist
+  Fix ddabe0ae3 is in source and CHRB cases for a RETURNED refusal exist (clone-hook-readiness.rollback.test.mjs lines 203-256). Running `node scratch/run-in.mjs <clone> <label> plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs` on Linux with all CHRB cases passing closes the item's own acceptance; the 'host checklist' adds no host behaviour the item names.

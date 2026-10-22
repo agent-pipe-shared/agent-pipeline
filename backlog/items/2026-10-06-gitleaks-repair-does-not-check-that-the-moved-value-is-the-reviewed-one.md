@@ -44,3 +44,12 @@ the live finding's value at the OLD line binding and refuses on mismatch. Due be
 - **Assignment (if accepted):** F1 test-only follow-up dispatch; F2 staged `verify.mjs` registration for the PO's next
   signature. The item stays open until both land (due before the 0.7.0 release candidate).
 - **Date:** 2026-10-06
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Run the repair route once against the real gitleaks binary; the pin uses synthetic scanner JSON
+  A real gitleaks binary exists on this WSL machine. Build a throwaway repo with a stale content-v1 entry whose value changed at the same path/rule/column and run scripts/gitleaks-repair-ignore.mjs against the real scanner output; closes when the repair refuses with the typed reason and leaves the ignore file untouched, and a same-value control repairs.
+- **NOT-BLOCKED** — Triage F2: registering the repair suite in protected verify.mjs needs a signature-bound patch if not yet landed
+  Already landed: harness/scripts/verify.mjs line 718 registers gitleaks-repair-ignore-value-binding-tests (gitleaks-repair-ignore.value-binding.test.mjs) in the dress2 clone.

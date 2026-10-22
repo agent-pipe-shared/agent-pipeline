@@ -29,3 +29,10 @@ issue, as its own work item separate from the read-target fixes.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-DECISION** (decided: D130) — Name the fixture issue the item refers to, or declare that clause out of scope; the backlog text never says which fixture
+  The item only says 'has a fixture issue' (RGGRAM split from bundle commit 866be2139) and never names it, so no agent can verify or close that part.

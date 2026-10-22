@@ -45,3 +45,10 @@ signed package.
   and by the real-git cases in `plugins/pipeline-core/lib/git-null-device-sites.test.mjs` (8 cases, 8 pass, 0 fail, 0 skip).
   The pin now also asserts that these enforcers exist. Not verified here: a native Windows run on Node v24 (the
   open-target cases that matter on win32 ran on Linux only).
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — A native Windows single-file run must leave no real NUL file in the repository root
+  Run lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs and one other sink-using test file with Windows node (confirm `node --version` is v24 on the Windows side) in a /mnt/d clone via cmd.exe, then check `git status`/dir for a root-level NUL file. Minutes, not hours.

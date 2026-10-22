@@ -29,3 +29,12 @@ PO-Auftrag: Die Pipeline muss den Wechsel selbst ausführen, nicht nur vorschlag
 Decision register: `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md` row D99. Within one model family (for
 example Opus, Sonnet, Haiku) the newest version is selected automatically, without a new confirmation. Only a NEW
 family needs the PO's decision. This item's rule therefore stands as written; it is the authoritative rule for version bumps. The opposed item `2026-10-16-model-role-bootstrap-ignores-version-bumps-within-a-family` is amended accordingly (its "propose, then accept" acceptance applies to a new family only).
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **NOT-BLOCKED** — Decide the D66 typed-pending row for the model-family cases
+  D66 already decided it: the typed latent reds MFHS002-008, MFHS023, MFHS028, MFI012, MFI013, MFMP003 become typed pending cases naming their backlog item; D99 settles the version rule and D113 builds the settled journal. No decision is missing.
+- **HOST-SESSION-NEEDED** — Installed-host acceptance on qualified Codex, Claude and Antigravity runners (pin case C5, real dispatch id, Offline/Compact)
+  Needs a real dispatch id from an installed Codex, Claude and Antigravity session (authenticated model turns, Offline/Compact on the host); observed: the automatically selected newest family version in the real dispatch. No agent may drive these.

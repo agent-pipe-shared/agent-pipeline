@@ -41,3 +41,12 @@ acceptance on the next stamped candidate remains open.
 - **Rationale:** commit(s) `d1a015ff5`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Re-run the real Agy global update and first greenfield preflight on the newly installed local candidate
+  The item states a fixture pass alone does not close it (source fix d1a015ff5; refresh 13/13, topology 9/9, installer 14/14 pass). It needs a stamped and installed candidate and the real agy 1.2.13 global update, which mutates the PO's real agy config and is not an agent action.
+- **PO-SIGNATURE** — A fresh stamp for the three-runner manifest build is a PO call
+  Stamping is an operator ceremony; D80 (2026-10-21) fixes the order: the full 0.7.0 scope first, then ONE candidate, and the Elephant does not stamp until the PO actively demands it (stamp, local greenfield tests, install, final release verify). Collect it into the 18:00 operator sitting list.

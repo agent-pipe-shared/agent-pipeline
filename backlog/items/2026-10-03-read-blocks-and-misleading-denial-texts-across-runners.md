@@ -77,3 +77,10 @@ a Codex row and an Antigravity row next to the Claude row; both start the real n
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run the WSL UNC exact-file admission case (U3) on native Windows or WSL, where it is not skipped
+  U3 (pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs line 306) skips on a non-win32 host (typed Linux-host skip) and runs on win32; run that pin with Windows node via cmd.exe on a /mnt/d clone against a \\wsl.localhost path reachable through interop. Minutes.

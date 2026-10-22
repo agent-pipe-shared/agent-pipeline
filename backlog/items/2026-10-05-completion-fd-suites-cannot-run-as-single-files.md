@@ -45,3 +45,10 @@ single-suite runner that opens the descriptor. Add a test for both modes.
 - **Rationale:** commit(s) `2f0c00932`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — The single-file route was counted on Linux only; the native Windows run is still missing
+  Fix 2f0c00932 (no-op recorder when fd 3 is not open) is pure Node, no model or UI. Run plugins/pipeline-core/hooks/post-compact-reground.test.mjs and the Codex/Antigravity adapter suites as single files with Windows node via cmd.exe on a /mnt/d clone; closes when the cases run with no TCC-FD-WRITE/EBADF. Single files, expected minutes, not hours.

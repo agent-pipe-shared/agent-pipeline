@@ -72,3 +72,12 @@ Added acceptance (0.7.0, major):
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-DECISION** (decided: D125) — Decide how the retired course is re-targeted so it can consume a fallback result as role evidence
+  Acceptance says 'the course accepts the fallback result as the role's evidence', but the course it names is retired; the target for that acceptance is undefined.
+- **HOST-SESSION-NEEDED** — Check the host-boundary route against a live Codex sandbox
+  The spawnSync EPERM at the Codex default sandbox edge and the declared host boundary only occur inside a live Codex session (codex app/CLI turn); an agent may not drive an authenticated Codex turn. Observed: admitted test commands route to the host boundary from the first call with no EPERM.

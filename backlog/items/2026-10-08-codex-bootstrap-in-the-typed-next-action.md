@@ -57,3 +57,10 @@ The deferral pin is retargeted to this state (it still fails if the preflight st
 Elephant triage: close as obsolete (premise refuted, route retired). The inventory row `docs/admin-steps-inventory.md` line 54 and
 candidate 6 still describe the step as automatable and are stale; correcting them was left to the triage because the inventory
 carries row counts.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **NOT-BLOCKED** — Decide whether the recurring-toil premise is verified or the item is deferred to the post-0.7.0 automation lane
+  Premise refuted by the agent on 2026-10-22 (pin codex-bootstrap-in-the-typed-next-action.test.mjs): the script is a per-design-package producer, not a host setup step, and ADR-0085 returns DESIGN-COURSE-RETIRED before it does anything. Recommended disposition is close as obsolete; this is an Elephant triage entry, not a PO question.

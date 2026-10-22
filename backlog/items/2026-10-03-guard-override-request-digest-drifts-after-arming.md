@@ -47,3 +47,10 @@ capability must say so explicitly.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run the seed-sign-arm-retry sequence on a native Windows host; the acceptance names Windows and POSIX and the counted run is POSIX
+  The pin (pins/guard-override-request-digest-drifts-after-arming.test.mjs) signs with a generated throwaway ed25519 key (generateKeyPairSync), so it needs no PO signature and no skip on win32. Run it with Windows node via cmd.exe on a Windows-drive clone; expected minutes. Closes when seed, sign, arm and identical retry consume the capability on win32.

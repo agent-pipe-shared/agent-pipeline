@@ -52,3 +52,10 @@ option holes open. The patch must not be signed or applied as-is.
 
 These belong to the R2 work package (W1-5) and to the closed-grammar acceptance
 above; verify with synthetic fixtures only.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run the Windows drive-spelling credential denial case on native Windows
+  A3 (pins/read-only-guard-admits-execution-and-output-options.test.mjs line 321) runs only on win32; run that pin with Windows node via cmd.exe on a /mnt/d clone; closes when A3 passes. Minutes.

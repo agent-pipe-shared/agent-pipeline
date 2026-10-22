@@ -78,3 +78,10 @@ signed. It must recognise the request it was given and show its members,
 paths and base commit. Signing also took about 4 minutes wall-clock; measure
 where the time goes. See also
 `2026-10-04-signed-quality-package-route-is-not-agent-operable-on-windows.md`.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-SIGNATURE** — A real PowerShell ceremony showing the compact prompt is not shown
+  The compact prompt is observed in the PO's own PowerShell terminal in front of the passphrase prompt of a real sign-intent; an agent cannot sit at that prompt or sign. Line count and file digest are already testable by agents; only the real ceremony view is open.

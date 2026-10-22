@@ -119,3 +119,10 @@ Residual, not changed here: `roles/critic.md` CR-03 (standard stage) still tells
 creates" a per-dispatch subdirectory, while the template and agent now say the native dispatch guard allocates the notes
 directory on the first admitted Write. The role text predates the guard-owned route and should be reconciled by the
 role owner.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — The live check that an installed Critic dispatch persists its notes is still open; the native Windows run of the pin is also missing
+  Live part: a real Critic dispatch on an installed Claude host must write critic-notes.md through the guard-allocated Write/Edit route (model turn, no agent may drive it). The native pin lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs could be run through Windows interop (WINDOWS-INTEROP-RUN, minutes), but that only closes the second half.

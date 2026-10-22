@@ -48,3 +48,10 @@ warning; a dead or previous-boot descriptor does not. Owner: Elephant. Due: befo
 - **Rationale:** a safety warning that silently never fires on the PO's platform is a false assurance.
 - **Assignment (if accepted):** 0.7.0 candidate (BN: not a Batman/Nightwing item).
 - **Date:** 2026-10-09
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — The warning is proven through platform seams on Linux; a real second session on native Windows has not been run
+  The warning is produced by pipeline-start-preflight.mjs and lib/worktree-lifecycle.mjs, not by a model. Run the PHX-WP-AAC01-MULTISESSION cases of pipeline-start-preflight.test.mjs plus worktree-lifecycle.test.mjs natively, then two real preflight processes against one repo via cmd.exe; closes when the second one emits the live-probable warning and a dead or previous-boot descriptor does not. Use a name-pattern filter so it stays short.

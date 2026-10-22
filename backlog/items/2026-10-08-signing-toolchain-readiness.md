@@ -45,3 +45,10 @@ Owner: pipeline; due 2026-10-31.
 - **Rationale:** decision AO: automatable admin step.
 - **Assignment (if accepted):** post-0.7.0 automation lane unless pulled in.
 - **Date:** 2026-10-08
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — The recurrence was a non-default Git root on a Windows PowerShell PATH; no counted native-Windows run of the pin exists
+  Run the readiness-report pin natively through cmd.exe with a controlled PATH that omits openssl and a Git under a non-default root (ucrt64 layout), expecting the typed missing-OpenSSL repair. Fast, no secrets.

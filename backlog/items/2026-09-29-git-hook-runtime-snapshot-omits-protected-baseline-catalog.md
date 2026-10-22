@@ -98,3 +98,10 @@ Critic review, and PO acceptance. The item status stays `open`.
 - **Rationale:** commit(s) `26fef9e7d`, host run needed.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **NOT-BLOCKED** — Counted Linux/WSL run of the onboarding suite
+  Already done: item section 'Counted runs 2026-10-22' records project-onboarding-v3.test.mjs 216 PASS / 0 fail in 467 s, git-hook-runtime-snapshot.test.mjs 8/8 and pre-commit-hook-install.test.mjs 59/59 on Linux/WSL2 at f3a9f02cb. Remaining item work (Full Verify, Critic, PO acceptance) is outside this clause.

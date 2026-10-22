@@ -33,3 +33,10 @@ share one claim registry and RC-1/RC-2 still hold.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — The landed-creation cases (OWN-5, OWN-6) skip on a non-Linux host; run them on native Windows
+  A skip on non-Linux means a native Windows run would only skip again; WSL is Linux, so run the owning suite here with node scratch/run-in.mjs and confirm OWN-5/OWN-6 execute and pass (0 skip). Not verified: I did not read the test to confirm the skip condition; if the cases need a real win32 implementation, reclassify as WINDOWS-INTEROP-RUN.

@@ -132,3 +132,10 @@ out-of-root and credential-root reads (keep
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run AP5 on native Windows and re-run the live read shapes after install
+  AP5 and the read-guard pin cases can run natively through cmd.exe on a /mnt/d clone (D118: the large guard suites take hours; run only the item's pin and the Windows case-differing-session-dir regression). Re-running the live Read/Grep/Glob shapes after install is a separate host session on the installed candidate.

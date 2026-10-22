@@ -47,3 +47,12 @@ run:
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **NOT-BLOCKED** — Record that the R4-9/R4-10 typed sub-reason clause is superseded by the ADR-0085 retirement, or keep it
+  Decided: D63 (po-decisions-2026-10-18.md line 90) confirms that only the named clauses drop in AC-124 (R4-7, R4-9, R4-10) as superseded by the ADR-0085 retirement; recording it in the item is agent doc work.
+- **WINDOWS-INTEROP-RUN** — A native Windows run of the retained argv, trust-root and schema behaviours is missing
+  Run the item's pin under lib/pins/ natively via cmd.exe on a /mnt/d clone (retained behaviours: runner argv, home-derived trusted executable roots, schema dialect accepted by the CLI); the Claude CLI also exists on the Windows side. Small pin file, expected minutes. No model call needed.

@@ -54,3 +54,10 @@ Two problems follow:
 - **Rationale:** commit(s) `57e397b0f`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Item triage closes it only after the 0.7.0 candidate host checklist (an Explore dispatch on an installed host)
+  The fix (57e397b0f) is in source; the closing check is a real Explore dispatch on an installed Claude host, which spends a model turn. The regression test with the exact tool_input shapes can be run on Linux but does not close the host checklist.

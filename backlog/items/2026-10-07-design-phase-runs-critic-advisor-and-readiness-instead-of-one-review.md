@@ -110,3 +110,10 @@ Added acceptance (0.7.0, D64):
 - A report is sanitized before the first canonical receipt; the receipt chain binds the original
   and the published digest and counts spent rounds independently of file names, so a delta after a
   formal correction is admitted without a budget exception.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-SIGNATURE** — The protected implementation-boundary guard step for the fitness-model check needs a PO-run ceremony
+  The change touches protected guard files; per the human-guard-override flow it lands only via a signature-bound patch applied by the PO as human operator (seed the denial, prepare-authorization, PO signs, authorize-by-signature, identical retry). Agent prepares the patch and plan; PO signs at the 18:00 sitting.

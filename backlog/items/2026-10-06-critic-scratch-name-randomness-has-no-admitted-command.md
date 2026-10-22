@@ -81,3 +81,10 @@ The residual named above is closed. There is no admitted scratch-name command to
 - `plugins/pipeline-core/agents/critic.md` (Report durability paragraph) and `templates/prompts/critic-review.md` with its vendored copy (Report durability paragraph): "the subdirectory you already create" now says the guard allocates it.
 
 The vendored template stays byte-identical (`plugins/pipeline-core/scripts/check-vendored-template-sync.mjs` passes). `plugins/pipeline-core/scripts/critic-notes-write.mjs` (the AC-143 script route) is not named by any of these texts and is untouched. No pin or test was changed.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **NOT-BLOCKED** — A live Critic dispatch must create its notes without an improvised randomness source
+  The item was rejected as a duplicate on 2026-10-22 and merged into critic-scratch-notes-write-is-refused-again; the no-randomness checks are pinned there (9 cases, 28 run, 26 pass, 0 fail, 2 typed skips). The remaining live observation is carried by that canonical item's host clause, not this one.

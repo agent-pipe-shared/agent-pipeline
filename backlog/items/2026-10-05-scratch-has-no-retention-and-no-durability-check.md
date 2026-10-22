@@ -35,3 +35,10 @@ Matrix: all runners and platforms; consumer repositories too.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — The item matrix names Windows; the pin has no counted native-Windows run
+  Run the item's pin test (scratch sweep and durability check) through cmd.exe with Windows node on a /mnt/d clone; it is a small filesystem suite, expected minutes, not hours. Closes when it passes natively and is counted in the receipt.

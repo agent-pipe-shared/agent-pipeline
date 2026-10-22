@@ -100,3 +100,10 @@ elaborating them before binding; and each draft embedded the full source materia
 (about 87 KB, so three copies in total). The verbatim-copy half is addressed by commit
 38e1758a4 (`design-input.md` is now a provenance record). The header contradiction
 ("do not hand-edit" versus "elaborate before binding") remains open.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — The host response budget for the same large input needs a real host measurement
+  Item states native token counts, host output budget and display truncation are unknown. Needs a real Codex (and Claude) host turn with the 14 KB input to observe truncation; the byte-level measurement (47,815 vs 2,153 bytes) is already done and is not the gap.

@@ -104,3 +104,10 @@ an interim unblock, not this target model. Owner: D3/D4.
 - **Rationale:** commit(s) `21fee38d1`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **PO-SIGNATURE** — Explicit established/active repository state with a ratcheting baseline under deferral (model gap D3/D4) is a model decision
+  Decided in direction by D66 (AC-119, po-decisions-2026-10-18.md line 93): the 'established with ratchet' state goes into the AC-9 adoption diagnosis (D60) as part of its priced proposal and is signed once together with AC-9. What is outstanding is that signature at the operator sitting, not a new question.

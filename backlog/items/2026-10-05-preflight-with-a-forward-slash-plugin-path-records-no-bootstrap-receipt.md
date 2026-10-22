@@ -53,3 +53,10 @@ Normalize the script path (separator and case) before matching and before derivi
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Renew the win32 count at current HEAD; the 11 win32 cases are skipped on Linux
+  Run lib/pins/preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt.test.mjs with Windows node via cmd.exe on a /mnt/d clone at current HEAD (P1-P5 are win32-only); record pass/skip/todo counts. Small file, minutes.

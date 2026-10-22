@@ -31,3 +31,10 @@ greenfield happy path and rollback boundary.
 - A failure identifies its cell without waiting for unrelated cells.
 - The full selected Verify path has a measured lower wall time without raising
   process or memory pressure beyond the runner budget.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Measure the lower wall time of the selected Verify path on Linux/WSL (the AC3 measurement-hold skip)
+  Time the split onboarding-init greenfield cases (pins/onboarding-init-greenfield-matrix-is-serial-and-slow.test.mjs and the split files) on Linux against the 368.5 s baseline, serially with a private TMPDIR, and record wall time; the measurement is a plain timed run, no host involved.

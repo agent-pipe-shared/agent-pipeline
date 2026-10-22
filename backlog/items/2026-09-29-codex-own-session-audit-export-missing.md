@@ -48,3 +48,10 @@ Added acceptance (0.7.0, major):
 - It works without an environment query and without a PO signature series.
 - A scaling test with many foreign sessions in the store stays within the scan bound
   (indexed or repository-filtered scan) and reports truncation honestly.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **DEFERRED** — Live-store field spellings and the Windows positive path, named unverified by b6d3c7a91, need a real Codex host run
+  This is AC-175 (forensics export): D63 (2026-10-20, po-decisions-2026-10-18.md line 90) lists it among the deferrals past 0.7.0, and D64 repeats that the audit-export major stays with AC-175, deferred by D63.

@@ -39,3 +39,10 @@ before the 0.7.0 release candidate.
 - **Rationale:** an unpinned security refusal can regress silently.
 - **Assignment (if accepted):** B-S1-F seam dispatch, then a test pin; 0.7.0 candidate.
 - **Date:** 2026-10-07
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run the P1/P2 seam and NOT_SECURE cases on native Windows to get a counted result
+  Run lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs with Windows node via cmd.exe on a /mnt/d clone (the WIN_ONLY cases at lines 106-155 skip on Linux); record the counted result. Minutes.

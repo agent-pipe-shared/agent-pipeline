@@ -58,3 +58,12 @@ ten case bodies are preserved. Bootstrap Source SHA:
 `76c41f1d7962b0c824ace4ac63e394e265201c0173a49161bbce9dc0054871ec`.
 Combined Verify, independent Critic and installed attended acceptance remain
 pending. This progress does not close the item or qualify the final candidate.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Installed attended acceptance of the confirmation prompt on a real Codex or Claude terminal (item says it remains pending)
+  An attended human must run the installed model-role-bootstrap in a real Codex or Claude terminal and type the displayed digest; observed: the prompt shows the expected digest, wrong input is explained, REUSED with seven receipts. An agent must never confirm on the human's behalf.
+- **LINUX-RUN** — Combined Full Verify including this pin on the WSL run is not stated as complete
+  Run lib/pins/model-role-confirmation-prompt-obscures-required-digest.test.mjs (the 16 targeted cases) serially via node scratch/run-in.mjs on Linux; a complete Full Verify including it, with a recorded exit 0, closes the clause.

@@ -56,3 +56,10 @@ its distinct receipt remains retained. No overall onboarding PASS is claimed.
 - **Rationale:** commit(s) `26fef9e7d`, host run needed.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Run the complete original onboarding controller and the preserved original callback on Linux/WSL
+  The 2026-10-08 close-out check only failed because the named onboarding test exceeded 600s; that is a timeout, not a host limit. Run the controller serially with a private TMPDIR via scratch/run-in.mjs in the background with a raised timeout; closes when all callbacks are observed with zero FAIL and the original unsafe-layout callback passes unchanged.

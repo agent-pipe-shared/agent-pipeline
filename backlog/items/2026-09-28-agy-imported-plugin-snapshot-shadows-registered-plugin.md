@@ -316,3 +316,12 @@ unverified, especially S2/S3.
 - **Rationale:** Physical duplicate/stale topology and installer/diagnostic blind spots are confirmed. Actual precedence, activation scope and supported remediation commands remain spike requirements, not confirmed outcomes. No installation fix or version-correct acceptance run has been completed.
 - **Assignment (if accepted):** First bounded S1–S6 validation, then source-backed topology diagnostics and convergent host-owned refresh, preserving unrelated configuration; version-correct acceptance evidence remains required.
 - **Date:** 2026-09-28
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Spike S1-S6 on a real agy CLI (load precedence, plugins.json root handling, import, restart) and the loaded-root proof
+  The agy CLI exists on WSL, and plugin install/validate/list probes could in principle run in a disposable HOME, but the item demands a disposable isolated account/container with no PO credentials, and the loaded-root proof (which plugin root a new session actually loads, restart behaviour) needs a live Antigravity session. D65 also routes 'does a workspace entry load' to the PO's AGY-WSL test.
+- **NOT-BLOCKED** — Pick the load topology (workspace-local only or agy-managed) after the spike
+  Decided: D65 (po-decisions-2026-10-18.md line 92, AC-110) fixes topology option B (workspace-local only: .agents/plugins.json, no global managed copy, entry or hook wiring) as the target; a negative result from the PO's AGY-WSL test comes back as a finding.

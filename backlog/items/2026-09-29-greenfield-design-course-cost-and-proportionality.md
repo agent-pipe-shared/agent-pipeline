@@ -87,3 +87,12 @@ evidence for the one-approval happy path.
 The existing mini profile and previous cost work do not demonstrate this
 feature-sized greenfield happy path. This is an architecture/course change;
 measure the installed runner outcome before closing.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Demonstrate a fresh small-project run on an installed runner that reaches implementation with one final PO gate
+  Requires an installed runner (Claude, Codex or Antigravity) executing the real design course with Advisor and readiness model turns and the PO's final plan approval; no agent may drive that. Observed: zero intermediate PO proofs, one final DWP proof, implementation admitted only after it.
+- **PO-DECISION** (decided: D125) — Confirm the original Advisor-plus-readiness acceptance is replaced by the successor policy (one review, no readiness, ADR-0085) and that telemetry stays deferred
+  Question: is the item's original acceptance (Advisor plus independent readiness before one final gate, with phase-time telemetry) superseded by ADR-0085 (one review, no readiness) so the course test is judged against the successor policy?

@@ -44,3 +44,10 @@ and can produce the unwanted two-step human approval sequence.
   incomplete packages and replayed final approvals.
 
 This is an open PO requirement, not a current guarantee or completed fix.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Walk the happy path once on an installed host (greenfield test) to show a single final PO approval
+  A greenfield session on an installed Claude, Codex or Antigravity host with the PO giving the single final approval; observed: no pre-submission acknowledgement and implementation refused until the final decision. Per the PO's own plan, greenfield tests run after the content is secured.

@@ -42,3 +42,10 @@ Security candidates found by code reading. Neither was probed: no credential sto
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — The directory-symlink alias case skips on native Windows and needs a native run there
+  The pin skips on win32 only because native Windows cannot create directory symlinks without privilege (HOST_LIMIT); the symlink-alias case runs on Linux. Run lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs on Linux; a native run would add nothing the case can test.

@@ -27,3 +27,10 @@ format would risk selecting the wrong message or silently changing whitespace.
   checkpoint, with replay/drift checks and a size limit.
 - Prove the chat-only greenfield path avoids agent re-emission of the full
   message and still captures byte-exact multiline content.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Only the Claude capture adapter has a host-shaped route; a real chat turn capture on installed Claude, Codex and Antigravity hosts is unproven
+  Requires a real chat turn in each installed host (Claude, Codex, Antigravity) to observe whether a byte-exact turn reference is exposed; codex/agy/claude CLIs need an authenticated model turn, which an agent must not make. Where a host exposes none, the typed-unavailable result is the acceptance and must also be observed on the host.

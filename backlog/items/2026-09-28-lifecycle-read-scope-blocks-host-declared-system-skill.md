@@ -50,3 +50,10 @@ was read, and no exceptional authorization was consumed.
   `declared-system-skill-read-requires-human-override` (AC-147) by PO decision
   of 2026-10-16. The item stays open; AC-209 is not counted against the 0.7.0
   local test candidate.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **DEFERRED** — Verify declared-skill admission at the installed Codex lifecycle boundary
+  The item is closed as a duplicate (2026-10-22) and merged into 2026-09-28-declared-system-skill-read-requires-human-override.md; both were deferred past the 0.7.0 candidate by PO decision of 2026-10-16 (AC-147 and AC-209 not counted; item Deferral line 2026-10-17). The pin's declared-skill cases are intentionally skipped as NATIVE_HOLD.

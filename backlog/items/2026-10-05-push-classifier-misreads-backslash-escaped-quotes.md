@@ -51,3 +51,10 @@ the plain `echo`-wrapped shape and the quoted-executable shape as refused. Secur
 - **Rationale:** commit(s) `6b0413700, a2857ac3a`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — The Codex route relies on the classifier alone and was not measured live on Codex
+  A live measurement needs a real Codex session whose model emits an escaped-quote git push command through codex-pretool-guard (authenticated model turn). A synthetic payload run of the adapter on Linux (pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs) is possible but does not count as live.

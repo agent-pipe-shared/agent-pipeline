@@ -54,3 +54,10 @@ The implementation design is frozen in
 `f9d805471e957902c4aae847a32c8659826536052501480b3f2322afa77431dd`.
 Source delivery and focused qualification are in progress; this item remains
 open until its candidate-bound acceptance is verified.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — Run the two original onboarding host callbacks on a real Codex host-managed readonly .git mount; native win32 cannot manufacture the readonly directory
+  On Linux/WSL a readonly empty .git is manufactured with chmod 0555, which is how the AC-188 pin builds it. Run pins/governance-scope-rejects-readonly-host-git-control.test.mjs plus the two original callbacks in lib/project-onboarding-v3.test.mjs (216 PASS already counted 2026-10-22 for the sibling snapshot item) with 0 skip. Residual: a literal Codex-managed mount is a host property, covered by the install checklist, not by this clause.

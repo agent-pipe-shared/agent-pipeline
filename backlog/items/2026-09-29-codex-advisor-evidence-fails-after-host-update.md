@@ -36,3 +36,10 @@ failure path, not yet a complete forensic diagnosis of the greenfield run.
 Historical executable comparison is implemented and the targeted Advisor
 execution suite passes 7/7, including a changed-binary regression. Safe
 subcheck diagnostics and installed greenfield replay remain open.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Replay the affected greenfield design package with the installed Codex build
+  Source fix and 7/7 targeted suite exist; the replay needs the installed Codex build and a real (authenticated) Advisor execution record from the greenfield run, which no agent may produce. Observed is the sealed Advisor result staying readable after a Codex binary change.

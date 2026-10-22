@@ -25,3 +25,10 @@ done_when: manual
 - Measure first-run and denial output bytes for all three runners and assert
   a stable budget in tests. Confirm that an agent can still follow the exact
   action without reconstructing commands.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — Measure first-run and denial output on installed Claude, Codex and Antigravity hosts; the pin uses the real CLI with injected seams only
+  Needs the installed start skill, first-run bootstrap and a real guard denial inside each of the three hosts to measure bytes in the host context; Claude Desktop and the Codex/Antigravity app flows cannot be driven by an agent. Observed: first-run and denial output sizes per runner against the pinned budget.

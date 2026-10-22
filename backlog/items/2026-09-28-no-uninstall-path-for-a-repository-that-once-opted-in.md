@@ -235,3 +235,10 @@ the present projection manifest; it remains an uninstall design requirement.
   as a destructive test fixture.
 - **Date:** 2026-09-28
 - **Scope record:** [Candidate scope intake](../evidence/2026-09-28-candidate-scope-intake.md).
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **LINUX-RUN** — The alias and private-mode refusals (PU-ALIAS, PU-PRIVATE-MODE) skip on native Windows; run an uninstall on a real installed host
+  The skip is a typed win32 host limitation that names the Linux/WSL run (PO decision K7); on Linux the case at pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs line 279 runs. Run that pin with node scratch/run-in.mjs. Only B2's actual runner cache pruning on an installed host remains unmeasured and is not part of this clause's closure.

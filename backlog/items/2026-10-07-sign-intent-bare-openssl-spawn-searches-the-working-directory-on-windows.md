@@ -49,3 +49,10 @@ test with a decoy `openssl` in the working directory that must never start.
 ## Residual risk (PO decision R, 2026-10-07)
 
 On win32 the signing spawn keeps the PO key directory as its cwd, so a planted `openssl.exe` or `openssl.com` in that directory would be started instead of the real binary. This remains because libuv searches the child cwd before PATH when resolving a bare executable name, and `NoDefaultCurrentDirectoryInExePath` is not honoured by that lookup. The operating rule is that the PO keeps the key directory free of executables.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — The Windows libuv lookup behavior needs a native-Windows run; it was never machine-verified
+  Plant a decoy openssl.exe in a throwaway cwd/key directory and spawn a bare openssl with Windows node via cmd.exe (shell false); observe whether the decoy starts. Seconds to run, no secrets involved. The item already records the residual risk as PO decision R, so this only confirms the documented behavior.

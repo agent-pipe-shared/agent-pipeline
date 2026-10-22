@@ -45,3 +45,10 @@ before the change. Due before the 0.7.0 release candidate.
 - **Rationale:** commit(s) `28eac0677, d69d39ad5`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — A whole-repository native Semgrep run (the original Windows measurement) is not covered by the fake-binary pin
+  Run the shipped security scan on the whole repository clone with real native Semgrep (1.171.0 shipped ruleset) via cmd.exe; expect the 17 results reported with a visible partial-parsing coverage note instead of ERROR. Whole-repo scan may take several minutes; needs Semgrep installed on the Windows side.

@@ -1,0 +1,81 @@
+[
+ {"itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection", "clauses": [
+  {"clause": "Run the complete original onboarding controller and the preserved original callback on Linux/WSL", "status": "LINUX-RUN", "detail": "The 2026-10-08 close-out check only failed because the named onboarding test exceeded 600s; that is a timeout, not a host limit. Run the controller serially with a private TMPDIR via scratch/run-in.mjs in the background with a raised timeout; closes when all callbacks are observed with zero FAIL and the original unsafe-layout callback passes unchanged."}
+ ]},
+ {"itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course", "clauses": [
+  {"clause": "Decide whether acceptance bullet 1 is superseded by the ADR-0085 retirement or must be re-targeted to the present-plan review-receipt route", "status": "PO-DECISION", "detail": "Item acceptance bullet 1 (Spec 21.5 R5-6/R5-8, one revision step rebinding sources) refers to an Advisor-course route that ADR-0085 may have retired; only the PO can say whether the bullet is dead or moves.", "options": "(A) Declare bullet 1 superseded by ADR-0085 and close the item on bullets 2-3 only (or retire them too); (B) re-target bullet 1 to the present-plan review-receipt route and keep it open. Recommendation: A if ADR-0085 really removed the Advisor course for native design, because B would build against a retired route."}
+ ]},
+ {"itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback", "clauses": [
+  {"clause": "Decide how the retired course is re-targeted so it can consume a fallback result as role evidence", "status": "PO-DECISION", "detail": "Acceptance says 'the course accepts the fallback result as the role's evidence', but the course it names is retired; the target for that acceptance is undefined.", "options": "(A) Re-target to the present-plan review-receipt route so a fallback-self-dispatch result is accepted there with an honest assurance label; (B) drop the clause and keep only the preflight report and the recorded route field; (C) defer past 0.7.0. Recommendation: A, since the evidence record is the point of the requirement."},
+  {"clause": "Check the host-boundary route against a live Codex sandbox", "status": "HOST-SESSION-NEEDED", "detail": "The spawnSync EPERM at the Codex default sandbox edge and the declared host boundary only occur inside a live Codex session (codex app/CLI turn); an agent may not drive an authenticated Codex turn. Observed: admitted test commands route to the host boundary from the first call with no EPERM."}
+ ]},
+ {"itemId": "pipeline.scratch-has-no-retention-and-no-durability-check", "clauses": [
+  {"clause": "The item matrix names Windows; the pin has no counted native-Windows run", "status": "WINDOWS-INTEROP-RUN", "detail": "Run the item's pin test (scratch sweep and durability check) through cmd.exe with Windows node on a /mnt/d clone; it is a small filesystem suite, expected minutes, not hours. Closes when it passes natively and is counted in the receipt."}
+ ]},
+ {"itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states", "clauses": [
+  {"clause": "The live readback that a blocked session saves a report without a PO override (and apply_patch lane on Codex) needs an installed-host run", "status": "HOST-SESSION-NEEDED", "detail": "Needs an installed plugin in a real Claude session blocked by a lifecycle state (Write of a scratch report admitted without override) and a real Codex session for the apply_patch lane; fixtures already cover the guard, the live host tool path is what is unobserved."}
+ ]},
+ {"itemId": "pipeline.script-mediated-writes-bypass-protected-test-paths", "clauses": [
+  {"clause": "The original incident was on Windows; no counted native-Windows run of the pin exists", "status": "WINDOWS-INTEROP-RUN", "detail": "Run the codemod-shape regression pin (node script rewriting a protected test file is detected or refused) natively through cmd.exe on a /mnt/d clone. The pin itself is small; the surrounding guard suites are the multi-hour part, so run only the pin file."}
+ ]},
+ {"itemId": "pipeline.security-scanner-failure-provenance", "clauses": [
+  {"clause": "Genuine native Semgrep acceptance is not claimed by the synthetic pin and stays open", "status": "WINDOWS-INTEROP-RUN", "detail": "Run the unchanged public PUSHSEED callback with the real Semgrep binary natively on a Windows-drive clone via cmd.exe (needs Semgrep installed on the Windows side; if absent, installing it is a prerequisite). Closes with a receipt showing the real executable/version and a scanner sidecar, reported separately from the fixture pin."}
+ ]},
+ {"itemId": "pipeline.semgrep-offline-default-version-check", "clauses": [
+  {"clause": "Native public-PUSHSEED acceptance against the final candidate is a separate obligation the item names; only a focused earlier receipt exists", "status": "WINDOWS-INTEROP-RUN", "detail": "Re-run the unchanged PUSHSEED callback with real native Semgrep against the final frozen candidate clone (Windows-drive clone via cmd.exe, Semgrep must be present on the Windows side). Cannot be done before the candidate is frozen; closes with exit 0 and a new receipt."}
+ ]},
+ {"itemId": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan", "clauses": [
+  {"clause": "A whole-repository native Semgrep run (the original Windows measurement) is not covered by the fake-binary pin", "status": "WINDOWS-INTEROP-RUN", "detail": "Run the shipped security scan on the whole repository clone with real native Semgrep (1.171.0 shipped ruleset) via cmd.exe; expect the 17 results reported with a visible partial-parsing coverage note instead of ERROR. Whole-repo scan may take several minutes; needs Semgrep installed on the Windows side."}
+ ]},
+ {"itemId": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement", "clauses": [
+  {"clause": "Name the fixture issue the item refers to, or declare that clause out of scope; the backlog text never says which fixture", "status": "PO-DECISION", "detail": "The item only says 'has a fixture issue' (RGGRAM split from bundle commit 866be2139) and never names it, so no agent can verify or close that part.", "options": "(A) PO names the fixture issue (or points to the RGGRAM notes) so it can be built; (B) declare the fixture clause out of scope and close on the capability placement alone; (C) defer. Recommendation: B unless a concrete failing fixture can be named quickly."}
+ ]},
+ {"itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows", "clauses": [
+  {"clause": "The Windows libuv lookup behavior needs a native-Windows run; it was never machine-verified", "status": "WINDOWS-INTEROP-RUN", "detail": "Plant a decoy openssl.exe in a throwaway cwd/key directory and spawn a bare openssl with Windows node via cmd.exe (shell false); observe whether the decoy starts. Seconds to run, no secrets involved. The item already records the residual risk as PO decision R, so this only confirms the documented behavior."}
+ ]},
+ {"itemId": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes", "clauses": [
+  {"clause": "The live HGO store sweep and the full sign-intent CLI ceremony need a Linux/WSL run with real private-directory modes", "status": "LINUX-RUN", "detail": "On a Linux-home clone seed a synthetic HGO request store (about 111 requests) and time sign-intent up to the disclosure/readiness stage; closes when the digest-keyed lookup returns in seconds and a missing openssl fails fast with its typed repair. The final passphrase signing of the ceremony is PO-only and not part of what an agent may run."}
+ ]},
+ {"itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks", "clauses": [
+  {"clause": "The pin signs with an in-memory fixture key; a real PO terminal signature on WSL and PowerShell is not shown. The item also defers its end-to-end proof to the three-runner happy-path item", "status": "PO-SIGNATURE", "detail": "A real single-line signing command run by the PO in a WSL terminal and in PowerShell, with one signature per approval, cannot be performed or faked by an agent. It is also covered only by the three-runner happy-path end-to-end run, so it closes together with that item."}
+ ]},
+ {"itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows", "clauses": [
+  {"clause": "A native-Windows run of the route and the skipped backslash-path case is missing", "status": "WINDOWS-INTEROP-RUN", "detail": "Run the signed-quality-package tests and the guard-lifecycle-ready backslash-path case (currently skipped off-Windows) natively via cmd.exe on a /mnt/d clone. The guard-lifecycle-ready suite is large, so expect hours; run just the quality-package and backslash cases if the runner allows. Closes when the skipped case passes natively."}
+ ]},
+ {"itemId": "pipeline.signing-default-test-fixture-root-escapes-the-repository", "clauses": [
+  {"clause": "The original import failure was on native Windows; the suite has no counted native-Windows run", "status": "WINDOWS-INTEROP-RUN", "detail": "Run plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs (cases RC21C001..RC21C005) natively with Windows node through cmd.exe on a /mnt/d clone. Small suite, expected minutes; closes when all five cases run past import and pass."}
+ ]},
+ {"itemId": "pipeline.signing-prompt-prints-the-whole-review-package", "clauses": [
+  {"clause": "A real PowerShell ceremony showing the compact prompt is not shown", "status": "PO-SIGNATURE", "detail": "The compact prompt is observed in the PO's own PowerShell terminal in front of the passphrase prompt of a real sign-intent; an agent cannot sit at that prompt or sign. Line count and file digest are already testable by agents; only the real ceremony view is open."}
+ ]},
+ {"itemId": "pipeline.signing-toolchain-readiness", "clauses": [
+  {"clause": "The recurrence was a non-default Git root on a Windows PowerShell PATH; no counted native-Windows run of the pin exists", "status": "WINDOWS-INTEROP-RUN", "detail": "Run the readiness-report pin natively through cmd.exe with a controlled PATH that omits openssl and a Git under a non-default root (ucrt64 layout), expecting the typed missing-OpenSSL repair. Fast, no secrets."}
+ ]},
+ {"itemId": "pipeline.source-agent-definition-change-locks-that-agent-until-install", "clauses": [
+  {"clause": "The item closes after the 0.7.0 candidate host checklist: a real installed-host dispatch with differing source and installed maxTurns is not shown", "status": "HOST-SESSION-NEEDED", "detail": "Needs the stamped candidate installed into a real Claude host, then a real Critic dispatch with differing source and installed maxTurns observed not refused with budget-tier-max-turns-conflict. Install plus dispatch is a host action after the operator sitting; the regression test already covers the logic."}
+ ]},
+ {"itemId": "pipeline.three-runner-happy-path-with-two-po-approvals", "clauses": [
+  {"clause": "One end-to-end greenfield run each on Claude, Codex and Antigravity reaching a pushed branch with exactly two PO proofs is missing", "status": "HOST-SESSION-NEEDED", "detail": "Three authenticated host sessions (Claude Windows, Codex, Antigravity app) with the PO giving exactly the plan and push approvals; agents may not drive model turns or sign. Observed: pushed feature branch, two proofs, zero guard overrides. The 2026-10-17 Codex WSL P0-1 delivery-state defect must be fixed in source first."}
+ ]},
+ {"itemId": "pipeline.unasked-advisor-export-consent-in-fresh-seed", "clauses": [
+  {"clause": "The pin drives the real driver with runner stubs; an installed-host first-answer round on each runner is not shown", "status": "HOST-SESSION-NEEDED", "detail": "Needs a fresh seed in a real Claude, Codex and Antigravity session where the PO answers the bundled first-answer round; observed: advisor_export.consent starts declined and flips to approved only after the PO's answer. Cannot be agent-driven."}
+ ]},
+ {"itemId": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason", "clauses": [
+  {"clause": "The item is WSL-only: a Verify run on a real /mnt/<drive> DrvFs checkout showing the typed hint is missing; the pin simulates permissive modes", "status": "LINUX-RUN", "detail": "This machine has real /mnt/d DrvFs: clone with --no-hardlinks under /mnt/d and run the verify-journal pin plus a Verify entry there, with a private TMPDIR. Closes when the output shows VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE in the cause chain and the typed hint naming the Linux-home clone workaround."}
+ ]},
+ {"itemId": "pipeline.windows-greenfield-scratch-write-denied", "clauses": [
+  {"clause": "A native-Windows run of the pin (absolute-path Write and PowerShell New-Item/Set-Content admitted) and a fresh Windows intake are missing", "status": "HOST-SESSION-NEEDED", "detail": "The guard pin can run natively via cmd.exe, but the clause also needs a fresh onboarding intake in a real Claude Windows session where Write and PowerShell scratch writes are admitted; that session cannot be agent-driven. The pin half alone is a WINDOWS-INTEROP-RUN on a /mnt/d clone."}
+ ]},
+ {"itemId": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures", "clauses": [
+  {"clause": "The eight win32-only cases need a native-Windows run, and the item's check that the v3 suite failure count drops there", "status": "WINDOWS-INTEROP-RUN", "detail": "Run the eight win32-only cases and the v3 onboarding suite natively through cmd.exe on a /mnt/d clone; the v3 suite is large and will take hours. Closes when the eight cases pass and the v3 failure count falls from about 125."}
+ ]},
+ {"itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error", "clauses": [
+  {"clause": "A native-Windows run of the drive-letter case and an observation of the installed Claude candidate in a fresh Windows session (A5) are missing", "status": "HOST-SESSION-NEEDED", "detail": "The drive-letter fixture can run natively via cmd.exe, but acceptance requires the installed Claude candidate observed in a fresh Windows session (A5), a real host onboarding of a non-Git project. That session cannot be agent-driven."}
+ ]},
+ {"itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action", "clauses": [
+  {"clause": "A native-Windows run proving install, marker readback, blocking push and removal, including the read-only descriptor EPERM assertion, is missing", "status": "WINDOWS-INTEROP-RUN", "detail": "Run the pre-push installer pin natively via cmd.exe with Git for Windows on a /mnt/d clone: install, marker readback, a blocking push to a local bare remote, removal, and the fsync read-only descriptor case. Single suite, expected minutes."}
+ ]},
+ {"itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake", "clauses": [
+  {"clause": "The 'preserve prior onboarding and uninstall behavior' clause rests on the other onboarding suites being green in a Full Verify", "status": "LINUX-RUN", "detail": "Run the other onboarding and uninstall suites (and the Verify journal) serially with a private TMPDIR on a Linux-home clone via scratch/run-in.mjs. Long but doable here; closes when all are green and the result is counted in a Full Verify receipt."}
+ ]}
+]

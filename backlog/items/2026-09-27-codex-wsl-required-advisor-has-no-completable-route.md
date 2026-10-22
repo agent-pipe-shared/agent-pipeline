@@ -217,3 +217,10 @@ must separate request coordinates from postexecution bindings, without guessed
 digests or a fake actual host result. This is a prototype integration finding,
 not a demonstrated installed failure. Evidence and constraints:
 `scratch/codex-advisor-durable-custody-design.md`.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — A real Codex/WSL Feature greenfield run must reach package validation with an answer or a governed unavailable exception
+  Item acceptance requires a real Codex/WSL Feature greenfield run on the installed candidate with host export approval; the ordinary answer path still reports ordinary-consult-host-callback-unavailable in source, and WSL is typed unavailable for the selected-sandbox route. Observed: final design-package validation passes with an answered or governed-unavailable Advisor receipt instead of stopping at DAC-RECEIPT-MISSING.

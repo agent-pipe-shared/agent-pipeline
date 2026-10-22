@@ -55,3 +55,10 @@ commit, and the classification of the 60 failures reported on 2026-10-04 (273 ca
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **WINDOWS-INTEROP-RUN** — Run guard-lifecycle-ready.test.mjs on native Windows and state the counted result
+  Run plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs (392 cases; Linux baseline 389 pass, 0 fail, 3 typed skips at f3a9f02cb) with Windows node through cmd.exe on a Windows-drive clone. Expected to take hours (large guard suite, POSIX-permission checks); record pass/fail/skip and classify any red case.
