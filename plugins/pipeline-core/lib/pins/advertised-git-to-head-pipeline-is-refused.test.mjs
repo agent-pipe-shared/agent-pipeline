@@ -93,7 +93,9 @@ for (const command of [
   "git log | head -501",
   "git log | cat",
   "git log | head -n 5 | head -n 2",
-  "git log | tail -n 5",
+  // QG-04: the entry "git log | tail -n 5" was removed from this refusal list and restated as an admitted case in the D114 tail
+  // section below (PO tile decision 2026-10-22: admit `tail` in the bounded git read pipeline in addition to `head`, D114 as written).
+  // Every other sink stays refused here and in the tail section (cat, wc, sort, tee, xargs, redirects, doubled sinks).
   "git log | head -n 5 > out.txt",
   "git commit -m x | head -n 5",
   "git push | head -n 5",
@@ -213,7 +215,6 @@ for (const command of [
   "git -C . diff --no-index a b | head -n 3",
   // sink bounds and shape are the existing ones
   "git -C . log | head -n 501",
-  "git -C . log | tail -n 3",
   "git -C . log | cat",
   "git -C . log | head -n 3 > out.txt",
   "git -C . log ; head -n 3",
@@ -230,6 +231,60 @@ for (const command of [
   "git -C . rev-parse HEAD | head -n 3",
 ]) {
   test(`D114 stays refused: ${command}`, () => { assert.equal(inRepo(command), false); });
+}
+
+// ------------------------------------------------------------------ D114 tail sink (PO tile decision 2026-10-22)
+// `tail` is admitted as the second sink of the bounded git read pipeline, with the same 1..500 bound, the same optional trailing
+// `2>/dev/null` and exactly the same containment / credential / -C rules as the head form. No other sink is added.
+test("D114 tail: the advertised git pipeline shape names tail with its bound and both spellings", () => {
+  const shape = ADMITTED_GRAMMAR_SHAPES.find((s) => s.spelling.includes("git-to-head"));
+  assert.ok(shape);
+  assert.match(shape.spelling, /tail -n N/u);
+  assert.match(shape.spelling, /tail -N/u);
+});
+
+for (const command of [
+  "git log | tail -n 5",
+  "git log | tail -5",
+  "git log | tail -n 5 2>/dev/null",
+  "git diff --stat | tail -n 20",
+  "git show HEAD:docs/state.md | tail -n 5",
+  "git log -n 5 -- docs/state.md | tail -500",
+]) {
+  test(`D114 tail admitted: ${command}`, () => { assert.equal(guard(command), true); });
+}
+
+for (const command of [
+  "git -C . log | tail -n 3",
+  "git -C . show HEAD:docs/state.md | tail -3 2>/dev/null",
+  "git -C . ls-files docs | tail -n 20",
+  "git -C . cat-file -p HEAD:docs/state.md | tail -n 3",
+  "git -C other diff --stat | tail -n 3",
+]) {
+  test(`D114 tail admitted with -C: ${command}`, () => { assert.equal(inRepo(command), true); });
+}
+
+for (const command of [
+  "git log | tail -n 0", "git log | tail -n 501", "git log | tail -501", "git log | tail", "git log | tail -n", "git log | tail -f",
+  "git log | tail -n +5", "git log | tail -c 5", "git log | tail -n 5 -f", "git log | tail -n 5 docs/state.md",
+  "git log | tail -n 5 | tail -n 2", "git log | head -n 5 | tail -n 2", "git log | tail -n 5 > out.txt", "git log | tail -n 5 2>&1",
+  "git log | cat", "git log | wc -l", "git log | sort", "git log | tee out.txt", "git log | xargs echo", "git log | sh",
+  "git log | rg x", "git log | grep x", "git log | less", "git log | tail -n 5 ; head -n 2",
+  "git commit -m x | tail -n 5", "git push | tail -n 5", "git add -- a.md | tail -n 5",
+  "git show HEAD:../outside.txt | tail -n 5", "git show HEAD:/etc/hostname | tail -n 5", "git show HEAD:.env | tail -n 5",
+  "git log -- ../outside.txt | tail -n 5", "git log ../outside.txt | tail -n 5", "git log -- .env | tail -n 5",
+]) {
+  test(`D114 tail stays refused: ${command}`, () => { assert.equal(guard(command), false); });
+}
+
+for (const command of [
+  "git -C .. log | tail -n 3", "git -C /etc log | tail -n 3", "git -C .env show HEAD:docs/state.md | tail -n 3",
+  "git -C sub log | tail -n 3", "git -C . -C other log | tail -n 3", "git -C . show HEAD:.env | tail -n 3",
+  "git -C . cat-file --batch | tail -n 3", "git -C . commit -m x | tail -n 3", "git -C . push | tail -n 3",
+  "git -C . checkout main | tail -n 3", "git -C . status | tail -n 3", "git -C . log | tail -n 501", "git -C . log | wc -l",
+  "git -C . log | cat", "git -C . log | tee out.txt", "git -C . log | xargs echo", "git -C . log | sort", "git -C . log | tail -n 3 > out.txt",
+]) {
+  test(`D114 tail with -C stays refused: ${command}`, () => { assert.equal(inRepo(command), false); });
 }
 
 test("D114 a symlinked -C target is refused even when it resolves inside the project; the real directory is admitted", (t) => {
