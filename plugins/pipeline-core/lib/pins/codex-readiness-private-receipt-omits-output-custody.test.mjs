@@ -10,7 +10,7 @@ import {join} from 'node:path';
 import {hostDigest} from '../codex-host-process-journal.mjs';
 import {canonicalJson} from '../codex-sandbox-compatibility.mjs';
 import {readinessFixture} from '../codex-readiness-finalization.fixture.mjs';
-import {runCodexToolFreeDesignReadiness} from '../codex-tool-free-design-readiness.mjs';
+import {runCodexToolFreeDesignReadiness,verifyCodexToolFreeBindingFromSources} from '../codex-tool-free-design-readiness.mjs';
 import {validateReadinessFinalization,validateReadinessOutputCustody,readFinalizedReadinessObservation} from '../codex-readiness-finalization.mjs';
 
 const h=c=>c.repeat(64),CAP=8388608,EMPTY=hostDigest(Buffer.alloc(0));
@@ -93,6 +93,53 @@ test('point 5: committed source paths and bytes stay bound: any source digest ch
 
 // Physical reader cap cases: the host store is Linux-only (CRHS-INPUT elsewhere), so these are skipped on other platforms.
 const linuxOnly=process.platform==='linux'?{}:{skip:'codex host store is Linux-only on this platform'};
+
+// Productive path: a real host run writes the private finalization and the private receipt; the package reader must refuse both
+// a forged and a missing output custody in either file. Every verdict below is asserted against a positive control first.
+async function productive(t){
+ const f=readinessFixture(t),result=await runCodexToolFreeDesignReadiness(f.args);assert.equal(result.status,'reviewed',JSON.stringify(result));
+ const journal=join(f.store.processRoot,'codex-host-'+result.receiptId),finalization=join(journal,'readiness-finalization.json'),
+  receipt=join(f.store.processRoot,'..','receipts',result.receiptId+'.json');
+ const sourceBytes=Object.fromEntries(Object.entries(f.sources).map(([name,s])=>[name,{path:s.path,bytes:readFileSync(join(f.root,s.path))}]));
+ const verify=()=>verifyCodexToolFreeBindingFromSources({repoRoot:f.root,hostExecution:result.report.hostExecution,report:result.report,candidate:f.candidate,
+  sources:f.sources,sourceBytes,route:f.route,store:f.store,repoFingerprint:f.repoFingerprint});
+ const bytes={finalization:readFileSync(finalization),receipt:readFileSync(receipt)};
+ const restore=()=>{writeFileSync(finalization,bytes.finalization);writeFileSync(receipt,bytes.receipt);};
+ const rewrite=(path,mutate)=>{const v=JSON.parse(readFileSync(path));mutate(v);writeFileSync(path,canonicalJson(v));};
+ assert.ok(readFinalizedReadinessObservation(journal,result.expected),'positive control: finalization reads');
+ assert.ok(f.store.read(result.receiptId,result.expected),'positive control: store reads');assert.equal(verify().ok,true,'positive control: package reader accepts');
+ return {f,result,journal,finalization,receipt,verify,restore,rewrite};
+}
+// reader=false: the mutation is shape-valid and only the private receipt / host store comparison can see it.
+const refused=(p,label,reader=true)=>{
+ if(reader)assert.equal(readFinalizedReadinessObservation(p.journal,p.result.expected),null,label+': finalization reader');
+ assert.equal(p.f.store.read(p.result.receiptId,p.result.expected),null,label+': host store');
+ assert.equal(p.verify().ok,false,label+': package reader');
+};
+test('productive path: a private finalization without output custody, or with a member removed, is refused by reader, store and package reader',linuxOnly,async t=>{
+ const p=await productive(t);
+ p.rewrite(p.finalization,v=>{delete v.outputCustody;});refused(p,'custody absent');p.restore();
+ p.rewrite(p.finalization,v=>{delete v.outputCustody.stdout.sha256;});refused(p,'stdout digest absent');p.restore();
+ p.rewrite(p.finalization,v=>{delete v.outputCustody.reportCanonicalSha256;});refused(p,'canonical report digest absent');p.restore();
+ assert.equal(p.verify().ok,true,'restored files are accepted again');
+});
+test('productive path: forged output custody in the private finalization is refused by reader, store and package reader',linuxOnly,async t=>{
+ const p=await productive(t);
+ p.rewrite(p.finalization,v=>{v.outputCustody.stdout.sha256=h('b');});refused(p,'forged stdout digest',false);p.restore();
+ p.rewrite(p.finalization,v=>{v.outputCustody.stdout.closed=false;});refused(p,'unclosed stdout claimed');p.restore();
+ p.rewrite(p.finalization,v=>{v.outputCustody.reportRawJsonSha256=h('b');});
+ assert.equal(p.f.store.read(p.result.receiptId,p.result.expected),null,'forged raw report digest: host store');
+ assert.equal(p.verify().ok,false,'forged raw report digest: package reader');p.restore();
+ assert.equal(p.verify().ok,true,'restored files are accepted again');
+});
+test('productive path: missing or forged output custody in the private receipt is refused by the host store and package reader',linuxOnly,async t=>{
+ const p=await productive(t);
+ p.rewrite(p.receipt,v=>{delete v.outputCustody;});refused(p,'receipt custody absent',false);p.restore();
+ p.rewrite(p.receipt,v=>{v.outputCustody.stdout.sha256=h('b');});refused(p,'receipt forged stdout digest',false);p.restore();
+ p.rewrite(p.receipt,v=>{v.outputCustody.stderr.bytes=v.outputCustody.stderr.bytes+1;v.outputCustody.stderr.retainedBytes=v.outputCustody.stderr.bytes;});
+ refused(p,'receipt forged stderr length',false);p.restore();
+ assert.equal(p.verify().ok,true,'restored files are accepted again');
+});
 test('point 5: finalization reader accepts a file exactly at 65536 bytes and refuses one byte more',linuxOnly,async t=>{
  const f=readinessFixture(t),result=await runCodexToolFreeDesignReadiness(f.args);assert.equal(result.status,'reviewed',JSON.stringify(result));
  const journal=join(f.store.processRoot,'codex-host-'+result.receiptId),path=join(journal,'readiness-finalization.json'),original=readFileSync(path);
