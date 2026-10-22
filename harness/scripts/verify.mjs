@@ -812,6 +812,7 @@ const TEST_SUITES = [
   { name: "check-vendored-template-sync-tests", file: join(pluginScriptsDir, "check-vendored-template-sync.test.mjs") },
   { name: "dispatch-authorship-verify-tests", file: join(pluginScriptsDir, "dispatch-authorship-verify.test.mjs") },
   { name: "dispatch-record-write-tests", file: join(pluginScriptsDir, "dispatch-record-write.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 19 }, (_, index) => `DRW${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "dispatch-record-liveness-tests", file: join(libDir, "dispatch-record-liveness.test.mjs") },
   { name: "execution-plane-launch-tests", file: join(pluginScriptsDir, "execution-plane-launch.test.mjs") },
   { name: "installed-plugin-attestation-host-tests", file: join(pluginScriptsDir, "installed-plugin-attestation-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 11 }, (_, index) => `IPH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "nova-a8-benchmark-runner-tests", file: join(pluginScriptsDir, "nova-a8-benchmark-runner.test.mjs") },
