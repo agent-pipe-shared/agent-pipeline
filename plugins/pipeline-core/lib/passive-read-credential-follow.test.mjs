@@ -45,8 +45,15 @@ add('retain user-visible external public exact markdown', () => assert.equal(adm
 add('retain safe public symlink identity', () => assert.equal(
   admitted(`${root}/safe-link.md`, { [`${root}/safe-link.md`]: `${root}/README.md` }), true));
 add('retain environment example public file', () => assert.equal(admitted(`${root}/.env.example`), true));
+// PO decision D109 (2026-10-22; QG-04 restatement): this alias used to point at ~/.ssh/config, which D109 lists as a named
+// exception (client configuration, no key material; owner PO, expires 2027-04-22). The pin's intent is the SSH IDENTITY, so
+// the alias now targets the private key itself and stays refused; the former target is the positive control.
 add('refuse protected SSH identity alias', () => assert.equal(
-  admitted(`${root}/public-ssh.md`, { [`${root}/public-ssh.md`]: `${home}/.ssh/config` }), false));
+  admitted(`${root}/public-ssh.md`, { [`${root}/public-ssh.md`]: `${home}/.ssh/id_ed25519` }), false));
+add('D109 control: an alias to the named-exception ~/.ssh/config is admitted, its sibling private key is not', () => {
+  assert.equal(admitted(`${root}/public-ssh.md`, { [`${root}/public-ssh.md`]: `${home}/.ssh/config` }), true);
+  assert.equal(admitted(`${home}/.ssh/id_ed25519`), false);
+});
 add('refuse protected cloud credential root', () => assert.equal(admitted(`${home}/.aws/credentials`), false));
 
 // This tree is exclusively owned and outside any Git discovery boundary.

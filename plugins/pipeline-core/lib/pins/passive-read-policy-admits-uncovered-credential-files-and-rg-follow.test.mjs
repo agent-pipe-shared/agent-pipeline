@@ -124,7 +124,14 @@ test("WSL UNC spellings (both) are refused for every credential entry", (t) => {
 });
 
 test("/etc/shadow is a declared credential path and is refused on POSIX hosts", (t) => {
-  assert.deepEqual([...PASSIVE_READ_CREDENTIAL_ROOTS.posixAbsolutePaths], ["/etc/shadow"]);
+  // PO decision D105 (2026-10-22, extending D96; QG-04 restatement): this pin froze the list at ONE entry. D105 enrolls the
+  // host locations D96 made newly readable in the same list, so the list is now exactly the old entry plus those; no entry
+  // was removed and "/etc/shadow" stays first. Behavioral pins for every new entry: passive-read-policy.test.mjs (D105).
+  assert.deepEqual([...PASSIVE_READ_CREDENTIAL_ROOTS.posixAbsolutePaths], ["/etc/shadow", "/etc/sudoers", "/etc/sudoers.d",
+    "/etc/ssl/private", "/var/run/secrets", "/run/secrets", "/private/var/run/secrets", "/var/spool/cron",
+    // PO decision D109 (2026-10-22; QG-04 restatement, again only additions): shadow backup, WireGuard keys, NetworkManager keyfiles,
+    // macOS system and network keychains. Behavioral pins: passive-read-policy.test.mjs (D109).
+    "/etc/shadow-", "/etc/wireguard", "/etc/NetworkManager/system-connections", "/Library/Keychains", "/Network/Library/Keychains"]);
   const skip = process.platform === "win32"
     ? HOST_LIMIT + "/etc/shadow behavioral refusal needs a POSIX path namespace" : false;
   if (skip) { t.skip(skip); return; }
@@ -204,7 +211,11 @@ test("RED mirror: without .git-credentials/.pypirc in the basename rule they are
   writeFileSync(mirrorPath, mirrorSource(join(libDir, "passive-read-policy.mjs"), [
     ['"./machine-plane.mjs"', JSON.stringify(pathToFileURL(join(libDir, "machine-plane.mjs")).href)],
     ['"./po-key-directory.mjs"', JSON.stringify(pathToFileURL(join(libDir, "po-key-directory.mjs")).href)],
-    ["\\\\.(?:npmrc|netrc|git-credentials|pypirc)", "\\\\.(?:npmrc|netrc)"],
+    // PO decision D109 (2026-10-22; QG-04 restatement): the basename rule gained more names, and the four basename-only home
+    // entries are now ALSO matched by path (a second line of defence, so the original defect needs both mutated). The mirror
+    // re-introduces the original defect exactly as before: neither the basename alternatives nor the path entries name them.
+    ["\\\\.(?:npmrc|netrc|git-credentials|pypirc|vault-token|pgpass|bash_history|zsh_history)", "\\\\.(?:npmrc|netrc|vault-token|pgpass|bash_history|zsh_history)"],
+    ['".netrc",".git-credentials",".npmrc",".pypirc",', '".netrc",".npmrc",'],
   ]));
   const mirror = await import(pathToFileURL(mirrorPath).href);
   const context = { rootDir: root, homeDir: home, ...injected };

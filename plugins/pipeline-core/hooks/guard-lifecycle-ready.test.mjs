@@ -1805,8 +1805,13 @@ test("single and piped rg share trusted recursive roots and unconditional exclus
   const pipeline = command => parseGuardCommand(`${command} | head -n 5`, project);
   const directArgs = command => parseGuardCommand(command, project).segments[0].argv;
   for (const command of [`rg --files '${approved}'`, `rg -n needle '${approved}'`]) {
-    assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project), false);
-    assert.equal(isBoundedSingleRg(directArgs(command), project), false);
+    // D96 (PO decision 2026-10-22; the 2026-09-10 correction in docs/adr/draft-read-scope-containment-boundary.md;
+    // QG-04 restatement): these two assertions said "false" only because the directory lay outside the repository
+    // without a caller-approved root. An ordinary outside directory is admitted now. The unconditional exclusions
+    // this test exists for (secret inventory, alias to a secret, hidden/ignore/--pre/--output options, config file)
+    // are the `denied` list and the RIPGREP_CONFIG_PATH block below, unchanged.
+    assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project), true);
+    assert.equal(isBoundedSingleRg(directArgs(command), project), true);
     assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project, [approved]), true);
     assert.equal(isBoundedSingleRg(directArgs(command), project, [approved]), true,
       "caller-approved recursive enumeration/search must reach the direct grammar");
@@ -1815,8 +1820,8 @@ test("single and piped rg share trusted recursive roots and unconditional exclus
   }
   const hooksDir = fileURLToPath(new URL("./", import.meta.url)).replace(/[\\/]$/u, "");
   for (const command of [`rg --files '${hooksDir}'`, `rg -n isBoundedReadOnlyPipeline '${hooksDir}'`]) {
-    assert.equal(isBoundedSingleRg(directArgs(command), project), false);
-    assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project), false);
+    assert.equal(isBoundedSingleRg(directArgs(command), project), true, "D96: the hooks directory is an ordinary outside directory");
+    assert.equal(isBoundedReadOnlyPipeline(pipeline(command), project), true);
     for (const shape of [command, `${command} | head -n 5`]) {
       assert.equal(isReadOnlyDiagnosticCommand(shape, project), true, shape);
       assert.equal(evaluateLifecycleReadyGuard(bash(shape), {
@@ -1866,7 +1871,9 @@ test("bounded rg pipeline admits self-inspection reads of the plugin's own insta
   const grammarFile = join(hooksDir, "guard-command-grammar.mjs");
   try {
     for (const [command, genericExpected] of [
-      [`rg --files ${hooksDir} | rg 'guard-lifecycle-ready'`, false],
+      // D96 (QG-04 restatement): the generic expectation for a recursive directory outside the repository was false only
+      // because it was outside; the credential screen decides it now (see the foreign-directory controls below).
+      [`rg --files ${hooksDir} | rg 'guard-lifecycle-ready'`, true],
       [`rg -n "isBoundedReadOnlyPipeline" ${grammarFile} | head -n 5`, true],
     ]) {
       const parsed = parseGuardCommand(command, path);
@@ -1882,7 +1889,10 @@ test("bounded rg pipeline admits self-inspection reads of the plugin's own insta
     const foreign = mkdtempSync(join(tmpdir(), "guard-lifecycle-foreign-"));
     try {
       const command = `rg --files ${foreign} | rg 'x'`;
-      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+      // D96: an ordinary foreign directory is admitted; the same directory holding a key file keeps its refusal.
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      writeFileSync(join(foreign, "id_rsa"), "synthetic fixture\n");
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, `${command} (credential file present)`);
     } finally { rmSync(foreign, { recursive: true, force: true }); }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
@@ -7162,28 +7172,37 @@ test("Claude task output is an exact session-bound passive read file, never a di
   try {
     assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }), dependencies).exitCode, 0);
     assert.equal(evaluateLifecycleReadyGuard(event("Grep", { path: taskOutputPath, pattern: "result" }), dependencies).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: siblingPath }), dependencies).exitCode, 2,
-      "a sibling task's output has no capability");
-    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }, "another_session"), dependencies).exitCode, 2,
-      "the task binding is current-session-specific");
+    // D96 (PO decision 2026-10-22, with the 2026-09-10 correction in docs/adr/draft-read-scope-containment-boundary.md;
+    // QG-04 restatement). The next assertions used to say "refused" ONLY because the file lay outside the repository
+    // without a task-output capability. An ordinary outside file is not refused for that any more, so the session
+    // binding no longer gates a PLAIN read. What is kept: the executable-input refusal, the credential negative
+    // control (an id_* file next to the output stays refused) and the exact-file shape of the capability itself.
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: siblingPath }), dependencies).exitCode, 0,
+      "D96: a sibling task's output is an ordinary outside file");
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: join(taskDirectory, "id_rsa") }), dependencies).exitCode, 2,
+      "a credential-named file next to the output stays refused");
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }, "another_session"), dependencies).exitCode, 0,
+      "D96: the task binding no longer gates a plain read of an ordinary file");
     assert.equal(evaluateLifecycleReadyGuard(event("Glob", { path: taskDirectory, pattern: "*.output" }), dependencies).exitCode, 2,
-      "task output authorization never grants directory or Glob scope");
+      "unchanged: the Glob selector allowlist (ordinary source/document extensions) still refuses an *.output pattern; that is not a containment decision");
     assert.equal(evaluateLifecycleReadyGuard(event("Bash", { command: `cat ${taskOutputPath}` }), dependencies).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(event("Bash", { command: `cat ${taskOutputPath} ${siblingPath}` }), dependencies).exitCode, 2,
-      "the exact shell route cannot add sibling output paths");
+    assert.equal(evaluateLifecycleReadyGuard(event("Bash", { command: `cat ${taskOutputPath} ${siblingPath}` }), dependencies).exitCode, 0,
+      "D96: the shell route admits ordinary outside files, one or several");
     assert.equal(isReadOnlyDiagnosticCommand(`node ${taskOutputPath}`, projectDir), false,
       "the output is never an executable-input read root");
     assert.equal(evaluateLifecycleReadyGuard(event("PowerShell", { command: `Get-Content -Path ${taskOutputPath}` }), dependencies).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(event("PowerShell", { command: `Get-Content ${taskDirectory}` }), dependencies).exitCode, 2);
+    writeFileSync(join(taskDirectory, "id_rsa"), "synthetic credential sentinel\n");
+    assert.equal(evaluateLifecycleReadyGuard(event("PowerShell", { command: `Get-Content ${taskDirectory}` }), dependencies).exitCode, 2,
+      "D96 negative control: a directory holding a credential-named file stays refused");
 
     const alias = join(taskDirectory, "alias.output");
     symlinkSync(taskOutputPath, alias);
-    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: alias }), dependencies).exitCode, 2,
-      "a symlink alias is not the recorded physical task file");
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: alias }), dependencies).exitCode, 0,
+      "D96: a symlink to an ordinary outside file is an ordinary outside file");
     const hardlink = join(taskDirectory, "hardlink.output");
     linkSync(taskOutputPath, hardlink);
-    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }), dependencies).exitCode, 2,
-      "a multiply-linked task output is not a private exact file");
+    assert.equal(evaluateLifecycleReadyGuard(event("Read", { file_path: taskOutputPath }), dependencies).exitCode, 0,
+      "D96: a multiply-linked ordinary outside file is still an ordinary outside file");
     rmSync(hardlink);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
@@ -7301,6 +7320,8 @@ test("PASSIVE-READ-ROOT-INTEROP: exact transcript files and memory directories a
   const memoryFile = join(memoryDir, "learned.md"), sibling = join(sessionDir, "sibling.md");
   for (const directory of [projectDir, homeDir, sessionDir, memoryDir]) mkdirSync(directory);
   for (const file of [transcriptPath, memoryFile, sibling]) writeFileSync(file, "fixture\n");
+  const credentialSibling = join(sessionDir, "id_rsa");
+  writeFileSync(credentialSibling, "synthetic credential sentinel\n");
   const script = `
     import assert from "node:assert/strict";
     import { spawnSync } from "node:child_process";
@@ -7347,10 +7368,19 @@ test("PASSIVE-READ-ROOT-INTEROP: exact transcript files and memory directories a
       "single recursive-grammar rg admits the exact transcript file");
     assert.equal(guard.isReadOnlyDiagnosticCommand("rg --files " + memoryDir + " | rg learned", projectDir, roots), true,
       "rg pipeline admits bounded memory inventory despite the file root");
-    assert.equal(guard.evaluateLifecycleReadyGuard(command("cat " + sibling), deps).exitCode, 2,
-      "the transcript file does not authorize its directory sibling");
-    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + sibling, projectDir, roots), false,
-      "single-command policy also refuses a session sibling");
+    // D96 (PO decision 2026-10-22, 2026-09-10 correction in docs/adr/draft-read-scope-containment-boundary.md; QG-04
+    // restatement): the two sibling assertions said "refused" only because the sibling lay outside the repository
+    // without a session root. An ordinary outside file is read on its own merits now; the exactness of the transcript
+    // root itself (it never authorizes a descendant) is pinned by the policy unit test, and a credential-named
+    // sibling stays refused on both routes below.
+    assert.equal(guard.evaluateLifecycleReadyGuard(command("cat " + sibling), deps).exitCode, 0,
+      "D96: an ordinary sibling of the transcript is an ordinary outside file");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + sibling, projectDir, roots), true,
+      "D96: single-command policy admits an ordinary outside file");
+    const credentialSibling = process.env.PASSIVE_FIXTURE_CREDENTIAL_SIBLING;
+    assert.equal(guard.evaluateLifecycleReadyGuard(command("cat " + credentialSibling), deps).exitCode, 2,
+      "a credential-named sibling stays refused");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + credentialSibling, projectDir, roots), false);
   `;
   const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
     cwd: projectDir,
@@ -7366,6 +7396,7 @@ test("PASSIVE-READ-ROOT-INTEROP: exact transcript files and memory directories a
       PASSIVE_FIXTURE_MEMORY: memoryDir,
       PASSIVE_FIXTURE_MEMORY_FILE: memoryFile,
       PASSIVE_FIXTURE_SIBLING: sibling,
+      PASSIVE_FIXTURE_CREDENTIAL_SIBLING: credentialSibling,
     },
   });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -8935,9 +8966,14 @@ test("greenfield passive PowerShell and native reads accept host-visible paths",
       "Get-ChildItem -LiteralPath escape",
       "Get-Content -LiteralPath C:\\Users\\Synthetic\\key",
     ]) {
-      const allowed = command.startsWith("Get-Content -LiteralPath '");
+      // D96 (PO decision 2026-10-22, 2026-09-10 correction; QG-04 restatement): listing an ordinary outside directory,
+      // directly or through an in-repository alias, is not refused for being outside any more. The foreign-drive
+      // spelling stays refused, and a credential-named file keeps its refusal (control below).
+      const allowed = !command.includes("C:\\Users\\Synthetic");
       assert.equal(ps(command).exitCode, allowed ? 0 : 2, command);
     }
+    writeFileSync(join(outside, "id_rsa"), "synthetic credential sentinel\n");
+    assert.equal(ps(`Get-Content -LiteralPath '${join(outside, "id_rsa")}'`).exitCode, 2, "a credential-named file stays refused");
     assert.equal(ps(`Get-ChildItem -LiteralPath '${outside}' -Name`).exitCode, 0);
     assert.match(ps("New-Item -Path src/escaped.md -ItemType File").stderr, /GUARD-POWERSHELL-GRAMMAR/u);
     assert.match(ps("Get-Content $env:SECRET").stderr, /GUARD-POWERSHELL-GRAMMAR/u);
