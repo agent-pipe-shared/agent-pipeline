@@ -296,6 +296,22 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("- Commit as soon as a piece is green, not at the very end. A commit that exists");
   put("  survives a truncated run; a commit that is only planned does not.");
   put();
+
+  put("## 7. Where a check runs (the declared test-command route)");
+  put();
+  put("<!-- hand-maintained: the route string is declared by the preflight readback");
+  put("     (plugins/pipeline-core/scripts/pipeline-start-preflight.mjs, `roleScope.testCommands`)");
+  put("     and consumed here through the briefing, not through a guard. Pinned by");
+  put("     plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs (point 6). -->");
+  put();
+  put("When the preflight readback declares `roleScope.testCommands.route` =");
+  put("`host-boundary-from-first-call` (with `executionBoundary` `host-authorized-wsl`),");
+  put("submit EVERY DoD / targeted / quick check at that host boundary from the FIRST call:");
+  put("never sandbox first, and never probe both views to find out which one works. A");
+  put("sandbox-first attempt only buys a `spawnSync EPERM` at the default sandbox edge and");
+  put("spends a tool use from the budget that is also the stop condition. When the route is");
+  put("`default`, run the checks as briefed.");
+  put();
   return `${lines.join("\n")}\n`;
 }
 

@@ -21,6 +21,9 @@
  * function only, never that a course consumes it.
  * 5 (P1-1 bullet 3, standalone, NOT wired into a caller): lib/dispatch-recovery-state.mjs keeps one atomic recovery
  *   state per task identity (dispatchId + role + candidate) with a bounded attempt history; see the point-5 cases.
+ * 6 (P1-1 bullet 2, briefing-side consumer of the declared route, no new guard): the agent-obligations document and the Goldfish
+ *   task template tell the owner to submit every DoD / targeted / quick check at the declared host boundary from the first call when
+ *   the preflight declares roleScope.testCommands.route = host-boundary-from-first-call; see the point-6 cases.
  * P1-1 (role-dependent preflight, 0.7.0) is pinned in scripts/pipeline-start-preflight.test.mjs.
  */
 import assert from "node:assert/strict";
@@ -461,4 +464,43 @@ test("point 5: only a real fallback result is an attempt; surfaced stderr is bou
     assert.match(stderr, /\[truncated\]$/u);
     assert.doesNotMatch(stderr, /example-user|\/home\/|[A-Za-z]:\\/iu);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// --- Point 6: the declared host-boundary test route reaches the Goldfish through the briefing -----------------------
+const ROUTE_DECLARATION = "host-boundary-from-first-call";
+const OBLIGATION_FILES = ["templates/prompts/agent-obligations.md", "plugins/pipeline-core/templates/prompts/agent-obligations.md"];
+const TASK_TEMPLATES = ["templates/prompts/goldfish-task.md", "plugins/pipeline-core/templates/prompts/goldfish-task.md"];
+const readUnix = (rel) => readFileSync(join(repoRoot, rel), "utf8").replace(/\r\n/g, "\n");
+const flatten = (text) => text.replace(/\s+/g, " ");
+
+test("point 6: the declaration string the briefing names is exactly the one the preflight emits", () => {
+  const source = readFileSync(join(pluginRoot, "scripts", "pipeline-start-preflight.mjs"), "utf8");
+  assert.ok(source.includes(`"${ROUTE_DECLARATION}"`), "preflight declares the route string");
+});
+
+test("point 6: the obligations document (canonical and vendored) states the host-boundary-from-first-call rule", () => {
+  for (const rel of OBLIGATION_FILES) {
+    const text = flatten(readUnix(rel));
+    assert.ok(text.includes("roleScope.testCommands.route"), `${rel}: names the preflight field`);
+    assert.ok(text.includes(ROUTE_DECLARATION), `${rel}: names the declaration exactly`);
+    assert.ok(text.includes("host-authorized-wsl"), `${rel}: names the execution boundary`);
+    assert.match(text, /EVERY DoD \/ targeted \/ quick check/, rel);
+    assert.match(text, /from the FIRST call/, rel);
+    assert.match(text, /never sandbox first/, rel);
+    assert.match(text, /never probe both views/, rel);
+  }
+});
+
+test("point 6: the Goldfish task template (canonical and vendored) carries the matching line inside the targeted-checks field", () => {
+  for (const rel of TASK_TEMPLATES) {
+    const text = readUnix(rel);
+    const start = text.indexOf("- Targeted checks");
+    const end = text.indexOf("- Quick check:");
+    assert.ok(start >= 0 && start < end, rel);
+    const field = flatten(text.slice(start, end));
+    assert.ok(field.includes("roleScope.testCommands.route"), `${rel}: names the preflight field`);
+    assert.ok(field.includes(ROUTE_DECLARATION), `${rel}: names the declaration exactly`);
+    assert.match(field, /from the first call/, rel);
+    assert.match(field, /agent-obligations\.md/, rel);
+  }
 });

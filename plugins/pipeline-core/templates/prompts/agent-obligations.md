@@ -204,3 +204,18 @@ deliberately carries no static copy of that; a second copy is the drift.
 - Commit as soon as a piece is green, not at the very end. A commit that exists
   survives a truncated run; a commit that is only planned does not.
 
+## 7. Where a check runs (the declared test-command route)
+
+<!-- hand-maintained: the route string is declared by the preflight readback
+     (plugins/pipeline-core/scripts/pipeline-start-preflight.mjs, `roleScope.testCommands`)
+     and consumed here through the briefing, not through a guard. Pinned by
+     plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs (point 6). -->
+
+When the preflight readback declares `roleScope.testCommands.route` =
+`host-boundary-from-first-call` (with `executionBoundary` `host-authorized-wsl`),
+submit EVERY DoD / targeted / quick check at that host boundary from the FIRST call:
+never sandbox first, and never probe both views to find out which one works. A
+sandbox-first attempt only buys a `spawnSync EPERM` at the default sandbox edge and
+spends a tool use from the budget that is also the stop condition. When the route is
+`default`, run the checks as briefed.
+
