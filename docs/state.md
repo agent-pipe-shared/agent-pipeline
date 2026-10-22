@@ -4,6 +4,24 @@
 > Previous state text is preserved as a public projection in the archive below.
 > Calibration: [`project/pipeline.json`](../project/pipeline.json) names this file as the handover.
 
+**Latest handover (2026-10-22, content-final pass; read this first, it wins over the older blocks below):**
+- Built since the K1 handover and committed on `feat/sprint-alfred`: PO sitting blocks 1-3 applied (K39-K49: delivery hand-off
+  check K40 per D134, onboarding fixtures K49, authority-restore advice K45), AC-9 adopted by a signed scoped adoption
+  (`architecture/adoption-state.json`, ref `po-0.7.0-adopt-2026-10-22`), D141/D142 recorded, MFI011 active again, the F3
+  digest-prompt fix `98a53938e`, the GND009 real-git pin `109ce619f`. Evidence: `specs/sprint-alfred-epic/evidence/`
+  `linux-single-verifys-2026-10-22.md` (counted Linux runs) and `gap-readers-2026-10-22/` (status readers, unverified verdicts).
+- Observed by the PO at the terminal: F3 first-anchor recovery ends `BTR-RECOVERED` in a throwaway repo; its prompt text was
+  erased by readline (fixed). F1/F2 (signing prompt on WSL/PowerShell) are observed at the push signature.
+- Not done, by owner: critic 174, po-acceptance 144, native-host 101, agent 67 (mostly stale-claim re-checks, item-text updates and
+  gitleaks/semgrep/onboarding-timing runs), po-decision 29, verify-wsl 17, po-signature 5. Full Verify, Opus Critic reads,
+  Windows work (D133), the Reader 2+1 course (D140) and the final delivery remeasure come AFTER the stamped install.
+- Order the PO set: content, Linux single runs, push-init for the exact HEAD, PO signs (WSL and PowerShell), `approve-push`, push
+  (exact command shown first), stamp (only on the PO's call), then STOP until the PO has installed the candidate.
+- Known follow-ups for the PO list: `TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE` should name the missing home directory as the
+  repair; `scratch/run-parallel.mjs` counted 8 instead of 9 cases for `git-null-device-sites` and reported green for a red new
+  case once (check its `--src` handling); WINACL001 possible product defect; MFHS023/028 cross-process ownership (post-0.7.0);
+  backlog item texts with stale "still open" text (K50 found 3 of 4 already pinned, K51 found all 5 stubs already real).
+
 **Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
 Read these three files first, in this order, before any other work:
 
