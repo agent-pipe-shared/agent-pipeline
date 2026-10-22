@@ -216,11 +216,13 @@ test("RED mirror: dropping the WSL branch from a scratch copy of the route modul
   const dir = scratchDir("wsl-pin-mirror");
   try {
     const source = readFileSync(routeScript, "utf8");
-    const needle = "if (route === ROUTES.HOST && isWslHostObservation(hostObservation)) return ROUTES.WSL_UNAVAILABLE;";
+    // PO tile 2026-10-22: the deferral is now conditional on the absence of a passing WSL sandbox preflight.
+    const needle = "if (route === ROUTES.HOST && isWslHostObservation(hostObservation) && !isPassingWslSandboxPreflight(sandboxPreflight)) return ROUTES.WSL_UNAVAILABLE;";
     assert.equal(source.includes(needle), true, "production WSL branch text drifted; update the mirror");
     const mirrored = source
       .replace(needle, "")
-      .replace('"../lib/entrypoint.mjs"', JSON.stringify(pathToFileURL(join(repoRoot, "plugins", "pipeline-core", "lib", "entrypoint.mjs")).href));
+      .replace('"../lib/entrypoint.mjs"', JSON.stringify(pathToFileURL(join(repoRoot, "plugins", "pipeline-core", "lib", "entrypoint.mjs")).href))
+      .replace('"./codex-sandbox-preflight.mjs"', JSON.stringify(pathToFileURL(join(repoRoot, "plugins", "pipeline-core", "scripts", "codex-sandbox-preflight.mjs")).href));
     const mirrorPath = join(dir, "route-mirror.mjs");
     writeFileSync(mirrorPath, mirrored);
     const mirror = await import(pathToFileURL(mirrorPath).href);
