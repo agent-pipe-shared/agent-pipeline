@@ -94,3 +94,15 @@ Remaining Claude/Windows-specific frictions:
   request (the writer itself also refuses a backslash path). The nearest literal "missing" strings are `close journal missing for CAS` and
   siblings in `scripts/publication-close-journal.mjs`, which belong to the close flow, not to draft. The PO phrase most plausibly maps to V-1
   (the `continuity-cas` refusal), which is admitted on this head.
+
+### Extension 2026-10-22 (PO decisions, ALF-K35)
+
+- **Dynamic Workflow prompt: typed warning, not a refusal.** A Goldfish `agent()` call in a Workflow script whose prompt cannot be resolved
+  statically (interpolation, a named const or other expression) stays admitted; `guard-dispatch.mjs` now emits the advisory
+  `GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED` naming the cause, that no route record was written for the call, and one repair (a static string
+  literal prompt built from `templates/prompts/goldfish-task.md`). What is recorded for static literals is unchanged.
+- **Critic and other non-Goldfish roles are out of scope of V-10.** Reasoning: V-10 binds a route digest to the briefing a Goldfish implements
+  against, keyed by the `Slice:` id of a governed queue item. A Critic reviews a fixed candidate and has no slice of its own (`critic-review.md`
+  carries no `Slice:` line), so a slice-keyed record would either collide with the Goldfish it reviews or need a new key and store with no
+  governed effect. The Critic is already measured by the template-bound preflight and contamination checks. This answers the open route-policy
+  question of the K28 measurement above as a disposition, not as a defect.
