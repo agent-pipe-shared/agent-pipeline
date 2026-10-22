@@ -54,3 +54,16 @@ Not covered: denials whose command is not introduced by a "Run"/"then run"/"use 
 and the PO-run commands that human-guard-override denials print (those are attended-operator steps by design). The second
 half of the Proposal (an approved feature whose approval cannot be re-verified degrades to advisory) is a product
 decision and was not touched.
+
+## Extension 2026-10-22: the second half is built (PO decision D117, decision BI)
+
+An approved feature whose approval cannot be re-verified now degrades to ONE advisory instead of blocking, in both lanes
+(Edit|Write hook and the Bash lane). "Cannot be re-verified" is deliberately narrow: only a verification INPUT that is
+unavailable qualifies, today exactly `DWP-PACKAGE-PHYSICAL` (the approved design workflow package file is missing or not a
+physical repository file). The advisory (`GUARD-DEVPLAN-APPROVAL-UNVERIFIED`) names the cause, what could not be verified,
+that nothing was verified, and the single repair (`reopen-design`); it travels on the existing exit-0 notice channel. Every
+mismatch (`DWP-APPROVAL-DIGEST-DRIFT`, source drift, wrong signer, binding drift), a missing trust-anchor setup, a revoked
+approval and an absent approval record keep blocking with their current codes. `designAdvisoryAdmission()` is unchanged, so
+callers that need real authority (architecture-design, design-decision-bindings) still see `ok:false`. Lane-level proof:
+`hooks/guard-devplan-approval-unverified.test.mjs`; the advisory contract is pinned in the denial pin. The first-half
+`todo` cases named in the earlier extension are already real (`todo: false`).

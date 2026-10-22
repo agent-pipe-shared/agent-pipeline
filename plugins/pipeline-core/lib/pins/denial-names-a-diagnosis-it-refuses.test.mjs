@@ -203,3 +203,32 @@ test('observed limit: the commands GG-22 and the dispatch-record lane name are r
     assert.equal(devPlanShellRefusalHit(command, root, allow), null);
   }
 });
+
+// --- Second half of the item (PO decision D117, decision BI), added 2026-10-22 ---
+// An approved feature whose approval cannot be re-verified degrades to ONE advisory instead of locking every write. The lane-level
+// proof (both lanes, real state, negative controls) is hooks/guard-devplan-approval-unverified.test.mjs; these cases pin the
+// advisory's own contract against the diagnosis rule this file exists for. They are green only with the D117 guard change applied.
+test('D117 advisory: typed code, what was not verified, one repair verb that is admitted, and no refused script command', async () => {
+  const policy = await import(new URL('../guard-devplan-policy.mjs', import.meta.url));
+  const advisory = policy.unverifiedApprovalAdvisory({ ok: false, code: 'DWP-PACKAGE-PHYSICAL' }, { planApproval: { designWorkflowPackagePath: 'evidence/package.json' } });
+  assert.ok(advisory, 'DWP-PACKAGE-PHYSICAL (the code this item was filed for) must degrade to an advisory');
+  assert.equal(advisory.code, 'GUARD-DEVPLAN-APPROVAL-UNVERIFIED');
+  for (const needle of [advisory.code, 'DWP-PACKAGE-PHYSICAL', 'evidence/package.json', 'Nothing was verified', 'Repair: run reopen-design']) {
+    assert.ok(advisory.text.includes(needle), `advisory must contain: ${needle}`);
+  }
+  assert.ok(!refusedNames(advisory.text), 'the advisory names a script command the lane refuses');
+  assert.equal(advisory.text.split('Repair:').length - 1, 1, 'exactly one repair');
+  const verb = VERBS.find(v => advisory.text.includes(v));
+  assert.equal(verb, 'reopen-design');
+  mkdirSync(join(root, 'scratch'), { recursive: true });
+  try {
+    assert.equal(isSanctionedLifecycleCommand(build(verb), root, {}), true, 'the named repair verb is admitted in the lifecycle state');
+    assert.equal(devPlanShellRefusalHit(build(verb), root, blockedDraft), null);
+  } finally { rmSync(join(root, receiptRel), { force: true }); }
+});
+test('D117 advisory: the other codes of the former denial still block (the denial keeps naming only admitted verbs)', async () => {
+  const policy = await import(new URL('../guard-devplan-policy.mjs', import.meta.url));
+  for (const code of ['DWP-APPROVAL-DIGEST-DRIFT', 'DAA-PO-APPROVAL-TRUST-MISMATCH', 'DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP', 'DAA-DESIGN-SOURCE-DRIFT']) {
+    assert.equal(policy.unverifiedApprovalAdvisory({ ok: false, code }, {}), null, `${code} must not degrade`);
+  }
+});
