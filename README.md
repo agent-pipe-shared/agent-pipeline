@@ -127,11 +127,11 @@ flowchart LR
     Elephant -->|"go/no-go recommendation"| PO
 ```
 
-> **Documentation line: `0.7.0`.** This describes the next distributed
-> architecture capability. Until it is released, consumer repositories should
-> continue to use the approved GitHub-distributed version they already have;
-> a maintainer's local candidate is neither an installation source nor evidence
-> that its release gates passed.
+> **Documentation line: `0.7.0`.** Until this line is released, consumer
+> repositories should continue to use the approved GitHub-distributed version
+> they already have; a maintainer's local candidate is neither an installation
+> source nor evidence that its release gates passed. The detailed release
+> status is kept in the [release-scope overview](docs/overview.md).
 
 <a id="capability-architecture-adoption-and-fitness"></a>
 <!-- capability:architecture-adoption-and-fitness -->
@@ -143,8 +143,7 @@ repository, start with the read-only adoption status and proposal described in
 Only then does the repository owner choose an explicitly bounded adoption
 decision. A valid deferred decision remains valid until its stated review or
 expiry date, explicit supersession, or a changed decision — an ordinary commit
-does not turn it into a partial lifecycle state. See the
-[release-scope overview](docs/overview.md).
+does not turn it into a partial lifecycle state.
 
 ## Bring your own architecture rules & guardrails
 
