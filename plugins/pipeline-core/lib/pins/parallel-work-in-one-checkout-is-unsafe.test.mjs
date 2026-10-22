@@ -593,9 +593,103 @@ test("PARWORK-M4a: the real producer CLI makes Critic evidence for an older comm
   assert.equal(existsSync(join(root, ".git", "agent-pipeline", "session-authority", "registry.lock")), false, "the producer leaves no session-authority registry lock");
 });
 
-// NOT PINNED HERE (reported to the Elephant, see the item's 2026-10-20 section): the session-authority registry staying readable with
-// no orphaned lock after a Critic and a Goldfish dispatch RAN IN PARALLEL needs a live two-session run (or a harness that drives two
-// real hook sessions against one registry); M4a only shows the producer itself never takes the registry lock.
-// DEFERRED, out of scope of this item's functional delivery (PO decision item): the liveness readback for open dispatch
-// records ("Observed again 2026-10-05 (round 3b)"); no case for it is pinned here. Its guard-side check belongs to the
-// protected guard-dispatch hook and needs a decision on the liveness signal first (pid, heartbeat or runner task state).
+// ===================================================================================================================
+// MODE 5 -- the session-authority registry stays clean after a Critic-side producer ran beside a registry-writing dispatch (ALF-K13)
+// ===================================================================================================================
+// The harness needs no live two-session run: the "Goldfish" is a real child process that takes the registry boundary (the exclusive
+// registry lock, exactly what a governed dispatch holds while it writes) and holds it on a file handshake; the "Critic" is the real
+// producer CLI plus the read-only repair `inspect`, run while the lock is held. Both handshakes are files, so the interleaving is
+// deterministic and there is no sleep-based race.
+import { inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead } from "../session-authority-registry.mjs";
+import { inspectSessionOwnerRuntime, inspectSignedDescriptorCustodyRepository, loadSessionDescriptor, startSessionDescriptor } from "../worktree-lifecycle.mjs";
+
+function pause5(milliseconds) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds); }
+function waitFor5(path, label) {
+  for (let attempt = 0; attempt < 1500; attempt += 1) { if (existsSync(path)) return; pause5(20); }
+  assert.fail(`timed out waiting for ${label}`);
+}
+
+test("PARWORK-M5a: the real producer CLI and the repair inspect run while another process holds the registry boundary; afterwards no lock, no retired-lock directory remain, the registry reads and the session descriptors are unchanged", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, ALF-K13)" : false, timeout: 300000 }, async () => {
+  const root = join(FIXTURE, "m5-root");
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m5", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
+  writeFileSync(join(root, "README.md"), "# Fixture\n");
+  writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+  prepareConsumerVerify({ rootDir: root });
+  git4(root, ["init", "-q"]);
+  const first = commit4(root, ["."], "initial");
+  mkdirSync(join(root, "specs"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Older candidate\n");
+  const older = commit4(root, [".claude/pipeline.yaml", "specs/spec.md"], "older candidate");
+  writeFileSync(join(root, "README.md"), "# Fixture moved on\n");
+  commit4(root, ["README.md"], "head moved on");
+
+  // The session whose descriptor must stay consistent through the whole run.
+  const session = startSessionDescriptor(root, { sessionId: "session-parwork-m5", ownerNonce: "owner-nonce-parwork-m5-0001" });
+  const repository = inspectSignedDescriptorCustodyRepository(root);
+  const descriptorsDir = dirname(session.path);
+  const descriptorState = () => ({ names: readdirSync(descriptorsDir).sort(),
+    loaded: loadSessionDescriptor(root, session.sessionId).descriptorSha256, owner: inspectSessionOwnerRuntime(root, session.sessionId).status });
+  const descriptorsBefore = descriptorState();
+  assert.deepEqual(descriptorsBefore, { names: ["session-parwork-m5.json"], loaded: session.descriptorSha256, owner: "live" });
+  const lockPath = join(repository.commonDir, "agent-pipeline", "session-authority", "registry.lock");
+  const abandoned = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned");
+  assert.equal(existsSync(lockPath), false, "fixture precondition: no registry lock before the run");
+  const registryBefore = inspectSessionAuthorityRegistryRead({ repository });
+
+  // The registry-writing "Goldfish": a real process that holds the registry boundary until told to leave.
+  const holder = join(FIXTURE, "m5-holder.mjs");
+  const ready = join(FIXTURE, "m5-ready"), go = join(FIXTURE, "m5-go");
+  writeFileSync(holder, [
+    `import { existsSync, writeFileSync } from "node:fs";`,
+    `import { withSessionAuthorityBoundary } from ${JSON.stringify(new URL("../session-authority-registry.mjs", import.meta.url).href)};`,
+    `import { inspectSignedDescriptorCustodyRepository } from ${JSON.stringify(new URL("../worktree-lifecycle.mjs", import.meta.url).href)};`,
+    `const [root, ready, go] = process.argv.slice(2);`,
+    `withSessionAuthorityBoundary({ repository: inspectSignedDescriptorCustodyRepository(root) }, () => {`,
+    `  writeFileSync(ready, "held");`,
+    `  for (let waited = 0; !existsSync(go) && waited < 60000; waited += 20) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);`,
+    `});`,
+  ].join("\n"));
+  const child = spawn(process.execPath, [holder, root, ready, go], { stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE } });
+  let holderStderr = "";
+  child.stderr.on("data", (chunk) => { holderStderr += chunk; });
+  const holderExit = new Promise((resolve) => child.on("exit", (code, signal) => resolve({ code, signal })));
+  try {
+    waitFor5(ready, "the registry-writing dispatch to hold the boundary");
+    const held = inspectSessionAuthorityLock({ repository });
+    assert.equal(held.status, "held", "the lock is observably held while the dispatch writes");
+    assert.equal(held.pid, child.pid);
+    assert.equal(held.owner, "live");
+
+    // The "Critic" side, beside it: the producer never takes the lock, and the read-only repair inspect only reports it.
+    const producer = fileURLToPath(new URL("../../scripts/verify-evidence-producer.mjs", import.meta.url));
+    const produced = spawnSync(process.execPath, [producer, "--root", root, "--mode", "critic", "--base", first, "--commit", older, "--out", "evidence/critic-m5.json"],
+      { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE }, timeout: 240000 });
+    assert.equal(produced.status, 0, `${produced.stdout}\n${produced.stderr}`);
+    assert.equal(JSON.parse(readFileSync(join(root, "evidence", "critic-m5.json"), "utf8")).commit, older);
+    const repair = spawnSync(process.execPath, [fileURLToPath(new URL("../../scripts/session-authority-repair.mjs", import.meta.url)), "inspect", "--root", root],
+      { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE }, timeout: 120000 });
+    assert.equal(repair.status, 0, `${repair.stdout}\n${repair.stderr}`);
+    assert.equal(JSON.parse(repair.stdout).status, "inspected");
+    assert.equal(existsSync(lockPath), true, "neither Critic-side call released or removed the dispatch's lock");
+    assert.equal(inspectSessionAuthorityLock({ repository }).pid, child.pid, "the lock is still the dispatch's own");
+  } finally {
+    writeFileSync(go, "go");
+  }
+  const exit = await holderExit;
+  assert.deepEqual(exit, { code: 0, signal: null }, holderStderr);
+
+  assert.equal(existsSync(lockPath), false, "the registry lock is released when the dispatch's boundary closes");
+  assert.equal(inspectSessionAuthorityLock({ repository }).status, "absent");
+  assert.equal(existsSync(abandoned), false, "no retired-lock (session-authority-abandoned) directory was left behind");
+  // The fixture never initialized a catalogue, so the registry reads as `absent` before and after; the point is that it is never `refused`.
+  assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), registryBefore, "the registry read is the same as before the run and is not refused");
+  assert.notEqual(registryBefore.status, "refused");
+  assert.deepEqual(descriptorState(), descriptorsBefore, "the session descriptor is byte-identical and its owner still judged live");
+});
+
+// DEFERRED, out of scope of this item's functional delivery: the GUARD-SIDE check that refuses a second writer while an open record's
+// owner is alive ("Observed again 2026-10-05 (round 3b)"). It belongs to the protected guard-dispatch hook. The liveness READBACK it
+// would consult is delivered and pinned in lib/dispatch-record-liveness.test.mjs (PO decision D110: PID plus process start identity,
+// alive | gone | unjudgeable, read-only).
