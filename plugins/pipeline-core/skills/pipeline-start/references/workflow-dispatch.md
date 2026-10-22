@@ -138,6 +138,17 @@ that will `git commit` in the shared tree, or give each its own
 `isolation: "worktree"`, rather than running them concurrently in
 `parallel()` against the same checkout.
 
+**Parallel host-commit dispatches (PO decision D76).** The rule above is about
+dispatches that run `git commit` themselves. Host-commit dispatches (the
+`native-host-commit` briefing form, which never commit) whose write scopes are
+disjoint MAY run in parallel in a shared tree: the orchestrator verifies and
+commits each result by its own paths. Self-committing dispatches stay
+sequenced or each in its own `isolation: "worktree"`. The briefing binding
+(`dispatch-briefing.mjs`) enforces the admission: it refuses a write scope
+that overlaps a running dispatch (`DBG-SCOPE-OVERLAP`), naming that dispatch,
+the overlapping paths and the repair (narrow the scope, wait for the other
+dispatch, finalize an abandoned record, or use a worktree).
+
 ## Tool-call budget — the ~50-call termination cliff
 
 `guardrails/token-budget.md` (TB-06, Claude compatibility projection)

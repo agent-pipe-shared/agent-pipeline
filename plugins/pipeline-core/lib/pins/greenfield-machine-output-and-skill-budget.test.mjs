@@ -165,3 +165,16 @@ test("each lazy reference stays under its per-file byte bound", () => {
     assert.ok(bytes <= bound, `${f}: ${bytes} B over ${bound} B bound`);
   }
 });
+
+// D76: the shared-tree guidance lets disjoint host-commit dispatches run in parallel, keeps self-committing ones
+// sequenced or worktree-isolated, and names the binding refusal that enforces it. The reference is the only copy
+// (no repo-root source, no generated vendored copy), so the source is the file under the skill directory.
+test("workflow-dispatch.md states the D76 parallel host-commit rule and the binding refusal that enforces it", () => {
+  const text = readRef("workflow-dispatch.md").replace(/\s+/gu, " ");
+  assert.match(text, /Parallel host-commit dispatches \(PO decision D76\)/u);
+  assert.match(text, /native-host-commit/u);
+  assert.match(text, /write scopes are disjoint MAY run in parallel in a shared tree/u);
+  assert.match(text, /Self-committing dispatches stay sequenced or each in its own `isolation: "worktree"`/u);
+  assert.match(text, /`DBG-SCOPE-OVERLAP`/u);
+  assert.match(text, /the overlapping paths and the repair/u);
+});
