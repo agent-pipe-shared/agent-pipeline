@@ -61,3 +61,28 @@ the same way.
 The merge `0aeaef18f` dropped the verifier: it took the second parent's version of both files.
 The first acceptance bullet is met by this measurement. The other two (one trailer grammar, a
 merge-survival check) remain open.
+
+## Reconciled 2026-10-22: the three bullets against the current tree
+
+The "remain open" sentence above is superseded; all three acceptance bullets hold at the current head and are pinned by
+`plugins/pipeline-core/lib/pins/design-trailer-verifier-lost-after-closure.test.mjs` (`node --test`, Linux host: 8 cases,
+8 pass, 0 fail, 0 skip).
+
+- Bullet 1 (the dropping merge): met by the 2026-10-20 measurement above (`0aeaef18f` took the second parent's version).
+  A one-off forensic act; it has no code property to pin.
+- Bullet 2 (one trailer grammar): decided by PO decision 2026-10-16 #12, which admits exactly `Dispatch: design (elephant)`
+  next to `Dispatch: stage-0 (elephant)`. The verifier (`scripts/dispatch-authorship-verify.mjs`) passes both Elephant ids
+  within the stage-0 size bound and refuses every other Elephant id (`elephant-direct-nonstandard-id`); the commit-message
+  policy refuses the near-misses as `GIT-03-DISPATCH-MALFORMED` in both the finished-message and the `--trailer` lane
+  (cases AC-A1 to AC-A3). The printed obligations carry the form with its bounds (AC-A5), and no non-test source emits a
+  malformed design variant (AC-A4). The lost symbol `ELEPHANT_DESIGN_ID` is intentionally not restored: the verifier names the
+  id `design` directly, and AC-A4 keeps the old symbol gone.
+- Bullet 3 (merge-survival check): the `done_when: contains <path> <needle>` predicate of closed items is evaluated for the
+  whole backlog by `scripts/check-backlog-done-predicate.mjs` (a step of `harness/scripts/verify.mjs`). Cases AC-B1 and AC-B2
+  prove it fails when a needle or its file disappears, and AC-B3 runs it over the real backlog at head: no closed item loses
+  a needle beyond the one recorded pre-existing loss (`2026-08-29-approve-announce-test-fixture-missing-present-plan-step`).
+  The related open item on the printed example (`installed-design-trailer-example-is-rejected-by-git-guard`) carries the
+  real-hook run of every printed example.
+
+Not verified here: that every closed item carries a machine `done_when` (the sweep evaluates the declared predicates only;
+items without one are counted as undeclared, not checked).

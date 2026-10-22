@@ -76,3 +76,11 @@ separate test-author dispatch, because a second dispatch must read the whole con
 - **Rationale:** commit(s) `b3cabc7f8`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+- **Counted evidence (2026-10-22, Linux host, `node --test`, clone head `fe9856572`):** the 2026-10-21 acceptance (one owner,
+  test-first order, rendered by `dispatch-briefing.mjs build`, tier binding by estimate) is pinned by
+  `plugins/pipeline-core/scripts/dispatch-briefing.test.mjs`: 46 cases, 46 pass, 0 fail, 0 skip. The rendered order is the
+  case "the generated briefing prescribes the test-first order in one dispatch (AC-186, PO 2026-10-21)"; the tier binding is
+  "an estimate above the tier cap binds the deep tier; above the deep cap it needs a grant rationale". The template/guardrail
+  side is `plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs`: 6 cases, 6 pass, 0 fail,
+  0 skip. Not verified here: the "independence stays with execution (host re-run, Full Verify) and the fresh Critic" bullet,
+  which is an end-to-end property of a real delivery run.
