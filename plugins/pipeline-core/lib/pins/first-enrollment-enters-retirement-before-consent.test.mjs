@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,7 @@ import {
   planProjectOnboardingV3, renderProjectOnboardingAction,
 } from "../project-onboarding-v3.mjs";
 import { isSanctionedLifecycleCommand } from "../../hooks/guard-lifecycle-ready.mjs";
+import { resolveOnboardingIntakeScope } from "../codex-onboarding-runtime.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(here, "../../../..");
@@ -228,5 +229,49 @@ test("AC6 the committed onboarding suite declares OBC298 and FRB001-FRB004, and 
   obc.run();
 });
 
-// Host limitation: needs directory mode bits / directory symlinks (Linux/WSL run).
-test("HL physical-history refusal for symlinked history paths (ER-HISTORY-UNSAFE)", HOST_LIMITATION, () => {});
+// Physical-history refusal: a retained-history path that is a link is never read as history. The case needs link
+// creation; a host that cannot create one takes the typed conditional skip below (native Windows without the privilege).
+function linkOrSkip(t, target, linkPath, type) {
+  try { symlinkSync(target, linkPath, type); return true; }
+  catch (error) { t.skip(`${HOST_LIMITATION.skip} (${error?.code ?? "unknown"})`); return false; }
+}
+test("HL physical-history refusal for symlinked history paths (ER-HISTORY-UNSAFE)", (t) => {
+  const outside = root();
+  try {
+    const foreign = join(outside, "foreign-consent.json");
+    writeFileSync(foreign, '{"foreign":"bytes"}\n');
+    // Link inside the project tree on a path the physical-chain check covers: refused before history is read.
+    // Link at the selected intake scope's retirement history (the ER-HISTORY-UNSAFE site proper): refused by name.
+    const cases = [
+      { name: "file link at .agent-pipeline/onboarding-consent.json", code: "KICKOFF-PATH-UNSAFE", prepare: (path) => {
+        mkdirSync(join(path, ".agent-pipeline"));
+        return linkOrSkip(t, foreign, join(path, ".agent-pipeline/onboarding-consent.json"), "file");
+      } },
+      { name: "directory link at the intake runtime directory", code: "KICKOFF-PATH-UNSAFE", prepare: (path) => {
+        mkdirSync(join(path, ".claude/.runtime/agent-pipeline"), { recursive: true });
+        return linkOrSkip(t, outside, join(path, ".claude/.runtime/agent-pipeline/onboarding"), "dir");
+      } },
+      { name: "file link at the selected scope's enrollment-retirement.json", code: "ER-HISTORY-UNSAFE", prepare: (path) => {
+        assert.equal(git(path, "init", "--initial-branch=main").status, 0);
+        const scope = resolveOnboardingIntakeScope(path, "local", { create: true });
+        return linkOrSkip(t, foreign, join(scope.directory, "enrollment-retirement.json"), "file");
+      } },
+      { name: "directory link at the selected scope's enrollment-retirement-archives", code: "ER-HISTORY-UNSAFE", prepare: (path) => {
+        assert.equal(git(path, "init", "--initial-branch=main").status, 0);
+        const scope = resolveOnboardingIntakeScope(path, "local", { create: true });
+        return linkOrSkip(t, outside, join(scope.directory, "enrollment-retirement-archives"), "dir");
+      } },
+    ];
+    for (const entry of cases) {
+      const path = root();
+      try {
+        if (!entry.prepare(path)) return;
+        const before = readFileSync(foreign);
+        assert.throws(() => observeOnboardingEnrollmentHistory({ rootDir: path }), (error) => error?.code === entry.code,
+          `${entry.name}: a linked history path must be refused with ${entry.code}, not read or counted as history`);
+        assert.deepEqual(readFileSync(foreign), before, `${entry.name}: the link target is untouched`);
+        assert.equal(readdirSync(outside).includes("enrollment-retirement.json"), false, `${entry.name}: nothing is written through the link`);
+      } finally { dispose(path); }
+    }
+  } finally { dispose(outside); }
+});
