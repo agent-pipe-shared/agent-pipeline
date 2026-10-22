@@ -158,6 +158,61 @@ transport, not invented by onboarding.
   `projection-drift`; a pending intent is recovery authority only and never a
   readiness receipt.
 
+## Host-managed Codex layout contract
+
+This section holds the maintainer-level contract behind the short consumer
+procedure in [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md#host-managed-codex-handoff).
+It was relocated here from that consumer guide so the guide keeps only the
+actions a consumer takes.
+
+- **Recognized layout.** The host-managed layout contains only inert host-owned
+  `.git`, `.codex`, and optional `.agents` controls. Portable seeding preserves
+  them and never initializes or mutates Git or `.codex/**` inside the workspace
+  sandbox.
+- **Empty control mount is not runtime authority.** When `.codex` is the exact
+  empty read-only Codex control mount, a successful seed readback advances
+  directly to `kickoff-required`, but the mount alone grants nothing. Until the
+  host initialization is durably bound, V3 reports
+  `runtimeProjection: "plugin-managed-unattested"` with
+  `runtimeReadback: "absent"` and the V4 lifecycle cannot report `ready`. No
+  project-local Codex runtime projection is claimed and no runtime-readback
+  restart is needed.
+- **Planned host action.** After kickoff, V4 reports
+  `host-repository-init-required` and `pipeline-start` plans one separate
+  `codex-host-repository-init.mjs` action. The plan is read-only, binds the
+  exact portable preimage, and marks the apply as confirmation-required and
+  host-bound. Only that exact apply runs outside the workspace sandbox. It
+  initializes `main` without a commit and moves the private kickoff continuity
+  receipt into the new Git control path. It never runs the full onboarding
+  inspector at the host boundary and never writes `.codex/**`.
+- **Single restart.** The successful host apply requires exactly one ordinary
+  project-session restart so Codex remounts the new repository. Only the exact
+  durable host-init admission bound to the current root, authority, kickoff
+  artifacts, and private history promotes the fresh session to
+  `local-valid-writable` plus `plugin-managed`; it must not request a runtime
+  initialization, native readback, or a second restart. The transaction,
+  admission-publication, and terminal `projection-drift` controls are the ones
+  listed under authentication controls above; a different read-only target or
+  any non-empty or colliding reserved path still fails closed with the typed
+  target/layout diagnostic.
+- **Runner- and platform-neutral argv.** Codex uses the host action only for its
+  reserved-control-mount case; Claude keeps its normal local Git path.
+  Bash/Zsh on Linux and macOS and PowerShell on Windows render the returned
+  argv with platform quoting but never reconstruct its digest or arguments.
+  Neither path creates a remote, commit, push, merge, tag, publication, or
+  release claim. Initial main-session scaffold work is allowed after the
+  restart; dispatch, worktrees, and delivery stay blocked until the repository
+  has its first commit.
+- **Verification requirement for any new host-owned layout.** Every future
+  addition of a host-owned onboarding layout, alongside this one, requires a
+  disposable-root test that asserts the end-to-end success contract: the public
+  inspect/plan/apply/readback transaction actually completes, the exact allowed
+  write set is proven, and every host control (`.git`, `.codex`, `.agents`, or
+  the new layout's own) is preserved untouched. A rejection-only test is valid
+  solely for an explicitly unsupported layout, never as a stand-in for proving a
+  supported layout's happy path
+  (`backlog/items/2026-07-25-managed-onboarding-success-contract.md`).
+
 ## Failure and rollback behavior
 
 Private-state writes use exclusive no-follow creation, file fsync, atomic
