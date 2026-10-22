@@ -114,6 +114,12 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // The exact baseline identity digest prevents an offsetting removal/addition
   // from satisfying the count; exact delta decisions pin the unchanged classifier.
   const baselineVulnerableCount = 266;
+  // Restated 2026-10-22 (QG-04, own commit; ALF-K23): git-null-device-sites-tests, human-guard-override-disjoint-tests,
+  // pin-denial-names-a-diagnosis-it-refuses-tests and pin-windows-authority-ancestors-above-repository-are-human-controlled-tests
+  // adopted the full completion protocol (each is asserted `required` below). The classifier reads the converted sources: the
+  // first two no longer import node:test, so they count as top-level-assertions (same assertion sites); the Windows pin keeps
+  // only the root before/after hooks from node:test and no longer registers a test( call, so it is no longer classified
+  // vulnerable and leaves this list. No identity is removed from the pinned sets and no other row changes.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",33],
@@ -150,7 +156,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["fanout-governor-tests","plugins/pipeline-core/lib/fanout-governor.test.mjs","top-level-assertions",273],
     ["fanout-ledger-tests","plugins/pipeline-core/lib/fanout-ledger.test.mjs","top-level-assertions",62],
     ["git-hook-runtime-snapshot-fast-verify-tests","plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs","top-level-assertions",57],
-    ["git-null-device-sites-tests","plugins/pipeline-core/lib/git-null-device-sites.test.mjs","node-test-single",14],
+    ["git-null-device-sites-tests","plugins/pipeline-core/lib/git-null-device-sites.test.mjs","top-level-assertions",14],
     ["git-stash-readonly-tests","plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs","top-level-assertions",7],
     ["gitleaks-repair-ignore-cli-tests","plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs","top-level-assertions",2],
     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
@@ -158,7 +164,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",140],
     ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",9],
     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],
-    ["human-guard-override-disjoint-tests","plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs","node-test-single",57],
+    ["human-guard-override-disjoint-tests","plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs","top-level-assertions",57],
     ["install-agy-inline-candidate-tests","plugins/pipeline-core/install-agy.inline-candidate.test.mjs","top-level-assertions",54],
     ["install-snapshot-progress-tests","plugins/pipeline-core/scripts/install-snapshot-progress.test.mjs","top-level-assertions",17],
     ["installed-bootstrap-import-closure-tests","plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs","top-level-assertions",17],
@@ -171,7 +177,6 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["phoenix-authority-revision-installed-package-tests","plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs","top-level-assertions",10],
     ["pin-denial-names-a-diagnosis-it-refuses-tests","plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs","top-level-assertions",34],
     ["pin-devplan-lane-admits-the-producer-materialize-step-tests","plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs","top-level-assertions",9],
-    ["pin-windows-authority-ancestors-above-repository-are-human-controlled-tests","plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs","node-test-single",22],
     ["plan-reopen-current-action-tests","harness/scripts/plan-reopen-current-action.test.mjs","top-level-assertions",27],
     ["project-onboarding-foreign-residue-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs","top-level-assertions",13],
     ["project-onboarding-foreign-residue-unit-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs","top-level-assertions",15],
@@ -304,6 +309,10 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "design-course-command-admission-tests",
     "design-course-coordinator-tests",
     "design-course-session-tests",
+    "git-null-device-sites-tests",
+    "human-guard-override-disjoint-tests",
+    "pin-denial-names-a-diagnosis-it-refuses-tests",
+    "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
   ]) assert.equal(registry.entries.find((entry) => entry.name === name)?.disposition, "required", name);
 });
 
