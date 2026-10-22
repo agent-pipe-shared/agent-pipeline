@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "2e0b2c928693d80b17a9f3ad22b477992303d639",
-    "tree": "a273299ad48e73d4047ae630c702e5e72be4318a"
+    "commit": "0bf80bb4971ca44ae03c9048c2cf7adac3ee4124",
+    "tree": "19002b2a932f4f63cd2c87b3d26a077075933b73"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -264,6 +264,7 @@
         "verify-phase:harness/scripts/verify.mjs:audit-index-tests",
         "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-check",
         "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-tests",
+        "verify-phase:harness/scripts/verify.mjs:authority-restore-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-tests",
@@ -430,6 +431,8 @@
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-write-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-recovery-admission-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-recovery-tests",
         "verify-phase:harness/scripts/verify.mjs:doc-reader-course-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:doc-reader-terminal-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:elephant-agy-implementation-dispatch-tests",
