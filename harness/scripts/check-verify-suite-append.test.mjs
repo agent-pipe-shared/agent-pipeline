@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkVerifySuiteAppend, evaluateSignedHistoryRestoration } from "./check-verify-suite-append.mjs";
+import { checkVerifySuiteAppend, evaluateSignedHistoryRestoration, integrationTrailerWitness } from "./check-verify-suite-append.mjs";
 import { evaluateVerifySuiteAppend } from "../../plugins/pipeline-core/lib/verify-suite-append-policy.mjs";
 
 function fixture(run) {
@@ -129,6 +129,62 @@ test("missing restoration and an unrelated historical commit are not accepted", 
   assert.equal(sameShapeWrongRestoration.length, prior.length + additions.length);
   assert.equal(evaluate({ candidateBytes: registry(sameShapeWrongRestoration) }).code, "VSA-RECOVERY-CANDIDATE-MISMATCH");
   assert.equal(evaluate({ integrationCommit: "f".repeat(40) }).code, "VSA-RECOVERY-AUTHORIZATION");
+});
+
+// D101: the exception must be provable from committed history alone, in a clone
+// that has no machine-local receipt directory at all.
+const INTENT = "9".repeat(64);
+const pretty = (names) => registry(names.map((name) => ({ name, file: `${name}.test.mjs` })));
+function recoveryFixture(f, { trailerIntent = INTENT, entryIntent = INTENT, commitRecovery = true } = {}) {
+  f.writeConfig([f.tp13]);
+  writeFileSync(join(f.root, "harness", "verify-suites.json"), pretty(["a", "b"]));
+  f.commit("introduce protected append");
+  const parent = f.git("rev-parse", "HEAD").trim();
+  writeFileSync(join(f.root, "harness", "verify-suites.json"), pretty(["a", "x", "y", "b"]));
+  f.git("add", ".");
+  f.git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "import",
+    "-m", `Dispatch: quality-package-${trailerIntent} (integration)\nAI-Assisted: true`);
+  const integration = f.git("rev-parse", "HEAD").trim();
+  writeFileSync(join(f.root, "harness", "verify-suites.json"), pretty(["a", "b", "x", "y"]));
+  f.commit("restore order");
+  const recovery = {
+    schema: "pipeline.verify-suite-history-recovery.v1",
+    entries: [{
+      schema: entry.schema, integrationCommit: integration, integrationParent: parent,
+      integrationIntentSha256: entryIntent,
+      parentRegistryBlobOid: f.git("rev-parse", parent + ":harness/verify-suites.json").trim(),
+      defectRegistryBlobOid: f.git("rev-parse", integration + ":harness/verify-suites.json").trim(),
+      priorSuiteCount: 2, appendedSuiteCount: 2,
+    }],
+  };
+  writeFileSync(join(f.root, "harness", "verify-suite-history-recovery.json"), JSON.stringify(recovery, null, 2) + "\n");
+  if (commitRecovery) f.commit("record recovery");
+}
+
+test("integration trailer witness binds the exact intent digest recorded in the recovery entry", () => {
+  const message = (sha) => `import\n\nDispatch: quality-package-${sha} (integration)\nAI-Assisted: true\n`;
+  assert.equal(integrationTrailerWitness({ entry: { ...entry, integrationIntentSha256: INTENT }, message: message(INTENT) }), true);
+  assert.equal(integrationTrailerWitness({ entry: { ...entry, integrationIntentSha256: INTENT }, message: message("8".repeat(64)) }), false);
+  assert.equal(integrationTrailerWitness({ entry, message: "import\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true\n" }), false);
+  assert.equal(integrationTrailerWitness({ entry: { ...entry, integrationIntentSha256: "short" }, message: message(INTENT) }), false);
+});
+
+test("committed ordering repair is accepted from tracked history alone, with no receipt directory", () => fixture((f) => {
+  recoveryFixture(f);
+  const result = checkVerifySuiteAppend({ rootDir: f.root });
+  assert.equal(result.ok, true);
+  assert.equal(result.code, "VSA-HISTORY-APPEND-ONLY-RECORDED-RESTORATION");
+}));
+
+test("the same repair is refused when the integration trailer, the entry digest, or the commit state differs", () => {
+  for (const options of [
+    { trailerIntent: "8".repeat(64) },
+    { entryIntent: "8".repeat(64) },
+    { commitRecovery: false },
+  ]) fixture((f) => {
+    recoveryFixture(f, options);
+    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED");
+  });
 });
 
 test("full history traversal refuses a rewrite when recovery is missing or invalid", () => {

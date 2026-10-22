@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-/** Check every post-TP-13 registration edit; allow only the exact signed b7
- * ordering repair after canonical import proof and byte-derived restoration. */
+/** Check every post-TP-13 registration edit; allow only the exact b7 ordering
+ * repair, proven from committed history alone (integration trailer plus
+ * byte-derived restoration; no machine-local receipt). */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -9,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { parseStrictJson } from "../../plugins/pipeline-core/lib/governance-event.mjs";
 import { canonical } from "../../plugins/pipeline-core/lib/po-approval-proof.mjs";
 import { evaluateVerifySuiteAppend } from "../../plugins/pipeline-core/lib/verify-suite-append-policy.mjs";
-import { verifyQualityPackageIntegrationPostCommit } from "../../plugins/pipeline-core/lib/signed-quality-package.mjs";
+import { parseIntegrationTrailerBlock } from "../../plugins/pipeline-core/lib/commit-message-policy.mjs";
 
 const CONFIG = "project/guard-config.json";
 const REGISTRY = "harness/verify-suites.json";
@@ -152,9 +153,28 @@ function readRecovery(root, read) {
   } catch { return null; }
 }
 
-function bindRecovery({ root, run, candidateBytes, entry }) {
+/**
+ * Tracked-evidence witness for the integration commit (PO decision D101).
+ * Everything it reads is committed history: the commit's own message trailer
+ * must be the canonical signed-package integration trailer naming exactly the
+ * intent digest the recovery entry records. That trailer is admitted into
+ * history only by the commit-msg boundary after the signed authorization was
+ * verified at commit time, so it is the committed trace of that gate. The
+ * machine-local, gitignored commit-authorization receipt is deliberately NOT
+ * consulted: evidence a check needs must be reachable from a clean clone.
+ */
+export function integrationTrailerWitness({ entry, message } = {}) {
+  if (!exactEntryShape(entry) || typeof message !== "string") return false;
+  const trailer = parseIntegrationTrailerBlock(message);
+  return trailer.ok === true && trailer.intentSha256 === entry.integrationIntentSha256;
+}
+
+function bindRecovery({ root, run, read, candidateBytes, entry }) {
   if (!entry) return null;
   try {
+    // The recovery entry itself must be committed and unmodified: a worktree-only
+    // edit of the index can never unlock the exception.
+    if (run(["show", "HEAD:" + RECOVERY]) !== read(resolve(root, RECOVERY), "utf8")) return null;
     const ancestry = run(["rev-list", "--parents", "-n", "1", entry.integrationCommit])
       .trim().split(/\s+/u);
     if (ancestry.length !== 2 || ancestry[0] !== entry.integrationCommit
@@ -164,15 +184,13 @@ function bindRecovery({ root, run, candidateBytes, entry }) {
     if (parentBlob !== entry.parentRegistryBlobOid || defectBlob !== entry.defectRegistryBlobOid) return null;
     const parentBytes = run(["show", entry.integrationParent + ":" + REGISTRY]);
     const defectBytes = run(["show", entry.integrationCommit + ":" + REGISTRY]);
-    const proof = verifyQualityPackageIntegrationPostCommit({
-      repoRoot: root,
-      commitSha: entry.integrationCommit,
-      intentSha256: entry.integrationIntentSha256,
+    const witnessed = integrationTrailerWitness({
+      entry, message: run(["show", "-s", "--format=%B", entry.integrationCommit]),
     });
     const result = evaluateSignedHistoryRestoration({
       entry, integrationCommit: entry.integrationCommit, integrationParent: ancestry[1],
       parentRegistryBlobOid: parentBlob, defectRegistryBlobOid: defectBlob,
-      parentBytes, defectBytes, candidateBytes, integrationVerified: proof.ok === true,
+      parentBytes, defectBytes, candidateBytes, integrationVerified: witnessed,
     });
     return result.ok ? { entry, parentBytes, defectBytes, ...result } : null;
   } catch { return null; }
@@ -192,7 +210,7 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
     if (!OID.test(head)) return fail("VSA-HEAD");
     const worktree = read(resolve(root, REGISTRY), "utf8");
     const entry = readRecovery(root, read);
-    const recovery = bindRecovery({ root, run, candidateBytes: worktree, entry });
+    const recovery = bindRecovery({ root, run, read, candidateBytes: worktree, entry });
     const configCommits = run(["log", "--first-parent", "--reverse", "--format=%H", "--", CONFIG])
       .trim().split("\n").filter(Boolean);
     let introduction = null;
@@ -206,7 +224,7 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
       const result = evaluateVerifySuiteAppend({ beforeBytes: before, afterBytes: worktree });
       if (result.ok) return { ok: true, code: "VSA-UNCOMMITTED-INTRODUCTION", checked: 1, appended: result.appended };
       if (recovery?.ok && before === recovery.defectBytes && worktree === recovery.restoredBytes) {
-        return { ok: true, code: "VSA-UNCOMMITTED-SIGNED-RESTORATION", checked: 1, appended: recovery.appendedSuiteCount };
+        return { ok: true, code: "VSA-UNCOMMITTED-RECORDED-RESTORATION", checked: 1, appended: recovery.appendedSuiteCount };
       }
       return fail(result.code, "uncommitted TP-13 registration postimage");
     }
@@ -242,7 +260,7 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
     }
     return {
       ok: true,
-      code: recovery?.ok ? "VSA-HISTORY-APPEND-ONLY-SIGNED-RESTORATION" : "VSA-HISTORY-APPEND-ONLY",
+      code: recovery?.ok ? "VSA-HISTORY-APPEND-ONLY-RECORDED-RESTORATION" : "VSA-HISTORY-APPEND-ONLY",
       checked,
     };
   } catch (error) {
