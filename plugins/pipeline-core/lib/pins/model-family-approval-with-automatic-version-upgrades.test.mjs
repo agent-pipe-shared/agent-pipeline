@@ -444,4 +444,52 @@ test("C4 independently qualified native installation is recorded per runner with
   assert.equal(rows.filter((x) => x.status === "not-installed").length, EXECUTION_RUNNERS.length - 1);
 });
 
+// ---- E: PO decision D99 (2026-10-22): a version inside an assigned family is automatic, a NEW family is the PO's call ----
+// These cases pin the family-active selection rule that the bootstrap (B1) and dispatch (D1) paths consume. The legacy
+// model-role V3 bootstrap path (family authority inactive) has no family concept and is NOT covered here (open design call).
+const watermarkOf = (a, version) => ({ runner: a.runner, accountBindingSha256: sha("a"), installationBindingSha256: sha("i"),
+  familyId: a.familyId, version, admittedReceiptSha256: sha("receipt") });
+
+test("E1 D99 an in-family version bump after an admitted watermark is followed silently: latest, no pin, no approval or proposal field", () => {
+  const a = baseSol();
+  const recs = [release(a, "sol", [6], "gpt-6-sol"), release(a, "sol", [6, 1], "gpt-6.1-sol")];
+  const r = evaluateModelFamilySelection({ assignment: a, discovery: discovery(a, recs), watermark: watermarkOf(a, [6]),
+    pinSelection: null, context: ctx(a, "gpt-6.1-sol"), now: NOW });
+  assert.equal(r.ok, true, r.code);
+  assert.equal(r.value.selectedModelId, "gpt-6.1-sol");
+  assert.equal(r.value.selection, "latest");
+  assert.equal(r.value.pinDecisionSha256, null);
+  assert.deepEqual(r.value.watermarkBefore, [6]);
+  assert.deepEqual(r.value.watermarkAfter, [6, 1], "the bump advances the watermark without a new confirmation");
+  assert.deepEqual(Object.keys(r.value).filter((k) => /approv|propos|confirm|acknowledg|signature/iu.test(k)), []);
+});
+
+test("E2 D99 a NEW family never changes the assigned selection and is only reported as unassigned for the PO", () => {
+  const a = baseSol();
+  const sol = release(a, "sol", [6], "gpt-6-sol"); const astra = release(a, "astra", [9], "gpt-9-astra");
+  const withNew = evaluateModelFamilySelection({ assignment: a, discovery: discovery(a, [sol, astra]), watermark: watermarkOf(a, [6]),
+    pinSelection: null, context: ctx(a, "gpt-6-sol"), now: NOW });
+  assert.equal(withNew.ok, true, withNew.code);
+  assert.equal(withNew.value.selectedModelId, "gpt-6-sol", "a higher version of an unassigned family is not selected");
+  assert.deepEqual(withNew.value.unassignedFamilyIds, ["astra"], "the new family is surfaced for the PO decision");
+  assert.deepEqual(withNew.value.watermarkAfter, [6], "the assigned family's watermark is untouched by the new family");
+  assert.equal(pick(a, [astra], "gpt-9-astra").code, "FAMILY_RELEASE_UNAVAILABLE", "a new family alone is never assigned by similarity");
+});
+
+test("E3 D99 an unreleased or unrecognised newer version changes nothing: the assigned selection stays, or the call refuses concretely", () => {
+  const a = baseSol();
+  const older = release(a, "sol", [6], "gpt-6-sol");
+  const unreleased = { ...release(a, "sol", [6, 1], "gpt-6.1-sol"), released: false };
+  const kept = evaluateModelFamilySelection({ assignment: a, discovery: discovery(a, [older, unreleased]), watermark: watermarkOf(a, [6]),
+    pinSelection: null, context: ctx(a, "gpt-6-sol"), now: NOW });
+  assert.equal(kept.ok, true, kept.code);
+  assert.equal(kept.value.selectedModelId, "gpt-6-sol");
+  assert.deepEqual(kept.value.watermarkAfter, [6], "an unavailable version does not advance the watermark");
+  const unknown = ctx(a, "gpt-6-sol", { coverage: { familyId: "sol", coverageEvidenceSha256: sha("v"), unknownTargetFamilyEvidenceSha256s: [sha("u")] } });
+  assert.equal(evaluateModelFamilySelection({ assignment: a, discovery: discovery(a, [older]), watermark: watermarkOf(a, [6]),
+    pinSelection: null, context: unknown, now: NOW }).code, "FAMILY_VERSION_UNRECOGNIZED");
+  assert.equal(evaluateModelFamilySelection({ assignment: a, discovery: discovery(a, [release(a, "sol", [5], "gpt-5-sol")]), watermark: watermarkOf(a, [6]),
+    pinSelection: null, context: ctx(a, "gpt-5-sol"), now: NOW }).code, "DOWNGRADE_REFUSED", "a lower version never replaces the admitted one");
+});
+
 test("C5 genuinely installed runner acceptance (host-held)", { skip: "native-pending: owner Elephant/PO host, due before AC-212 PO acceptance, host = a machine with qualified installed codex/claude/antigravity runners; the real readInstalledResult/verifyInstalledQualification ports behind createModelFamilyAcceptanceHost (model-family-acceptance.mjs) and the real createModelFamilyRuntimeHost resolveCurrentInvocationIdentity are not available in this session" }, () => {});
