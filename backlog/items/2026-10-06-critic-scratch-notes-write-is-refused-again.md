@@ -47,3 +47,75 @@ shape for the Critic role or give the Critic a sanctioned notes-writer command n
 - **Rationale:** commit(s) `f95fc6998`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+## Merged from `2026-10-06-critic-scratch-name-randomness-has-no-admitted-command` (created 2026-10-06; merged 2026-10-22)
+
+*Carried over verbatim from the item closed as a duplicate of this one. What is unique to it: From the duplicate: (1) the template/agent text must carry no random-name instruction (no openssl, /dev/urandom, mktemp, CSPRNG) and must say a Critic without the route reports persistence as unavailable instead of improvising; (2) the runaway-background-process hazard (a sed read of /dev/urandom that never terminated); (3) the closed shell grammar must keep admitting no randomness command. All three are already pinned by the 9 cases added to the canonical's pin, so the canonical only needs a note that these are covered.*
+
+**Front matter of the merged item, verbatim (status/ledger fields of the original):**
+
+```yaml
+schema: pipeline.backlog-item.v1
+id: pipeline.critic-scratch-name-randomness-has-no-admitted-command
+type: defect
+owner: pipeline
+status: open
+created: 2026-10-06
+source: "Observed live during the Alfred night run, 2026-10-06 (two Opus Critic dispatches, GPGL-5/6 delta and FANOUT bundle remainder)."
+sprint: alfred
+done_when: manual
+```
+
+#### Description
+
+`templates/prompts/critic-review.md` ("Scratchpad isolation") tells the Critic to create
+`scratch/dispatch/<codename>-<random-hex>/` with at least 8 hex characters "from a CSPRNG (e.g. `openssl rand -hex 4`)"
+and a bare `mkdir`. The Critic agent has no Write tool, and the closed shell grammar admits neither `openssl` nor a
+bare `mkdir` of that shape. In one dispatch the Critic improvised a `sed` read of `/dev/urandom` started in the
+background; it never terminated, held a CPU core, and the Critic's grammar admits no kill, so the dispatcher had to stop
+it. In a second dispatch the notes write itself was refused (`GUARD-DEVPLAN-SHELL`). Both Critics therefore reported
+"persistence unavailable", which is the gap already filed as
+`backlog/items/2026-08-27-critic-dispatches-cannot-persist-their-scratch-notes.md`; this item adds the randomness
+instruction and the runaway-process hazard it invites.
+
+#### Triggering situation
+
+Critic records `specs/sprint-alfred-epic/evidence/critic-2026-10-05/gpgl-5-6-delta.md` (operational incident) and
+`specs/sprint-alfred-epic/evidence/critic-2026-10-05/fanout-bundle-remainder.md` (persistence unavailable).
+
+#### Affected artifact
+
+`templates/prompts/critic-review.md` (and its vendored copy under `plugins/pipeline-core/templates/prompts/`),
+`plugins/pipeline-core/agents/critic.md`, the shell grammar in `templates/prompts/agent-obligations.md`.
+
+#### Proposal
+
+Give the Critic one admitted, bounded route that creates its own fresh scratch subdirectory and writes
+`critic-notes.md` inside it (a plugin script that draws the suffix with `node:crypto`, creates the directory
+atomically, and appends notes), and replace the `openssl` example in the template with that script. Until then, the
+template should say plainly that a Critic without that route reports persistence as unavailable and must not
+improvise a randomness source.
+
+#### Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+- **Rationale:** commit(s) `f95fc6998`.
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-08.
+
+#### Verification 2026-10-22: the pin the item asked for
+
+`templates/prompts/critic-review.md`, its vendored copy and `plugins/pipeline-core/agents/critic.md` carry no random-name,
+`openssl`, `/dev/urandom`, `mktemp` or CSPRNG instruction, and each names the single admitted route (Write/Edit only, the
+guard-allocated `critic-<authenticated-native-agent-id>` target, persistence reported as unavailable when admission is
+missing). Nine cases were added to `plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs`
+(the registered pin of the same notes lane): the no-randomness and route checks for each of the three texts, canonical
+versus vendored paragraph equality, a mirror that proves the detector catches the old instruction, and a check that the
+closed shell grammar still admits no randomness command. Counted result, run alone on 2026-10-22: 28 cases, 26 pass,
+0 fail, 2 skipped (the two typed host-limitation skips for synthetic mode bits), 0 todo.
+
+Residual, not changed here: `roles/critic.md` CR-03 (standard stage) still tells the Critic to create a
+`scratch/dispatch/critic-<task-or-codename>-a1/` directory with a bare `mkdir`, and three texts say the Critic "already
+creates" a per-dispatch subdirectory, while the template and agent now say the native dispatch guard allocates the notes
+directory on the first admitted Write. The role text predates the guard-owned route and should be reconciled by the
+role owner.
