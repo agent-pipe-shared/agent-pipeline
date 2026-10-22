@@ -883,6 +883,28 @@ test("actual commit paths reject false T5/T0 and allow generated lockfile T0", (
   assert.equal(evaluate(trueT0Root, ["generated/client.mjs", "package-lock.json"]).ok, true);
 });
 
+// D104: the repository no longer carries a recovery index. An absent index is the
+// normal case; it retires nothing, produces no finding of its own, and every
+// record stays subject to the ordinary per-record Critic disposition.
+test("an absent abandoned-v3 recovery index is normal and retires no record", () => {
+  const clean = fixture({ "evidence/dispatch-record-T5.json": json(v3("T5", { criticSkip: skip() })) });
+  const none = evaluate(clean, []);
+  assert.equal(none.ok, true, none.readFindings.join("\n"));
+  assert.equal(none.administrativelyRetiredRecordCount, 0);
+  assert.deepEqual(none.readFindings, []);
+
+  // The two historical task IDs get no special treatment without the index.
+  const named = fixture({
+    "evidence/dispatch-record-ALF-ADOPTION-PROOF.json": json(v3("ALF-ADOPTION-PROOF", { candidateCommit: null, criticRequired: required() })),
+    "evidence/dispatch-record-ALF-RECOVERY-PLAN.json": json(v3("ALF-RECOVERY-PLAN", { criticRequired: required() })),
+  });
+  const strict = evaluate(named, []);
+  assert.equal(strict.ok, false);
+  assert.equal(strict.administrativelyRetiredRecordCount, 0);
+  assert.equal(strict.readFindings.filter((finding) => /ALF-ADOPTION-PROOF|ALF-RECOVERY-PLAN/u.test(finding)).length, 2);
+  assert.doesNotMatch(strict.readFindings.join("\n"), /recovery index/u);
+});
+
 test("empty commit paths preserve T5 admission and reject T0", () => {
   const t0 = { schema: CRITIC_SKIP_SCHEMA, trigger: trigger({ diff: { mechanical: true, architecture: false, guardrails: false, security: false } }), appliedRow: "T0" };
   const t5Root = fixture({ "evidence/dispatch-record-T5.json": json(v3("T5", { criticSkip: skip() })) });
