@@ -340,3 +340,38 @@ test('AC-241 point 3: drift after the actual turn refuses publication and the pr
     assert.equal(existsSync(receiptFileOf(late.f, late.receiptId)), false, `${file}: no private readiness record is published`);
   }
 });
+
+// Acceptance 5 (historical preservation): the old not-ready reports stay as recorded failures. Byte digests pin them as unchanged
+// public receipts; no ready report may reuse a not-ready report's dispatch or candidate (a manual conversion would have to).
+// Final package validation of a not-ready report is counted coverage of design-workflow-package.test.mjs (DWP02, DWP-READINESS-BINDING).
+const HISTORICAL = {
+  'design-readiness-08ef241a-20260928a.json': ['2145305cef32223b27030446e22cc88f7de51f47d63804bab256e61ea2896920', 'not-ready'],
+  'design-readiness-3b05a045-20260928.json': ['a40d44e3dcb8149fb059a349f5640b0de44ea75ee08ff1693cd1175b17533252', 'not-ready'],
+  'design-readiness-628df5aa-20260928c.json': ['b82512c75810865347bf6b33e63491ab50557a88d5f44ba6f70be57cbfa3f855', 'not-ready'],
+  'design-readiness-9a416793-20260928b.json': ['8b8c53a5b76ac8f3a1eee2a89f58879111cd8052f6c6e8167b57a86b6d4349cc', 'not-ready'],
+  'design-readiness-c22c1cd2-20260928.json': ['cb6e6371330f6b9a8408e6da35880a72e8ae710aaa5ffbcfb1bf34e0f2c6e00d', 'ready-for-po-review'],
+  'design-readiness-f038d96e-20260928d.json': ['926bf9396d3976f42dddb215c7649a9651f0290c42cf6ab3dbfbd8a1c1f6a491', 'ready-for-po-review'],
+};
+test('AC-241 point 5: old not-ready Readiness reports are preserved unchanged and none was converted to ready', () => {
+  const dir = join(repoRoot, 'specs', 'sprint-alfred-epic', 'evidence');
+  const reports = Object.entries(HISTORICAL).map(([file, [digest, outcome]]) => {
+    const bytes = readFileSync(join(dir, file));
+    assert.equal(sha(bytes), digest, `${file}: the public receipt bytes changed`);
+    const report = JSON.parse(bytes.toString('utf8'));
+    assert.equal(report.outcome, outcome, file);
+    assert.equal(report.schema, 'pipeline.design-readiness-receipt.v1', file);
+    return { file, report };
+  });
+  const notReady = reports.filter(({ report }) => report.outcome === 'not-ready'), ready = reports.filter(({ report }) => report.outcome === 'ready-for-po-review');
+  assert.equal(notReady.length, 4); assert.equal(ready.length, 2);
+  for (const { file, report } of notReady) assert.equal(report.findings.some(f => f.severity === 'blocking') && report.findings.length > 0, true, `${file}: a not-ready report keeps its blocking findings`);
+  for (const { file, report } of ready) assert.deepEqual(report.findings.filter(f => f.severity === 'blocking'), [], `${file}: a ready report carries no blocking finding`);
+  for (const { report: r } of ready) for (const { file, report: o } of notReady) {
+    assert.notEqual(r.dispatchId, o.dispatchId, `${file}: a ready report reuses its dispatch`);
+    assert.notEqual(r.candidate.commit, o.candidate.commit, `${file}: a ready report claims its candidate`);
+  }
+  // The two reports named by the item still record the missing current Advisor binding, not a waiver of it.
+  const codes = file => notReady.find(entry => entry.file === file).report.findings.map(f => f.code);
+  assert.deepEqual(codes('design-readiness-9a416793-20260928b.json'), ['CURRENT_ADVISOR_BINDING_MISSING', 'SUBMISSION_ACK_GATE_CONFLICT']);
+  assert.deepEqual(codes('design-readiness-628df5aa-20260928c.json'), ['ADVISOR-CURRENT-BINDING-MISSING']);
+});
