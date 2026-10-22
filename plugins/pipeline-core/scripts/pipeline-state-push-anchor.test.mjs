@@ -37,6 +37,12 @@ import test from "node:test";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { criticalPushScratchArtifactPaths } from "./po-human-approval.mjs";
 import { run } from "./pipeline-state.mjs";
+import { readFileSync } from "node:fs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
+import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 
 const NOW = "2026-10-08T00:00:00.000Z";
 const CANDIDATE = { commit: "a".repeat(40), tree: "b".repeat(40) };
@@ -256,3 +262,162 @@ test("R7-6-P: case 4 -- neither a machine plane nor a legacy pointer keeps LOCAL
   const result = callApprove(buildFixture({ signer: a }));
   assertRefusedWith(result, UNAVAILABLE, MISMATCH);
 });
+
+
+// ---- K52: approve-push in signature mode while the session-authority catalogue exists (block-scoped helpers) ----
+/*
+ * pins `approve-push` in SIGNATURE mode while the
+ * session-authority catalogue exists (K52, PO decision Option A, 2026-10-22).
+ *
+ * Before: with `.git/agent-pipeline/session-authority/catalogue.json` present, every shell-run
+ * `approve-push` went to the State push producer route, which needs a requester bound by a
+ * source-owned host process; a terminal or agent shell binds none, so the documented Layer-4 command
+ * was refused with SDC-AUTHORITY-UNAVAILABLE (state-push-source-requester) and no route existed.
+ * Now: only a waived (chat) push takes the producer route; signature mode falls through to the PF-54
+ * in-flight gate and the legacy route, whose detached proof stays bound to the exact commit, remote
+ * and destination. Real git candidates, no injected dependencies (an injected route stays refused
+ * while a catalogue exists).
+ */
+{
+const REMOTE = "origin";
+const DESTINATION = "refs/heads/main";
+const SUCCESS_LINE = 'Push approved by "PO"';
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+
+const roots = [];
+test.after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+
+function git(cwd, args) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  if (result.error || result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
+  return result.stdout.trim();
+}
+
+function captured(fn) {
+  const stdout = [];
+  const stderr = [];
+  const saved = { log: console.log, error: console.error };
+  console.log = (...args) => stdout.push(args.join(" "));
+  console.error = (...args) => stderr.push(args.join(" "));
+  let code;
+  try { code = fn(); } finally { Object.assign(console, saved); }
+  return { code, stdout: stdout.join("\n"), stderr: stderr.join("\n") };
+}
+
+/** A governed repository with an initialized catalogue and a complete, correctly signed push bundle. */
+function buildFixture({ tamper = null } = {}) {
+  const parent = nativeContractFixtureParent();
+  mkdirSync(parent, { recursive: true, mode: 0o700 });
+  const dir = mkdtempSync(join(parent, "k52-approve-push-"));
+  roots.push(dir);
+  const home = mkdtempSync(join(tmpdir(), "k52-approve-push-home-"));
+  roots.push(home);
+  mkdirSync(join(dir, "evidence"), { mode: 0o700 });
+  git(dir, ["init", "-q", "-b", "main"]);
+  for (const [name, value] of [["user.name", "Fixture"], ["user.email", "fixture@example.invalid"], ["commit.gpgsign", "false"]]) git(dir, ["config", name, value]);
+  writeFileSync(join(dir, "README.md"), "fixture\n");
+  writeFileSync(join(dir, ".gitignore"), "scratch/\nevidence/\n.claude/\n");
+  git(dir, ["add", "README.md", ".gitignore"]);
+  git(dir, ["commit", "-q", "-m", "init"]);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(dir, "fixture-host") });
+  const plan = controller.planDecision({ rootDir: dir, decision: "enroll", by: "fixture explicit course" });
+  controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  prepareApprovedItemCourseFixture({ root: dir });
+  writeFileSync(join(dir, "pipeline.user.yaml"), 'schema: "pipeline.user.v1"\ngates:\n  push_approval: "signature"\n');
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+  const keyReference = "fixture-key-k52";
+  const publicKeySha256 = sha256(publicKey);
+  const keyDir = mkdtempSync(join(tmpdir(), "k52-approve-push-key-"));
+  roots.push(keyDir);
+  writeFileSync(join(keyDir, "trust-policy.json"), JSON.stringify({ keyReference, publicKeySha256 }));
+  mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(home, ".agent-pipeline", "machine.json"), JSON.stringify({
+    schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDir, pushApprovalDefault: "signature",
+    routing: null, language: null, session: null, usage: null, updatedAt: "2026-10-22T00:00:00.000Z",
+  }));
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"], trustAnchor: { keyReference, publicKeySha256 },
+  }));
+  const threatModelBody = "fixture threat model\n";
+  writeFileSync(join(dir, "project", "push-threat-model.md"), threatModelBody);
+  const threatModel = { path: "project/push-threat-model.md", sha256: sha256(threatModelBody) };
+  const stateFile = join(dir, ".claude", "pipeline-state.json");
+  const activeState = JSON.parse(readFileSync(stateFile, "utf8"));
+  const featureId = activeState.activeFeature.id;
+  const planBytes = readFileSync(join(dir, "specs", "unit", "prd_unit.md"));
+  const specBytes = readFileSync(join(dir, "specs", "unit", "spec.md"));
+  assert.equal(activeState.planApproval?.poGateAuthority?.planSha256, sha256(planBytes), "the fixture plan bytes are the approved plan");
+  assert.equal(activeState.planApproval?.poGateAuthority?.specSha256, sha256(specBytes), "the fixture spec bytes are the approved spec");
+  git(dir, ["add", "pipeline.user.yaml", "project/critical-human-proof.json", "project/push-threat-model.md"]);
+  git(dir, ["commit", "-q", "-m", "fixture policy"]);
+  const repository = inspectSignedDescriptorCustodyRepository(dir);
+  initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository }));
+  const candidate = { commit: git(dir, ["rev-parse", "HEAD"]), tree: git(dir, ["rev-parse", "HEAD^{tree}"]) };
+  const signedDestination = tamper === "destination" ? "refs/heads/other" : DESTINATION;
+  const signedCommit = tamper === "commit" ? "c".repeat(40) : candidate.commit;
+  const subjectSha256 = criticalActionSubjectSha256({
+    kind: "push", candidate: { commit: signedCommit, tree: candidate.tree },
+    subject: { sourceCommit: signedCommit, remote: REMOTE, destination: signedDestination, threatModel },
+  });
+  const request = createCriticalActionApprovalRequest({
+    candidate: { commit: signedCommit, tree: candidate.tree }, featureId,
+    planBytes, specBytes,
+    action: { kind: "push", subjectSha256, expiresAt: "2099-01-01T00:00:00.000Z" },
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference, publicKey,
+    signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64"),
+  };
+  if (tamper === "forged") proof.signatureBase64 = Buffer.alloc(64, 7).toString("base64");
+  const common = realpathSync(join(dir, ".git"));
+  const paths = criticalPushScratchArtifactPaths(dir, common);
+  mkdirSync(join(dir, "scratch"), { recursive: true });
+  writeFileSync(paths.request, JSON.stringify(request));
+  writeFileSync(paths.authority, JSON.stringify({ keyReference, publicKeySha256 }));
+  if (tamper !== "missing") writeFileSync(paths.proof, JSON.stringify(proof));
+  return {
+    dir, home,
+    argv: ["approve-push", "--by", "PO", "--remote", REMOTE, "--destination", DESTINATION,
+      "--proof-request", paths.request, "--proof-authority", paths.authority, "--proof", paths.proof],
+  };
+}
+
+function callApprove(fixture) {
+  const names = ["HOME", "USERPROFILE", "PIPELINE_PO_APPROVAL_DIRECTORY"];
+  const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  process.env.HOME = fixture.home;
+  process.env.USERPROFILE = fixture.home;
+  delete process.env.PIPELINE_PO_APPROVAL_DIRECTORY;
+  try {
+    return captured(() => run(fixture.argv, { dir: fixture.dir }));
+  } finally {
+    for (const name of names) { if (saved[name] === undefined) delete process.env[name]; else process.env[name] = saved[name]; }
+  }
+}
+
+const describeResult = (result) => `exit ${result.code}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`;
+
+test("K52-1: with a catalogue present, signature-mode approve-push approves a correctly signed proof (the documented Layer-4 route works)", () => {
+  const fixture = buildFixture();
+  const result = callApprove(fixture);
+  assert.ok(!result.stderr.includes("state-push-source-requester"), `the producer route must not be taken\n${describeResult(result)}`);
+  assert.equal(result.code, 0, describeResult(result));
+  assert.ok(result.stdout.includes(SUCCESS_LINE), describeResult(result));
+  const state = JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8"));
+  assert.equal(state.pushApproval?.lastApproved?.forCommit, git(fixture.dir, ["rev-parse", "HEAD"]), "the approval is bound to the exact candidate commit");
+});
+
+for (const [tamper, label] of [["commit", "a proof signed for another commit"], ["destination", "a proof signed for another destination"],
+  ["forged", "a forged signature"], ["missing", "a missing proof file"]]) {
+  test(`K52-2: with a catalogue present, ${label} is still refused and records no approval`, () => {
+    const fixture = buildFixture({ tamper });
+    const result = callApprove(fixture);
+    assert.notEqual(result.code, 0, describeResult(result));
+    assert.ok(!result.stdout.includes(SUCCESS_LINE), describeResult(result));
+    const state = JSON.parse(readFileSync(join(fixture.dir, ".claude", "pipeline-state.json"), "utf8"));
+    assert.equal(state.pushApproval?.lastApproved, undefined, "no approval may be recorded");
+  });
+}
+}
