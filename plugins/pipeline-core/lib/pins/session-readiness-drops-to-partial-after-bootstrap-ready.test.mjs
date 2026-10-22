@@ -13,15 +13,17 @@
 // The real preflight module runs; only its project-readiness probe (a documented dependency seam,
 // `requireProjectOnboardingReadyFn`) is driven so the bootstrap-ready/session-partial state is
 // deterministic. The guard's admission of the emitted command is decided by the guard's own real
-// function. Not covered (named, not claimed): the concurrent-schedule cause of intermittent
-// `cleanup_recovery_observation_unavailable` (measured 2026-10-05, separate FLAP fix; typed
-// uncovered point UNCOVERED-CONCURRENT-CAUSE: AC6 starts real parallel processes over one
-// deterministic probe state, but the real intermittent cause needs live shared on-disk state this pin
-// does not fabricate), and SKILL.md prose.
+// function. The concurrent-schedule cause of the intermittent `cleanup_recovery_observation_unavailable`
+// (measured 2026-10-05, FLAP fixes 073a5a230 and d3c41ca5e) is covered by AC7a/AC7b over real shared
+// on-disk state: a separate OS process owns a real session descriptor in an onboarded fixture repository and
+// retires it at an exact point of the parent's real strict cleanup-recovery observation (AC6 starts real
+// parallel processes over one deterministic probe state). Not covered (named, not claimed): SKILL.md prose,
+// other concurrent writers than session descriptors, and a dense create/retire loop of sub-millisecond
+// descriptors, which the bounded re-observation does not absorb (see the backlog item).
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { writeSync } from "node:fs";
+import { existsSync, realpathSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -29,6 +31,10 @@ import { fileURLToPath } from "node:url";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { ProjectOnboardingReadyError } from "../project-onboarding-ready-gate.mjs";
 import { isSanctionedLifecycleCommand } from "../../hooks/guard-lifecycle-ready.mjs";
+import { partialCleanupRecoveryResultCore } from "../project-onboarding-v3.mjs";
+import { planSessionCleanupRecovery } from "../session-cleanup-recovery.mjs";
+import { listActiveSessionDescriptors, retireSessionDescriptor, startSessionDescriptor } from "../worktree-lifecycle.mjs";
+import { createLegacyLayoutFixture } from "../test-session-cleanup-requester-fixture.mjs";
 
 const CWD = resolve("/projects/current");
 // The readiness guard compares `--root` against a real repository identity, so admission is checked
@@ -101,6 +107,21 @@ const commandOf = (action) => {
   const word = (value) => (/^[A-Za-z0-9_.:=-]+$/u.test(value) ? value : `'${value}'`);
   return [action.executable, ...action.argv].map(word).join(" ");
 };
+
+// Child mode (AC7): the same file, run as a separate process, is one concurrent "agent" that owns a real session
+// descriptor in the SHARED on-disk repository the parent observes. It announces the descriptor, then retires it the
+// instant the parent drops the signal file (the owner retiring its own session at an exact point of the parent's read).
+if (process.env.ALF_PIN_OWNER_CHILD === "1") {
+  const root = process.env.ALF_PIN_OWNER_ROOT;
+  const signal = process.env.ALF_PIN_OWNER_SIGNAL;
+  const handle = startSessionDescriptor(root, { ownerRuntime: null });
+  writeSync(1, `${JSON.stringify({ sessionId: handle.sessionId, path: handle.path })}\n`);
+  const deadline = Date.now() + 30_000;
+  while (!existsSync(signal) && Date.now() < deadline) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2);
+  if (!existsSync(signal)) process.exit(3);
+  retireSessionDescriptor(root, { sessionId: handle.sessionId, ownerNonce: handle.ownerNonce, descriptorSha256: handle.descriptorSha256 });
+  process.exit(0);
+}
 
 // Child mode (AC6): the same file, run as a separate process, emits the preflight action as JSON.
 if (process.env.ALF_PIN_PREFLIGHT_CHILD === "1") {
@@ -186,6 +207,92 @@ test("AC6: real parallel read-only preflight processes over the same probe state
   }
   assert.equal(intentOf(results[0].nextAction), "session");
   assert.equal(results[0].nextAction.mutation, false);
+});
+
+// AC7: the measured intermittent cause (2026-10-05: 2 of 60 `inspect --intent session` runs under 4-5 concurrent
+// agents) was ANOTHER session's descriptor being retired by its owner while the cleanup-recovery plan listed and loaded
+// it. These cases reproduce that over REAL shared on-disk state: an onboarded fixture repository, a separate OS
+// process that owns a real session descriptor in it and retires it at an exact point of this process's read, and
+// the real strict cleanup-recovery observation (the function behind `inspect --intent session`). The retire is
+// scheduled by a handshake (the owner retires only after the parent has read the descriptor), so the schedule is
+// exact and never depends on timing. A dense create/retire loop is deliberately NOT asserted: a descriptor that lives
+// for a fraction of a millisecond is outside any bounded re-observation (measured, see the backlog item).
+async function withDescriptorOwnedByAnotherProcess(run) {
+  const root = realpathSync(createLegacyLayoutFixture({ prefix: "pin-flap", name: "owner", goal: "Concurrent readiness pin" }));
+  const signal = join(root, ".git", "pin-retire-now.signal");
+  let child = null;
+  try {
+    child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
+      env: { ...process.env, ALF_PIN_OWNER_CHILD: "1", ALF_PIN_OWNER_ROOT: root, ALF_PIN_OWNER_SIGNAL: signal }, stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    let err = "";
+    child.stderr.on("data", (d) => { err += d; });
+    const announced = await new Promise((res, rej) => {
+      child.on("error", rej);
+      child.on("close", (code) => rej(new Error(`owner exited before announcing its descriptor (${code}): ${err}`)));
+      child.stdout.on("data", (d) => { out += d; if (out.includes("\n")) res(JSON.parse(out.split("\n")[0])); });
+    });
+    const closed = new Promise((res) => child.on("close", res));
+    // Retire the descriptor in the OTHER process and wait until this process sees it gone.
+    const retireInOtherProcess = () => {
+      writeFileSync(signal, "retire\n");
+      const deadline = Date.now() + 20_000;
+      while (existsSync(announced.path) && Date.now() < deadline) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2);
+      assert.equal(existsSync(announced.path), false, "the owning process retired its descriptor");
+    };
+    assert.equal(existsSync(announced.path), true, "positive control: the descriptor existed on shared disk before the race");
+    await run({ root, announced, retireInOtherProcess });
+    assert.equal(await closed, 0, "the owning process retired cleanly");
+  } finally {
+    child?.kill();
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+}
+
+function observeStrict(root, planDeps) {
+  let planCalls = 0;
+  const result = partialCleanupRecoveryResultCore({
+    root, runner: "claude", intent: "session", repository: {}, strict: true,
+    deps: {
+      sleepSync: () => {},
+      planSessionCleanupRecovery: (args) => { planCalls += 1; return planSessionCleanupRecovery({ ...args, deps: planDeps(planCalls) }); },
+    },
+  });
+  return { result, planCalls };
+}
+
+test("AC7a: a descriptor retired by another process between the directory read and its load is skipped; the observation is ready on the first attempt", async () => {
+  await withDescriptorOwnedByAnotherProcess(({ root, retireInOtherProcess }) => {
+    let raced = false;
+    const { result, planCalls } = observeStrict(root, () => ({
+      listActiveSessionDescriptorsFn: (rootDir, options = {}) => listActiveSessionDescriptors(rootDir, {
+        ...options,
+        descriptorStageHook: (stage) => { if (stage === "listed" && !raced) { raced = true; retireInOtherProcess(); } },
+      }),
+    }));
+    assert.equal(raced, true, "the race really happened: the descriptor was listed, then retired by its owner, then loaded");
+    assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
+    assert.ok(result === null);
+    assert.equal(planCalls, 1, "no re-observation was needed");
+  });
+});
+
+test("AC7b: a descriptor retired by another process after it was listed, before it is inspected, is absorbed by the bounded re-observation", async () => {
+  await withDescriptorOwnedByAnotherProcess(({ root, retireInOtherProcess }) => {
+    let raced = false;
+    const { result, planCalls } = observeStrict(root, () => ({
+      listActiveSessionDescriptorsFn: (rootDir, options = {}) => {
+        const listed = listActiveSessionDescriptors(rootDir, options);
+        if (!raced) { raced = true; retireInOtherProcess(); }
+        return listed;
+      },
+    }));
+    assert.equal(raced, true, "the race really happened: the stale listing named a descriptor its owner had already retired");
+    assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
+    assert.ok(result === null);
+    assert.equal(planCalls, 2, "the plan was re-observed exactly once, then converged");
+  });
 });
 
 // Typed-reason cases (AC-253, ALF-C-P1-01C). The preflight result carries an additive

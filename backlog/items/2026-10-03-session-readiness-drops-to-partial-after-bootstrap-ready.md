@@ -68,3 +68,19 @@ returned `partial` under 4-5 concurrent agents. Both carried
 code path is the bare strict-mode `catch` in `lib/project-onboarding-v3.mjs`
 (about lines 1869-1886), which turns any observation failure into that code.
 A fix dispatch (FLAP) is in progress.
+
+## Covered and measured 2026-10-22
+
+The two FLAP fixes (`073a5a230` bounded re-observation, `d3c41ca5e` skip of a descriptor retired between listing and
+loading) are now pinned over real shared on-disk state: `lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs`
+AC7a/AC7b run a separate OS process that owns a real session descriptor and retires it at an exact point of the parent's
+strict cleanup-recovery observation. Both cases fail (`cleanup_recovery_observation_unavailable`, cause
+`WT-SESSION-MISSING`) with either fix reverted and pass with both in place.
+
+Residual, measured and not asserted: a dense create/retire loop of sub-millisecond descriptors (3-4 processes) still
+makes a share of the strict observations `partial` (26 of 46 raw plans before the fixes, 2 of 28-31 observations with the
+retry in place, about 25 percent of raw plan calls throwing `WT-SESSION-MISSING` from the retirement inspector's
+required load). A listed descriptor retired before `inspectSessionRetirement` loads it is only absorbed by the three-attempt
+re-observation, not skipped. Real sessions hold a descriptor for far longer than a plan takes, so this is a stress bound,
+not the measured 2-of-60 schedule; whether the inspector should skip a listed-then-retired descriptor like the listing
+does is a design question for the owner of `session-cleanup-recovery.mjs`.
