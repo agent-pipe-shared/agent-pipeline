@@ -101,10 +101,10 @@ Added acceptance (0.7.0, D62):
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** D25 (PO, 2026-10-18): in scope for 0.7.0, both serial packages and restart liveness are built; D62 (PO, 2026-10-20): PF-57 (2) and the parallel case of the PF-55 addendum folded into this item (AC-224); D110 (PO, 2026-10-22): the liveness signal is PID plus process start time; D63 (PO, 2026-10-20): the AGY parallel-worktree part leaves 0.7.0. Recorded at the 2026-10-23 text sweep.
+- **Rationale:** the guard-side liveness check, the Critic evidence for an earlier commit and the registry-clean pins are built; only the host-session proof and the AGY worktree route remain.
+- **Assignment (if accepted):** live parallel Critic plus Goldfish run on an installed host (host session); AGY isolated-worktree preparation after 0.7.0 (D63).
+- **Date:** 2026-10-23
 
 ### Blocker analysis 2026-10-22
 
@@ -118,3 +118,23 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
   Decided: PO decision D63 lists AC-224's AGY parallel worktrees among the deferrals past 0.7.0.
 - **HOST-SESSION-NEEDED** — A live parallel Critic plus Goldfish run on an installed host (and AGY worktree route if pulled in)
   Needs real Critic and Goldfish dispatches (model turns) in an installed Claude or Codex session, then reading the session-authority registry (lock absent, read readable); the AGY worktree route is deferred (D63).
+
+## Reconciled 2026-10-23
+
+Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
+
+- "Observed again 2026-10-05 (round 3b)" fix direction ("a liveness readback for open dispatch records ... that the
+  dispatch guard checks before admitting a second writer") and the Blocker analysis PO-SIGNATURE bullet ("wiring it into
+  the guard-dispatch hook is a protected plugin source change that the PO applies and commits ... at the sitting"):
+  the wiring is committed. Commit `1cbd22393` (`feat(guard): refuse a second writer while an open dispatch record's owner
+  is alive`, PO decision D110) makes `plugins/pipeline-core/hooks/guard-dispatch.mjs` consult the liveness readback
+  (PID plus process start identity): an alive owner refuses with the record, its owner and a runnable repair, a gone
+  owner never blocks, an unjudgeable one admits with an advisory, and the dispatch's own record and worktree-isolated
+  dispatches are not held against it. Kernel list and threat model were extended in the same commit. The pin cases
+  PARWORK-M6a to PARWORK-M6f in `plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs` cover
+  control, alive, gone, unjudgeable, same-dispatch and isolated; the cases were located, not re-run, in this sweep.
+- Blocker analysis NOT-BLOCKED bullet (producer for an older commit, registry clean after parallel Critic and Goldfish):
+  unchanged and correct, PARWORK-M4a and PARWORK-M5a exist in the same pin file and skip only on win32.
+- The Triage block above had empty fields; they were filled from D25, D62, D63 and D110 (text not rewritten).
+- Still open and not agent work: the live parallel Critic plus Goldfish run on an installed host and PO acceptance; AGY
+  isolated-worktree preparation is outside 0.7.0 (D63). The status stays `open`.

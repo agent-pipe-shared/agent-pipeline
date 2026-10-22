@@ -57,3 +57,15 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **DEFERRED** — Verify declared-skill admission at the installed Codex lifecycle boundary
   The item is closed as a duplicate (2026-10-22) and merged into 2026-09-28-declared-system-skill-read-requires-human-override.md; both were deferred past the 0.7.0 candidate by PO decision of 2026-10-16 (AC-147 and AC-209 not counted; item Deferral line 2026-10-17). The pin's declared-skill cases are intentionally skipped as NATIVE_HOLD.
+
+## Reconciled 2026-10-23
+
+Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
+
+- Triage "Deferral (2026-10-17) ... The item stays open": this item is not open. Its front matter is `status: closed`
+  (`closed_at: 2026-10-22`), rejected as a duplicate and merged into
+  `backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md`, whose own status is `open`. The line
+  now applies to that canonical item only; the PO deferral of 2026-10-16 (AC-147 and AC-209) is carried by it.
+- The Blocker analysis DEFERRED bullet ("Verify declared-skill admission at the installed Codex lifecycle boundary") and
+  any delivery-remeasure row listing this item as open agent work: the clauses live in the canonical item. This item
+  should be dropped from the open list; nothing is lost, its content was carried over verbatim into the canonical item.

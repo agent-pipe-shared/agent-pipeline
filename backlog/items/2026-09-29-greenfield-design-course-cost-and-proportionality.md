@@ -88,6 +88,11 @@ The existing mini profile and previous cost work do not demonstrate this
 feature-sized greenfield happy path. This is an architecture/course change;
 measure the installed runner outcome before closing.
 
+- **Decision:** D125 (PO, 2026-10-22): ADR-0085 supersedes the Advisor-plus-readiness design course for this item; the telemetry clause is split out per D25 and D121. Recorded at the 2026-10-23 text sweep.
+- **Rationale:** the original acceptance (Advisor plus independent readiness before one final gate) is restated against the single-review route of ADR-0085, and the phase-time telemetry clause is tracked in its own item.
+- **Assignment (if accepted):** telemetry clause: `backlog/items/2026-10-16-design-course-telemetry-is-deferred.md`; remaining clauses: judged against the successor policy, installed-runner measurement still open.
+- **Date:** 2026-10-23
+
 ### Blocker analysis 2026-10-22
 
 Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
@@ -96,3 +101,24 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
   Requires an installed runner (Claude, Codex or Antigravity) executing the real design course with Advisor and readiness model turns and the PO's final plan approval; no agent may drive that. Observed: zero intermediate PO proofs, one final DWP proof, implementation admitted only after it.
 - **PO-DECISION** (decided: D125) — Confirm the original Advisor-plus-readiness acceptance is replaced by the successor policy (one review, no readiness, ADR-0085) and that telemetry stays deferred
   Question: is the item's original acceptance (Advisor plus independent readiness before one final gate, with phase-time telemetry) superseded by ADR-0085 (one review, no readiness) so the course test is judged against the successor policy?
+
+## Reconciled 2026-10-23
+
+Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
+
+- Acceptance bullet 1 ("Advisor and independent readiness complete before the single final PO plan approval") and every
+  other Acceptance or Description sentence that names independent readiness: decided by D125 (PO, 2026-10-22,
+  `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`). ADR-0085 supersedes the Advisor-plus-readiness design
+  course for this item; its acceptance is restated against the single-review route, with fallback evidence going to the
+  present-plan review-receipt route. The one-final-PO-gate and no-intermediate-proof parts of the bullet are unchanged.
+- Acceptance bullet 5 ("Record phase wall time, tool time and human wait separately; report model tokens only where the
+  host supplies trustworthy counters"): leaves this item's acceptance by D25 (2026-10-18) and stays postponed for 0.7.0
+  by D121 (2026-10-22; named as open in the release note, no new schema before the test candidate). It is tracked in
+  `backlog/items/2026-10-16-design-course-telemetry-is-deferred.md`; the duplicate
+  `2026-10-19-design-course-phase-telemetry-is-not-recorded.md` is closed and merged into it.
+- Blocker analysis PO-DECISION bullet "Confirm the original Advisor-plus-readiness acceptance is replaced by the
+  successor policy ... and that telemetry stays deferred": answered, D125 and D121 (the bullet already says "decided: D125").
+- The Triage block above had no Decision, Rationale, Assignment or Date; the four fields were added from D125, D25 and
+  D121. The Triage text was not rewritten.
+- Still open and not agent work: the HOST-SESSION-NEEDED run (a fresh small-project course on an installed runner,
+  judged against the successor policy) and PO acceptance. The status stays `open`.
