@@ -39,7 +39,6 @@ const APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
 const FIXTURE_AUTHOR = "HgoPinIsolatedAuthor";
 const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL" }];
 const TEST_TIMEOUT_MS = 600_000;
-const PREFLIGHT_PENDING = "needs protected patch P21-07C";
 
 const pair = generateKeyPairSync("ed25519");
 const publicKeyPem = pair.publicKey.export({ type: "spki", format: "pem" });
@@ -161,7 +160,7 @@ function malformedFixture() {
   });
 }
 
-test(`AC-201 point 1 (${PREFLIGHT_PENDING}): a malformed hunk is rejected before a human signature is requested`, { timeout: TEST_TIMEOUT_MS }, () => {
+test(`AC-201 point 1: a malformed hunk is rejected before a human signature is requested`, { timeout: TEST_TIMEOUT_MS }, () => {
   const { root, outcome } = malformedFixture();
   // The old context cannot apply to the frozen preimage (blank line missing).
   assert.equal(readFileSync(join(root, "notes.md"), "utf8"), CLEAN_PREIMAGE);
@@ -221,12 +220,11 @@ test("AC-201 point 3: a changed preimage requires a fresh review and signature",
 });
 
 // ---------------------------------------------------------------------------------------------
-// Cases for the stored-patch preflight (AC-201 / AC-264 point 1). These carry the RED title tag
-// "[needs protected patch P21-07D]" until the signature-bound patch is applied to the module.
-// The module lacks the new export on HEAD, so it is reached only through a namespace import: a
-// named import would break module load and turn the cases above red.
+// Cases for the stored-patch preflight (AC-201 / AC-264 point 1). The stored-patch preflight is
+// built (commit 724e9db87), so these cases no longer carry a pending-patch title tag.
+// The module is reached through a namespace import, so a missing export fails the case that needs
+// it loudly instead of breaking module load for the cases above.
 // ---------------------------------------------------------------------------------------------
-const P07D_PENDING = "[needs protected patch P21-07D]";
 const hgoDir = (root) => join(root, ".git", "agent-pipeline", "human-guard-overrides");
 const canonicalJson = (value) => (Array.isArray(value)
   ? `[${value.map(canonicalJson).join(",")}]`
@@ -254,7 +252,7 @@ function correctedFixture() {
   });
 }
 
-test(`${P07D_PENDING} AC-201 point 1 stored patch: the denial persists the exact patch privately, bound to toolInputSha256`, { timeout: TEST_TIMEOUT_MS }, () => {
+test(`AC-201 point 1 stored patch: the denial persists the exact patch privately, bound to toolInputSha256`, { timeout: TEST_TIMEOUT_MS }, () => {
   const { root, request } = malformedFixture();
   const stored = JSON.parse(readFileSync(join(hgoDir(root), "requests", `${request.requestSha256}.json`), "utf8"));
   assert.equal(stored.schema, "pipeline.human-guard-override-request.v5");
@@ -263,7 +261,7 @@ test(`${P07D_PENDING} AC-201 point 1 stored patch: the denial persists the exact
   assert.equal(sha(canonicalJson(stored)), request.requestSha256);
 });
 
-test(`${P07D_PENDING} AC-201 point 1 refusal: the refusal is typed, constant text and leaves no scratch file`, { timeout: TEST_TIMEOUT_MS }, () => {
+test(`AC-201 point 1 refusal: the refusal is typed, constant text and leaves no scratch file`, { timeout: TEST_TIMEOUT_MS }, () => {
   const { root, outcome } = malformedFixture();
   assert.ok(outcome.error instanceof HumanGuardOverrideError, "prepare-for-signature must refuse the malformed patch");
   assert.equal(outcome.error.code, "HGO-PATCH-PREFLIGHT");
@@ -272,7 +270,7 @@ test(`${P07D_PENDING} AC-201 point 1 refusal: the refusal is typed, constant tex
   assert.ok(requestsDirIsClean(root), "the private preflight scratch file is removed on the refusal path");
 });
 
-test(`${P07D_PENDING} AC-201 point 1 legacy request: a request without stored patch text is refused with a typed code`, { timeout: TEST_TIMEOUT_MS }, () => {
+test(`AC-201 point 1 legacy request: a request without stored patch text is refused with a typed code`, { timeout: TEST_TIMEOUT_MS }, () => {
   const { root } = makeFixture();
   const fresh = record(root, CORRECTED_PATCH);
   const requestsDir = join(hgoDir(root), "requests");
@@ -289,7 +287,7 @@ test(`${P07D_PENDING} AC-201 point 1 legacy request: a request without stored pa
   assert.equal(readFileSync(join(root, "notes.md"), "utf8"), CLEAN_PREIMAGE);
 });
 
-test(`${P07D_PENDING} AC-201 point 2 preflight: a patch that applies prepares for signature and leaves no scratch file`, { timeout: TEST_TIMEOUT_MS }, () => {
+test(`AC-201 point 2 preflight: a patch that applies prepares for signature and leaves no scratch file`, { timeout: TEST_TIMEOUT_MS }, () => {
   const { root, signing } = correctedFixture();
   assert.equal(signing.status, "prepared");
   assert.ok(requestsDirIsClean(root), "the private preflight scratch file is removed on the success path");
@@ -298,7 +296,7 @@ test(`${P07D_PENDING} AC-201 point 2 preflight: a patch that applies prepares fo
 
 const fixtureTarget = (files) => (rawPath) => ({ path: rawPath, text: Object.hasOwn(files, rawPath) ? files[rawPath] : null });
 
-test(`${P07D_PENDING} AC-201 converter: anything outside the closed grammar is refused with a typed code and constant text`, () => {
+test(`AC-201 converter: anything outside the closed grammar is refused with a typed code and constant text`, () => {
   const convert = converter();
   const files = { "notes.md": CLEAN_PREIMAGE, "crlf.txt": "a\r\nb\r\n" };
   const refuse = (command, code, resolver = fixtureTarget(files)) => {
@@ -340,7 +338,7 @@ function applyViaGit(files, command) {
   return { root, result: git("apply", "--unidiff-zero", "--whitespace=nowarn", "--", patchFile) };
 }
 
-test(`${P07D_PENDING} AC-201 converter: converted diffs apply with real git and produce the exact expected files`, () => {
+test(`AC-201 converter: converted diffs apply with real git and produce the exact expected files`, () => {
   converter();
   const cases = [
     {
