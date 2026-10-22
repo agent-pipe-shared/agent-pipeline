@@ -46,7 +46,7 @@ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 // (missing success marker) rather than silently vanish the whole file's coverage.
 const GUARD = fileURLToPath(new URL("./guard-dispatch.mjs", import.meta.url));
 const ADVISOR_GUARD = fileURLToPath(new URL("./guard-advisor-prohibition.mjs", import.meta.url));
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."); mkdirSync(join(repoRoot, "scratch"), { recursive: true }); // a fresh checkout has no scratch/
 const bindingRepo = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-binding-"));
 execFileSync("git", ["init", "-q"], { cwd: bindingRepo });
 mkdirSync(join(bindingRepo, ".claude"), { recursive: true });
