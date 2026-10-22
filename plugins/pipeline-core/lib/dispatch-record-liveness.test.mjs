@@ -232,3 +232,37 @@ test("DRL-11 the CLI prints the same typed result as one JSON document, exits 0,
   assert.equal(notRepo.status, 2);
   assert.equal(JSON.parse(notRepo.stdout).code, "DRL-ROOT");
 });
+
+test("DRL-12 --second-writer (the guard mode): alive -> exit 2 with a repair on stderr; the dispatch's own record, gone and unjudgeable -> exit 0; a failed check is an advisory, never a refusal", { skip: SKIP }, async () => {
+  const fx = fixture();
+  const run = (...args) => spawnSync(process.execPath, [SCRIPT, "--root", fx.primary, "--second-writer", ...args], { encoding: "utf8" });
+  const none = run("-");
+  assert.deepEqual([none.status, none.stderr], [0, ""], "no open record: silent exit 0");
+  openRecordOwnedBySession(fx, "SW-ALIVE-1");
+  const refused = run("-");
+  assert.equal(refused.status, 2);
+  assert.match(refused.stderr, /GUARD-DISPATCH-SECOND-WRITER: .*dispatch-record-SW-ALIVE-1\.json.*session-SW-ALIVE-1/su);
+  assert.match(refused.stderr, /Repair, one of: wait .*dispatch-record-liveness\.mjs --root .*dispatch-record-write\.mjs/su);
+  assert.equal(run("SW-ALIVE-1").status, 0, "the dispatch's own record never refuses it");
+  assert.equal(run("OTHER,SW-ALIVE-1").status, 0);
+  const child = spawn("sleep", ["60"], { stdio: "ignore" });
+  children.push(child);
+  openRecordOwnedBySession(fx, "SW-GONE-1", { ownerPid: child.pid });
+  child.kill("SIGKILL");
+  await once(child, "exit");
+  assert.equal(run("SW-ALIVE-1").status, 0);
+  assert.doesNotMatch(run("SW-ALIVE-1").stderr, /SW-GONE-1/u, "a gone owner is neither refused nor announced");
+  writeRecord(fx, "SW-V1-1", "in-progress");
+  writeV1Claim(fx, "SW-V1-1");
+  const unjudged = run("SW-ALIVE-1");
+  assert.equal(unjudged.status, 0);
+  assert.match(unjudged.stderr, /GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: .*dispatch-record-SW-V1-1\.json.*claim-v1-has-no-owner-process/su);
+  const outside = mkdtempSync(join(tmpdir(), "dispatch-liveness-norepo-"));
+  roots.push(outside);
+  const broken = spawnSync(process.execPath, [SCRIPT, "--root", outside, "--second-writer", "-"], { encoding: "utf8" });
+  assert.equal(broken.status, 0);
+  assert.match(broken.stderr, /GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: the open dispatch records of this checkout could not be read/u);
+  const badArgs = spawnSync(process.execPath, [SCRIPT, "--second-writer"], { encoding: "utf8" });
+  assert.equal(badArgs.status, 0);
+  assert.match(badArgs.stderr, /could not run/u);
+});

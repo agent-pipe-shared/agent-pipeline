@@ -71,6 +71,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 import {
   persistPendingAdvisorProhibitionBindings,
@@ -93,16 +94,13 @@ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 
-const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
-const BRIEFING_GENERATOR_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-briefing.mjs", import.meta.url));
-// D52 (2): a session-authority refusal without a repair of its own names the general repair, which reports
-// the cause and the exact command that clears it.
+const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url)); const LIVENESS_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-liveness.mjs", import.meta.url)); const BRIEFING_GENERATOR_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-briefing.mjs", import.meta.url));
+// D52 (2): a session-authority refusal without a repair of its own names the general repair, which reports the cause and the exact command that clears it.
 const sessionAuthorityRepair = (code, root) => typeof code === "string" && code.startsWith("SDC-")
   ? `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} inspect --root ${root} names the cause and the command that clears it`
   : null;
 // Repository admission precedes hook input hardening and all governed effects.
 if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
-
 
 // Recover `{ agentType: '...', prompt: `...` }`-shaped dispatches embedded in a Workflow
 // script body. Regex-based, not a JS parser: it only claims the statically-obvious case.
@@ -809,6 +807,8 @@ if (isDirectInvocation(import.meta.url)) {
     }
   }
   const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
+  const second = blocked.length === 0 && productive.length > 0 && toolInput.isolation !== "worktree" && !/isolation\s*:\s*['"`]worktree/u.test(String(toolInput.script ?? "")) ? spawnSync(process.execPath, [LIVENESS_SCRIPT, "--root", routeRoot, "--second-writer", productive.map(({ dispatch }) => parseDispatchSlice(dispatch.prompt).sliceId).filter(Boolean).join(",") || "-"], { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 30000 }) : null;
+  if (second) { process.stderr.write(second.stderr || (second.status === 0 ? "" : "WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: the second-writer check could not run; this dispatch is admitted without it (ALF-K39, D110).\n")); if (second.status === 2) process.exit(2); }
   // D78: a governed Goldfish briefing should be the unedited generator output. QG-06 warn state: reason transition
   // to generated briefings, owner PO, expires with 0.7.1 (PO 2026-10-21); then this becomes the refusal.
   for (const { dispatch } of productive) {

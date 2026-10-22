@@ -663,6 +663,17 @@ sealed host-owned executor, and it reports an answer only when
 only kernel paths and `lib/advisory-lifecycle-v2.mjs` and `lib/advisory-receipt-assurance.mjs`
 (both already kernel paths), and is itself one.
 
+ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
+and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
+(the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
+cycle that an import of `lib/worktree-lifecycle.mjs` would break) and
+`plugins/pipeline-core/lib/dispatch-record-liveness.mjs` (the read-only owner-liveness
+readback and the second-writer decision it imports). Both only read: no lock, no registry
+write, nothing retired or healed. They import kernel paths only (`lib/dispatch-record.mjs`,
+`lib/guard/dispatch-record-lane.mjs`, `lib/worktree-lifecycle.mjs`, `lib/entrypoint.mjs`) and are
+themselves kernel paths. A failure of the check is an advisory, never a silent pass and never a
+refusal; only an owner judged alive refuses a second writer.
+
 ## Threats and controls
 
 | Threat | Control |

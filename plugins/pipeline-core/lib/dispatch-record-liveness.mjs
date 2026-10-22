@@ -19,6 +19,7 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { isSafeTaskId, isTerminalOutcome } from "./dispatch-record.mjs";
 import { DISPATCH_RECORD_INTERIM_OUTCOME, DISPATCH_RECORD_OWNER_SCHEMA, LANDED_DISPATCH_RECORD_OWNER_SCHEMA } from "./guard/dispatch-record-lane.mjs";
@@ -117,4 +118,33 @@ export function readDispatchRecordLiveness(root, options = {}) {
   const counts = { alive: 0, gone: 0, unjudgeable: 0 };
   for (const entry of records) counts[entry.verdict] += 1;
   return { schema: DISPATCH_RECORD_LIVENESS_SCHEMA, status: "inspected", readOnly: true, records, counts };
+}
+
+const LIVENESS_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-liveness.mjs", import.meta.url));
+const WRITER_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-write.mjs", import.meta.url));
+const plain = (text) => String(text).replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 200);
+
+/**
+ * ALF-K39 / D110: the guard-side use of the readback. Before a dispatch that would start a SECOND WRITER in the checkout at `root` is
+ * admitted, every open dispatch record of that checkout is consulted. An `alive` owner refuses (self-describing, one runnable repair);
+ * `gone` never blocks (a stale record is not a lock); `unjudgeable` never blocks and is announced, never a silent pass. A record of the
+ * dispatch being admitted (`ownTaskIds`) is never held against it, and a dispatch isolated in its own worktree writes in another checkout.
+ * Returns `{ refusal, advisory }` (strings, empty when none); never throws, and an unreadable readback is itself an advisory.
+ */
+export function secondWriterAdmission({ root, ownTaskIds = [], isolated = false, readFn = readDispatchRecordLiveness, ...seams } = {}) {
+  if (isolated) return { refusal: "", advisory: "" };
+  let records;
+  try { records = readFn(root, seams).records.filter((entry) => !ownTaskIds.includes(entry.taskId)); }
+  catch (error) {
+    return { refusal: "", advisory: `WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: the open dispatch records of this checkout could not be read (${plain(error?.message)}), so this dispatch is admitted without a second-writer check. Re-check with: node ${LIVENESS_SCRIPT} --root ${root}\n` };
+  }
+  const alive = records.filter((entry) => entry.verdict === "alive");
+  const unjudged = records.filter((entry) => entry.verdict === "unjudgeable");
+  const describe = (entry) => `${entry.record} (outcome ${entry.outcome ?? "unreadable"}${entry.sessionId ? `, owner session ${entry.sessionId}` : ""}, ${entry.reason})`;
+  const refusal = alive.length === 0 ? "" : [
+    `BLOCKED (guard-dispatch, plugin pipeline-core): GUARD-DISPATCH-SECOND-WRITER: this dispatch would start a second writer in a checkout where an open dispatch record is owned by a process that is still alive: ${alive.map(describe).join("; ")}.`,
+    `A second writer would overwrite that dispatch's files (backlog 2026-10-04-parallel-work-in-one-checkout-is-unsafe). Repair, one of: wait until that dispatch finishes and dispatch again (re-check with: node ${LIVENESS_SCRIPT} --root ${root}); or, if you know it is abandoned, finalize its record with a terminal outcome through the sanctioned writer (node ${WRITER_SCRIPT} --repo-root ${root} --request <repo-relative request json>); or isolate this dispatch in its own worktree.`, "",
+  ].join("\n");
+  const advisory = unjudged.length === 0 ? "" : `WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: open dispatch record(s) of this checkout whose owner cannot be judged alive or gone: ${unjudged.map(describe).join("; ")}. This dispatch is admitted (an unjudgeable owner never blocks); check them with: node ${LIVENESS_SCRIPT} --root ${root}\n`;
+  return { refusal, advisory };
 }
