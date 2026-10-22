@@ -43,3 +43,22 @@ Fix direction: sort the paths inside the producer (the order is canonical, so re
 - **Rationale:** commit(s) `c277e4aac`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+## Verification 2026-10-22: every observed refusal path is closed and pinned
+
+All three observed failure shapes were re-checked against the current source, not the earlier characterization:
+
+- Path order: `plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs` sorts the `--path` values before calling the
+  library, so any permutation yields the identical result (cases "CLI normalizes unsorted --path input" and "never spends a
+  refusal on path order for any permutation"). Duplicates and invalid paths are still refused, by design.
+- `--summary` and `--body`: `templates/prompts/goldfish-task.md` (final-report section) and its vendored copy state that
+  both are mandatory and that omitting either gives `GF-COMMAND-INPUT`; case "the template states that --summary and --body
+  are mandatory" pins the sentence and the refusal code.
+- Multi-line `copyCommand`: both `copyCommand.posix` and `copyCommand.powershell` are one physical line, admitted by the
+  guard grammar at linux and win32 (COMMITFLOW-T2 cases (b) to (e) for three scenarios).
+
+Counted result, `node --test plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs`, run alone on 2026-10-22:
+29 cases, 29 pass, 0 fail, 0 skipped, 0 todo. The suite is registered in `harness/verify-suites.json` as
+`goldfish-commit-command-flow-tests`. A refused producer call still spends one counted tool use by design; the item's
+"exempt producer refusals from the counted budget" alternative was not taken and is not needed once the three shapes above
+cannot occur.
