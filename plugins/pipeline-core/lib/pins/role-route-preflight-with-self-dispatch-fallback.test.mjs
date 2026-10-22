@@ -19,12 +19,15 @@
  * end-to-end course clause stays HELD ("the course accepts that result as the role's evidence")
  * until the Elephant decides how a retired course is re-targeted. This pin proves the admission
  * function only, never that a course consumes it.
+ * 5 (P1-1 bullet 3, standalone, NOT wired into a caller): lib/dispatch-recovery-state.mjs keeps one atomic recovery
+ *   state per task identity (dispatchId + role + candidate) with a bounded attempt history; see the point-5 cases.
  * P1-1 (role-dependent preflight, 0.7.0) is pinned in scripts/pipeline-start-preflight.test.mjs.
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -308,4 +311,154 @@ test("point 4b: the surfaced stderr carries no absolute home or drive paths", ()
   assert.doesNotMatch(result.stderr, /example-user/iu);
   assert.doesNotMatch(result.stderr, /[A-Za-z]:\\/u);
   assert.doesNotMatch(result.stderr, /\/home\/|\/Users\//u);
+});
+
+// --- Point 5: an atomic recovery state keeps the task identity and the attempt history -----------
+// Namespace import with a catch: a missing module then fails each case on its own (TypeError), not the whole file at link time.
+const recovery = await import("../dispatch-recovery-state.mjs").catch(() => ({}));
+const failedRun = (role, index, code = 3, stderr = "boom") => runCanonicalRoleFallback({ root: fixture, packet: packetFor(role, index),
+  runner: "claude", reasonCode: RFE_REASON, launch: async () => ({ exitCode: code, stdout: "", stderr }) });
+const returnedRun = (role, index) => returnedFallback(role, index);
+const recoveryRoot = () => realpathSync(mkdtempSync(join(tmpdir(), "dispatch-recovery-pin-")));
+const stateFile = (root, id) => join(root, "evidence", `dispatch-recovery-${id}.json`);
+const fixedNow = () => "2026-10-22T00:00:00.000Z";
+
+test("point 5: a failed fallback opens one recovery state bound to dispatchId, role and candidate", async () => {
+  const root = recoveryRoot();
+  try {
+    const packet = packetFor("critic", 80);
+    const opened = await recovery.openDispatchRecovery({ root, packet, result: await failedRun("critic", 80), now: fixedNow });
+    assert.equal(opened.ok, true, opened.code);
+    assert.equal(opened.state.schema, "pipeline.dispatch-recovery-state.v1");
+    assert.equal(opened.state.status, "open");
+    assert.deepEqual(opened.state.taskIdentity, { dispatchId: packet.dispatchId, role: packet.role, candidateCommit: candidate.commit, candidateTree: candidate.tree });
+    assert.match(opened.state.taskIdentitySha256, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(opened.state.attempts, [{ attempt: 1, outcome: "failed", code: "RDF-PRODUCER-FAILED", route: "fallback-self-dispatch",
+      reasonCode: RFE_REASON, exitCode: 3, stderr: "boom", recordedAt: fixedNow() }]);
+    const read = recovery.readDispatchRecovery({ root, dispatchId: packet.dispatchId });
+    assert.equal(read.ok, true, read.code);
+    assert.deepEqual(read.state, opened.state);
+    assert.equal((await recovery.openDispatchRecovery({ root, packet, result: await failedRun("critic", 80), now: fixedNow })).code, "DRS-EXISTS",
+      "a second open never replaces the first state");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("point 5: a further failed attempt is appended; attempt 1 and the task identity stay byte-identical", async () => {
+  const root = recoveryRoot();
+  try {
+    const packet = packetFor("critic", 81);
+    const first = await recovery.openDispatchRecovery({ root, packet, result: await failedRun("critic", 81, 3, "first"), now: fixedNow });
+    const second = await recovery.recordRecoveryAttempt({ root, packet, result: await failedRun("critic", 81, 4, "second"), expectedAttempts: 1, now: fixedNow });
+    assert.equal(second.ok, true, second.code);
+    assert.equal(second.state.attempts.length, 2);
+    assert.deepEqual(second.state.attempts[0], first.state.attempts[0]);
+    assert.equal(second.state.attempts[1].attempt, 2);
+    assert.equal(second.state.attempts[1].stderr, "second");
+    assert.equal(second.state.taskIdentitySha256, first.state.taskIdentitySha256);
+    assert.equal(second.state.status, "open");
+    const unlaunched = await recovery.recordRecoveryAttempt({ root, packet, result: await runCanonicalRoleFallback({ root: fixture, packet, runner: "claude", reasonCode: RFE_REASON }),
+      expectedAttempts: 2, now: fixedNow });
+    assert.equal(unlaunched.ok, true, "a route that never launched (RDF-LAUNCHER) is an attempt too");
+    assert.equal(unlaunched.state.attempts[2].code, "RDF-LAUNCHER");
+    assert.equal(unlaunched.state.attempts[2].exitCode, null);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("point 5: a renamed or re-bound task cannot continue another task's recovery state", async () => {
+  const root = recoveryRoot();
+  try {
+    const packet = packetFor("critic", 82);
+    await recovery.openDispatchRecovery({ root, packet, result: await failedRun("critic", 82), now: fixedNow });
+    const bytesBefore = readFileSync(stateFile(root, packet.dispatchId), "utf8");
+    const renamed = { ...packet, dispatchId: "renamed-82" };
+    const viaRename = await recovery.recordRecoveryAttempt({ root, packet: renamed, result: await failedRun("critic", 82), expectedAttempts: 1, now: fixedNow });
+    assert.equal(viaRename.code, "DRS-NO-RECOVERY", "a renamed task has no state of its own and does not inherit the old one");
+    const foreign = await recovery.recordRecoveryAttempt({ root, packet, result: await failedRun("critic", 90), expectedAttempts: 1, now: fixedNow });
+    assert.equal(foreign.code, "DRS-ATTEMPT-INVALID", "a result produced for another task is not an attempt of this one");
+    for (const mutated of [{ ...packet, role: "pipeline-core:consult-advisor" }, { ...packet, candidate: { commit: candidate.commit, tree: "0".repeat(40) } }]) {
+      const result = await recovery.recordRecoveryAttempt({ root, packet: mutated, result: await failedRun("critic", 82), expectedAttempts: 1, now: fixedNow });
+      assert.equal(result.code, "DRS-IDENTITY-MISMATCH");
+    }
+    assert.equal(readFileSync(stateFile(root, packet.dispatchId), "utf8"), bytesBefore, "every refusal leaves the state untouched");
+    assert.deepEqual(readdirSync(join(root, "evidence")), [`dispatch-recovery-${packet.dispatchId}.json`], "no state file and no temporary file for the renamed task");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("point 5: the write is atomic and compare-and-swap (stale count, injected write failure, attempt bound)", async () => {
+  const root = recoveryRoot();
+  try {
+    const packet = packetFor("critic", 83);
+    await recovery.openDispatchRecovery({ root, packet, result: await failedRun("critic", 83), now: fixedNow });
+    const bytesBefore = readFileSync(stateFile(root, packet.dispatchId), "utf8");
+    const failing = await failedRun("critic", 83, 5, "again");
+    assert.equal((await recovery.recordRecoveryAttempt({ root, packet, result: failing, expectedAttempts: 0, now: fixedNow })).code, "DRS-STALE");
+    assert.equal((await recovery.recordRecoveryAttempt({ root, packet, result: failing, now: fixedNow })).code, "DRS-STALE", "the expected count is mandatory");
+    const broken = await recovery.recordRecoveryAttempt({ root, packet, result: failing, expectedAttempts: 1, now: fixedNow,
+      io: { open: async () => { throw new Error("disk full"); } } });
+    assert.equal(broken.code, "DRS-WRITE-FAILED");
+    assert.equal(readFileSync(stateFile(root, packet.dispatchId), "utf8"), bytesBefore, "a failed write leaves the previous state");
+    assert.deepEqual(readdirSync(join(root, "evidence")), [`dispatch-recovery-${packet.dispatchId}.json`], "no temporary file is left");
+    for (let count = 1; count < recovery.MAX_RECOVERY_ATTEMPTS; count += 1) {
+      assert.equal((await recovery.recordRecoveryAttempt({ root, packet, result: failing, expectedAttempts: count, now: fixedNow })).ok, true, `attempt ${count + 1}`);
+    }
+    const over = await recovery.recordRecoveryAttempt({ root, packet, result: failing, expectedAttempts: recovery.MAX_RECOVERY_ATTEMPTS, now: fixedNow });
+    assert.equal(over.code, "DRS-ATTEMPT-LIMIT", "the history is bounded and never drops an old attempt");
+    assert.equal(recovery.readDispatchRecovery({ root, dispatchId: packet.dispatchId }).state.attempts.length, recovery.MAX_RECOVERY_ATTEMPTS);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("point 5: a returned fallback resolves the state; a resolved state accepts nothing more", async () => {
+  const root = recoveryRoot();
+  try {
+    const packet = packetFor("critic", 84);
+    await recovery.openDispatchRecovery({ root, packet, result: await failedRun("critic", 84), now: fixedNow });
+    const resolved = await recovery.recordRecoveryAttempt({ root, packet, result: await returnedRun("critic", 84), expectedAttempts: 1, now: fixedNow });
+    assert.equal(resolved.ok, true, resolved.code);
+    assert.equal(resolved.state.status, "resolved");
+    assert.equal(resolved.state.attempts[1].outcome, "returned");
+    assert.equal((await recovery.recordRecoveryAttempt({ root, packet, result: await failedRun("critic", 84), expectedAttempts: 2, now: fixedNow })).code, "DRS-TERMINAL");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("point 5: a state that was edited, truncated or is unreadable is refused, never trusted", async () => {
+  const root = recoveryRoot();
+  try {
+    const packet = packetFor("critic", 85);
+    await recovery.openDispatchRecovery({ root, packet, result: await failedRun("critic", 85), now: fixedNow });
+    const file = stateFile(root, packet.dispatchId);
+    const original = readFileSync(file, "utf8");
+    const edits = [
+      (state) => { state.attempts[0].exitCode = 0; },
+      (state) => { state.attempts = []; },
+      (state) => { state.taskIdentity.dispatchId = "other-85"; },
+      (state) => { state.extra = true; },
+    ];
+    for (const edit of edits) {
+      const state = JSON.parse(original); edit(state);
+      writeFileSync(file, JSON.stringify(state));
+      assert.equal(recovery.readDispatchRecovery({ root, dispatchId: packet.dispatchId }).code, "DRS-CORRUPT");
+    }
+    writeFileSync(file, original.slice(0, 40));
+    assert.equal(recovery.readDispatchRecovery({ root, dispatchId: packet.dispatchId }).code, "DRS-CORRUPT");
+    assert.equal(recovery.readDispatchRecovery({ root, dispatchId: "no-such-task" }).code, "DRS-NO-RECOVERY");
+    assert.equal(recovery.readDispatchRecovery({ root, dispatchId: "../escape" }).code, "DRS-INPUT");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("point 5: only a real fallback result is an attempt; surfaced stderr is bounded and path-free", async () => {
+  const root = recoveryRoot();
+  try {
+    const packet = packetFor("critic", 86);
+    for (const result of [undefined, null, {}, { schema: "pipeline.canonical-role-fallback.v1", status: "prepared", code: "RDF-PREPARED" },
+      { ...(await failedRun("critic", 86)), code: 7 }]) {
+      assert.equal((await recovery.openDispatchRecovery({ root, packet, result, now: fixedNow })).code, "DRS-ATTEMPT-INVALID", JSON.stringify(result)?.slice(0, 60));
+    }
+    const dirty = `fatal at /home/example-user/work/y.js and C:\\Users\\example-user\\z.js ${"x".repeat(5000)}`;
+    const opened = await recovery.openDispatchRecovery({ root, packet, result: await failedRun("critic", 86, 9, dirty), now: fixedNow });
+    assert.equal(opened.ok, true, opened.code);
+    const { stderr } = opened.state.attempts[0];
+    assert.ok(Buffer.byteLength(stderr) <= 1024);
+    assert.match(stderr, /\[truncated\]$/u);
+    assert.doesNotMatch(stderr, /example-user|\/home\/|[A-Za-z]:\\/iu);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
