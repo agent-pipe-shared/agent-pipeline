@@ -614,6 +614,88 @@ test("AC-135: every no-child refusal names a repair or alternative the user can 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+// --- AC-135 (ALF-K32, PO tile 2026-10-22): WSL is admitted only behind a passing sandbox preflight ---
+// The WSL deferral stays the default; the existing preflight receipt (codex-sandbox-preflight.mjs) is the
+// only evidence that lifts it. These are fixtures: no Codex CLI, sandbox or model call runs here.
+import * as routeNs from "../../scripts/codex-host-advisor-route.mjs";
+import { validatePreflightReceipt } from "../../scripts/codex-sandbox-preflight.mjs";
+function wslPreflightReceipt(patch = {}) {
+  const receipt = {
+    schema: "pipeline.codex-sandbox-preflight.v1", cli: { version: "0.144.6", artifactSha256: "a".repeat(64) },
+    sandboxTransport: { selection: "codex-cli-owned" }, observedHelper: { role: "diagnostic-only", artifactSha256: null },
+    platform: { os: "linux", kernelClass: "wsl2", filesystemClass: "wsl-native" },
+    profile: { id: "codex-critic-intermediate.v1", rawSha256: "b".repeat(64), compiledStateSha256: "c".repeat(64) }, networkEnabled: true,
+    vectors: { allowedRead: true, externalReadDenied: false, sensitiveReadDenied: false, writeDenied: true, scratchWriteAllowed: true, networkDenied: false,
+      childStdioEquivalent: true, stdinEofEquivalent: true, childExitEquivalent: true, appServerInitEquivalent: true, lifecycleComplete: true },
+    appServer: { control: { appServerInitialized: true, appServerBoundedStop: true, appServerErrorClass: null }, sandbox: { appServerInitialized: true, appServerBoundedStop: true, appServerErrorClass: null } },
+    canaries: { count: 4, manifestSha256: "d".repeat(64), unchanged: true }, eventChainSha256: "e".repeat(64), durationMs: 1200,
+    eligibility: "intermediate", terminalCode: "ok", ...patch,
+  };
+  return receipt;
+}
+const FEATURE_APPROVED = { runner: "codex", profile: "feature", consent: "approved" };
+
+test("AC-135: the fixture receipt is a valid existing preflight receipt", () => {
+  assert.doesNotThrow(() => validatePreflightReceipt(wslPreflightReceipt()));
+});
+
+test("AC-135: WSL with a passing intermediate WSL preflight receipt resolves to the host route; anything else stays deferred with one runnable repair", () => {
+  for (const observation of [WSL_RELEASE, WSL_DISTRO]) {
+    assert.equal(routeNs.selectHostAdvisorRouteForHost(FEATURE_APPROVED, observation, wslPreflightReceipt()), ROUTES.HOST);
+    const resolved = routeNs.resolveHostAdvisorRouteForHost(FEATURE_APPROVED, observation, wslPreflightReceipt());
+    assert.equal(resolved.route, ROUTES.HOST);
+    assert.equal(resolved.policy.maxAttempts, 1);
+    const failing = [
+      undefined, null, {}, "ok",
+      wslPreflightReceipt({ eligibility: "none", terminalCode: "canary-drift" }),
+      wslPreflightReceipt({ terminalCode: "permission-mismatch" }),
+      wslPreflightReceipt({ eligibility: "diagnostic" }),
+      wslPreflightReceipt({ platform: { os: "linux", kernelClass: "linux", filesystemClass: "native-linux" } }),
+      wslPreflightReceipt({ canaries: { count: 4, manifestSha256: "d".repeat(64), unchanged: false } }),
+      { ...wslPreflightReceipt(), extra: true },
+    ];
+    for (const receipt of failing) {
+      assert.equal(routeNs.selectHostAdvisorRouteForHost(FEATURE_APPROVED, observation, receipt), ROUTES.WSL_UNAVAILABLE, `deferred for ${JSON.stringify(receipt)?.slice(0, 40)}`);
+      const denied = routeNs.resolveHostAdvisorRouteForHost(FEATURE_APPROVED, observation, receipt);
+      assert.equal(denied.route, ROUTES.WSL_UNAVAILABLE);
+      assert.equal(denied.policy, null);
+      assert.equal(denied.reason, "wsl-sandbox-preflight-not-passed");
+      assert.equal(denied.repair, routeNs.WSL_PREFLIGHT_REPAIR);
+    }
+  }
+  assert.match(routeNs.WSL_PREFLIGHT_REPAIR, /codex-sandbox-preflight\.mjs --run --kind intermediate --codex \S+ --receipt \S+/u);
+  assert.equal(routeNs.WSL_PREFLIGHT_REPAIR.includes("\n"), false, "one command");
+  // A passing receipt changes nothing off WSL and never lifts a decline or the mini profile.
+  assert.equal(routeNs.selectHostAdvisorRouteForHost(FEATURE_APPROVED, NON_WSL, wslPreflightReceipt()), ROUTES.HOST);
+  assert.equal(routeNs.selectHostAdvisorRouteForHost({ ...FEATURE_APPROVED, consent: "declined" }, WSL_RELEASE, wslPreflightReceipt()), ROUTES.NO_CONSENT);
+  assert.equal(routeNs.selectHostAdvisorRouteForHost({ ...FEATURE_APPROVED, profile: "mini" }, WSL_RELEASE, wslPreflightReceipt()), ROUTES.PROFILE);
+  // The 2-argument form (no preflight evidence) is unchanged.
+  assert.equal(selectHostAdvisorRouteForHost(FEATURE_APPROVED, WSL_RELEASE), ROUTES.WSL_UNAVAILABLE);
+});
+
+test("AC-135: the bridge's selected-sandbox entry honours a passing WSL preflight and otherwise returns the repair, with no launch", async () => {
+  const input = advisoryInput();
+  let launches = 0;
+  const failing = await runCodexAdvisoryThroughSelectedSandbox(input, async () => { launches += 1; }, {
+    hostObservation: WSL_RELEASE, repoRoot, sandboxPreflight: wslPreflightReceipt({ terminalCode: "canary-drift", eligibility: "none" }),
+    observeWorkspace: () => { throw new Error("must not observe"); },
+  });
+  assert.equal(failing.advisoryResult.code, "advisory_unavailable_wsl_native_deferred");
+  assert.equal(failing.advisoryResult.repair, routeNs.WSL_PREFLIGHT_REPAIR);
+  assert.equal(failing.advisoryResult.answer, null);
+  assert.equal(failing.advisoryResult.receipt, null);
+  assert.equal(launches, 0);
+  const passingInput = advisoryInput();
+  const passed = await runCodexAdvisoryThroughSelectedSandbox(passingInput, async () => { launches += 1; }, {
+    ...answeredTransport(passingInput), hostObservation: WSL_RELEASE, sandboxPreflight: wslPreflightReceipt(),
+    observeWorkspace: () => ({ workspaceSha256: "f".repeat(64) }),
+  });
+  assert.equal(passed.advisoryResult.ok, true, JSON.stringify(passed.advisoryResult));
+  assert.equal(passed.advisoryResult.code, "answered");
+  assert.equal(launches, 0, "the JSON adapter is still ignored");
+  assert.equal(verifyAnsweredAdvisoryReceipt(boundParts(passingInput, passed)).ok, true);
+});
+
 test("AC-135: the skill states the tested route, its executor condition and the runner/platform matrix", () => {
   const skill = readFileSync(join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "SKILL.md"), "utf8");
   const flat = skill.replace(/\s+/gu, " ");
@@ -622,6 +704,8 @@ test("AC-135: the skill states the tested route, its executor condition and the 
   assert.match(flat, /ordinary-consult-host-callback-unavailable/u);
   assert.match(flat, /advisory-unavailable-wsl-native-deferred/u);
   assert.match(flat, /ADR-0085/u);
+  assert.match(flat, /wsl-sandbox-preflight-not-passed/u);
+  assert.match(flat, /codex-sandbox-preflight\.mjs --run --kind intermediate/u);
   assert.equal(/produces only the no-child unavailable\s+record below, even if export admission is reported as available\. Do not call/iu.test(skill), false,
     "the superseded 'always no-child' sentence must not remain once the seam exists");
   const matrix = flat.slice(flat.indexOf("Supported runner/platform matrix"));

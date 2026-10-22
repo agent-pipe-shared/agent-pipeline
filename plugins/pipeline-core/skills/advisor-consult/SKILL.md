@@ -127,7 +127,7 @@ a row marked unverified has no tested route and must be reported as unavailable.
 | Runner and route | Platform | Tested outcome |
 | --- | --- | --- |
 | Codex ordinary consult (admission, then sealed host-owned executor) | Linux and WSL (WSL deferral does not apply to this route) | No-child unavailable by default; answered only through the executor and the answered-receipt verifier; exercised with a managed Node stand-in, no real model call |
-| Codex selected-sandbox/App-Server route | WSL | `advisory-unavailable-wsl-native-deferred`, typed, before any evidence or child work |
+| Codex selected-sandbox/App-Server route | WSL | `advisory-unavailable-wsl-native-deferred`, typed, before any evidence or child work, with reason `wsl-sandbox-preflight-not-passed` and one repair (`codex-sandbox-preflight.mjs --run --kind intermediate`); a passing intermediate WSL2 preflight receipt lifts it to the host route, subject to the same admission and verifier (PO decision 2026-10-22) |
 | Codex selected-sandbox/App-Server route | native Linux | Host route, subject to the same admission and verifier |
 | Codex, native Windows | native Windows | unverified until a tested host capability is present |
 | Claude native Opus then consult | any | V3 route below |
