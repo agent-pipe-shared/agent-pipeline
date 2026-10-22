@@ -4,6 +4,7 @@
  * repair, proven from committed history alone (integration trailer plus
  * byte-derived restoration; no machine-local receipt). */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -62,10 +63,43 @@ function exactEntryShape(entry) {
     && Number.isSafeInteger(entry.appendedSuiteCount) && entry.appendedSuiteCount > 0;
 }
 
+// D107: one narrow, unsigned-by-design, historical exception kind next to the signed
+// b7 one: "a row with a duplicate name/file added by commit X, removed again by commit Y".
+// It names both full commit SHAs and four registry digests; nothing is derived from a
+// pattern, so no other commit pair can use it and the kind cannot be extended by data.
+const DUP_ENTRY_SCHEMA = "pipeline.verify-suite-duplicate-repair-entry.v1";
+const DUP_ENTRY_KEYS = [
+  "addCommit", "addParent", "addPostimageSha256", "addPreimageSha256", "duplicateFile",
+  "duplicateName", "duplicateRowSha256", "owner", "reason", "removeCommit", "removeParent",
+  "removePostimageSha256", "removePreimageSha256", "schema", "signed",
+].sort().join("\0");
+const sha256Hex = (value) => createHash("sha256").update(value).digest("hex");
+const fullOid = (value) => /^[a-f0-9]{40}$/u.test(value ?? "");
+
+function exactDuplicateRepairShape(entry) {
+  return entry !== null && typeof entry === "object" && !Array.isArray(entry)
+    && Object.keys(entry).sort().join("\0") === DUP_ENTRY_KEYS
+    && entry.schema === DUP_ENTRY_SCHEMA
+    && [entry.addCommit, entry.addParent, entry.removeCommit, entry.removeParent].every(fullOid)
+    && entry.addCommit !== entry.removeCommit
+    && [entry.addPreimageSha256, entry.addPostimageSha256, entry.removePreimageSha256,
+      entry.removePostimageSha256, entry.duplicateRowSha256].every((value) => SHA256.test(value ?? ""))
+    && entry.removePreimageSha256 === entry.addPostimageSha256
+    && typeof entry.duplicateName === "string" && entry.duplicateName.length > 0
+    && typeof entry.duplicateFile === "string" && entry.duplicateFile.length > 0
+    && entry.owner === "Elephant" && entry.signed === false
+    && typeof entry.reason === "string" && /unsigned/u.test(entry.reason)
+    && /historical/iu.test(entry.reason) && entry.reason.length >= 40;
+}
+
 function exactRecoveryShape(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    && Object.keys(value).sort().join("\0") === "entries\0schema"
-    && value.schema === RECOVERY_SCHEMA && Array.isArray(value.entries)
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value).sort().join("\0");
+  if (keys !== "entries\0schema" && keys !== "duplicateRepairs\0entries\0schema") return false;
+  if (Object.hasOwn(value, "duplicateRepairs")
+    && !(Array.isArray(value.duplicateRepairs) && value.duplicateRepairs.length === 1
+      && exactDuplicateRepairShape(value.duplicateRepairs[0]))) return false;
+  return value.schema === RECOVERY_SCHEMA && Array.isArray(value.entries)
     && value.entries.length === 1 && exactEntryShape(value.entries[0]);
 }
 
@@ -162,6 +196,73 @@ function readRecovery(root, read) {
   } catch { return null; }
 }
 
+function readDuplicateRepair(root, read) {
+  try {
+    const value = parseStrictJson(read(resolve(root, RECOVERY), "utf8"));
+    return exactRecoveryShape(value) && Object.hasOwn(value, "duplicateRepairs") ? value.duplicateRepairs[0] : null;
+  } catch { return null; }
+}
+
+/**
+ * Pure D107 witness. Everything is derived from the four registry byte strings and
+ * the entry: the add step must be an ordinary relaxed-contract insertion plus exactly
+ * one row that repeats the name and file of a retained row; the removal step must
+ * drop exactly that row and otherwise satisfy the relaxed contract.
+ */
+export function evaluateDuplicateRepair({
+  entry, addCommit, addParent, removeCommit, removeParent,
+  addBeforeBytes, addAfterBytes, removeBeforeBytes, removeAfterBytes,
+} = {}) {
+  const fail = (code) => ({ ok: false, code });
+  if (!exactDuplicateRepairShape(entry)) return fail("VSA-DUPREPAIR-SHAPE");
+  if (addCommit !== entry.addCommit || addParent !== entry.addParent
+    || removeCommit !== entry.removeCommit || removeParent !== entry.removeParent
+    || sha256Hex(addBeforeBytes) !== entry.addPreimageSha256 || sha256Hex(addAfterBytes) !== entry.addPostimageSha256
+    || sha256Hex(removeBeforeBytes) !== entry.removePreimageSha256 || sha256Hex(removeAfterBytes) !== entry.removePostimageSha256) {
+    return fail("VSA-DUPREPAIR-AUTHORIZATION");
+  }
+  const addBefore = parseRegistry(addBeforeBytes);
+  const addAfter = parseRegistry(addAfterBytes);
+  const removeBefore = parseRegistry(removeBeforeBytes);
+  const removeAfter = parseRegistry(removeAfterBytes);
+  if (!addBefore || !addAfter || !removeBefore || !removeAfter) return fail("VSA-DUPREPAIR-SHAPE");
+  const isDuplicate = (row) => row?.name === entry.duplicateName && row?.file === entry.duplicateFile
+    && sha256Hex(canonical(row)) === entry.duplicateRowSha256;
+  if (!addBefore.suites.some((row) => row?.name === entry.duplicateName && row?.file === entry.duplicateFile)) {
+    return fail("VSA-DUPREPAIR-NOT-DUPLICATE-ADD");
+  }
+  const without = (suites, index) => suites.filter((_, position) => position !== index);
+  const added = addAfter.suites.map((row, index) => (isDuplicate(row) ? index : -1)).filter((index) => index >= 0)
+    .some((index) => evaluateVerifySuiteAppend({ beforeBytes: addBeforeBytes, afterBytes: registryBytes(without(addAfter.suites, index)) }).ok);
+  if (!added) return fail("VSA-DUPREPAIR-NOT-DUPLICATE-ADD");
+  if (removeAfter.suites.some(isDuplicate)) return fail("VSA-DUPREPAIR-NOT-REMOVAL");
+  const removed = removeBefore.suites.map((row, index) => (isDuplicate(row) ? index : -1)).filter((index) => index >= 0)
+    .some((index) => evaluateVerifySuiteAppend({ beforeBytes: registryBytes(without(removeBefore.suites, index)), afterBytes: removeAfterBytes }).ok);
+  if (!removed) return fail("VSA-DUPREPAIR-NOT-REMOVAL");
+  return { ok: true, code: "VSA-DUPREPAIR-VERIFIED" };
+}
+
+function bindDuplicateRepair({ root, run, read, entry }) {
+  if (!entry) return null;
+  try {
+    // The entry must be committed and unmodified: a worktree-only edit never unlocks it.
+    if (run(["show", "HEAD:" + RECOVERY]) !== read(resolve(root, RECOVERY), "utf8")) return null;
+    const parentOf = (commit) => {
+      const line = run(["rev-list", "--parents", "-n", "1", commit]).trim().split(/\s+/u);
+      return line.length === 2 && line[0] === commit ? line[1] : null;
+    };
+    const addParent = parentOf(entry.addCommit);
+    const removeParent = parentOf(entry.removeCommit);
+    if (addParent === null || removeParent === null) return null;
+    const result = evaluateDuplicateRepair({
+      entry, addCommit: entry.addCommit, addParent, removeCommit: entry.removeCommit, removeParent,
+      addBeforeBytes: run(["show", addParent + ":" + REGISTRY]), addAfterBytes: run(["show", entry.addCommit + ":" + REGISTRY]),
+      removeBeforeBytes: run(["show", removeParent + ":" + REGISTRY]), removeAfterBytes: run(["show", entry.removeCommit + ":" + REGISTRY]),
+    });
+    return result.ok ? { entry } : null;
+  } catch { return null; }
+}
+
 /**
  * Tracked-evidence witness for the integration commit (PO decision D101).
  * Everything it reads is committed history: the commit's own message trailer
@@ -241,6 +342,9 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
       introduction + "^.." + head, "--", REGISTRY]).trim().split("\n").filter(Boolean);
     let checked = 0;
     let integrationWitnessSeen = false;
+    const dup = bindDuplicateRepair({ root, run, read, entry: readDuplicateRepair(root, read) });
+    let dupAddSeen = false;
+    let dupRemoveSeen = false;
     for (const commit of commits) {
       if (!OID.test(commit)) return fail("VSA-HISTORY-SHAPE");
       const before = show(commit + "^", REGISTRY);
@@ -257,12 +361,19 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
           && before === recovery.defectBytes && after === recovery.restoredBytes) {
           // This is the one exact defect-to-restoration transition. Any other
           // historical failure remains subject to the original prefix policy.
+        } else if (dup && !dupAddSeen && commit === dup.entry.addCommit
+          && sha256Hex(before) === dup.entry.addPreimageSha256 && sha256Hex(after) === dup.entry.addPostimageSha256) {
+          dupAddSeen = true;
+        } else if (dup && dupAddSeen && !dupRemoveSeen && commit === dup.entry.removeCommit
+          && sha256Hex(before) === dup.entry.removePreimageSha256 && sha256Hex(after) === dup.entry.removePostimageSha256) {
+          dupRemoveSeen = true;
         } else {
           return fail(result.code, commit);
         }
       }
       checked += 1;
     }
+    if (dupAddSeen && !dupRemoveSeen) return fail("VSA-DUPREPAIR-INCOMPLETE", dup.entry.removeCommit);
     const committed = show(head, REGISTRY);
     if (committed !== worktree) {
       const result = evaluateVerifySuiteAppend({ beforeBytes: committed, afterBytes: worktree });
@@ -272,7 +383,8 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
     }
     return {
       ok: true,
-      code: recovery?.ok ? "VSA-HISTORY-APPEND-ONLY-RECORDED-RESTORATION" : "VSA-HISTORY-APPEND-ONLY",
+      code: recovery?.ok ? "VSA-HISTORY-APPEND-ONLY-RECORDED-RESTORATION"
+        : dupRemoveSeen ? "VSA-HISTORY-APPEND-ONLY-RECORDED-DUPLICATE-REPAIR" : "VSA-HISTORY-APPEND-ONLY",
       checked,
     };
   } catch (error) {

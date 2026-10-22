@@ -5,7 +5,9 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkVerifySuiteAppend, evaluateSignedHistoryRestoration, integrationTrailerWitness } from "./check-verify-suite-append.mjs";
+import { createHash } from "node:crypto";
+import { canonical } from "../../plugins/pipeline-core/lib/po-approval-proof.mjs";
+import { checkVerifySuiteAppend, evaluateDuplicateRepair, evaluateSignedHistoryRestoration, integrationTrailerWitness } from "./check-verify-suite-append.mjs";
 import { evaluateVerifySuiteAppend } from "../../plugins/pipeline-core/lib/verify-suite-append-policy.mjs";
 
 function fixture(run) {
@@ -214,6 +216,117 @@ test("the recorded restoration still holds after later rows were inserted mid-fi
   assert.equal(evaluate({ candidateBytes: lostRow }).code, "VSA-RECOVERY-CANDIDATE-MISMATCH");
   const duplicated = registry([...prior, ...additions, { name: "tail", file: additions[0].file }]);
   assert.equal(evaluate({ candidateBytes: duplicated }).code, "VSA-RECOVERY-DUPLICATE-IDENTITY");
+});
+
+// D107: one exact, byte-bound, unsigned exception for a duplicate row added by one commit
+// and removed again by another. Narrow by construction: it names two full commit SHAs and
+// four registry digests, so a look-alike commit of the same shape stays refused.
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const row = (name, extra = {}) => ({ name, file: `${name}.test.mjs`, ...extra });
+const rowHash = (value) => sha256(canonical(value));
+const dupRow = row("a", { invariantPinned: "generic second entry" });
+const registryText = (rows) => JSON.stringify({ schema: "pipeline.verify-suites.v1", suites: rows }, null, 2) + "\n";
+function dupRepairHistory(f, { lookAlike = false, mutateEntry = (e) => e, commitRecovery = true } = {}) {
+  const write = (rows) => writeFileSync(join(f.root, "harness", "verify-suites.json"), registryText(rows));
+  const sha = (rev) => f.git("rev-parse", rev).trim();
+  const bytes = (rev) => f.git("show", rev + ":harness/verify-suites.json");
+  f.writeConfig([f.tp13]);
+  write([row("a"), row("b")]);
+  f.commit("introduce protected registry");
+  write([row("a"), row("b"), row("c"), dupRow]);
+  f.commit("add rows including a duplicate identity");
+  const addCommit = sha("HEAD");
+  write([row("a"), row("b"), row("c"), row("d"), row("e")]);
+  f.commit("drop the duplicate again and add rows");
+  const removeCommit = sha("HEAD");
+  const dupEntry = mutateEntry({
+    schema: "pipeline.verify-suite-duplicate-repair-entry.v1",
+    addCommit, addParent: sha(addCommit + "^"), removeCommit, removeParent: sha(removeCommit + "^"),
+    addPreimageSha256: sha256(bytes(addCommit + "^")), addPostimageSha256: sha256(bytes(addCommit)),
+    removePreimageSha256: sha256(bytes(removeCommit + "^")), removePostimageSha256: sha256(bytes(removeCommit)),
+    duplicateName: dupRow.name, duplicateFile: dupRow.file, duplicateRowSha256: rowHash(dupRow),
+    owner: "Elephant", signed: false,
+    reason: "Historical, unsigned exception recorded by the Elephant: narrow, bound to these two commits and their registry bytes, not extendable.",
+  });
+  if (lookAlike) {
+    // The very same shape again, by two other commits that the entry does not name.
+    write([row("a"), row("b"), row("c"), row("d"), row("e"), row("g", { invariantPinned: "x" }), row("g2", { name: "d", file: "d.test.mjs", invariantPinned: "generic" })]);
+    f.commit("look-alike: add a duplicate identity again");
+    write([row("a"), row("b"), row("c"), row("d"), row("e"), row("g", { invariantPinned: "x" }), row("h")]);
+    f.commit("look-alike: drop it again");
+  }
+  writeFileSync(join(f.root, "harness", "verify-suite-history-recovery.json"), JSON.stringify({
+    schema: "pipeline.verify-suite-history-recovery.v1", entries: [entry], duplicateRepairs: [dupEntry],
+  }, null, 2) + "\n");
+  if (commitRecovery) f.commit("record recovery");
+  return { dupEntry, addCommit, removeCommit };
+}
+
+test("a duplicate row added by one commit and removed by another is accepted only for the exactly named pair", () => fixture((f) => {
+  dupRepairHistory(f);
+  const result = checkVerifySuiteAppend({ rootDir: f.root });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.code, "VSA-HISTORY-APPEND-ONLY-RECORDED-DUPLICATE-REPAIR");
+}));
+
+test("a look-alike commit pair of the same shape is refused (the exception is not extendable)", () => fixture((f) => {
+  const { addCommit } = dupRepairHistory(f, { lookAlike: true });
+  const result = checkVerifySuiteAppend({ rootDir: f.root });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "VSA-ENTRY");
+  assert.notEqual(result.detail, addCommit);
+}));
+
+test("the exception is refused when a digest, a commit, the reason or the commit state is wrong", () => {
+  const variants = [
+    (e) => ({ ...e, addPostimageSha256: "0".repeat(64) }),
+    (e) => ({ ...e, removePreimageSha256: "0".repeat(64) }),
+    (e) => ({ ...e, addCommit: "f".repeat(40) }),
+    (e) => ({ ...e, removeCommit: e.addCommit }),
+    (e) => ({ ...e, duplicateRowSha256: "1".repeat(64) }),
+    (e) => ({ ...e, signed: true }),
+    (e) => ({ ...e, owner: "Someone" }),
+    (e) => ({ ...e, reason: "short" }),
+    (e) => ({ ...e, extra: 1 }),
+  ];
+  for (const mutateEntry of variants) fixture((f) => {
+    dupRepairHistory(f, { mutateEntry });
+    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).ok, false, mutateEntry.toString());
+  });
+  fixture((f) => {
+    dupRepairHistory(f, { commitRecovery: false });
+    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).ok, false);
+  });
+});
+
+test("evaluateDuplicateRepair derives the shape from the bytes: no duplicate add, no removal, or an extra change is refused", () => {
+  const base = [row("a"), row("b")];
+  const withDup = [...base, row("c"), dupRow];
+  const fixed = [...base, row("c"), row("d")];
+  const input = (over = {}) => {
+    const e = {
+      schema: "pipeline.verify-suite-duplicate-repair-entry.v1",
+      addCommit: "a".repeat(40), addParent: "b".repeat(40), removeCommit: "c".repeat(40), removeParent: "d".repeat(40),
+      addPreimageSha256: sha256(registryText(base)), addPostimageSha256: sha256(registryText(withDup)),
+      removePreimageSha256: sha256(registryText(withDup)), removePostimageSha256: sha256(registryText(fixed)),
+      duplicateName: dupRow.name, duplicateFile: dupRow.file, duplicateRowSha256: rowHash(dupRow),
+      owner: "Elephant", signed: false, reason: "Historical, unsigned exception recorded by the Elephant: narrow, not extendable.",
+    };
+    return { entry: e, addCommit: e.addCommit, addParent: e.addParent, removeCommit: e.removeCommit, removeParent: e.removeParent,
+      addBeforeBytes: registryText(base), addAfterBytes: registryText(withDup),
+      removeBeforeBytes: registryText(withDup), removeAfterBytes: registryText(fixed), ...over };
+  };
+  assert.equal(evaluateDuplicateRepair(input()).ok, true);
+  // The add step must really be a duplicate identity, not a plain append.
+  const plain = [...base, row("c"), row("z")];
+  assert.equal(evaluateDuplicateRepair(input({ addAfterBytes: registryText(plain) })).ok, false);
+  // The removal step must remove exactly that row and change no other prior row.
+  const alsoRemoved = [row("a"), row("c"), row("d")];
+  assert.equal(evaluateDuplicateRepair(input({ removeAfterBytes: registryText(alsoRemoved) })).ok, false);
+  const keptDup = [...base, row("c"), dupRow, row("d")];
+  assert.equal(evaluateDuplicateRepair(input({ removeAfterBytes: registryText(keptDup) })).ok, false);
+  const changedPrior = [row("a"), { ...row("b"), invariantPinned: "weakened" }, row("c"), row("d")];
+  assert.equal(evaluateDuplicateRepair(input({ removeAfterBytes: registryText(changedPrior) })).ok, false);
 });
 
 test("full history traversal refuses a rewrite when recovery is missing or invalid", () => {
