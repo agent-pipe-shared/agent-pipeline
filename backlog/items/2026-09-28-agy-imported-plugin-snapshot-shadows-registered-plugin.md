@@ -325,3 +325,33 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
   The agy CLI exists on WSL, and plugin install/validate/list probes could in principle run in a disposable HOME, but the item demands a disposable isolated account/container with no PO credentials, and the loaded-root proof (which plugin root a new session actually loads, restart behaviour) needs a live Antigravity session. D65 also routes 'does a workspace entry load' to the PO's AGY-WSL test.
 - **NOT-BLOCKED** — Pick the load topology (workspace-local only or agy-managed) after the spike
   Decided: D65 (po-decisions-2026-10-18.md line 92, AC-110) fixes topology option B (workspace-local only: .agents/plugins.json, no global managed copy, entry or hook wiring) as the target; a negative result from the PO's AGY-WSL test comes back as a finding.
+
+## Reconciled 2026-10-23
+
+Text sweep K61-BACKLOG-TEXT-SWEEP-5. The Description, the Proposal, the Triage block (2026-09-28) and the Blocker
+analysis above stay as history; these sentences are superseded.
+
+- Proposal §0 "Record the results under `backlog/evidence/` and pick topology option A or B (§1) from them" and §1 heading
+  "One load topology per scope (PO decision after the spike)": the topology is decided by D65 (2026-10-20, AC-110,
+  `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`). Option B (workspace-local only: `.agents/plugins.json`, no
+  global managed copy, entry or hook wiring) is the target; the read-only topology observer and reason codes are built. The
+  decision does not wait for the spike results. What the spike still decides is whether a workspace entry actually loads;
+  that is checked in the PO's AGY-WSL test and a negative result comes back as a finding (D65). Option A is the
+  alternative that D65 did not choose.
+- Triage Assignment "First bounded S1-S6 validation, then source-backed topology diagnostics and convergent host-owned
+  refresh" and Description "The current installer ... has no imported-copy lifecycle or discovery": the diagnostics and
+  the host-owned refresh are built. `lib/antigravity-plugin-topology.mjs` (schema `pipeline.antigravity-plugin-topology.v1`),
+  `lib/antigravity-topology-refresh-host.mjs` and `install-agy.mjs --refresh [--yes]` (exact plan first, CLI-owned
+  metadata never hand-edited, readback, fresh session required) exist; the preflight no longer skips a fresh lock whose
+  version differs from the running build but reports `antigravity-lock-version-mismatch` naming both versions
+  (`scripts/pipeline-start-preflight.mjs`, mutable-lock evidence class). Latest topology commit `553342999` (D79).
+  The spike S1-S6 and the version-correct acceptance run are still open host-session work (Blocker analysis above); the
+  S1-S6 results have not been recorded under `backlog/evidence/`.
+- Known gap left by `553342999` (a tracked repo-relative workspace registry entry makes project uninstall refuse with
+  `PU-WORKSPACE-DRIFT`) is not mentioned in this item: it was split into
+  `2026-10-22-project-uninstall-refuses-a-tracked-relative-antigravity-registry-entry.md`, whose Triage records it
+  implemented (`observeAntigravityWorkspaceBindings` with `trackedRelative`; cases `UC02C018` to `UC02C020`, titled
+  "D79: ..." in `plugins/pipeline-core/lib/project-uninstall.test.mjs`). Whether the real Antigravity host resolves a
+  relative `entries[].path` against the workspace is unverified and belongs to the spike (S2/S3). A counted GREEN run of
+  that suite was not re-measured in this sweep.
+- The Triage block above already carries its Decision, Rationale and Assignment; it was not changed.

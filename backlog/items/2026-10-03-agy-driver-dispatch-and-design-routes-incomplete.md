@@ -86,10 +86,10 @@ Added acceptance (0.7.0, minor unless the PO raises it):
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** D122 (2026-10-22, PO tiles) for the Critic/Advisor/Verify route clause only; the greenfield happy-path and F-05 clauses are not decided here.
+- **Rationale:** the recorded self-dispatch fallback is admitted for the Antigravity Advisor and Critic with an honest assurance label, native AGY route cells wait for an authenticated per-call carrier (D63/AC-109), and Verify needs only the node-sandbox probe.
+- **Assignment (if accepted):** route clause built (see "Reconciled 2026-10-23"); the Antigravity greenfield run and the F-05 live re-check remain host-session work (Blocker analysis above).
+- **Date:** 2026-10-23
 
 ### Agent measurement of the open acceptance (2026-10-22)
 
@@ -117,3 +117,32 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
   The item states it is not re-checked because it needs a live AGY Goldfish issuing parallel write_to_file calls (3 of 4 failed with 'permission check failed for write_file'); observed would be all parallel writes succeeding or the template forbidding parallel writes.
 - **PO-DECISION** (decided: D122) — Show Critic, Advisor and Verify routes on AGY (or the recorded self-dispatch fallback) and an admitted route for the main agent to update the handover in every phase
   The 2026-10-22 pin measurement shows the handover write is admitted in design and implementation phases, but Antigravity advisor/critic/readiness/mechanic/deep still resolve to unavailable (RRP-ROUTE-CELL-UNAVAILABLE) and the self-dispatch fallback is legal only for the Claude advisor; registering AGY route cells or admitting a fallback is a route-policy decision (typed todo in the pin).
+
+## Reconciled 2026-10-23
+
+Text sweep K61-BACKLOG-TEXT-SWEEP-5. The Acceptance, the 2026-10-18 section, the 2026-10-22 measurement and the Blocker
+analysis above stay as history; these sentences are superseded. Case names are in
+`plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs`, re-run 2026-10-23: 14 cases,
+14 pass, 0 fail, 0 todo.
+
+- Measurement "Critic and Advisor routes: not met ... the self-dispatch fallback is legal only for the Claude advisor ...
+  is a route-policy decision (typed todo in the pin)" and "14 cases (13 pass, 0 fail, 1 typed todo)": decided by D122
+  (2026-10-22, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`) and built. Commit `aa9b85443` admits the
+  recorded self-dispatch fallback for the Antigravity Advisor and Critic in `lib/role-route-preflight.mjs` under the new
+  reason code `RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER` (a self-dispatch without an authenticated per-call carrier, never a
+  native route); every other Antigravity cell stays `RRP-ROUTE-CELL-UNAVAILABLE`. Commit `d80719e5f` turned the typed todo
+  into the asserting case "AC-108: Critic and Advisor each have an Antigravity route or the recorded self-dispatch
+  fallback (D122 ...)". Native AGY route cells still wait for an authenticated per-call carrier (D63/AC-109).
+- Measurement "Verify: not measured as a route": D122 says Verify needs only the node-sandbox probe. It is built:
+  `scripts/pipeline-start-preflight.mjs` imports `observeNodeSandboxProbe` and reports it as `nodeSandbox`; the case
+  "AC-108: the start preflight reports a sandbox-unreachable node with a typed code and the one-time remedy, and unknown is
+  never ready" pins it (F-02 added acceptance 1).
+- Added acceptance 2 (AGY Goldfish template forbids parallel file writes in one turn): the mitigation is built and pinned by
+  "AC-108: the AGY Goldfish dispatch reference forbids parallel file writes in one turn until the hook race is fixed"
+  (asserts `skills/pipeline-start/references/antigravity-native-dispatch.md`). Only the live confirmation that the F-05
+  hook race is real or fixed needs an Antigravity run (HOST-SESSION-NEEDED above).
+- Added acceptance 3 (handover updatable in every phase): measured, case "AC-108: with project readiness satisfied the
+  lifecycle guard admits the handover write for the antigravity runner whatever the feature phase" and the two phase
+  fixture cases; the native session with a fully onboarded project stays unmeasured.
+- The empty Triage block above is filled from D122, scoped to the route clause. The first Acceptance bullet (the AGY
+  greenfield happy path) is not decided by any repository decision and stays open as host-session work.
