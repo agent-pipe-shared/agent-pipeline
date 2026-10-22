@@ -5,15 +5,22 @@
 // Codex/Claude runtime targets; a later migration reports no false drift for
 // .codex targets, and an explicit Codex selection is what makes them appear.
 //
-// Plan-only: no apply/activate and no child process. The git probe is answered
-// by an in-process fake (the fakeDeps pattern of project-onboarding-v3.test.mjs).
+// (a)-(d) are plan-only: no apply/activate and no child process. The git probe is
+// answered by an in-process fake (the fakeDeps pattern of project-onboarding-v3.test.mjs).
+// (e)-(g) are REAL applies on a disposable root under scratch/: the portable seed and
+// the runtime initialization are applied through the lifecycle the product ships, the
+// files that exist on disk afterwards are listed, and a later multi-runner activation
+// is applied and read back (the shared fakeDeps of project-onboarding-v3.test.mjs
+// answers only the machine facts: git version, Codex capability, machine plane).
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+import { readRestartBarrier } from "../codex-onboarding-runtime.mjs";
+import { applyProjectOnboardingLifecycleV4, applyProjectOnboardingV3, planProjectOnboardingLifecycleV4, planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+import { fakeDeps as machineDeps } from "../project-onboarding-v3.test.mjs";
 import { planRunnerProfileMigrationV3 } from "../runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "../runner-profiles-v3.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../runtime-projection-v3.mjs";
@@ -201,5 +208,75 @@ test("(d) the same root with Codex baselines present and only Claude selected st
   try {
     const plan = planRunnerProfileMigrationV3({ rootDir: root });
     assert.ok(["ready", "noop"].includes(plan.status), `${plan.status} ${JSON.stringify(plan.diagnostics)}`);
+  } finally { dispose(root); }
+});
+
+// Real apply: the portable seed, then the runtime initialization, exactly as the shipped lifecycle runs them.
+function appliedProject(runner) {
+  const root = freshRoot(`apply-${runner}`);
+  const portable = planProjectOnboardingV3({ rootDir: root, deps: machineDeps, runner });
+  assert.equal(portable.status, "ready", JSON.stringify(portable.diagnostics));
+  assert.equal(applyProjectOnboardingV3(portable, { rootDir: root, activate: true, deps: machineDeps }).status, "applied");
+  return { root, runtimeResult: applyRuntime(root, runner) };
+}
+function applyRuntime(root, runner) {
+  const runtime = planProjectOnboardingLifecycleV4({ rootDir: root, deps: machineDeps, operation: "runtime", runner });
+  assert.equal(runtime.status, "runtime-initialization-required", JSON.stringify(runtime.diagnostics));
+  const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+  assert.match(digest, /^[a-f0-9]{64}$/u);
+  return applyProjectOnboardingLifecycleV4({ rootDir: root, deps: machineDeps, operation: "runtime", planSha256: digest, activate: true, runner });
+}
+// Every file on disk below the root as a repo-relative path with its bytes; the Git control directory is excluded.
+function filesOf(root, prefix = "") {
+  const found = {};
+  for (const entry of readdirSync(join(root, prefix), { withFileTypes: true })) {
+    if (entry.name === ".git") continue;
+    const relative = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+    if (entry.isDirectory()) Object.assign(found, filesOf(root, relative));
+    else found[relative] = readFileSync(join(root, relative), "utf8");
+  }
+  return found;
+}
+const noCodexOnDisk = (files) => assert.deepEqual(Object.keys(files).filter((path) => path === ".codex" || isCodexPath(path)), [], "no native Codex file exists");
+const enabledBlock = (runners) => `runners:\n  default: "${runners[0]}"\n  enabled:\n${runners.map((name) => `    - "${name}"\n`).join("")}schema:`;
+
+for (const runner of ["claude", "antigravity"]) {
+  test(`(e) real apply: a ${runner}-only project gets no .codex file and no Codex restart barrier, and its readback is clean`, () => {
+    const { root, runtimeResult } = appliedProject(runner);
+    try {
+      assert.equal(runtimeResult.status, "intake-required", JSON.stringify(runtimeResult.diagnostics));
+      const files = filesOf(root);
+      noCodexOnDisk(files);
+      assert.ok(files[".claude/settings.json"] !== undefined && files["pipeline.user.yaml"] !== undefined, "the shared tier was really applied (the listing is not vacuous)");
+      assert.ok(files["pipeline.user.yaml"].includes(enabledBlock([runner])), `exactly [${runner}] is enabled on disk`);
+      assert.equal(readRestartBarrier({ rootDir: root }).status, "absent", "no Codex restart barrier is published for an unselected Codex");
+      const readback = planRunnerProfileMigrationV3({ rootDir: root });
+      assert.equal(readback.status, "noop", JSON.stringify(readback.diagnostics));
+      assert.deepEqual(codexPathsOf(readback), []);
+    } finally { dispose(root); }
+  });
+}
+
+test("(f) real apply: enabling Codex later plans only the .codex creations, applies them, and reports no drift on the Claude tier", () => {
+  const { root } = appliedProject("claude");
+  try {
+    const before = filesOf(root);
+    noCodexOnDisk(before);
+    const yamlPath = join(root, "pipeline.user.yaml");
+    assert.ok(before["pipeline.user.yaml"].includes(enabledBlock(["claude"])));
+    writeFileSync(yamlPath, before["pipeline.user.yaml"].replace(enabledBlock(["claude"]), enabledBlock(["claude", "codex"])));
+    const plan = planRunnerProfileMigrationV3({ rootDir: root, deps: machineDeps, initializeMissingRuntimeForSlimV3: true, overlayCalibration: false });
+    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+    const changed = plan.targets.filter((target) => target.changed).map((target) => target.path).sort();
+    assert.ok(changed.length > 0 && changed.every(isCodexPath), `only .codex targets change: ${changed.join(",")}`);
+    assert.deepEqual(plan.targets.filter((target) => !isCodexPath(target.path) && target.changed), [], "no Claude/shared target is reported as drift");
+    const applied = applyRuntime(root, "claude");
+    assert.equal(applied.status, "intake-required", JSON.stringify(applied.diagnostics));
+    const after = filesOf(root);
+    assert.deepEqual(Object.keys(after).filter((path) => !(path in before)).sort(), changed, "the new files are exactly the planned .codex targets");
+    assert.deepEqual(Object.keys(before).filter((path) => before[path] !== after[path]), ["pipeline.user.yaml"], "every earlier file is byte-identical except the one selection edit");
+    assert.throws(() => noCodexOnDisk(after), /no native Codex file exists/u, "the no-.codex check fails once Codex is enabled");
+    const readback = planRunnerProfileMigrationV3({ rootDir: root, deps: machineDeps });
+    assert.equal(readback.status, "noop", `a settled multi-runner project reports no drift: ${JSON.stringify(readback.diagnostics)}`);
   } finally { dispose(root); }
 });

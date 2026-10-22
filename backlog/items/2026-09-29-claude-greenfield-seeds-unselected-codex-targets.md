@@ -17,3 +17,11 @@ only. Native Codex files and restart barrier are projected only after Codex
 is explicitly enabled. Preserve the shared neutral/Claude authority tier and
 support later multi-runner activation without repairing a false drift.
 Verify across all three runners and supported host platforms.
+
+## Triage
+
+- **Agent work (2026-10-22):** the real-apply pin exists. `plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs`
+  cases (e) and (f) apply the portable seed and the runtime initialization for a Claude-only and an Antigravity-only project
+  (no `.codex` file on disk, no Codex restart barrier, clean readback), then enable Codex in `pipeline.user.yaml`, plan and apply
+  the runtime again (only the `.codex` targets are created, every earlier file stays byte-identical, readback is `noop`). The
+  Windows host run and the Codex-enrolling native walk remain native-host work.
