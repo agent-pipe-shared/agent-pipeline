@@ -622,9 +622,9 @@ session model); the module imports only kernel paths and is itself one.
 `lib/guard/evaluate.mjs` imports it (it re-asks the closed shell grammar and names the one flag
 whose removal makes a refused read admitted, so it shapes the text of a guard refusal); it
 imports only modules that are already kernel paths. `plugins/pipeline-core/lib/plan-handoff-readiness.mjs`
-(decides whether a plan's delivery hand-off is ready) would join it if `scripts/pipeline-state.mjs`
-were to call it at `submit-plan` and `present-plan`; that wiring is deferred, so the module is
-not a kernel path today.
+(decides whether a plan's delivery hand-off is ready, and words the refusal) is a kernel path
+because `scripts/pipeline-state.mjs` calls it at `submit-plan` and `present-plan` (PO decision
+D85, pulled into 0.7.0 on 2026-10-22); it imports only modules that are already kernel paths.
 
 Closure repair GMWKC01/GMWKC03 (2026-10-21) adds eight first-party modules that kernel
 files import and that were never listed; each executes with kernel authority:
