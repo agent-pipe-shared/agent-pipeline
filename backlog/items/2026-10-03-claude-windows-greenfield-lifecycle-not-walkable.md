@@ -61,7 +61,7 @@ Remaining Claude/Windows-specific frictions:
 
 ### Agent measurement (2026-10-22)
 
-`plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs` now has 36 cases (35 pass, 0 fail, 1 skipped).
+`plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs` now has 40 cases (39 pass, 0 fail, 1 skipped; 36/35/1 before ALF-K28 added the Workflow registration and dynamic-gap cases).
 
 - V-9, V-12, V-13: covered by the existing pin cases, unchanged and green.
 - V-10: the route digest is bound to the inline briefing, the producer and the guard admission step record it, and the caller set is pinned.
@@ -74,3 +74,23 @@ Remaining Claude/Windows-specific frictions:
 - The CAS/"missing" failure: not reproduced and not located. It needs the Windows run, and no code or message text from the report is
   available here. Searching the library for CAS-style codes returns many unrelated hits, so naming one would be a guess. It stays open.
 - The two-approval happy path (implementation and push) stays a skipped native case that needs a live interactive Claude/Windows session.
+
+### Agent measurement (2026-10-22, ALF-K28): the two V-10 gaps and the CAS probe
+
+- **Dynamic Workflow script: not a hook-path gap, a static-resolvability limit.** `hooks/hooks.json` matches `Task|Agent|Workflow` for
+  `guard-dispatch.mjs`, so the Workflow call and its script text reach the hook, and a static `agent()` literal is recorded (existing pin).
+  `extractWorkflowDispatches` skips a prompt that is built at run time (interpolation, a named const) by design (fail-open), so that call is
+  admitted and records nothing. Both facts are now pinned ("V-10 runner registration", "V-10 typed gap, measured"). Not observable here and
+  not claimed: whether the host fires the hook again for each `agent()` the running script launches.
+- **Critic and unrelated-role dispatches: not implemented, needs a route-policy decision.** A route record is keyed only by the `Slice:` id
+  (`evidence/dispatch-route-<sliceId>.json`); `critic-review.md` carries no `Slice:` line, and a Critic that names a Goldfish's slice shares that
+  key (an existing pin makes it refuse on other bytes and stay unrecorded). Where such a record lives is the open question, so no RED case
+  can be written yet. Options are in the K28 report.
+- **CAS/"missing": not reproduced; literal code not located.** Probes (own fixtures): `pipeline-state continuity-cas` returns
+  `PS-CONTINUITY-REQUEST-FILE` (file missing, absolute, backslash or `./` spelling), `PS-CONTINUITY-REQUEST` (UTF-8 BOM or UTF-16 request
+  file, the shape a Windows editor or PowerShell redirect writes), `CS-STALE`, `CS-PROTECTED-AUTHORITY` and, without any State, "requires an
+  existing valid pipeline.state.v0 state"; none says "missing". At the guard, the closed `continuity-cas` grammar is admitted in native,
+  forward-slash and MSYS spelling and refused as `opaque-script-execution` for a backslash `--request-file` or a nested `scratch/<dir>/`
+  request (the writer itself also refuses a backslash path). The nearest literal "missing" strings are `close journal missing for CAS` and
+  siblings in `scripts/publication-close-journal.mjs`, which belong to the close flow, not to draft. The PO phrase most plausibly maps to V-1
+  (the `continuity-cas` refusal), which is admitted on this head.
