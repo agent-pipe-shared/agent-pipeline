@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { applyBootstrapTrustRecovery, main, planBootstrapTrustRecovery } from "./bootstrap-trust-recovery.mjs";
+import { applyBootstrapTrustRecovery, confirmOnTerminal, main, planBootstrapTrustRecovery } from "./bootstrap-trust-recovery.mjs";
 
 function fixture(fn) {
   const home = mkdtempSync(join(tmpdir(), "pipeline-bootstrap-recovery-"));
@@ -57,6 +57,19 @@ test("recovery CLI rejects non-TTY activation without invoking setup", () => fix
   assert.equal(code, 2);
   assert.match(lines.join(""), /BTR-EXTERNAL-TTY-REQUIRED/u);
 }));
+
+test("recovery confirmation puts the digest request in the readline question, so the terminal does not erase it", async () => {
+  const plan = { planSha256: "a".repeat(64), intent: { root: "/repo" } };
+  const questions = [];
+  const written = [];
+  let closed = false;
+  const createInterface = () => ({ question: async (q) => { questions.push(q); return `  ${plan.planSha256}\n`; }, close() { closed = true; } });
+  const answer = await confirmOnTerminal(plan, { stdin: {}, stdout: { write: (s) => written.push(s) } }, createInterface);
+  assert.equal(answer, plan.planSha256);
+  assert.equal(closed, true);
+  assert.deepEqual(questions, [`Type the plan digest ${plan.planSha256} to continue: `]);
+  assert.doesNotMatch(written.join(""), /Type the plan digest/u);
+});
 
 test("recovery reports source complete if audit fails, without pretending the setup rolled back", () => fixture(async (options) => {
   const plan = planBootstrapTrustRecovery(options);

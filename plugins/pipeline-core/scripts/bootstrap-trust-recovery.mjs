@@ -12,7 +12,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { createInterface } from "node:readline/promises";
+import { createInterface as createReadlineInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { applyTrustAnchorBootstrap } from "./onboarding-init.mjs";
@@ -142,7 +142,17 @@ export async function applyBootstrapTrustRecovery(options, { confirm, apply = ap
   }
 }
 
-export async function main(argv = process.argv.slice(2), io = process) {
+// The digest request is the argument of question(): readline redraws its own prompt line, so text written
+// before an empty question("") is erased on a real terminal and the human sees a bare cursor.
+export async function confirmOnTerminal(plan, io, createInterface = createReadlineInterface) {
+  const terminal = createInterface({ input: io.stdin, output: io.stdout });
+  try {
+    io.stdout.write(`First-anchor recovery for ${plan.intent.root}. This does not waive any approval gate.\n`);
+    return (await terminal.question(`Type the plan digest ${plan.planSha256} to continue: `)).trim();
+  } finally { terminal.close(); }
+}
+
+export async function main(argv = process.argv.slice(2), io = process, createInterface = createReadlineInterface) {
   const parsed = parse(argv);
   if (!parsed) {
     io.stderr.write("Usage: bootstrap-trust-recovery.mjs plan|apply --root ABS --mode existing|new --directory ABS --human-name NAME --existing-key ABS|none [--plan-sha256 HEX for apply]\n");
@@ -160,13 +170,7 @@ export async function main(argv = process.argv.slice(2), io = process) {
     io.stderr.write(`${JSON.stringify(refusal("BTR-EXTERNAL-TTY-REQUIRED"))}\n`);
     return 2;
   }
-  const result = await applyBootstrapTrustRecovery(options, { confirm: async (plan) => {
-    const terminal = createInterface({ input: io.stdin, output: io.stdout });
-    try {
-      io.stdout.write(`First-anchor recovery for ${plan.intent.root}. This does not waive any approval gate.\nType the plan digest ${plan.planSha256} to continue: `);
-      return (await terminal.question("")).trim();
-    } finally { terminal.close(); }
-  } });
+  const result = await applyBootstrapTrustRecovery(options, { confirm: (plan) => confirmOnTerminal(plan, io, createInterface) });
   io.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   return result.ok ? 0 : 1;
 }
