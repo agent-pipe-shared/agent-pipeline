@@ -18,7 +18,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import childProcess, { spawnSync } from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
@@ -36,6 +37,8 @@ import {
   discoverRepository,
   ensurePrimaryBranchExclude,
   finalizeTemporaryResource,
+  inspectSignedDescriptorCustodyRepository,
+  withCustodyTopologyScope,
   inspectTemporaryResource,
   inspectSessionClosure,
   inspectExternallyArchivedSession,
@@ -1931,6 +1934,100 @@ check("R7-1a single-source ratchet (RED until every site is converted): no produ
   if (offences.length > 0) {
     assert.fail(`${offences.length} git null-device site(s) spell an inline /dev/null literal (Spec section 22.1: one shared constant; import GIT_NULL_DEVICE from lib/git-null-device.mjs):\n  ${offences.join("\n  ")}`);
   }
+});
+
+// D91 (ALF-I2-HOSTCOMMIT): the SubagentStop host commit entered the session-authority registry boundary ~11 times and every
+// entry re-discovered the repository topology ~1,500 times (five git spawns per custody inspection). The registry now opens a
+// topology scope per outermost boundary: topology is observed once, HEAD is read on every inspection, and the scope ends with
+// the boundary.
+function countGitSpawns(operation) {
+  const original = childProcess.spawnSync;
+  const calls = { topology: 0, head: 0, other: 0 };
+  childProcess.spawnSync = function counted(command, args, ...rest) {
+    const list = Array.isArray(args) ? args.map(String) : [];
+    if (command === "git") {
+      if (list.includes("--git-common-dir")) calls.topology += 1;
+      else if (list.includes("HEAD^{tree}")) calls.head += 1;
+      else calls.other += 1;
+    }
+    return original.call(this, command, args, ...rest);
+  };
+  syncBuiltinESMExports();
+  try { operation(); } finally { childProcess.spawnSync = original; syncBuiltinESMExports(); }
+  return calls;
+}
+
+check("D91-01 inside a topology scope the topology is observed once and HEAD on every custody inspection; outside one nothing is memoized", () => {
+  const { primary } = repoFixture();
+  const root = realpathSync(primary);
+  const results = [];
+  const outside = countGitSpawns(() => { for (let i = 0; i < 3; i += 1) results.push(inspectSignedDescriptorCustodyRepository(root)); });
+  assert.equal(outside.topology, 3, "outside a scope every inspection discovers the topology (unchanged behaviour)");
+  assert.equal(outside.head, 3);
+  const inside = countGitSpawns(() => withCustodyTopologyScope(() => {
+    for (let i = 0; i < 3; i += 1) results.push(inspectSignedDescriptorCustodyRepository(root));
+    withCustodyTopologyScope(() => results.push(inspectSignedDescriptorCustodyRepository(root)));
+  }));
+  assert.equal(inside.topology, 1, "inside a scope (and a nested one) the topology is observed exactly once");
+  assert.equal(inside.head, 4, "HEAD is read on every inspection, never memoized");
+  const after = countGitSpawns(() => results.push(inspectSignedDescriptorCustodyRepository(root)));
+  assert.equal(after.topology, 1, "the scope ended with the outermost operation: nothing is remembered after it");
+  for (const result of results) assert.deepEqual(result, results[0], "scoped and unscoped inspections return the same repository binding");
+});
+
+check("D91-02 a commit made inside a topology scope is visible to the very next inspection (HEAD and tree are never served from the scope)", () => {
+  const { primary } = repoFixture();
+  const root = realpathSync(primary);
+  withCustodyTopologyScope(() => {
+    const before = inspectSignedDescriptorCustodyRepository(root);
+    writeFileSync(join(primary, "second.txt"), "second\n");
+    git(primary, ["add", "second.txt"]);
+    git(primary, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "second"]);
+    const after = inspectSignedDescriptorCustodyRepository(root);
+    assert.equal(after.candidate.commit, git(primary, ["rev-parse", "HEAD"]).stdout.trim());
+    assert.equal(after.candidate.tree, git(primary, ["rev-parse", "HEAD^{tree}"]).stdout.trim());
+    assert.notEqual(after.candidate.commit, before.candidate.commit);
+    assert.notEqual(after.candidate.tree, before.candidate.tree);
+    assert.equal(after.primaryRoot, before.primaryRoot);
+    assert.equal(after.commonDir, before.commonDir);
+  });
+});
+
+// Git's own upward search must not escape the fixture when a repository above the temp directory exists.
+function withCeiling(ceiling, operation) {
+  const before = process.env.GIT_CEILING_DIRECTORIES;
+  process.env.GIT_CEILING_DIRECTORIES = ceiling;
+  try { return operation(); } finally { if (before === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = before; }
+}
+
+check("D91-03 a memoized topology is dropped, not served, once its directories are no longer the ones observed", () => {
+  const first = repoFixture();
+  const root = realpathSync(first.primary);
+  withCeiling(realpathSync(first.fixture), () => withCustodyTopologyScope(() => {
+    inspectSignedDescriptorCustodyRepository(root);
+    rmSync(join(first.primary, ".git"), { recursive: true, force: true });
+    assert.throws(() => inspectSignedDescriptorCustodyRepository(root), "a repository whose common directory vanished mid-scope is refused");
+  }));
+  const second = repoFixture();
+  const secondRoot = realpathSync(second.primary);
+  withCeiling(realpathSync(second.fixture), () => withCustodyTopologyScope(() => {
+    inspectSignedDescriptorCustodyRepository(secondRoot);
+    rmSync(secondRoot, { recursive: true, force: true });
+    assert.throws(() => inspectSignedDescriptorCustodyRepository(secondRoot), "a repository whose root vanished mid-scope is refused");
+  }));
+});
+
+check("D91-04 the combined HEAD read keeps the unborn-repository outcome and the git failure of the unscoped sequence", () => {
+  const fixture = mkdtempSync(join(tmpdir(), "worktree-lifecycle-test-"));
+  fixtureRoots.push(fixture);
+  const unborn = join(fixture, "unborn");
+  mkdirSync(unborn);
+  git(unborn, ["init", "--initial-branch=main"]);
+  const root = realpathSync(unborn);
+  const expected = { commit: "0".repeat(40), tree: "4b825dc642cb6eb9a060e54bf8d69288fbee4904" };
+  assert.deepEqual(inspectSignedDescriptorCustodyRepository(root).candidate, expected);
+  withCustodyTopologyScope(() => assert.deepEqual(inspectSignedDescriptorCustodyRepository(root).candidate, expected));
+  withCeiling(realpathSync(fixture), () => assert.throws(() => inspectSignedDescriptorCustodyRepository(realpathSync(fixture)), "a directory that is not a repository still fails"));
 });
 
 for (const root of fixtureRoots) rmSync(root, { recursive: true, force: true });
