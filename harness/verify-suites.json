@@ -3718,6 +3718,24 @@
       "file": "plugins/pipeline-core/lib/pins/fitness-model-qualification-observed-at-implementation-boundary.test.mjs",
       "invariantPinned": "At set-phase implementation a materialized fitness model that never ran on the candidate is reported with one runnable repair and is not counted as qualified, while a project without a model is unaffected (AC-155, D131)",
       "nonOverlapNote": "Unique cases: the report-only fitness-model observation at the implementation boundary"
+    },
+    {
+      "name": "dispatch-recovery-tests",
+      "file": "plugins/pipeline-core/scripts/dispatch-recovery.test.mjs",
+      "invariantPinned": "The dispatch recovery verb records, inspects and clears the bounded per-dispatch recovery state through a closed argv, refuses with one runnable repair and writes nothing on a refusal, and never drops an open attempt history (AC-245, D139)",
+      "nonOverlapNote": "Unique cases: the record, inspect and clear verbs over lib/dispatch-recovery-state.mjs"
+    },
+    {
+      "name": "dispatch-recovery-admission-tests",
+      "file": "plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs",
+      "invariantPinned": "The guard admits exactly the three closed argv shapes of the dispatch recovery verb, root-bound and limited to scratch or evidence json paths (AC-245, D139)",
+      "nonOverlapNote": "Unique cases: the command-catalogue admission of dispatch-recovery.mjs"
+    },
+    {
+      "name": "authority-restore-tests",
+      "file": "plugins/pipeline-core/lib/authority-restore.test.mjs",
+      "invariantPinned": "An edited bound PRD or Spec is restored from git only when the bytes equal the approved digest, all documents or none, with one repair and no write on a refusal; the lock denial names the consequence and the restore command (D31, AC-115, D137)",
+      "nonOverlapNote": "Unique cases: the typed self-revert of an edited bound authority document and its pre-edit warning"
     }
   ]
 }
