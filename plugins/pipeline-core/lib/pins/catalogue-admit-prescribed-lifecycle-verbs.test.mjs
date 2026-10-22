@@ -5,7 +5,7 @@
 // agent in the state where it is prescribed -- the real guard classifies and admits the exact
 // emitted shape -- WITHOUT a broad grammar relaxation (tampered shapes stay refused).
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -323,7 +323,27 @@ test("AC-123 design-course-session --run-v2: tampered shapes stay refused (no br
   } finally { f.cleanup(); }
 });
 
-test("AC-123 receipt aliases (directory/file symlink) never gain present-plan admission", { skip: HOST_LIMITATION }, () => {});
+test("AC-123 receipt aliases (directory/file symlink) never gain present-plan admission", (t) => {
+  return withFixture("feature", f => {
+    const real = receipt(f, "real-1");
+    const fileAlias = "evidence/alias-file.json";
+    const dirAlias = "evidence-alias";
+    try {
+      symlinkSync(join(f.root, real), join(f.root, fileAlias), "file");
+      symlinkSync(join(f.root, "evidence"), join(f.root, dirAlias), "dir");
+    } catch (error) {
+      // Typed conditional skip: only a host that cannot create a link (native Windows without the privilege).
+      t.skip(`${HOST_LIMITATION} (${error?.code ?? "unknown"})`);
+      return;
+    }
+    const present = path => stateAction("present-plan", "--by", "Fixture", "--review-receipt", path);
+    assert.equal(admitted(present(real), f), true, "control: the physical receipt itself is admitted");
+    for (const [label, path] of [["file symlink", fileAlias], ["directory symlink", `${dirAlias}/real-1.json`]]) {
+      assert.equal(admitted(present(path), f), false, label);
+      assert.equal(guardCode(present(path), f), 2, label);
+    }
+  });
+});
 
 test("AC-123 continuity-* writers are not catalogue-admitted lifecycle verbs of the current course", () => {
   // Boundary pin: the current course text (skills/pipeline-start/references/design-course.md) prescribes
