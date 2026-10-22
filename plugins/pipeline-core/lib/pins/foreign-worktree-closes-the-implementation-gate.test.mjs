@@ -4,8 +4,9 @@
 // Cases that currently FAIL are the RED evidence that the point is not satisfied (see report).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
+import {readFileSync,existsSync,mkdirSync,writeFileSync,rmSync,mkdtempSync} from 'node:fs';
 import {join,dirname} from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {readDesignWorkflowPackageV2FromRepository} from '../design-workflow-package-v2.mjs';
 import {resolvePoGateRepositoryTopology} from '../po-gate-authority.mjs';
@@ -202,6 +203,99 @@ test('AC5 ADR-0085 C2 legacy re-read removes the hot-path read (mode constant ex
   assert.match(src('design-workflow-package.mjs'),/DWP2-LEGACY-APPROVED-REREAD/u);
 });
 
-test('HOST-LIMITATION skip: WSL-registered foreign worktree fixture (/mnt gitdir) needs Linux/WSL',{skip:'host-limitation: native Windows host cannot register a WSL /mnt worktree; owner Coordinator, due 2026-10-19 (PO decision K7), Linux/WSL run'},()=>{});
+// Real WSL-registered foreign worktree (Linux/WSL host only). A DrvFs mount under /mnt/<drive> is detected at run time
+// (no drive letter is hard-coded); a git worktree is registered with its checkout directory on that mount. The registration
+// is then LOCKED and its directory removed, which is what a Windows-side host sees for a WSL `/mnt` registration it cannot
+// resolve: registered, not prunable (git never prunes a locked worktree), physically unresolvable.
+const drvfsMounts=()=>{
+  if(process.platform!=='linux')return [];
+  try{
+    return readFileSync('/proc/mounts','utf8').split('\n').map(l=>l.split(' ')).filter(f=>f.length>=4&&/^\/mnt\/[^/]+$/u.test(f[1])&&(f[2]==='drvfs'||(f[2]==='9p'&&/aname=drvfs/u.test(f[3])))).map(f=>f[1]);
+  }catch{return [];}
+};
+const mountTemp=()=>{
+  for(const m of drvfsMounts()){
+    try{return mkdtempSync(join(m,'agent-pipeline-fwt-'));}catch{/* not writable by this user: try the next mount */}
+  }
+  return null;
+};
+const probe=mountTemp();
+if(probe)rmSync(probe,{recursive:true,force:true});
+const WSL_MNT_LIMITATION=probe?false:'host-limitation: no writable DrvFs mount under /mnt/<drive> (or the platform is not Linux/WSL), so a WSL-registered /mnt foreign worktree cannot be created; owner Coordinator, due 2026-10-31, host: Linux/WSL with a writable /mnt/<drive> mount';
+const git=(cwd,args)=>spawnSync('git',['-c','user.name=pin','-c','user.email=pin@example.invalid','-c','commit.gpgsign=false',...args],{cwd,encoding:'utf8'});
+const gitOk=(cwd,args)=>{const r=git(cwd,args);assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);return r.stdout;};
+
+// The acceptance examiner, applied to whichever gate pair it is handed: `resolve(repo)` is the topology/gate step,
+// `handover(repo)` the onboarding inspect action for the same repository.
+async function assertForeignWorktreeAcceptance(repo,{resolve,handover}){
+  let thrown;
+  try{resolve(repo);}catch(e){thrown=e;}
+  assert.ok(thrown,'a registered foreign worktree must raise, not silently pass');
+  assert.equal(thrown.code,'DWP2-ENVIRONMENT-UNAVAILABLE','typed environment code');
+  assert.equal(thrown.cause,'foreign-worktree','closed foreign-worktree cause');
+  const action=await handover(repo);
+  assert.equal(action?.kind,'architecture-design-required','typed diagnosis, not a design reopen');
+  assert.equal(action.code,'DWP2-ENVIRONMENT-UNAVAILABLE');
+  assert.ok(!JSON.stringify(action).includes(REOPEN),'no reopen-design action is offered');
+}
+
+test('WSL /mnt foreign worktree (real registration): typed environment condition, no reopen-design',{skip:WSL_MNT_LIMITATION},async()=>{
+  const nodeFs=(await import('node:fs')).default;
+  const base=join(repoRoot,'scratch');
+  mkdirSync(base,{recursive:true});
+  const main=mkdtempSync(join(base,'foreign-worktree-pin-wsl-'));
+  const mnt=mountTemp();
+  assert.ok(mnt,'a writable DrvFs mount was available at module load');
+  const worktree=join(mnt,'wt');
+  try{
+    const root=nodeFs.realpathSync(main);
+    gitOk(root,['init','-q']);
+    gitOk(root,['commit','-q','--allow-empty','-m','fixture']);
+    gitOk(root,['worktree','add','-q','--detach',worktree,'HEAD']);
+    assert.ok(worktree.startsWith('/mnt/'),'the registered checkout lives under /mnt');
+    gitOk(root,['worktree','lock',worktree]);
+    rmSync(worktree,{recursive:true,force:true});
+    // Precondition: git still lists the registration, and does not mark it prunable.
+    const listed=gitOk(root,['worktree','list','--porcelain']);
+    assert.ok(listed.split('\n').some(l=>l==='worktree '+worktree),'the /mnt registration is listed');
+    assert.ok(!/^prunable/mu.test(listed),'a locked registration is not prunable');
+    const gate={
+      resolve:r=>resolvePoGateRepositoryTopology(r),
+      // A full approved design package cannot be built inside a throwaway repository, so the inspection seam runs the REAL
+      // topology step against the real foreign registration and reports it the way architecture-design.mjs reports a
+      // typed DWP2-ENVIRONMENT-UNAVAILABLE (status environment-unavailable); the REAL handover action then classifies it.
+      handover:r=>approvedHandover(()=>{
+        try{resolvePoGateRepositoryTopology(r);}
+        catch(e){if(e?.code==='DWP2-ENVIRONMENT-UNAVAILABLE')return {ok:false,status:'environment-unavailable',code:e.code,cause:e.cause};throw e;}
+        return {ok:true,status:'materialized'};
+      }),
+    };
+    await assertForeignWorktreeAcceptance(root,gate);
+  }finally{
+    // restore-before-yield: unregister the worktree, remove its directory on the mount, then the throwaway repository.
+    git(main,['worktree','unlock',worktree]);
+    git(main,['worktree','remove','--force',worktree]);
+    git(main,['worktree','prune']);
+    rmSync(mnt,{recursive:true,force:true});
+    rmSync(main,{recursive:true,force:true});
+  }
+});
+
+test('WSL /mnt foreign worktree: RED proof, the examiner fails against a gate that treats the foreign worktree as closing (scratch mirror)',async()=>{
+  const repo=repoRoot;
+  // Mirror of the reported behaviour: the registration collapses to the generic physical/git failure and the
+  // onboarding inspect offers a full design reopen.
+  const closing={
+    resolve:()=>{throw Object.assign(new Error('DWP2-PHYSICAL-OR-GIT'),{code:'DWP2-PHYSICAL-OR-GIT'});},
+    handover:()=>({kind:'collect-input',applyAction:{verb:'reopen-design'}}),
+  };
+  await assert.rejects(()=>assertForeignWorktreeAcceptance(repo,closing),assert.AssertionError);
+  // Typed on the topology side but still offering reopen-design is also insufficient.
+  const typedButReopens={
+    resolve:()=>{throw Object.assign(new Error('DWP2-ENVIRONMENT-UNAVAILABLE'),{code:'DWP2-ENVIRONMENT-UNAVAILABLE',cause:'foreign-worktree'});},
+    handover:()=>({kind:'architecture-design-required',code:'DWP2-ENVIRONMENT-UNAVAILABLE',applyAction:{verb:'reopen-design'}}),
+  };
+  await assert.rejects(()=>assertForeignWorktreeAcceptance(repo,typedButReopens),assert.AssertionError);
+});
 
 test('sanity: the plugin tree exists',()=>{assert.ok(existsSync(join(lib,'design-workflow-package-v2.mjs')));});
