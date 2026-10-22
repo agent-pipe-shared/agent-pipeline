@@ -18,9 +18,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, lstatSync, linkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, lstatSync, linkSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { symlinkCapability, symlinkSkip } from '../symlink-capability.mjs';
 
 const repository = fileURLToPath(new URL('../../../../', import.meta.url));
 const libUrl = process.env.HEADROOM_PIN_LIB
@@ -32,9 +33,6 @@ const { reportProjectResourceHeadroom, ResourceHeadroomError } = await import(li
 const cli = process.env.HEADROOM_PIN_SCRIPT
   ? await import(pathToFileURL(scriptPath).href)
   : await import('../../scripts/report-resource-headroom.mjs');
-
-const HOST_LIMITATION = 'host-limitation: native Windows host cannot create directory symlinks or mode bits; '
-  + 'owner Coordinator, due 2026-10-19, to be run on the Linux/WSL host (PO decision K7)';
 
 const base = join(repository, 'scratch', 'headroom-pin-fixtures');
 mkdirSync(base, { recursive: true });
@@ -238,7 +236,41 @@ test('A4 the guard admits the bundled reporter as a read-only command and refuse
   assert.equal(isReadOnlyDiagnosticCommand(cmd(real, '../escape.json'), root), false);
 });
 
-test('A3 CLI refuses an input reached through a symlinked parent or aliased file', { skip: HOST_LIMITATION }, () => {});
+// The physical-alias refusals (symlinked parent directory, symlinked file) are exercised wherever the host can create the link;
+// each case first runs the same input by its physical path, so a refusal cannot be a fixture mistake.
+const DIRECTORY_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: 'dir' }));
+const FILE_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: 'file' }));
+const symlinkRefusalFixture = () => {
+  const root = fixture();
+  mkdirSync(join(root, 'real'));
+  const payload = JSON.stringify(doc([{ id: 'a', limit: limit(100), measurement: meas(25) }]));
+  writeFileSync(join(root, 'real', 'obs.json'), payload, { flag: 'wx' });
+  return { root, payload };
+};
+
+test('A3 CLI refuses an input reached through a symlinked parent directory', { skip: DIRECTORY_SYMLINK_SKIP }, async () => {
+  const { root, payload } = symlinkRefusalFixture();
+  symlinkSync(join(root, 'real'), join(root, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
+  const physical = await runMain(root, ['--input', 'real/obs.json']);
+  assert.equal(physical.code, 0, physical.err);
+  const aliased = await runMain(root, ['--input', 'linked/obs.json']);
+  assert.equal(aliased.code, 2);
+  assert.equal(aliased.out, '');
+  assert.match(aliased.err, /^RESOURCE-HEADROOM-INPUT: /u);
+  assert.equal(readFileSync(join(root, 'real', 'obs.json'), 'utf8'), payload, 'the reporter left the input unchanged');
+});
+
+test('A3 CLI refuses an input that is a symlink to a regular file', { skip: FILE_SYMLINK_SKIP }, async () => {
+  const { root } = symlinkRefusalFixture();
+  symlinkSync(join(root, 'real', 'obs.json'), join(root, 'real', 'alias.json'), 'file');
+  const physical = await runMain(root, ['--input', 'real/obs.json']);
+  assert.equal(physical.code, 0, physical.err);
+  const aliased = await runMain(root, ['--input', 'real/alias.json']);
+  assert.equal(aliased.code, 2);
+  assert.equal(aliased.out, '');
+  assert.match(aliased.err, /^RESOURCE-HEADROOM-INPUT: /u);
+});
+
 test('A3 CLI refuses a hard-linked input (nlink != 1)', async () => {
   const root = fixture();
   const file = join(root, 'inputs', 'obs.json');
