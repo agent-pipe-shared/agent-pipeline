@@ -71,3 +71,13 @@ Residual, not changed here: `roles/critic.md` CR-03 (standard stage) still tells
 creates" a per-dispatch subdirectory, while the template and agent now say the native dispatch guard allocates the notes
 directory on the first admitted Write. The role text predates the guard-owned route and should be reconciled by the
 role owner.
+
+## Reconciled 2026-10-22: the residual role text
+
+The residual named above is closed. There is no admitted scratch-name command to state, by design: the Critic runs no `mkdir`, no `openssl` and no random-name source. The one admitted route, as `plugins/pipeline-core/hooks/guard-dispatch-budget.mjs` defines it, is Write (create) and Edit (append) on `scratch/dispatch/critic-<authenticated-native-agent-id>/critic-notes.md`; on the first admitted Write/Edit the native dispatch guard creates that directory exclusively and binds it to the authenticated dispatch and counter, and when allocation or Write/Edit admission is unavailable the Critic returns the report as text and discloses persistence as unavailable. Reconciled to that wording, which stays authoritative in the `Scratchpad isolation` paragraph of `templates/prompts/critic-review.md`:
+
+- `roles/critic.md` section 3 (CR-03, standard stage): the bare-`mkdir` / `-a1` step is replaced by the guard-allocated target.
+- `roles/critic.md` section 5.5 (CR-06-D): "Where" no longer says the Critic already creates the directory; "How" no longer carries the superseded `node -e` write shape or the bare-`mkdir` step.
+- `plugins/pipeline-core/agents/critic.md` (Report durability paragraph) and `templates/prompts/critic-review.md` with its vendored copy (Report durability paragraph): "the subdirectory you already create" now says the guard allocates it.
+
+The vendored template stays byte-identical (`plugins/pipeline-core/scripts/check-vendored-template-sync.mjs` passes). `plugins/pipeline-core/scripts/critic-notes-write.mjs` (the AC-143 script route) is not named by any of these texts and is untouched. No pin or test was changed.
