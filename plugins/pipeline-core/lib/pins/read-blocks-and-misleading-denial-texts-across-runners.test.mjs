@@ -277,8 +277,7 @@ test("M4 Antigravity row: in-root native read tools are allowed by the real adap
 
 // The three cases below assert the item's acceptance where the runner rows are NOT yet satisfied. They are `todo`: they
 // run and report, they do not fail the suite, and each flips to a plain pass once its fix site lands (see the item).
-test("M5 (todo: Antigravity native read tools are allowed unconditionally, so a credential file is readable) a native view_file of a credential file is denied on Antigravity (A1: credential roots stay denied)", {
-  todo: "decision needed: hooks/antigravity-pretool-guard.mjs allows every read-only tool call immediately; its own test pins that as intended",
+test("M5 a native view_file of a credential file is denied on Antigravity (A1: credential roots stay denied; D87 gated the native read tools, ea69fe398)", {
   timeout: 300000,
 }, () => withRunnerFixture((path) => {
   const decision = runnerDecision("antigravity", { antigravity: { toolCall: { name: "view_file", args: { AbsolutePath: join(path, "vault", "id_rsa") } } } }, path);
@@ -286,8 +285,7 @@ test("M5 (todo: Antigravity native read tools are allowed unconditionally, so a 
   assert.deepEqual(denialProblems(decision.text), [], decision.text);
 }));
 
-test("M6 (todo: the note recommends tools the Codex runner refuses) a denial surfaced on Codex does not tell the agent to use native Read, Glob or Grep tools (A2: a truthful, actionable denial)", {
-  todo: "fix site lib/guard/grammar-denials.mjs READ_COMMAND_UNSUPPORTED_NOTE (protected path): runner-neutral wording needed, a source patch is prepared",
+test("M6 a denial surfaced on Codex does not tell the agent to use native Read, Glob or Grep tools (A2: a truthful, actionable denial; runner-neutral note, operator patch 38)", {
   timeout: 300000,
 }, () => withRunnerFixture((path) => {
   const decision = runnerDecision("codex", shellCall("cat vault/id_rsa", path), path);
