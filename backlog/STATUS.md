@@ -184,7 +184,7 @@
 | pipeline.closed-shell-grammar-still-rejects-common-readonly-composition | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
 | pipeline.codex-advisor-evidence-fails-after-host-update | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity | open | defect | pipeline | none | 2026-09-28 | — | — |
-| pipeline.codex-bootstrap-in-the-typed-next-action | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
+| pipeline.codex-bootstrap-in-the-typed-next-action | closed | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.codex-compact-sessionstart-json-rejects-measurement-fields | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.codex-design-readiness-child-rejects-valid-review | open | defect | pipeline | alfred | 2026-09-28 | — | — |
@@ -779,6 +779,7 @@
 | pipeline.scratch-write-exemption-does-not-cover-restart-required | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.scratch-write-refused-during-intake-against-documented-exemption | closed | defect | pipeline | nova | 2026-08-28 | — | — |
 | pipeline.script-mediated-writes-bypass-protected-test-paths | open | defect | pipeline | alfred | 2026-10-05 | — | — |
+| pipeline.second-writer-check-skips-a-worktree-isolation-that-may-not-be-granted | open | defect | pipeline | none | 2026-10-22 | — | — |
 | pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | — | 2026-07-25 | — | — |
 | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
@@ -967,6 +968,6 @@
 
 - open: 270
 - in_progress: 0
-- closed: 673
+- closed: 674
 - rejected: 3
 - deferred: 11

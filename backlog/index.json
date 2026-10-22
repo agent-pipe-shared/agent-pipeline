@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bafed581403d7ff1bf1771a0339a979b32d72c953e3544a45803d6af6292a668"
+    "transitionHead": "996af27bd591cd493b2a65fac3c155261a4f712e3954862a57e70fdc63c90499"
   },
   "counts": {
     "open": 270,
     "in_progress": 0,
-    "closed": 673,
+    "closed": 674,
     "rejected": 3,
     "deferred": 11
   },
@@ -2295,14 +2295,18 @@
     },
     {
       "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-10-08",
       "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
       "deferred": false,
       "due": "2026-10-31",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "d1a24c6a6da46232b493138b11d777c42aa1220e",
+      "closureEvidence": "plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs"
     },
     {
       "id": "pipeline.codex-compact-sessionstart-json-rejects-measurement-fields",
@@ -9921,6 +9925,16 @@
       "source": "Live observation, ALFRED-NULSWEEP dispatch, Agent-Pipeline Claude/Windows session 2026-10-05: an agent-authored node script rewrote a protected test file.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.second-writer-check-skips-a-worktree-isolation-that-may-not-be-granted",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-22",
+      "source": "K39 delivery (guard-side second-writer refusal, D110) and CLAUDE.md note of 2026-08-25 on worktree isolation that was not granted.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates",
