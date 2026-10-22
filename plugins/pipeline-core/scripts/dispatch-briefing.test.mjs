@@ -302,6 +302,42 @@ for (const [name, overrides, extra, depOverrides, code, mention] of REFUSALS) {
   });
 }
 
+// K12: a transient registry lock must never degrade into a different ruleset identity.
+const heldLock = (over = {}) => ({ status: "held", owner: "live", pid: 4242, ageSeconds: 3, ...over });
+const unavailableObserver = () => ({ rulesetSource: { loadedIdentity: { status: "unavailable" } }, pluginRoot: "/fixture/plugin-root" });
+
+test("K12 a lock that stays held refuses DBG-RULESET-LOCK-HELD naming the holder instead of falling back to the plugin-root hash", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  let clock = 0;
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { observePreflight: unavailableObserver, snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }),
+    registryLock: () => heldLock(), now: () => clock, pause: (ms) => { clock += ms; } }));
+  assert.equal(result.ok, false); assert.equal(result.code, "DBG-RULESET-LOCK-HELD", result.message);
+  assert.match(result.message, /pid 4242/u); assert.match(result.message, /retry this command/u); assert.match(result.message, /session-authority-repair\.mjs wait/u);
+  assert.equal(result.skeleton, undefined);
+});
+
+test("K12 a lock that clears within the wait changes nothing: the identity is read again and the loaded one is used", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  let clock = 0; let reads = 0; let observed = 0;
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, {
+    observePreflight: () => { observed += 1; if (observed === 1) { const error = new Error("held"); error.code = "SDC-LOCK-HELD"; throw error; } return availableObserver(); },
+    snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }),
+    registryLock: () => { reads += 1; return reads <= 2 ? heldLock() : { status: "absent" }; }, now: () => clock, pause: (ms) => { clock += ms; } }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  assert.equal(result.binding.rulesetSha, RULESET);
+  assert.equal(result.warnings.some((warning) => warning.code === "DBG-RULESET-FALLBACK"), false, "no fallback identity was used");
+});
+
+test("K12 a preflight that throws SDC-LOCK-HELD is refused typed, never answered with a fallback identity", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { observePreflight: () => { const error = new Error("held"); error.code = "SDC-LOCK-HELD"; throw error; },
+    snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }), registryLock: () => ({ status: "absent" }) }));
+  assert.equal(result.ok, false); assert.equal(result.code, "DBG-RULESET-LOCK-HELD", result.message);
+});
+
 test("refuses an unknown subcommand", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();

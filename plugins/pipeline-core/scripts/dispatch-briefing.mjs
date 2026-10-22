@@ -59,6 +59,8 @@ import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/prote
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+import * as sessionAuthorityRegistry from "../lib/session-authority-registry.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { loadMapBundle } from "./module-inventory.mjs";
 import { owningModules } from "./architecture-boundary-check.mjs";
 
@@ -156,6 +158,15 @@ function defaultQueueRow(root, sliceId) {
     return governed.status === "required" ? governed.normalized.slices.find((row) => row.id === sliceId) ?? null : null;
   } catch { return null; }
 }
+
+/** K12: the session-authority registry lock as a reader sees it (never taken), or null when it cannot be observed. */
+function defaultRegistryLock(root) {
+  try { return sessionAuthorityRegistry.inspectSessionAuthorityLock({ repository: inspectSignedDescriptorCustodyRepository(root) }); } catch { return null; }
+}
+// The registry's own bound when it exports one (K12); a short fixed default otherwise, so this script never needs the
+// registry module and the bound to be changed in the same commit.
+const REGISTRY_LOCK_WAIT_MS = Number.isSafeInteger(sessionAuthorityRegistry.SESSION_AUTHORITY_LOCK_WAIT_MS) ? sessionAuthorityRegistry.SESSION_AUTHORITY_LOCK_WAIT_MS : 1500;
+const sleepMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 function defaultSpecPathFromState(root) {
   try {
@@ -487,11 +498,37 @@ export function generateDispatchBinding(options, deps = {}) {
   // binding). Order: loaded, installed, content hash of the loaded plugin root. Each fallback warns.
   let observation;
   let observationFault = null;
-  try { observation = observePreflight({ cwd: root }); } catch (error) { observationFault = error?.code ?? "observer-threw"; }
-  const identity = observation?.rulesetSource?.loadedIdentity;
-  const identityStatus = observationFault ?? (identity ? String(identity.status) : "absent");
+  const observeOnce = () => {
+    observationFault = null;
+    try { observation = observePreflight({ cwd: root }); } catch (error) { observation = undefined; observationFault = error?.code ?? "observer-threw"; }
+  };
+  observeOnce();
+  let identity = observation?.rulesetSource?.loadedIdentity;
+  let identityStatus = observationFault ?? (identity ? String(identity.status) : "absent");
   let rulesetSha = null;
   let rulesetFallback = null;
+  // K12: a lock-held registry is a transient state, never a reason to settle for a lesser identity. Before any
+  // fallback the lock is observed; a live or unjudgeable holder is waited for (bounded), the preflight is
+  // observed again once it clears, and a lock that stays held is refused typed, naming the holder and the retry.
+  if (!(identityStatus === "available" && typeof identity?.value === "string" && SHA.test(identity.value))) {
+    const lockOf = deps.registryLock ?? defaultRegistryLock;
+    const pause = deps.pause ?? sleepMs;
+    const now = deps.now ?? Date.now;
+    const deadline = now() + REGISTRY_LOCK_WAIT_MS;
+    let lock = lockOf(root);
+    let waited = false;
+    while ((lock?.status === "held" && lock.owner !== "dead") && now() < deadline) { pause(50); waited = true; lock = lockOf(root); }
+    if (lock?.status === "held") {
+      const holder = lock.pid === null || lock.pid === undefined ? "an owner it does not record" : `pid ${lock.pid}`;
+      refuse("DBG-RULESET-LOCK-HELD", `the session-authority registry lock is held by ${holder} (${lock.owner}, for ${lock.ageSeconds}s) and no fallback ruleset identity is taken while it is (preflight status: ${identityStatus}); repair: retry this command; to wait longer run \`node <plugin-root>/scripts/session-authority-repair.mjs wait --root <repo> --timeout 120\`; if the owner is gone or cannot be judged run \`... release-lock --root <repo> --no-pipeline-running --reason "<why>"\``);
+    }
+    if (waited || observationFault === "SDC-LOCK-HELD") {
+      observeOnce();
+      identity = observation?.rulesetSource?.loadedIdentity;
+      identityStatus = observationFault ?? (identity ? String(identity.status) : "absent");
+      if (observationFault === "SDC-LOCK-HELD") refuse("DBG-RULESET-LOCK-HELD", `the session-authority registry lock was still contended when the ruleset identity was read again, so no fallback identity is taken; repair: retry this command`);
+    }
+  }
   if (identityStatus === "available" && typeof identity?.value === "string" && SHA.test(identity.value)) rulesetSha = identity.value;
   else {
     const installed = observation?.rulesetSource?.installedIdentity;
