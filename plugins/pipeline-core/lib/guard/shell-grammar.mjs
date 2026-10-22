@@ -343,17 +343,33 @@ export function isBoundedGitPipeline(parsed, root, extraRoots = BOUNDED_PIPELINE
   const sourceArgv = parsed.segments[0].argv;
   if (sourceArgv.length === 0) return false;
   let index = 0;
-  while (index < sourceArgv.length && ["--no-pager", "-p", "--literal-pathspecs"].includes(sourceArgv[index])) {
-    index += 1;
+  // D114: at most one `-C <repo>`, resolved by resolveGitCPipelineTarget below; every operand is then judged against THAT directory.
+  let gitDir = null;
+  for (;;) {
+    const flag = sourceArgv[index];
+    if (["--no-pager", "-p", "--literal-pathspecs"].includes(flag)) { index += 1; continue; }
+    if (flag === "-C" && gitDir === null) {
+      gitDir = resolveGitCPipelineTarget(sourceArgv[index + 1], root, extraRoots);
+      if (gitDir === null) return false;
+      index += 2;
+      continue;
+    }
+    break;
   }
   const subcommand = sourceArgv[index];
   const subargs = sourceArgv.slice(index + 1);
-  if (!isReadOnlyGitSubcommand(subcommand, subargs)) return false;
-  if (!areGitObjectSpecOperandsContained(subcommand, subargs, root)) return false;
-  if (!areGitPipelineOperandsContained(subargs, root, extraRoots)) return false;
-  if (!areGitReadOperandsInsideRoot(subcommand, subargs, root)) return false;
+  if (gitDir !== null) {
+    if (!isGitCPipelineOperandsAdmitted(subcommand, subargs, gitDir)) return false;
+  } else {
+    if (!isReadOnlyGitSubcommand(subcommand, subargs)) return false;
+    if (!areGitObjectSpecOperandsContained(subcommand, subargs, root)) return false;
+    if (!areGitPipelineOperandsContained(subargs, root, extraRoots)) return false;
+    if (!areGitReadOperandsInsideRoot(subcommand, subargs, root)) return false;
+  }
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
-  if (sinkName !== (windows ? "head.exe" : "head")) return false;
+  // D114 (PO tile decision 2026-10-22): `tail` is the second admitted sink -- same 1..500 count spellings, same optional
+  // trailing 2>/dev/null, same source rules (including -C). No other sink.
+  if (sinkName !== (windows ? "head.exe" : "head") && sinkName !== (windows ? "tail.exe" : "tail")) return false;
   if (parsed.redirects.length === 1) {
     const redirect = parsed.redirects[0];
     if ((redirect.segment !== 0 && redirect.segment !== 1) || redirect.fd !== 2 || redirect.direction !== ">"
@@ -424,6 +440,59 @@ function areGitPipelineOperandsContained(subargs, root, extraRoots) {
     if (!isGitRevisionOperand(arg, root, extraRoots)) return false;
   }
   return true;
+}
+
+// D114 (PO decision 2026-10-22): `git -C <repo> show|log|diff|ls-files|cat-file ... | head -n N`, READ forms only. The -C target is
+// the SAME real, non-symlink directory inside the project/approved roots the un-piped `git -C` already requires, additionally a
+// repository top level (it has a `.git` entry, so `<rev>:<path>` and pathspecs mean the same directory the screen judges) and
+// cleared by the passive-read credential screen as a directory. Every operand is then judged against THAT directory with the same
+// functions the plain pipeline uses, and may not leave it. Nothing else changes: a second -C, a flag-shaped, glob, expansion or
+// escaping target, and every non-read subcommand are refused.
+const GIT_C_PIPELINE_SUBCOMMANDS = new Set(["show", "log", "diff", "ls-files", "cat-file"]);
+const GIT_CAT_FILE_MODES = new Set(["-p", "-t", "-s", "-e"]);
+const GIT_LS_FILES_FLAGS = new Set(["-c", "--cached", "-d", "--deleted", "-m", "--modified", "-s", "--stage", "-u", "--unmerged",
+  "-z", "--full-name", "--error-unmatch", "--exclude-standard", "--deduplicate", "--eol"]);
+
+function resolveGitCPipelineTarget(target, root, extraRoots) {
+  if (typeof target !== "string" || target === "" || target.startsWith("-") || /[\0$`*?\[\]{}~\\]/u.test(target)) return null;
+  try {
+    const directory = resolve(root, target);
+    const facts = lstatSync(directory);
+    if (!facts.isDirectory() || facts.isSymbolicLink()) return null;
+    const physical = realpathSync(directory);
+    if (!isApprovedSingleCommandReadArg(physical, root, extraRoots, true)) return null;
+    if (!isAllowedPassiveReadTarget(physical, { rootDir: root, directoryListing: true, additionalRecursiveRoots: extraRoots })) return null;
+    lstatSync(join(physical, ".git"));
+    return physical;
+  } catch { return null; }
+}
+
+function areGitLsFilesOperandsInside(subargs, gitDir) {
+  let afterDashDash = false;
+  for (const arg of subargs) {
+    if (!afterDashDash && arg === "--") { afterDashDash = true; continue; }
+    if (!afterDashDash && arg.startsWith("-")) {
+      if (!GIT_LS_FILES_FLAGS.has(arg)) return false;
+      continue;
+    }
+    if (!isGitPathOperandInsideRoot(arg, gitDir)) return false;
+  }
+  return true;
+}
+
+function isGitCPipelineOperandsAdmitted(subcommand, subargs, gitDir) {
+  if (!GIT_C_PIPELINE_SUBCOMMANDS.has(subcommand)) return false;
+  if (subcommand === "cat-file") {
+    // Closed form: exactly one of -p/-t/-s/-e and one object; no --batch*, --textconv, --filters or --follow-symlinks.
+    return subargs.length === 2 && GIT_CAT_FILE_MODES.has(subargs[0])
+      && (isStrictGitRevision(subargs[1]) || isContainedGitObjectSpec(subargs[1], gitDir));
+  }
+  if (!isReadOnlyGitSubcommand(subcommand, subargs)) return false;
+  if (!areGitObjectSpecOperandsContained(subcommand, subargs, gitDir)) return false;
+  if (!areGitPipelineOperandsContained(subargs, gitDir, [])) return false;
+  return subcommand === "ls-files"
+    ? areGitLsFilesOperandsInside(subargs, gitDir)
+    : areGitReadOperandsInsideRoot(subcommand, subargs, gitDir);
 }
 
 /**

@@ -89,8 +89,9 @@ export const ADMITTED_GRAMMAR_SHAPES = [
     example: "cat probe.txt | head -5",
   },
   {
-    spelling: "bounded git-to-head diagnostic pipeline: \"git <read-only-subcommand> ... | "
-      + "head -n N\" / \"git <read-only-subcommand> ... | head -N\" (the same read-only "
+    spelling: "bounded git-to-head (or git-to-tail) diagnostic pipeline: \"git <read-only-subcommand> ... | "
+      + "head -n N\" / \"git <read-only-subcommand> ... | head -N\", or the same with \"tail -n N\" / "
+      + "\"tail -N\" (the same read-only "
       + "subcommand set the un-piped git form already trusts; N in 1..500), optionally "
       + "followed by \"2>/dev/null\"",
     example: "git log | head -5",

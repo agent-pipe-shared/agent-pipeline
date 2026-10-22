@@ -183,9 +183,17 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
   } catch { return false; }
 }
 
-// Read-only assessment forms and the documented help only. --compile-summary writes
-// project/architecture-decisions.compiled.json and --validate reads an arbitrary path: neither is admitted here.
+// Read-only assessment forms, the documented help, and (D115, PO decision 2026-10-22) exactly one write form:
+// `--root <root> --compile-summary`, which the script answers with the single fixed output
+// project/architecture-decisions.compiled.json (it has no output flag). That output must stay physically sound: `project` must be
+// a real directory (or absent) and the target a regular file (or absent), so the fixed write cannot be redirected by a link.
+// --validate reads an arbitrary path and stays refused; --compile-summary combined with any other flag or argument stays refused.
+const COMPILED_SUMMARY_OUT = "project/architecture-decisions.compiled.json";
 function sanctionedArchitectureBaselineArgs(args, root) {
+  if (args.includes("--compile-summary")) {
+    return args.length === 3 && args[0] === "--root" && args[1] === root && args[2] === "--compile-summary"
+      && physicalDesignCoursePath(root, COMPILED_SUMMARY_OUT);
+  }
   if (args.length === 1) return args[0] === "--help" || args[0] === "-h";
   const matched = matchFlagSpec(args, {
     requiredValue: { "--root": (value) => value === root },
