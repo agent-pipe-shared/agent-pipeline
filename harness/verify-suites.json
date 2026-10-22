@@ -3712,6 +3712,12 @@
       "file": "plugins/pipeline-core/lib/pins/sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.test.mjs",
       "invariantPinned": "The sign-intent openssl spawn never resolves a bare executable name through the working directory on Windows",
       "nonOverlapNote": "Unique test suite for the sign-intent openssl spawn on Windows"
+    },
+    {
+      "name": "pin-fitness-model-qualification-observed-at-implementation-boundary-tests",
+      "file": "plugins/pipeline-core/lib/pins/fitness-model-qualification-observed-at-implementation-boundary.test.mjs",
+      "invariantPinned": "At set-phase implementation a materialized fitness model that never ran on the candidate is reported with one runnable repair and is not counted as qualified, while a project without a model is unaffected (AC-155, D131)",
+      "nonOverlapNote": "Unique cases: the report-only fitness-model observation at the implementation boundary"
     }
   ]
 }
