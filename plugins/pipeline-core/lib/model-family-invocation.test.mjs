@@ -510,7 +510,7 @@ test("same synthetic signed S4 authority advances Luna 6 to 7 under real S2 hand
   } finally { f.cleanup(); }
 });
 
-test("overlapping asynchronous S2 captures keep each signed invocation bound to its own catalogue", { todo: "typed-pending: D66(a); binding backlog item pipeline.a-member-reserved-by-another-process-is-refused-as-unowned (a member reserved by another owner instance is refused as unowned; cross-owner ownership moves after 0.7.0); assertions unchanged" }, async () => {
+test("overlapping asynchronous S2 captures keep each signed invocation bound to its own catalogue", async () => {
   const catalogues = new Map([
     ["overlap-left", [{ modelId: "gpt-6-sol", version: [6] }]],
     ["overlap-right", [{ modelId: "gpt-6-sol", version: [6] }, { modelId: "gpt-6.1-sol", version: [6, 1] }]],
