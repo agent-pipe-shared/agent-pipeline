@@ -11,7 +11,7 @@
 //   P3 the admitted shape stays closed: bounds, sink, write subcommands, root containment
 //   P4 meaningful: a mirror of the module without the git-pipeline lane fails P1/P2 (RED)
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -136,9 +136,108 @@ for (const command of [
     () => { assert.equal(guard(command), true); });
 }
 
-test("P5 addendum shape (needs a guard-owner decision): git -C <repo> show <rev>:<path> | head",
-  { todo: "decision: isBoundedGitPipeline excludes -C on purpose (cross-repository reach); admitting -C <project dir> in the pipeline is a security trade, not made here" },
-  () => { assert.equal(guard("git -C . show HEAD:docs/state.md | head -n 3"), true); });
+// QG-04 justification (PO decision D114, 2026-10-22, specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md): this case was a `todo`
+// because admitting `git -C <repo>` in the pipeline was an open product question ("a security trade, not made here"). D114 resolved it:
+// the READ forms of `git -C <repo> show|log|diff|ls-files|cat-file ... | head -n N` are admitted, with the -C target and every
+// path/revision-path operand cleared by the same passive-read credential screen as any other read; writing git forms stay refused.
+// The case below keeps its original intent and assertion; only the `todo` marker is removed because the decision now exists.
+test("P5 addendum shape (decided by D114): git -C <repo> show <rev>:<path> | head", () => {
+  assert.equal(guard("git -C . show HEAD:docs/state.md | head -n 3"), true);
+});
+
+// D114 admitted siblings (same repository root, read subcommands only) and negative controls. Fixtures live under scratch/.
+const repo = join(fixture, "repo");
+mkdirSync(join(repo, ".git"), { recursive: true });
+mkdirSync(join(repo, "docs"), { recursive: true });
+mkdirSync(join(repo, "sub"), { recursive: true });
+mkdirSync(join(repo, "other", ".git"), { recursive: true });
+mkdirSync(join(repo, ".env", ".git"), { recursive: true });
+mkdirSync(join(repo, "other", "docs"), { recursive: true });
+writeFileSync(join(repo, "docs", "state.md"), "state\n");
+writeFileSync(join(repo, "other", "docs", "state.md"), "other state\n");
+writeFileSync(join(repo, ".env", "config"), "x\n");
+const inRepo = (command) => isReadOnlyDiagnosticCommand(command, repo);
+
+for (const command of [
+  "git -C . show HEAD:docs/state.md | head -n 3",
+  "git -C . show HEAD:docs/state.md | head -3 2>/dev/null",
+  "git -C other show HEAD:docs/state.md | head -n 3",
+  "git -C . --no-pager log -n 3 | head -n 5",
+  "git --no-pager -C . log --oneline | head -n 5",
+  "git -C . diff --stat | head -n 20",
+  "git -C . diff HEAD~1 -- docs/state.md | head -n 20",
+  "git -C . ls-files docs | head -n 20",
+  "git -C . ls-files | head -n 20",
+  "git -C . cat-file -p HEAD:docs/state.md | head -n 3",
+  "git -C . cat-file -t HEAD | head -n 1",
+]) {
+  test(`D114 admitted: ${command}`, () => { assert.equal(inRepo(command), true); });
+}
+
+for (const command of [
+  // the -C target: escaping, credential-named, missing, not a repository, doubled, flag-shaped, glob or expansion
+  "git -C .. show HEAD:docs/state.md | head -n 3",
+  "git -C /etc show HEAD:docs/state.md | head -n 3",
+  "git -C .env show HEAD:docs/state.md | head -n 3",
+  "git -C missing show HEAD:docs/state.md | head -n 3",
+  "git -C sub show HEAD:docs/state.md | head -n 3",
+  "git -C . -C other show HEAD:docs/state.md | head -n 3",
+  "git -C -p show HEAD:docs/state.md | head -n 3",
+  "git -C 'ot*' show HEAD:docs/state.md | head -n 3",
+  "git -C $HOME show HEAD:docs/state.md | head -n 3",
+  "git -C ~/.ssh log | head -n 3",
+  // operands: credential names, hidden parts, traversal, absolute paths, metacharacters
+  "git -C . show HEAD:.env | head -n 3",
+  "git -C . show HEAD:.env/config | head -n 3",
+  "git -C . show HEAD:../outside.txt | head -n 3",
+  "git -C . show HEAD:/etc/hostname | head -n 3",
+  "git -C . log -- .env | head -n 3",
+  "git -C . log -- ../outside.txt | head -n 3",
+  "git -C other log -- ../docs/state.md | head -n 3",
+  "git -C . ls-files .env | head -n 3",
+  "git -C . ls-files ../outside | head -n 3",
+  "git -C . ls-files 'docs/*' | head -n 3",
+  "git -C . cat-file -p HEAD:.env | head -n 3",
+  "git -C . cat-file -p HEAD:../outside.txt | head -n 3",
+  "git -C . show HEAD:docs/state.md$(id) | head -n 3",
+  "git -C . show `id` | head -n 3",
+  "git -C . show HEAD:docs/state.md;id | head -n 3",
+  // cat-file is a closed -p/-t/-s/-e form: batch modes, filters and bare forms stay refused
+  "git -C . cat-file --batch | head -n 3",
+  "git -C . cat-file --textconv HEAD:docs/state.md | head -n 3",
+  "git -C . cat-file -p | head -n 3",
+  "git -C . cat-file -p HEAD HEAD | head -n 3",
+  // execution/output options of the admitted subcommands
+  "git -C . log --output=out.txt | head -n 3",
+  "git -C . diff --ext-diff | head -n 3",
+  "git -C . diff --no-index a b | head -n 3",
+  // sink bounds and shape are the existing ones
+  "git -C . log | head -n 501",
+  "git -C . log | tail -n 3",
+  "git -C . log | cat",
+  "git -C . log | head -n 3 > out.txt",
+  "git -C . log ; head -n 3",
+  // writing and unlisted git forms with -C stay refused
+  "git -C . commit -m x | head -n 3",
+  "git -C . add -- docs/state.md | head -n 3",
+  "git -C . rm docs/state.md | head -n 3",
+  "git -C . checkout main | head -n 3",
+  "git -C . reset --hard | head -n 3",
+  "git -C . stash | head -n 3",
+  "git -C . config user.name x | head -n 3",
+  "git -C . push | head -n 3",
+  "git -C . status | head -n 3",
+  "git -C . rev-parse HEAD | head -n 3",
+]) {
+  test(`D114 stays refused: ${command}`, () => { assert.equal(inRepo(command), false); });
+}
+
+test("D114 a symlinked -C target is refused even when it resolves inside the project; the real directory is admitted", (t) => {
+  try { symlinkSync(join(repo, "other"), join(repo, "other-link"), "dir"); }
+  catch (error) { t.skip(`host-limitation: cannot create directory symlinks (${error?.code ?? "unknown"})`); return; }
+  assert.equal(inRepo("git -C other show HEAD:docs/state.md | head -n 3"), true, "control: the real directory");
+  assert.equal(inRepo("git -C other-link show HEAD:docs/state.md | head -n 3"), false);
+});
 
 test("P5 control: the other refused addendum rg flags and an escaping -C target stay refused", () => {
   for (const command of ["rg --hidden needle README.md", "rg --pre cat needle README.md", "rg -c -c needle README.md",
