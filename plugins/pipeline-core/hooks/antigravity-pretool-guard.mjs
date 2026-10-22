@@ -9,6 +9,8 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { readToolScopeVerdict } from "../lib/guard/read-scope.mjs";
+import { isAllowedPassiveReadTarget } from "../lib/passive-read-policy.mjs";
 import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
 import {
   consumeHumanGuardOverride,
@@ -298,6 +300,60 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
   return { toolName, toolInput, filePath, command, isReadOnly };
 }
 
+// PO decision D87: the credential-root decision is NOT restated here. It is the one the Claude native
+// Read lane and the shell-read grammar already use -- readToolScopeVerdict (lib/guard/read-scope.mjs)
+// for a file, and isAllowedPassiveReadTarget (lib/passive-read-policy.mjs, the same function that
+// verdict bottoms out in, with its single PASSIVE_READ_CREDENTIAL_ROOTS list) for directory and search
+// operands. Both resolve a relative operand against the project root and check the lexical AND the
+// physical (symlink-resolved) identity.
+const NATIVE_READ_TARGET_DENIAL = "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.";
+
+/** Path operands of one native read-only tool call. kind: "file" (contents of one file), "content"
+ * (a search that reads file contents), "listing" (entry names only). A present-but-unusable operand,
+ * or a file tool without one, is returned as { kind, malformed: true } and denied (fail closed). */
+export function nativeReadTargets(toolName, toolInput) {
+  const args = toolInput !== null && typeof toolInput === "object" ? toolInput : {};
+  const operand = (kind, keys, { defaultsToRoot = false } = {}) => {
+    const key = keys.find((name) => Object.hasOwn(args, name));
+    if (key === undefined) return [defaultsToRoot ? { kind, value: "." } : { kind, malformed: true }];
+    const value = args[key];
+    return [typeof value === "string" && value.trim() !== "" && !value.includes("\0")
+      ? { kind, value } : { kind, malformed: true }];
+  };
+  switch (toolName) {
+    case "view_file": return operand("file", ["AbsolutePath", "file_path"]);
+    case "Read": return operand("file", ["file_path", "AbsolutePath"]);
+    case "list_dir": return operand("listing", ["DirectoryPath", "path"], { defaultsToRoot: true });
+    case "find_by_name": return operand("listing", ["SearchDirectory", "path"], { defaultsToRoot: true });
+    case "Glob": return operand("listing", ["path"], { defaultsToRoot: true });
+    case "grep_search": return operand("content", ["SearchPath", "path"], { defaultsToRoot: true });
+    case "Grep": return operand("content", ["path"], { defaultsToRoot: true });
+    case "read_url_content": {
+      const key = ["Url", "url", "URL"].find((name) => Object.hasOwn(args, name));
+      const url = key === undefined ? undefined : args[key];
+      if (typeof url !== "string" || !/^\s*file:/iu.test(url)) return [];
+      try { return [{ kind: "file", value: fileURLToPath(url.trim()) }]; }
+      catch { return [{ kind: "file", malformed: true }]; }
+    }
+    default: return [];
+  }
+}
+
+/** null when the target is admitted, otherwise the agent-visible denial text. */
+export function nativeReadTargetRefusal(target, projectRoot, workspaceRoots = []) {
+  if (target.malformed) return NATIVE_READ_TARGET_DENIAL;
+  if (target.kind === "file") {
+    const verdict = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: target.value } }, projectRoot, {});
+    return verdict.exitCode === 0 ? null : (String(verdict.stderr).trim() || NATIVE_READ_TARGET_DENIAL);
+  }
+  const allowed = isAllowedPassiveReadTarget(target.value, {
+    rootDir: projectRoot,
+    ...(target.kind === "content" ? { recursive: true } : { directoryListing: true }),
+    additionalRecursiveRoots: workspaceRoots,
+  });
+  return allowed ? null : NATIVE_READ_TARGET_DENIAL;
+}
+
 
 export function isBootstrapReadCommand(value, {
   pipelineStartSkill = PIPELINE_START_SKILL,
@@ -419,6 +475,33 @@ export async function runAntigravityPreToolGuard(rawInput) {
   }
 
   if (normalized.isReadOnly) {
+    // PO decision D87: a native read of a credential root is refused here exactly as the Claude
+    // native Read and the shell-read grammar refuse it. Tools with no path operand stay allowed.
+    const readTargets = nativeReadTargets(normalized.toolName, normalized.toolInput);
+    if (readTargets.length > 0) {
+      let readRoot;
+      let workspaceRoots = [];
+      try {
+        const rawCwd = (Array.isArray(input?.workspacePaths) && typeof input.workspacePaths[0] === "string"
+          && input.workspacePaths[0].trim() !== "")
+          ? input.workspacePaths[0]
+          : (typeof input?.cwd === "string" && input.cwd.trim() !== "" ? input.cwd : process.cwd());
+        readRoot = realpathSync(resolve(rawCwd));
+        workspaceRoots = (Array.isArray(input?.workspacePaths) ? input.workspacePaths : [])
+          .filter((value) => typeof value === "string" && value.trim() !== "")
+          .map((value) => { try { return realpathSync(resolve(value)); } catch { return null; } })
+          .filter((value) => value !== null && value !== readRoot);
+      } catch (error) {
+        deny("Antigravity PreToolUse project root is unavailable; pipeline guards fail closed.", {
+          code: "project-root-unavailable",
+          fields: { name: error?.name, code: error?.code },
+        });
+      }
+      for (const target of readTargets) {
+        const refusal = nativeReadTargetRefusal(target, readRoot, workspaceRoots);
+        if (refusal !== null) deny(refusal, { code: "native-read-credential-root", fields: { tool: normalized.toolName, kind: target.kind } });
+      }
+    }
     allow();
     return;
   }
