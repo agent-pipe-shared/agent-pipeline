@@ -25,6 +25,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { applyGovernanceScopeDecision, planGovernanceScopeDecision } from "../governance-scope.mjs";
 import { readAgentMaxTurns } from "../dispatch-budget-binding.mjs";
 import * as realCore from "../dispatch-budget-core.mjs";
+import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
 
 const GUARD = fileURLToPath(new URL("../../hooks/guard-dispatch-budget.mjs", import.meta.url));
 const CORE_PATH = fileURLToPath(new URL("../dispatch-budget-core.mjs", import.meta.url));
@@ -167,6 +168,44 @@ test("C1 a Critic's Write/Edit to anything but its own notes file gets the typed
   writeFileSync(join(goldfish, "gf.json"), JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", agentId: "gf", agentType: GOLDFISH, maxTurns: 80, baseCalls: 20, workingCap: 20, count: 2 }));
   const gf = call(root, "gf", "Write", { file_path: join(root, "src", "x.mjs"), content: "x" }, GOLDFISH);
   assert.doesNotMatch(gf.stderr, /CRITIC-WRITE-CONFINED/u, "confinement is the Critic's only");
+});
+
+// ------------------------------------------------------------------ case E: refusals that spend Critic budget
+// The item's second "observed again" paragraph names two classes: counter-lock-busy on parallel calls and
+// rg/Glob/Grep read-scope refusals. E1 pins the read half end to end: the read shapes a Critic uses on a diff are
+// admitted by the real lifecycle read-scope check (so none of them is a refusal that spends budget for nothing) and
+// the real budget guard counts each exactly once. E2 ties the lock half to the suite that owns it.
+const readCounter = (root, id) => JSON.parse(readFileSync(join(root, ".git", "agent-pipeline", "dispatch-budget", `${id}.json`), "utf8")).count;
+
+test("E1 the read shapes a Critic uses are admitted by the read-scope check and each costs exactly one budget call", () => {
+  const root = consumerRoot("reads");
+  const id = "ce";
+  mkdirSync(join(root, "plugins", "x"), { recursive: true });
+  writeFileSync(join(root, "plugins", "x", "a.mjs"), "export const needle = 1;\n");
+  seed(root, { agentId: id, count: 0 });
+  const calls = [
+    { tool_name: "Read", tool_input: { file_path: join(root, "plugins", "x", "a.mjs") } },
+    { tool_name: "Grep", tool_input: { pattern: "needle", path: join(root, "plugins", "x", "a.mjs") } },
+    { tool_name: "Glob", tool_input: { pattern: "plugins/x/*.mjs" } },
+    { tool_name: "Bash", tool_input: { command: "rg -n needle plugins/x" } },
+    { tool_name: "Bash", tool_input: { command: "cat plugins/x/a.mjs" } },
+  ];
+  calls.forEach((input, index) => {
+    const verdict = evaluateLifecycleReadyGuard(input, { projectDir: root });
+    assert.equal(verdict.exitCode, 0, `read-scope refused a Critic read shape: ${JSON.stringify(input)}\n${verdict.stderr ?? ""}`);
+    const counted = call(root, id, input.tool_name, input.tool_input);
+    assert.equal(counted.status, 0, `${JSON.stringify(input)}: ${counted.stderr}`);
+    assert.equal(readCounter(root, id), index + 1, "one call, one count");
+  });
+});
+
+test("E2 the counter-lock half is owned by the dispatch-budget suite: busy locks wait, a timeout is refused uncounted", () => {
+  const suite = readFileSync(join(PLUGIN_ROOT, "hooks", "guard-dispatch-budget.test.mjs"), "utf8");
+  for (const title of [
+    "R7-11a: N concurrent tool calls of one subagent that all meet a live lock holder are all admitted",
+    "R7-11d: at hook level a live holder beyond the bound refuses with counter-lock-timeout, names the holder age and counts nothing",
+  ]) assert.ok(suite.includes(title), `the owning suite no longer carries: ${title}`);
+  assert.match(readFileSync(GUARD, "utf8"), /This call was not counted and the persisted counter was left unchanged; retry the same call/u);
 });
 
 // ------------------------------------------------------------------ case D: notes persist in the closing lane
