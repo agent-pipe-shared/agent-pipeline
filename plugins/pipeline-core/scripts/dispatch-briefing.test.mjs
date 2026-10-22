@@ -695,3 +695,71 @@ test("init-dispatch-record prints a valid opening v4 record whose digests come f
   assert.equal(missing.code, "IDR-BRIEFING-UNREADABLE");
   assert.match(missing.message, /repair: /u);
 });
+
+// --- D76: the binding admits a write scope only when it is disjoint from every running dispatch ---
+
+const PATH_B = "plugins/x/other.mjs";
+const running = (over = {}) => ({ dispatchId: "ALF-RUN", writeScope: [PATH_B, "plugins/x/other.test.mjs"], verdict: "alive", ...over });
+
+test("D76 a write scope that overlaps a running dispatch is refused DBG-SCOPE-OVERLAP, naming the dispatch, the overlap and the repair", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [running({ writeScope: [PATH_A, PATH_B] })] }));
+  assert.equal(result.ok, false, JSON.stringify(result).slice(0, 300));
+  assert.equal(result.code, "DBG-SCOPE-OVERLAP", result.message);
+  assert.ok(result.message.includes("ALF-RUN"), "names the running dispatch");
+  assert.ok(result.message.includes(PATH_A), "names the overlapping path");
+  assert.match(result.message, /repair, one of: /u);
+  assert.match(result.message, /disjoint/u);
+  assert.match(result.message, /worktree/u);
+  assert.equal(result.skeleton, undefined);
+});
+
+test("D76 a glob in the running dispatch's scope overlaps a literal path of this one", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [running({ writeScope: ["plugins/x/**"] })] }));
+  assert.equal(result.code, "DBG-SCOPE-OVERLAP", JSON.stringify(result).slice(0, 300));
+  assert.ok(result.message.includes("plugins/x/**"));
+});
+
+test("D76 a disjoint scope is admitted, and so is a call with no running dispatch or only its own earlier record", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [running()] })).ok, true, "disjoint");
+  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [] })).ok, true, "none running");
+  const own = running({ dispatchId: "ALF-T1", writeScope: [PATH_A, CHECK] });
+  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [own] })).ok, true, "a rebind is not held against itself");
+});
+
+test("D76 a running dispatch whose scope cannot be read never blocks and is announced as a warning", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [running({ writeScope: null, verdict: "unjudgeable" })] }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  const warning = result.warnings.find((entry) => entry.code === "DBG-RUNNING-SCOPE-UNKNOWN");
+  assert.ok(warning, JSON.stringify(result.warnings));
+  assert.ok(warning.message.includes("ALF-RUN"));
+});
+
+test("D76 the default reader finds a running dispatch from its open record and its generated briefing, and ignores a finished one", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
+  const init = spawnSync("git", ["-C", fx.root, "init", "-q"], { encoding: "utf8", env });
+  assert.equal(init.status, 0, init.stderr);
+  const other = runDispatchBriefing(argvOf(fx, { "--dispatch-id": "ALF-RUN", "--check": "plugins/x/other.test.mjs", "--path": PATH_A }), depsOf(fx));
+  assert.equal(other.ok, true, JSON.stringify(other));
+  mkdirSync(join(fx.root, "scratch"), { recursive: true });
+  mkdirSync(join(fx.root, "evidence"), { recursive: true });
+  writeFileSync(join(fx.root, "scratch", "briefing-ALF-RUN.md"), other.skeleton);
+  const record = join(fx.root, "evidence", "dispatch-record-ALF-RUN.json");
+  writeFileSync(record, JSON.stringify({ taskId: "ALF-RUN", outcome: "in-progress" }));
+  const deps = depsOf(fx);
+  delete deps.queueRow;
+  const refused = runDispatchBriefing(argvOf(fx), deps);
+  assert.equal(refused.code, "DBG-SCOPE-OVERLAP", JSON.stringify(refused).slice(0, 300));
+  assert.ok(refused.message.includes("ALF-RUN") && refused.message.includes(PATH_A));
+  writeFileSync(record, JSON.stringify({ taskId: "ALF-RUN", outcome: "succeeded" }));
+  assert.equal(runDispatchBriefing(argvOf(fx), deps).ok, true, "a terminal record is not a running dispatch");
+});

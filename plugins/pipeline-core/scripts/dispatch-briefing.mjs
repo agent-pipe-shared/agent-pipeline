@@ -25,6 +25,10 @@
  *                                    compound `AC-E<epic>-<story>-<nn>`, found in the Markdown
  *                                    shapes below, item id `<feature>.<slug>`, no backlog item)
  *
+ * PO decision D76: the write scope is admitted only when it is disjoint from every other running dispatch of the
+ * checkout (open dispatch record, owner not provably gone); an overlap is DBG-SCOPE-OVERLAP, naming the dispatch,
+ * the overlapping paths and the repair. The overlap predicate is the pure `scopesOverlap` of lib/slice-queue.mjs.
+ *
  * The generator calls no model and runs no mutating git command. `binding` writes no file and
  * leaves the judgment fields (goal, context, DoD, forbidden, stop) as template placeholders;
  * `build` (PO decision D78) fills them from a closed package through
@@ -32,7 +36,7 @@
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -58,6 +62,8 @@ import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
 import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+import { readDispatchRecordLiveness } from "../lib/dispatch-record-liveness.mjs";
+import { scopesOverlap } from "../lib/slice-queue.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
 import * as sessionAuthorityRegistry from "../lib/session-authority-registry.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
@@ -157,6 +163,43 @@ function defaultQueueRow(root, sliceId) {
     const governed = resolveGovernedItemQueue({ root });
     return governed.status === "required" ? governed.normalized.slices.find((row) => row.id === sliceId) ?? null : null;
   } catch { return null; }
+}
+
+const BRIEFING_SCAN_LIMIT = 500;
+const BRIEFING_READ_LIMIT = 1048576;
+
+/** The allowed paths of every generated briefing directly under scratch/, by dispatch id (read-only, bounded, never throws). */
+function briefedWriteScopes(root) {
+  const scopes = new Map();
+  let names = [];
+  try { names = readdirSync(resolve(root, "scratch")).filter((name) => name.endsWith(".md")).sort().slice(0, BRIEFING_SCAN_LIMIT); } catch { return scopes; }
+  for (const name of names) {
+    const bytes = readRepoFile(root, `scratch/${name}`);
+    if (!bytes || bytes.byteLength > BRIEFING_READ_LIMIT || !bytes.includes(BLOCK_OPEN.slice(0, BLOCK_OPEN.lastIndexOf(":v") + 2))) continue;
+    try {
+      const parsed = parseNativeGoldfishBriefing(bytes.toString("utf8"));
+      if (parsed.ok && !scopes.has(parsed.binding.dispatchId)) scopes.set(parsed.binding.dispatchId, [...parsed.binding.allowedPaths]);
+    } catch { /* a file that is not a briefing is not a source of scopes */ }
+  }
+  return scopes;
+}
+
+/**
+ * D76: the dispatches that may still be writing in this checkout, each with its write scope when it can be read.
+ * A dispatch is running while its record (evidence/dispatch-record-<id>.json) is open and its owner is not provably
+ * gone (the existing liveness readback: alive, or unjudgeable, which is the usual Claude case). Its scope is the
+ * governed queue row's write scope, else the allowed paths of its generated briefing under scratch/; `writeScope`
+ * is null when neither exists. A checkout whose records cannot be read has no running dispatch to judge.
+ */
+function defaultRunningDispatches(root) {
+  let records;
+  try { records = readDispatchRecordLiveness(root).records.filter((entry) => entry.verdict !== "gone"); } catch { return []; }
+  if (records.length === 0) return [];
+  const briefed = briefedWriteScopes(root);
+  return records.map((entry) => ({
+    dispatchId: entry.taskId, verdict: entry.verdict, record: entry.record,
+    writeScope: defaultQueueRow(root, entry.taskId)?.writeScope ?? briefed.get(entry.taskId) ?? null,
+  }));
 }
 
 /** K12: the session-authority registry lock as a reader sees it (never taken), or null when it cannot be observed. */
@@ -477,6 +520,21 @@ export function generateDispatchBinding(options, deps = {}) {
       const checks = scope.filter((path) => /\.test\.(?:mjs|cjs|js)$/u.test(path));
       refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" first when it still holds a successor)`);
     }
+  }
+
+  // D76: the write scope is admitted only when it is disjoint from every other running dispatch of this checkout. The check
+  // dependencies of this binding are its allowed paths (assertBindingInvariants), so one scope test covers both clauses.
+  const others = (deps.runningDispatches ?? defaultRunningDispatches)(root).filter((entry) => entry.dispatchId !== dispatchId);
+  const unreadable = others.filter((entry) => !Array.isArray(entry.writeScope) || entry.writeScope.length === 0);
+  for (const entry of others) {
+    if (unreadable.includes(entry)) continue;
+    const pairs = [];
+    for (const path of allowedPaths) for (const theirs of entry.writeScope) if (scopesOverlap([path], [theirs])) pairs.push(path === theirs ? path : `${path} (against ${theirs})`);
+    if (pairs.length === 0) continue;
+    refuse("DBG-SCOPE-OVERLAP", `the write scope of ${dispatchId} overlaps the write scope of running dispatch ${entry.dispatchId} (${entry.record ?? "open dispatch record"}, owner ${entry.verdict ?? "unknown"}) on ${pairs.join(", ")}; two dispatches writing the same paths in one checkout overwrite each other. repair, one of: bind this dispatch with a write scope disjoint from ${entry.dispatchId} (drop or narrow the overlapping --path); wait until ${entry.dispatchId} has a terminal dispatch record and bind again; if ${entry.dispatchId} is abandoned, finalize its record with a terminal outcome through the sanctioned dispatch-record writer; or run this dispatch in its own worktree`);
+  }
+  if (unreadable.length > 0) {
+    warnings.push({ code: "DBG-RUNNING-SCOPE-UNKNOWN", message: `the write scope of running dispatch(es) ${unreadable.map((entry) => entry.dispatchId).join(", ")} could not be read (no governed queue row and no generated briefing under scratch/), so this binding was not checked against them; confirm the scopes are disjoint before dispatching` });
   }
 
   // Agent definition: effort, model alias and the maxTurns cliff.
