@@ -29,8 +29,12 @@ export function runGoldfishCommitCommandFlow(argv = process.argv.slice(2)) {
   values.paths = values.paths.map((path) => {
     try { return normalizeDispatchRecordPath(path, "commit path"); } catch { return path; }
   }).sort();
-  return createGoldfishCommitCommandFlow(values);
+  const result = createGoldfishCommitCommandFlow(values);
+  return !result.ok && result.code === "GF-COMMAND-INPUT" ? { ...result, hint: INPUT_HINT } : result;
 }
+
+/** A refusal costs a counted tool use, so the refusal itself names the repair (backlog item commit-producer-path-order). */
+const INPUT_HINT = "Repair: pass --task-id, --type, --scope, --summary (one line, at most 120 bytes) and at least one --body (one line each, at most 4) plus one --path per file; --summary and --body are mandatory, and a value containing a newline is refused.";
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const result = runGoldfishCommitCommandFlow();

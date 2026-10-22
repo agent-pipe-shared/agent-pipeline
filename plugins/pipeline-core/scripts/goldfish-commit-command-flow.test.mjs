@@ -93,6 +93,28 @@ test("ALF-C-I03 AC-137: the template states that --summary and --body are mandat
   }
 });
 
+test("ALF-J3-A: a GF-COMMAND-INPUT refusal names the repair itself, so a retry needs no template lookup", () => {
+  const base = ["--task-id", input.taskId, "--type", input.type, "--scope", input.scope];
+  const pathArgs = input.paths.flatMap((path) => ["--path", path]);
+  const noSummary = runGoldfishCommitCommandFlow([...base, "--body", "why", ...pathArgs]);
+  const noBody = runGoldfishCommitCommandFlow([...base, "--summary", "s", ...pathArgs]);
+  for (const refused of [noSummary, noBody]) {
+    assert.equal(refused.ok, false);
+    assert.equal(refused.code, "GF-COMMAND-INPUT");
+    assert.equal(typeof refused.hint, "string");
+    assert.match(refused.hint, /--summary/u);
+    assert.match(refused.hint, /--body/u);
+    assert.match(refused.hint, /mandatory/u);
+    assert.match(refused.hint, /one line/u);
+    assert.equal(/[\r\n]/u.test(refused.hint), false, "the hint is a single physical line");
+  }
+  // The hint never rides on a success result, so the ok-path equality with the library stays exact.
+  const ok = runGoldfishCommitCommandFlow([...base, "--summary", input.summary,
+    ...input.bodyParagraphs.flatMap((body) => ["--body", body]), ...pathArgs]);
+  assert.equal(ok.ok, true);
+  assert.equal("hint" in ok, false);
+});
+
 test("CLI normalizes unsorted --path input to the sorted output and still refuses duplicates", () => {
   // PRODSORT: unsorted input is normalized, not refused
   const base = ["--task-id", input.taskId, "--type", input.type, "--scope", input.scope,
