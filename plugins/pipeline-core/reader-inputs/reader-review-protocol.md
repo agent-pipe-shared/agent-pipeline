@@ -126,8 +126,21 @@ finding names a commit in that round's correction batch. An `accepted` finding
 requires null and its exact `<round>/<finding-id>` in the owner's acceptance
 list. Open, unknown, duplicated or malformed findings fail. An empty earlier
 round belongs to early ordinary closure rather than a manufactured terminal
-course. This disposition contract is unchanged; no `openFindings` key belongs
-in terminal v2.
+course. No `openFindings` key belongs in terminal v2.
+
+A finding may instead be `adjudicated` in terminal v1 and v2: the round's own
+phase-two Reader expressly declined the phase-one finding and the course
+changed nothing for it. It has `resolutionCommit: null` and exactly one extra
+field, `adjudication`, with `report` (exactly `path` and `sha256`, equal to
+that round's `phaseTwo` reference), `phaseOneQuote` and `phaseTwoQuote`. Each
+quote is one trimmed line of 16..300 characters occurring literally in the
+matching immutable report; the two differ and a phase-one quote is used once
+per disposition. The status is neither a correction nor an owner acceptance and
+never appears in the owner's acceptance list. The checker proves only the
+binding, not that the Reader's reasoning is right. Use it only for a decline the
+phase-two report states: a finding that report leaves open, carries forward or
+only partly addresses stays unresolved and keeps the course open. Never infer
+an adjudication, an acceptance or a resolution commit that was not recorded.
 
 The closed owner record uses
 `pipeline.doc-reader-terminal-owner-decision.v2` with exactly `schema`,

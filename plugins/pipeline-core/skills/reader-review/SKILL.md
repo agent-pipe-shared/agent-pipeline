@@ -117,7 +117,8 @@ source-bound mode.
 7. For terminal correction after two or three paired rounds, use the source
    protocol's closed terminal v2 record. Preserve all report pairs and their
    publication provenance, bind every reviewed snapshot and correction batch,
-   record each finding's exact resolution or existing owner acceptance, and
+   record each finding's exact resolution, existing owner acceptance, or a
+   report-bound adjudication that its own phase-two report states, and
    bind the final committed state. Disclose normalized reports and any protocol
    transition. Derive the v2 owner record from existing policy or the actual
    course decision; do not invent an approval or ask the PO merely to finish
