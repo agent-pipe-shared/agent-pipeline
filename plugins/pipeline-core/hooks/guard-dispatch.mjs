@@ -39,6 +39,9 @@
  * helper function, interpolation) is NOT statically resolvable here and is deliberately left
  * alone (fail-open, same posture as the rest of this file) rather than guessed at — a false
  * positive on a script that never dispatches a Goldfish/Critic role is worse than a miss.
+ * A Goldfish `agent()` call that is skipped for that reason is admitted with a typed advisory
+ * (GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED, ALF-K35): it names the cause, says no route record was written
+ * for the call, and gives one repair (a static string-literal prompt built from goldfish-task.md). Never a refusal.
  *
  * ANTIGRAVITY RUNNER AWARENESS. The Antigravity runner's native `invoke_subagent` tool call
  * uses neither of the two shapes above: its payload is `{ Subagents: [{ TypeName: "...",
@@ -129,6 +132,42 @@ export function extractWorkflowDispatches(script) {
     found.push({ subagentType: agentType, prompt: body });
   }
   return found;
+}
+
+// ALF-K35 (PO decision 2026-10-22): the calls `extractWorkflowDispatches` skips by design are not silent for a Goldfish.
+// Scans the same `agentType` anchors with the same window and reports every call whose role is Goldfish (the predicate
+// `requiresGovernedItemAdmission` uses) and whose prompt cannot be resolved statically: a `${` interpolation, a value that
+// is not a string literal (an identifier or expression), or a literal that does not terminate. Advisory only: the caller
+// admits the call and records nothing for it. Critic and other roles are out of scope of V-10.
+export function findUnresolvedWorkflowGoldfishPrompts(script) {
+  const unresolved = [];
+  const agentTypeRe = /agentType\s*:\s*(['"])((?:(?!\1)[\s\S])*?)\1/g;
+  let m;
+  while ((m = agentTypeRe.exec(script)) !== null) {
+    const agentType = m[2];
+    if (!requiresGovernedItemAdmission(dispatchFindings({ subagentType: agentType, prompt: "", transport: "workflow" }))) continue;
+    const window = script.slice(agentTypeRe.lastIndex, Math.min(script.length, agentTypeRe.lastIndex + 4000));
+    const key = /\bprompt\s*(:\s*|(?=[,}]))/.exec(window);
+    if (!key) continue; // no prompt field nearby -> not a dispatch call
+    const open = /^([`'"])/.exec(window.slice(key.index + key[0].length));
+    if (!key[1] || !open) { unresolved.push({ agentType, cause: "its prompt is not a string literal (an identifier or expression)" }); continue; }
+    const start = key.index + key[0].length + 1;
+    let i = start;
+    let body = null;
+    while (i < window.length) {
+      if (window[i] === "\\") { i += 2; continue; }
+      if (window[i] === open[1]) { body = window.slice(start, i); break; }
+      i += 1;
+    }
+    if (body === null) unresolved.push({ agentType, cause: "its prompt literal does not terminate within the scanned window" });
+    else if (body.includes("${")) unresolved.push({ agentType, cause: "its prompt contains a ${...} interpolation" });
+  }
+  return unresolved;
+}
+
+export function workflowPromptUnresolvedNotice(unresolved) {
+  const causes = [...new Set(unresolved.map(({ cause }) => cause))].join("; ");
+  return `WARNING (guard-dispatch): GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED: ${unresolved.length} Goldfish agent() call(s) in this Workflow script cannot be resolved statically (${causes}). The call is admitted, and no route record was written for this call, so the V-10 briefing-route binding does not apply to it. Repair: write the prompt as a static string literal (no \${...}, no variable) built from templates/prompts/goldfish-task.md, as plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md describes.\n`;
 }
 
 // Recover `{ TypeName: '...', Prompt: '...' }`-shaped entries from the Antigravity runner's
@@ -704,6 +743,9 @@ if (isDirectInvocation(import.meta.url)) {
     // Workflow-tool call: no discrete subagent_type/prompt field, but the script may carry
     // one or more embedded agent()/parallel()/pipeline() dispatches worth checking the same way.
     dispatches = extractWorkflowDispatches(toolInput.script).map((dispatch) => ({ ...dispatch, transport: "workflow" }));
+    // ALF-K35: an unresolvable Goldfish prompt stays admitted (fail-open) but is announced, never silent.
+    const unresolvedWorkflow = findUnresolvedWorkflowGoldfishPrompts(toolInput.script);
+    if (unresolvedWorkflow.length > 0) process.stderr.write(workflowPromptUnresolvedNotice(unresolvedWorkflow));
     if (dispatches.length === 0) process.exit(0);
   } else {
     process.exit(0);
