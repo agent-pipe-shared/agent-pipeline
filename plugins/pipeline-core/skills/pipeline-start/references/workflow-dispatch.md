@@ -224,6 +224,15 @@ fails immediately — it needs the plugin prefix: `'pipeline-core:goldfish-imple
 2026-08-18: a two-agent parallel dispatch failed outright on the first
 attempt with bare names before this was known.
 
+## A Goldfish `agent()` prompt must be a static string literal
+
+Write the `prompt` of every Goldfish `agent()` call as a static string literal (single-, double- or
+backtick-quoted, no `${...}` interpolation, no variable or helper call), built from
+`templates/prompts/goldfish-task.md`. The guard reads the literal to bind the briefing's route digest (V-10) and
+to record the admitted route. A prompt it cannot resolve statically (interpolation, a named const, a built
+string) is still admitted, but no route record is written for that call, and the guard says so with
+`GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED`. Critic and other non-Goldfish roles are out of scope of V-10.
+
 ## The binding and field 6 come from the generator, not from memory
 
 For a native-host-commit Goldfish dispatch, Agent tool and Workflow `agent()` alike, generate the
