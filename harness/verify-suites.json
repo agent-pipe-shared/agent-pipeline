@@ -3652,6 +3652,18 @@
       "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs",
       "invariantPinned": "A recorded dispatch-budget grant is announced to the agent with its state and continuation, from the counter state the hook holds (D75 B)",
       "nonOverlapNote": "Unique test suite for the grant notice path of hooks/guard-dispatch-budget.mjs"
+    },
+    {
+      "name": "git-cmd-push-classifier-tests",
+      "file": "plugins/pipeline-core/lib/git-cmd-push-classifier.test.mjs",
+      "invariantPinned": "The commandIsGitPush classifier keeps every traced push bypass (quoted git words, heredoc and script-language receivers, editor and busybox runners, comments and quote characters, git executables) a push candidate and keeps plain commands out of the gate (Q12-C through AC-238 tables)",
+      "nonOverlapNote": "Unique cases: the second half of the commandIsGitPush tables, split out of lib/git-cmd.test.mjs with every case id unchanged and none repeated there"
+    },
+    {
+      "name": "guard-git-gg22-tests",
+      "file": "plugins/pipeline-core/hooks/guard-git-gg22.test.mjs",
+      "invariantPinned": "GG-22 blocks a commit that leaves an earlier backlog status flip unreconciled, scopes a pathspec commit only when it is provably exclusive, and prints the reconcile-last remediation order",
+      "nonOverlapNote": "Unique cases: the GG22-* cases, split out of hooks/guard-git.test.mjs with every case id unchanged and none repeated there"
     }
   ]
 }
