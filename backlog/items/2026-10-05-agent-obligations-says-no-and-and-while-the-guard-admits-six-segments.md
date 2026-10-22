@@ -34,3 +34,12 @@ Edit the generator source text to match the guard ("one simple command per call;
 - **Rationale:** commit(s) `7b1b4083b`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+## Follow-up 2026-10-22: the optional better option is done
+
+The `&&` segment bound in section 1 is no longer a hand-written `6`: `harness/scripts/generate-agent-obligations.mjs`
+imports the guard's exported `MAX_AND_CHAIN_SEGMENTS` and interpolates it, and the section's piping sentence no longer
+claims that only `rg` pipelines are admitted (the guard also admits `grep`, `cat` and `git` into `head`). Both
+generated copies were regenerated. Pin cases AP8 and AP9 in
+`plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs` fail
+against the previous generator and pass now.

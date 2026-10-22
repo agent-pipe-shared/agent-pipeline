@@ -26,7 +26,8 @@
  *
  * WHAT IS DERIVED, AND WHAT IS NOT. Derived: the protected-path table (from
  * `project/guard-config.json`), the draft-phase write prefixes (from
- * `guard-devplan.mjs`'s exported constant), the gate-strength shell exemption
+ * `guard-devplan.mjs`'s exported constant), the `&&` chain bound in section 1
+ * (from `grammar-denials.mjs`'s exported `MAX_AND_CHAIN_SEGMENTS`), the gate-strength shell exemption
  * (from `guard-lifecycle-ready.mjs`'s exported table), and the admitted/refused
  * command shapes (MEASURED by asking the guard's own exported predicates, not by
  * restating its documentation). Hand-maintained lines are marked as such in the
@@ -49,6 +50,7 @@ import {
   isReadOnlyDiagnosticCommand,
   retryActionsForDeniedCommand,
 } from "../../plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs";
+import { MAX_AND_CHAIN_SEGMENTS } from "../../plugins/pipeline-core/lib/guard/grammar-denials.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const OBLIGATIONS_PATH = join(REPO_ROOT, "templates", "prompts", "agent-obligations.md");
@@ -125,17 +127,21 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
 
   put("## 1. One simple command per Bash call (the closed shell grammar)");
   put();
-  put("<!-- hand-maintained: no component exports the grammar as data, so this rule");
-  put("     is stated rather than derived. Source of truth:");
+  put("<!-- hand-maintained, except the `&&` segment bound below, which is read from the guard's");
+  put("     exported MAX_AND_CHAIN_SEGMENTS (plugins/pipeline-core/lib/guard/");
+  put("     grammar-denials.mjs); the rest of this rule is stated, because no component");
+  put("     exports the whole grammar as data. Source of truth:");
   put("     plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables");
   put("     below ARE measured. -->");
   put();
   put("`guard-lifecycle-ready` admits **one simple command per tool call**.");
   put("No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining");
-  put("with `&&` is admitted only as up to 6 segments, and only when every segment is");
+  put(`with \`&&\` is admitted only as up to ${MAX_AND_CHAIN_SEGMENTS} segments, and only when every segment is`);
   put("itself an admitted read-only shape (or the small always-safe-write allowlist:");
-  put("`echo`, `mkdir -p` under `scratch/`). Bounded `rg`-to-`rg` and `rg`-to-`head`");
-  put("diagnostic pipelines are the only admitted piping.");
+  put("`echo`, `mkdir -p` under `scratch/`). The only admitted piping is the bounded");
+  put("read-only diagnostic pipelines (a read command into `head` or `tail`, or `rg`/`grep` into");
+  put("`rg`/`grep`); every grammar refusal prints the complete current list with its");
+  put("bounds, so read that list instead of guessing.");
   put();
   put("The two workarounds that cost the most time before they were written down:");
   put();

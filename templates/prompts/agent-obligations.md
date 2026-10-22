@@ -18,8 +18,10 @@ spends a tool use from the budget that is also the stop condition.
 
 ## 1. One simple command per Bash call (the closed shell grammar)
 
-<!-- hand-maintained: no component exports the grammar as data, so this rule
-     is stated rather than derived. Source of truth:
+<!-- hand-maintained, except the `&&` segment bound below, which is read from the guard's
+     exported MAX_AND_CHAIN_SEGMENTS (plugins/pipeline-core/lib/guard/
+     grammar-denials.mjs); the rest of this rule is stated, because no component
+     exports the whole grammar as data. Source of truth:
      plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables
      below ARE measured. -->
 
@@ -27,8 +29,10 @@ spends a tool use from the budget that is also the stop condition.
 No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining
 with `&&` is admitted only as up to 6 segments, and only when every segment is
 itself an admitted read-only shape (or the small always-safe-write allowlist:
-`echo`, `mkdir -p` under `scratch/`). Bounded `rg`-to-`rg` and `rg`-to-`head`
-diagnostic pipelines are the only admitted piping.
+`echo`, `mkdir -p` under `scratch/`). The only admitted piping is the bounded
+read-only diagnostic pipelines (a read command into `head` or `tail`, or `rg`/`grep` into
+`rg`/`grep`); every grammar refusal prints the complete current list with its
+bounds, so read that list instead of guessing.
 
 The two workarounds that cost the most time before they were written down:
 

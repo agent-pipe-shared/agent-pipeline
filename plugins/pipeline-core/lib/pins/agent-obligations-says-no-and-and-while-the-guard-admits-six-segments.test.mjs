@@ -69,6 +69,25 @@ test("AP6: the guard's refusal grammar lists the same bound the document states"
   assert.equal(admitted(shape.example.replaceAll("probe.txt", "CLAUDE.md")), true, "the table's own example must be admitted");
 });
 
+test("AP8: the chain bound in section 1 is derived from the guard export, not a literal in the generator", () => {
+  const source = readFileSync(join(REPO_ROOT, "harness", "scripts", "generate-agent-obligations.mjs"), "utf8");
+  assert.match(source, /import \{ MAX_AND_CHAIN_SEGMENTS \} from "[^"]*lib\/guard\/grammar-denials\.mjs"/u,
+    "the generator must import the guard's exported bound");
+  assert.match(source, /up to \$\{MAX_AND_CHAIN_SEGMENTS\} segments/u, "the section text must interpolate the exported bound");
+  assert.doesNotMatch(source, /up to \d+ segments/u, "no hand-written numeric bound may remain in the generator");
+});
+
+test("AP9: section 1 does not claim rg-only piping while the guard admits grep, cat and git pipelines", () => {
+  for (const command of ["rg -n needle CLAUDE.md | head -n 3", "grep -n needle CLAUDE.md | head -n 3",
+    "cat CLAUDE.md | head -n 3", "git log | head -n 3"]) {
+    assert.equal(admitted(command), true, `fixture must be admitted by the guard: ${command}`);
+  }
+  const text = section1(readFileSync(OBLIGATIONS_PATH, "utf8")).replace(/\s+/gu, " ");
+  assert.doesNotMatch(text, /`rg`-to-`rg` and `rg`-to-`head`[^.]*only admitted piping/u,
+    "section 1 must not restrict piping to rg when the guard admits more");
+  assert.match(text, /only admitted piping is the bounded read-only diagnostic pipelines/u);
+});
+
 test("AP7: the committed canonical and vendored documents equal a fresh generation", () => {
   const committed = readFileSync(OBLIGATIONS_PATH, "utf8");
   assert.equal(renderAgentObligations(), committed);
