@@ -48,9 +48,16 @@ the real-Git restoration regression and original corpus pass9/9. No fifth
 Reader was launched. Bounded correction review and the final Alfred binding
 remain distinct obligations; no release acceptance or item closure is claimed.
 
-- **Decision:** pending
+- **Decision:** accepted (D66, 2026-10-20, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`, AC-118): a
+  report-bound `adjudicated-no-change` disposition form for the seven phase-two no-change adjudications; the two
+  remaining findings (the carried relocation and the partly evidenced terminal finding) are corrected by
+  documentation commits and bound; no fifth Reader, no inferred owner acceptance. The form exists in
+  `harness/scripts/doc-reader-terminal-binding.mjs` (status `adjudicated`, quotes bound to the immutable
+  phase-two report) and is pinned by `plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs`.
+  The item stays open: the actual Alfred terminal record is not built (see "Terminal record attempt 2026-10-22").
+  The owner acceptance and the policy-transition field remain unset for the PO.
 - **Assignment:** Alfred release preparation
-- **Date:** 2026-09-27
+- **Date:** 2026-09-27 (opened), 2026-10-22 (decision recorded)
 
 ## Preparation evidence (2026-09-28)
 
@@ -120,6 +127,30 @@ report-bound adjudication form, retaining unresolved or partial findings as
 non-passing. Do not infer owner acceptance, fabricate resolution commits,
 restart the bounded course, or launch a fifth Reader. Actual Alfred binding
 remains pending even though all eight report blobs are immutable.
+
+### Terminal record attempt 2026-10-22
+
+The historical inputs exist and were re-checked: the four reviewed commits, the eight immutable reports under
+`specs/sprint-alfred-epic/evidence/reader-review/{phase-one,phase-two}/` and the correction commits of each interval. The
+terminal record was nevertheless NOT built, because a record that passes the committed checker cannot be built honestly
+from them today. Measured against the live repository:
+
+1. Two findings have no supported disposition. Round 1 finding 7 (Codex host contract relocation) and round 4 finding 4
+   (retained README availability passage) are neither resolved by a commit in their own correction batch, nor
+   phase-two adjudicated, nor owner accepted. D66 closes them by documentation commits (not yet made); the owner
+   acceptance stays unset for the PO.
+2. The covered state moved after the terminal correction `641b6d17`. Nine commits since then changed covered documents
+   (`99e0fba95`, `e779200cf`, `030a6111f`, `69c4d0bd1`, `3c0396bb0`, `d02409a8a`, `101ed4ef5`, `96ccb175e`,
+   `15722ce6a`) and none was read by a Reader; listing them as correction-batch commits would present unreviewed changes as
+   reviewed corrections.
+3. `docs/product-capability-inventory.json` changed in more than twenty commits after the fourth reviewed commit
+   `c3ff4084`; the checker refuses an unreviewed inventory transition (`unreviewed inventory or governance transition`).
+4. The per-round disposition files, `owner-decision.json` (needs the owner's name and decision) and `record.json` do not
+   exist in the repository. The owner decision source `course-decision-request-2026-09-27.md` does.
+
+No checker run was made over a record, since none was written. The next step needs a PO decision on points 2 and 3
+(re-baseline the course on a freshly reviewed state, or bound the post-course changes), plus the two documentation
+commits of point 1. Owner acceptance and the policy-transition field are left unset.
 
 ### Blocker analysis 2026-10-22
 
