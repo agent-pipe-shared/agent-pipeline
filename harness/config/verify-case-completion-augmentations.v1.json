@@ -1015,6 +1015,110 @@
         ],
         "maxBytes": 65536
       }
+    },
+    {
+      "name": "git-null-device-sites-tests",
+      "file": "plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GND001",
+          "GND002",
+          "GND003",
+          "GND004",
+          "GND005",
+          "GND006",
+          "GND007",
+          "GND008"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "human-guard-override-disjoint-tests",
+      "file": "plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "HGOD001",
+          "HGOD002",
+          "HGOD003",
+          "HGOD004",
+          "HGOD005",
+          "HGOD006",
+          "HGOD007",
+          "HGOD008",
+          "HGOD009",
+          "HGOD010",
+          "HGOD011",
+          "HGOD012",
+          "HGOD013",
+          "HGOD014",
+          "HGOD015",
+          "HGOD016",
+          "HGOD017",
+          "HGOD018",
+          "HGOD019",
+          "HGOD020",
+          "HGOD021",
+          "HGOD022",
+          "HGOD023",
+          "HGOD024",
+          "HGOD025",
+          "HGOD026",
+          "HGOD027",
+          "HGOD028",
+          "HGOD029",
+          "HGOD030",
+          "HGOD031",
+          "HGOD032",
+          "HGOD033",
+          "HGOD034",
+          "HGOD035"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "pin-denial-names-a-diagnosis-it-refuses-tests",
+      "file": "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DND001",
+          "DND002",
+          "DND003",
+          "DND004",
+          "DND005",
+          "DND006",
+          "DND007",
+          "DND008",
+          "DND009",
+          "DND010",
+          "DND011",
+          "DND012",
+          "DND013"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
+      "file": "plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "WAA001",
+          "WAA002",
+          "WAA003",
+          "WAA004",
+          "WAA005",
+          "WAA006",
+          "WAA007",
+          "WAA008"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }
