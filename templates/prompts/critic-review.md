@@ -506,8 +506,9 @@ dispatch there rather than producing this report.
 restated here):** your judgement is the entire deliverable, so it must exist as
 a file before it exists as a message. Persist MATERIAL, never conclusions: in
 Phase A, append each candidate as `file:line` plus one line, labelled `candidate
-— not a finding`, to `critic-notes.md` inside the fresh per-dispatch `scratch/`
-subdirectory you already create; the moment Phase B produces them, write the
+— not a finding`, to `critic-notes.md` inside the per-dispatch notes directory
+the native dispatch guard allocates on your first admitted Write/Edit (you never
+create it yourself; see "Scratchpad isolation" above); the moment Phase B produces them, write the
 surviving findings, the deliberately-not-flagged list, the trajectory verdict
 and any requested pass/fail into the same file — that write is your LAST ACT
 before returning the report as text. Name the path in the report. Stated
