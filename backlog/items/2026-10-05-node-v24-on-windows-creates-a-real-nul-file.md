@@ -37,3 +37,11 @@ signed package.
 - **Rationale:** commit(s) `866be2139, 12ac0a7af`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+- **Counted evidence (2026-10-22, Linux host, head of the h2 clone):** acceptance 1 is the live ratchet in
+  `plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs` (14 cases, 14 pass, 0 fail,
+  0 skip; `node --test`). Acceptance 2 is enforced by the R7-1a ratchets in `plugins/pipeline-core/lib/worktree-lifecycle.test.mjs`
+  (production and fixture trees of `lib/`, `scripts/`, `hooks/`: no `NUL` literal beside a git null-device key;
+  single-source ratchet for `GIT_NULL_DEVICE`; 81/81 checks pass, run as `node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs`)
+  and by the real-git cases in `plugins/pipeline-core/lib/git-null-device-sites.test.mjs` (8 cases, 8 pass, 0 fail, 0 skip).
+  The pin now also asserts that these enforcers exist. Not verified here: a native Windows run on Node v24 (the
+  open-target cases that matter on win32 ran on Linux only).

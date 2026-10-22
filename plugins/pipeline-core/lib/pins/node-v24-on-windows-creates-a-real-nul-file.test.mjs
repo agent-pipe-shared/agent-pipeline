@@ -5,7 +5,11 @@
 //
 // Acceptance points pinned here:
 //   A1. No "NUL" literal is a Node open target anywhere in the repository's JS sources (live ratchet scan).
-//   A2. `GIT_CONFIG_GLOBAL: "NUL"` (read by git, never opened by Node) is explicitly allowed.
+//   A2. A git config null-device value (`GIT_CONFIG_GLOBAL` and similar) is read by git and never opened by
+//       Node, so this open-target scanner does not flag it. That is not a licence to spell it NUL: Git for Windows
+//       2.56 rejects NUL, and acceptance 2 of the item requires GIT_NULL_DEVICE (lib/git-null-device.mjs). That rule
+//       is enforced by the R7-1a ratchets in lib/worktree-lifecycle.test.mjs (production and fixture trees) and by
+//       the real-git cases in lib/git-null-device-sites.test.mjs, not by this scanner.
 // Plus: the scanner is proven able to fail (RED fixtures, scratch mirror, never production edits), and the
 // sanctioned sink (os.devNull) really leaves no NUL file behind.
 import test from "node:test";
@@ -147,6 +151,16 @@ test("A2: the allowance does not shelter an actual open of NUL beside a git env 
   const offences = nulOpenOffences(source);
   assert.equal(offences.length, 1);
   assert.equal(offences[0].line, 2);
+});
+
+test("acceptance 2: the git null-device rule has live enforcers beside this scanner (shared constant, ratchets, real git)", () => {
+  const lib = resolve(REPO_ROOT, "plugins", "pipeline-core", "lib");
+  assert.match(readFileSync(join(lib, "git-null-device.mjs"), "utf8"), /export const GIT_NULL_DEVICE = "\/dev\/null";/u);
+  const ratchets = readFileSync(join(lib, "worktree-lifecycle.test.mjs"), "utf8");
+  assert.match(ratchets, /R7-1a ratchet: no production module \(lib, scripts, hooks\) assigns a \\"NUL\\" literal to a git environment or -c value/u);
+  assert.match(ratchets, /R7-1a ratchet: no \*\.test\.mjs fixture/u);
+  const realGit = readFileSync(join(lib, "git-null-device-sites.test.mjs"), "utf8");
+  assert.match(realGit, /real git accepts GIT_CONFIG_GLOBAL=GIT_NULL_DEVICE/u);
 });
 
 test("allowances: comments and non-open string uses are not offences", () => {

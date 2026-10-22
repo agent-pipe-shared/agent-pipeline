@@ -52,3 +52,11 @@ through the next signed package.
 - **Rationale:** commit(s) `12ac0a7af, 2532a96fe`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+- **Counted evidence (2026-10-22, Linux host, head of the h2 clone):** the shared constant is
+  `plugins/pipeline-core/lib/git-null-device.mjs` (`GIT_NULL_DEVICE = "/dev/null"`). The regression test that spawns real
+  git with the constant is `plugins/pipeline-core/lib/git-null-device-sites.test.mjs` (8 cases, 8 pass, 0 fail, 0 skip;
+  `node --test`). The ratchet scan is in `plugins/pipeline-core/lib/worktree-lifecycle.test.mjs` (R7-1a: production tree,
+  fixture tree, single-source; 81/81 checks pass, run as `node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs`). The
+  acceptance line of the Node-v24 NUL item was already updated to require `GIT_NULL_DEVICE`. Not verified here: a real
+  Git for Windows 2.56 run (the real-git cases ran against the Linux git; the Windows-version behaviour is shown by the
+  upstream-regression stub only).
