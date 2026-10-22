@@ -29,8 +29,11 @@
 //         it is refused DISPATCH-BRIEFING-DIGEST-MISMATCH, as are two different briefings of one slice in one call.
 //         Only a dispatch that is itself recorded (a Goldfish briefing) can supersede an admission record.
 //         Typed gaps (no fake record is written for any of them):
-//         V-10 Critic and unrelated-role dispatches are not recorded (critic-review.md carries no Slice line): open, owner Coordinator, due 2026-10-31
-//         V-10 a dynamically built Workflow script (not statically resolvable, fail-open in the guard) has no admission point: open, owner Coordinator, due 2026-10-31
+//         V-10 Critic and unrelated-role dispatches are not recorded (critic-review.md carries no Slice line): dispositioned, out of scope of V-10
+//              (PO decision 2026-10-22, ALF-K35, commit 38e94a0ef: a Critic has no slice of its own, so a slice-keyed record has no governed effect)
+//         V-10 a dynamically built Workflow script (not statically resolvable, fail-open in the guard) has no route record: dispositioned
+//              (PO decision 2026-10-22, ALF-K35, commits c080a1e22 and f294d0fa3: still admitted, with the typed advisory
+//              GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED; the repair is a static string literal prompt, 10d12d897)
 //              (measured, ALF-K28: the Workflow CALL reaches guard-dispatch -- hooks.json matches Task|Agent|Workflow, "V-10 runner registration" --
 //              and a static agent() literal is recorded; a prompt built at run time (interpolation, a named const) is admitted and records no
 //              route, "V-10 typed gap, measured". Whether the host re-fires the hook per inner agent() is not observable here and not claimed.)
