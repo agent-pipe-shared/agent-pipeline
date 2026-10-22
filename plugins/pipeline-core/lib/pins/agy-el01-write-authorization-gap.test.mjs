@@ -18,12 +18,15 @@
 // worker's scope, refused (fail closed) when that evidence is missing or
 // unauthenticated. guard-el01-tripwire.mjs has no carrier input and no
 // worker-scope input, so none of those three clauses can be exercised here.
-// OPEN PO DECISION (R2.md line 14): whether the criterion is accepted on a
-// documented carrier-unavailable disposition or held until native carrier
-// evidence exists. Owner: Coordinator. Due: 2026-10-19 (specs/sprint-alfred-epic/spec.md, unresolved-originals disposition). Until that decision
-// lands, whether the Antigravity adapter must fail closed without an
-// authenticated role carrier is undecided and no production behaviour is
-// pinned for it.
+// DISPOSITION (the question of R2.md line 14 is decided): Elephant decision E6
+// (plans/elephant-decisions-2026-10-19.md) accepts the criterion on a documented
+// "carrier unavailable" disposition, and PO decision D63 (plans/po-decisions-2026-10-18.md,
+// 2026-10-20) closes AC-109 as not reconstructable. Antigravity provides no authenticated
+// per-call carrier today, so no carrier or worker-scope behaviour is pinned here and none is
+// owed. MEASURED AGAINST E6's rationale ("the fail-closed refusal is already the safe
+// state"): that holds for the three cases below only; the tripwire still exits 0 in the
+// fail-open conditions listed next, so authorization is NOT never-inferred on this head.
+// That gap is recorded here, not pinned as a refusal.
 //
 // FAIL-OPEN CONDITIONS of hooks/guard-el01-tripwire.mjs (the tripwire exits 0
 // and therefore allows the write; none of these is pinned as a refusal). This
