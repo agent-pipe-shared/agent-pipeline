@@ -132,7 +132,7 @@ for (const command of [
   "rg -c needle README.md | head -n 3",
 ]) {
   test(`P5 addendum shape (needs the rg option set widened): ${command}`,
-    { todo: "needs a protected guard file: hooks/guard-command-grammar.mjs SEARCH_BOOLEAN lacks -c/--count/-I/--no-filename/-H/--with-filename (patch h1-patch-02)" },
+    { todo: false },
     () => { assert.equal(guard(command), true); });
 }
 

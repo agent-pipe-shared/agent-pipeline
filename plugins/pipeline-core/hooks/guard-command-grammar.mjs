@@ -19,7 +19,8 @@ const SEARCH_BOOLEAN = new Set([
   "-x", "--line-regexp", "-l", "--files-with-matches",
   "--files-without-match", "--no-messages", "--no-heading",
   // TR-B-F (T74): match-output spellings. They change only what is printed from operands the checks below already admitted.
-  "-o", "--only-matching",
+  // -h is NOT among them: in ripgrep it is the short help flag; the filename spellings are -I/--no-filename and -H/--with-filename.
+  "-o", "--only-matching", "-c", "--count", "-I", "--no-filename", "-H", "--with-filename",
 ]);
 const SEARCH_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
