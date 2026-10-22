@@ -481,7 +481,10 @@ test("D64 architecture baseline diagnosis: the read-only assessment forms and --
     bothAdmit(scriptAction(baselineScript, "--help"), f, "--help");
     bothAdmit(scriptAction(baselineScript, "-h"), f, "-h");
     for (const [label, action] of [
-      ["compile-summary writes project/architecture-decisions.compiled.json", base("--compile-summary")],
+      // QG-04 justification (PO decision D115, 2026-10-22): the case "compile-summary writes
+      // project/architecture-decisions.compiled.json" was pinned refused as an open product question. D115 admitted exactly
+      // `--root <root> --compile-summary` (one fixed output path) and nothing else on the command; that exact form moved to the
+      // D115 test below, which also pins every near-miss as refused. Everything else in this list is unchanged.
       ["validate reads an arbitrary path", scriptAction(baselineScript, "--validate", "docs/adr/0001.md")],
       ["foreign root", scriptAction(baselineScript, "--root", join(f.root, ".."))],
       ["unknown format", base("--format", "yaml")],
@@ -491,6 +494,53 @@ test("D64 architecture baseline diagnosis: the read-only assessment forms and --
       ["help with a root", base("--help")],
       ["repeated flag", base("--format", "json", "--format", "text")],
     ]) bothRefuse(action, f, label);
+  });
+});
+
+// ---- D115 (PO decision 2026-10-22): `architecture-baseline --compile-summary` in its exact documented form, one fixed output ----
+// skills/architecture-decision/SKILL.md step 6 prescribes `architecture-baseline.mjs --root "$PWD" --compile-summary`; the script writes
+// exactly project/architecture-decisions.compiled.json (it has no output flag). Only that argv is admitted, and only while that one
+// output path is physically sound (no linked `project` directory, no linked or non-file target). Every other flag stays refused.
+test("D115 architecture baseline --compile-summary: the exact documented form is admitted, near-misses and unsafe outputs are not", (t) => {
+  withFixture("feature", f => {
+    const base = (...rest) => scriptAction(baselineScript, ...rest);
+    bothAdmit(base("--root", f.root, "--compile-summary"), f, "compile-summary");
+    // an already compiled summary (a regular file) is overwritten in place: still the same one output path
+    writeFileSync(join(f.root, "project", "architecture-decisions.compiled.json"), "{}\n");
+    bothAdmit(base("--root", f.root, "--compile-summary"), f, "compile-summary over an existing regular file");
+    for (const [label, action] of [
+      ["flag before the root", base("--compile-summary", "--root", f.root)],
+      ["no root", base("--compile-summary")],
+      ["foreign root", base("--root", join(f.root, ".."), "--compile-summary")],
+      ["relative root", base("--root", ".", "--compile-summary")],
+      ["with a format", base("--root", f.root, "--compile-summary", "--format", "json")],
+      ["format before the flag", base("--root", f.root, "--format", "json", "--compile-summary")],
+      ["with a diff", base("--root", f.root, "--compile-summary", "--diff", "HEAD")],
+      ["with a range", base("--root", f.root, "--compile-summary", "--from", "a".repeat(40), "--through", "b".repeat(40))],
+      ["with validate", base("--root", f.root, "--compile-summary", "--validate", "docs/adr/0001.md")],
+      ["with an output flag", base("--root", f.root, "--compile-summary", "--out", "docs/x.json")],
+      ["with an output path argument", base("--root", f.root, "--compile-summary", "project/other.json")],
+      ["repeated flag", base("--root", f.root, "--compile-summary", "--compile-summary")],
+      ["with help", base("--root", f.root, "--compile-summary", "--help")],
+      ["without the root value", base("--root", "--compile-summary")],
+    ]) bothRefuse(action, f, label);
+  });
+  // (model-role-bootstrap stays refused: pinned by the D64 bootstrap test below, unchanged.)
+  return withFixture("feature", f => {
+    const out = join(f.root, "project", "architecture-decisions.compiled.json");
+    const base = () => scriptAction(baselineScript, "--root", f.root, "--compile-summary");
+    mkdirSync(join(f.root, "elsewhere"), { recursive: true });
+    try {
+      symlinkSync(join(f.root, "elsewhere", "target.json"), out, "file");
+    } catch (error) { t.skip(`${HOST_LIMITATION} (${error?.code ?? "unknown"})`); return; }
+    bothRefuse(base(), f, "output is a linked file");
+    rmSync(out, { force: true });
+    mkdirSync(out);
+    bothRefuse(base(), f, "output is a directory");
+    rmSync(out, { recursive: true, force: true });
+    rmSync(join(f.root, "project"), { recursive: true, force: true });
+    symlinkSync(join(f.root, "elsewhere"), join(f.root, "project"), "dir");
+    bothRefuse(base(), f, "project is a linked directory");
   });
 });
 
