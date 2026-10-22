@@ -12897,7 +12897,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const present=withSessionAuthorityBoundary({repository},()=>stateCataloguePresent(repository));
       if(!present) return runStateSource(argv,deps);
       if(!Object.keys(deps).every(key=>key === "dir" || key === "now")) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-injected-route");
-      return runStatePushSource(argv,repository);
+      if(criticalProofWaiverFor(dir,"push").waived===true) return runStatePushSource(argv,repository); // K52 (PO, Option A; D53 extension): only a waived (chat) push takes the producer route; signature mode falls through to the PF-54 in-flight gate below and the legacy route, whose detached proof stays bound to the exact commit, remote and destination.
     }
     if (STATE_COMPANION_ENTRIES.has(sub)) {
       const cataloguePresent=withSessionAuthorityBoundary({repository},()=>stateCataloguePresent(repository));
