@@ -788,6 +788,17 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/owned-continuity-verification.mjs",
   "plugins/pipeline-core/lib/project-calibration-identity.mjs",
   "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+  // Closure additions 2026-10-21 (GMWKC01): first-party imports of kernel paths that were never listed.
+  // lost-binding <- session-cleanup-recovery; observers <- native-goldfish-host-state; owned-files <- push/commit
+  // writers; orphan-member-step <- onboarding-continuity; budget-notice <- hooks/guard-dispatch-budget;
+  // answered-receipt <- scripts/advisory-host-bridge; sandbox-probe <- scripts/pipeline-start-preflight.
+  "plugins/pipeline-core/lib/advisory-answered-receipt.mjs",
+  "plugins/pipeline-core/lib/dispatch-budget-notice.mjs",
+  "plugins/pipeline-core/lib/node-sandbox-probe.mjs",
+  "plugins/pipeline-core/lib/pipeline-owned-files.mjs",
+  "plugins/pipeline-core/lib/session-authority-observers.mjs",
+  "plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs",
+  "plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs",
   "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
   "plugins/pipeline-core/lib/session-authority-registry.mjs",
   "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs",
