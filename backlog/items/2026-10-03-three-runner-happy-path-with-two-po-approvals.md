@@ -120,6 +120,23 @@ Added acceptance (0.7.0, minor; toil, PO 2026-10-18):
 - **Assignment (if accepted):**
 - **Date:**
 
+### Agent measurement of the added 0.7.0 acceptance (2026-10-22)
+
+The pin `plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs` now states the added acceptance
+with one real case per point (19 cases: 16 pass, 0 fail, 1 typed skip for the per-runner host run, 2 typed todo):
+
+- Typed absent course with a repair: delivered (`SQ-DELIVERY-COURSE-ABSENT`, repair names the governed course writer and `slice-queue.json`;
+  an unsafe course file still fails closed as `SQ-DELIVERY-STATE-UNAVAILABLE`). The repair is prose naming the writer, not an argv action.
+- Course writer for German-table Specs and `.test.js` checks: delivered (numbered and `R-n` rows under `Abnahmekriterien`, `.test.js` admitted).
+- Delivery hand-off at plan readiness: `lib/plan-handoff-readiness.mjs` is delivered and tested, but no code calls it. `submit-plan` and
+  `present-plan` in the protected `scripts/pipeline-state.mjs` do not invoke it, so the failure can still first appear after approval.
+  Typed todo; the call sites are the patch `three-runner-patch-01.json` (operator applies it in the signature sitting).
+- Onboarding answers surviving the restart: the intake record holds the Git author, language and profile and a fresh process reads
+  them back, and no restart plan is offered before the record is complete. Not met: after the record holds the Git author the next
+  inspection still publishes `gitAuthorName`/`gitAuthorEmail` as pending asks (language is honoured). Typed todo, blocked on a design
+  call; `lib/project-onboarding-v3.mjs` is exactly at its architecture line bound, so code must move out before any line is added.
+- Not covered: the per-runner end-to-end runs (host evidence), the fix for the two todo points, PO acceptance.
+
 ## Observed 2026-10-20: Codex WSL greenfield, second run (major)
 
 Source: PO-supplied forensic analysis of a Codex greenfield run on WSL

@@ -11,21 +11,36 @@
  * `pipeline-state.mjs --help` output, so a newly added approval-bearing verb that
  * nobody classified fails here. The per-runner end-to-end proof is host evidence
  * (E) and stays a typed skip.
+ *
+ * The same file also carries the item's added 0.7.0 acceptance (2026-10-17 P0-1, 2026-10-20 D64), each case
+ * driving the real module: the typed absent course, the German-table criterion scan, the `.test.js` check
+ * admission, the plan-readiness hand-off inspection, and the onboarding answers held in one intake record
+ * across a real restart. Two acceptance points are not met on this head and are typed `todo` cases that flip
+ * to passing when delivered: the submit-plan/present-plan call sites of the hand-off inspection (protected
+ * file, patch three-runner-patch-01) and the Git author no longer asked once the intake record holds it.
  */
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { devNull } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { readState, run } from "../../scripts/pipeline-state.mjs";
 import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
 import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
 import { createGovernanceScopeController } from "../governance-scope.mjs";
-import { applyOnboardingIntakeConsent } from "../onboarding-continuity.mjs";
+import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
+import { scanAcceptedCriterionRows } from "../critic-accepted-contract.mjs";
+import { validateItemDeliveryBriefing } from "../native-goldfish-host-return.mjs";
+import { resolveGovernedItemQueue } from "../native-goldfish-host-state.mjs";
+import { inspectPlanDeliveryHandoff } from "../plan-handoff-readiness.mjs";
+import { applyProjectOnboardingV3, inspectProjectOnboardingV3, planProjectOnboardingLifecycleV4, planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+import { fakeDeps as machineDeps } from "../project-onboarding-v3.test.mjs";
+import { nativeContractFixtureParent } from "../test-item-approved-course-fixture.mjs";
 import { NEUTRAL_MANIFEST } from "../project-authority.mjs";
 import * as po from "../po-gate-authority.mjs";
 import { hardenWindowsPrivateDirectory } from "../windows-private-state.mjs";
@@ -320,6 +335,159 @@ test("RED mirror: the bare --intent-sha256 form (no resolvable request) disclose
   const fallback = compactSigningDisclosure({ intentSha256: "a".repeat(64), record: null }).join("\n");
   assert.match(fallback, /no recorded request resolves for this digest/u);
   assert.match(fallback, /guard-lift\/guard-override authorization/u);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Added 0.7.0 acceptance of the item (observed 2026-10-17 P0-1 and 2026-10-20 D64): a typed absent-course result with a
+// repair, a course writer that binds a German-table Spec and `.test.js` checks without reformatting the signed bytes,
+// the delivery hand-off proven at plan readiness, and onboarding answers that survive the restart. Each case drives the
+// real module on a disposable root under scratch/. A case whose acceptance is not met on this head is a `todo` that names
+// the missing piece and flips to a normal passing case once it is delivered; nothing here is a silent skip.
+// ---------------------------------------------------------------------------------------------------------------------
+const GERMAN_TABLE = [
+  "| Nr. | Kriterium |", "| --- | --- |",
+  "| 1 | Das System speichert jede Bestellung mit Zeitstempel. |",
+  "| R-2 | Das System zeigt den Warenkorb mit allen gewählten Produkten an. |",
+];
+const germanSpec = (...extra) => ["# Spezifikation Bestell-App", "", "## Abnahmekriterien", "", ...GERMAN_TABLE, "", ...extra, ""].join("\n");
+const hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const acceptanceRoots = [];
+after(() => { for (const path of acceptanceRoots) rmSync(path, { recursive: true, force: true, maxRetries: 3 }); });
+
+/** A disposable Git root under the repository's fixture parent (the authority walk refuses a group-writable ancestor such as /tmp). */
+function gitRoot(label) {
+  const root = mkdtempSync(join(nativeContractFixtureParent(), `tri-${label}-`));
+  acceptanceRoots.push(root);
+  const config = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", `core.hooksPath=${devNull}`, "-c", "commit.gpgsign=false"];
+  for (const args of [["init", "-q", root], ["-C", root, ...config, "commit", "--allow-empty", "-q", "-m", "fixture"]]) {
+    const out = spawnSync("git", args, { encoding: "utf8" });
+    assert.equal(out.status, 0, `SETUP git ${args[0]}: ${out.stderr}`);
+  }
+  return root;
+}
+function enroll(root) {
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") });
+  const decision = controller.planDecision({ rootDir: root, decision: "enroll", by: "tri-acceptance-fixture" });
+  assert.equal(controller.applyDecision(decision, { activate: true, planSha256: decision.planSha256 }).state, "active", "SETUP governance enrollment");
+}
+function writeIn(root, path, text) { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); }
+
+test("AC-264 added (P0-1): an approved feature without a delivery course reports a typed absent course with a repair, and an unsafe course file still fails closed", () => {
+  const root = gitRoot("absent");
+  enroll(root);
+  writeIn(root, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\n");
+  writeIn(root, ".claude/pipeline-state.json", JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "unit", planPath: "specs/unit/plan.md", phase: "implementation" }, planApproved: true }));
+  mkdirSync(join(root, "specs/unit"), { recursive: true });
+  const absent = resolveGovernedItemQueue({ root });
+  assert.equal(absent.status, "refused");
+  assert.equal(absent.code, "SQ-DELIVERY-COURSE-ABSENT");
+  assert.notEqual(absent.code, "SQ-DELIVERY-STATE-UNAVAILABLE", "the absent course is not reported as the generic unavailable state");
+  assert.match(absent.repair, /slice-queue\.json/u);
+  assert.match(absent.repair, /prepareGovernedItemQueue/u, "the repair names the governed course writer");
+  symlinkSync(join(root, "nowhere.json"), join(root, "specs/unit/slice-queue.json"));
+  assert.equal(resolveGovernedItemQueue({ root }).code, "SQ-DELIVERY-STATE-UNAVAILABLE", "only a missing file is an absent course");
+});
+
+test("AC-264 added (P0-1): the criterion scan binds numbered and R-n rows of a German table under a non-English heading and leaves the Spec bytes alone", () => {
+  const text = germanSpec();
+  const bytes = Buffer.from(text);
+  const rows = scanAcceptedCriterionRows(text);
+  assert.deepEqual(rows.map((row) => [row.id, row.normative]), [["AC-1", true], ["AC-2", true]]);
+  assert.match(bytes.subarray(rows[0].startByte, rows[0].endByte).toString("utf8"), /Das System speichert jede Bestellung mit Zeitstempel\./u);
+  assert.match(bytes.subarray(rows[1].startByte, rows[1].endByte).toString("utf8"), /Warenkorb/u);
+  assert.equal(Buffer.from(text).equals(bytes), true, "the scan reads the bytes; it never rewrites them");
+  assert.deepEqual(scanAcceptedCriterionRows(text.replace("## Abnahmekriterien", "## Beispiele")).filter((row) => row.normative === true), [],
+    "RED mirror: the same table under a non-acceptance heading binds nothing");
+});
+
+test("AC-264 added (P0-1): the item delivery briefing admits the project's own .test.js check files and refuses other suffixes and shapes", () => {
+  const text = germanSpec();
+  const bytes = Buffer.from(text);
+  const [row] = scanAcceptedCriterionRows(text);
+  const locator = { schema: "pipeline.critic-criterion-locator.v1", sourcePath: "specs/orders/spec.md", sourceSha256: hex(bytes), criterionId: row.id,
+    startByte: row.startByte, endByte: row.endByte, excerptSha256: hex(bytes.subarray(row.startByte, row.endByte)) };
+  const briefing = (path) => ({ schema: "pipeline.item-delivery-briefing.v1", sliceId: "slice-1", itemId: "item-1", criterionLocator: locator,
+    checks: [{ id: "check-1", path, dependencies: [path] }] });
+  for (const path of ["tests/orders.test.js", "tests/orders.test.mjs", "tests/orders.test.cjs"]) assert.equal(validateItemDeliveryBriefing(briefing(path)).ok, true, path);
+  for (const path of ["tests/orders.spec.js", "tests/orders.test.ts", "../orders.test.js", "/abs/orders.test.js"]) assert.equal(validateItemDeliveryBriefing(briefing(path)).ok, false, path);
+});
+
+test("AC-264 added (P0-1): plan readiness proves the delivery hand-off from the Spec bytes: a German table with .test.js checks is ready, a Spec without a criterion row is refused before approval", () => {
+  const root = gitRoot("handoff");
+  enroll(root);
+  writeIn(root, "specs/orders/spec.md", germanSpec("## Prüfungen", "", "- tests/orders.test.js (vorhanden)", "- tests/neu.test.js (noch nicht vorhanden)"));
+  writeIn(root, "tests/orders.test.js", "// present\n");
+  const ready = inspectPlanDeliveryHandoff({ rootDir: root, specPath: "specs/orders/spec.md", expectedSpecSha256: hex(readFileSync(join(root, "specs/orders/spec.md"))) });
+  assert.equal(ready.ok, true, JSON.stringify(ready));
+  assert.equal(ready.code, "PLR-HANDOFF-READY");
+  assert.deepEqual(ready.admittedCriteria, ["AC-1", "AC-2"]);
+  assert.deepEqual(ready.checks, [{ path: "tests/neu.test.js", state: "absent" }, { path: "tests/orders.test.js", state: "present" }]);
+  writeIn(root, "specs/empty/spec.md", "# Spezifikation\n\nKeine Kriterien hier.\n");
+  const refused = inspectPlanDeliveryHandoff({ rootDir: root, specPath: "specs/empty/spec.md", expectedSpecSha256: hex(readFileSync(join(root, "specs/empty/spec.md"))) });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "PLR-HANDOFF-NO-CRITERION");
+});
+
+/** The body of one `case "<verb>": { ... }` handler of the lifecycle CLI, up to the next top-level case label. */
+function lifecycleHandler(source, verb) {
+  const start = source.indexOf(`    case "${verb}": {`);
+  if (start < 0) return "";
+  const next = source.indexOf('\n    case "', start + 10);
+  return source.slice(start, next < 0 ? source.length : next);
+}
+const pipelineStateSource = readFileSync(join(PLUGIN, "scripts", "pipeline-state.mjs"), "utf8");
+const handoffWired = ["submit-plan", "present-plan"].every((verb) => lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"));
+test("AC-264 added (P0-1): submit-plan and present-plan call the plan-readiness hand-off inspection, so the failure cannot first appear after approval", {
+  todo: handoffWired ? false : "PATCH-FOR-OPERATOR: scripts/pipeline-state.mjs is protected; the call sites are in the patch file three-runner-patch-01.json. lib/plan-handoff-readiness.mjs is delivered and covered above but has no caller.",
+}, () => {
+  for (const verb of ["submit-plan", "present-plan"]) {
+    assert.ok(lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"), `${verb} must call inspectPlanDeliveryHandoff before the PO is asked to sign`);
+  }
+  assert.equal(lifecycleHandler(pipelineStateSource, "approve-plan").includes("inspectPlanDeliveryHandoff"), false, "never at approval: a refusal there would burn the signature");
+});
+
+/** A fresh Codex onboarding root through the real portable apply (the shared fakeDeps answers only the machine facts). */
+function codexOnboardedRoot() {
+  const scratch = join(DESIGN_REPO_ROOT, "scratch");
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "tri-intake-"));
+  acceptanceRoots.push(root);
+  const portable = planProjectOnboardingV3({ rootDir: root, deps: machineDeps, runner: "codex" });
+  assert.equal(portable.status, "ready", JSON.stringify(portable.diagnostics));
+  assert.equal(applyProjectOnboardingV3(portable, { rootDir: root, activate: true, deps: machineDeps }).status, "applied");
+  return root;
+}
+const intakeAnswers = { gitAuthor: { name: "Test Owner", email: "owner@example.invalid" }, language: "de", profile: "feature" };
+
+test("AC-264 added (D64): the answers live in one typed intake record, the first Codex restart is not offered before it is complete, and a fresh process reads the same record", () => {
+  const root = codexOnboardedRoot();
+  const runtimePlan = () => planProjectOnboardingLifecycleV4({ rootDir: root, deps: machineDeps, operation: "runtime", runner: "codex" });
+  assert.equal(runtimePlan().status, "intake-required", "no restart plan is offered while the intake record is missing");
+  const applied = applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });
+  assert.equal(applied.status, "applied");
+  const settled = runtimePlan();
+  assert.equal(settled.status, "runtime-initialization-required", JSON.stringify(settled.diagnostics));
+  assert.equal(settled.runtime.firstRestartIntake.status, "captured", "the restart is offered only once the material is captured and read back");
+  const stored = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.equal(stored.status, "present");
+  assert.deepEqual(stored.value.values, intakeAnswers);
+  // A restart is a new process: nothing in this process's memory may be what carries the answers.
+  const reader = pathToFileURL(resolve(PLUGIN, "lib", "onboarding-continuity.mjs")).href;
+  const script = `import { readOnboardingIntakeCheckpoint } from ${JSON.stringify(reader)};const r = readOnboardingIntakeCheckpoint({ rootDir: ${JSON.stringify(root)} });process.stdout.write(JSON.stringify({ status: r.status, values: r.value.values, consent: r.value.consent !== null, material: r.value.materialInput.length }));`;
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 60000 });
+  assert.equal(child.status, 0, child.stderr);
+  assert.deepEqual(JSON.parse(child.stdout), { status: "present", values: intakeAnswers, consent: true, material: 1 });
+});
+
+test("AC-264 added (D64): the next session does not ask again for an answer the intake record already holds", {
+  todo: "BLOCKED-NEEDS-DECISION (measured on this head): the intake record keeps the language and the pending-ask computation honours it, but it still publishes gitAuthorName and gitAuthorEmail as pending asks after the record holds the Git author. lib/project-onboarding-v3.mjs sits exactly on its architecture line bound (7807 lines), so a fix there must first move code out of that file.",
+}, () => {
+  const root = codexOnboardedRoot();
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });
+  const inspected = inspectProjectOnboardingV3({ rootDir: root, deps: machineDeps, runner: "codex" });
+  const asked = (inspected.nextAction?.pendingAsks ?? []).flatMap((ask) => (ask.inputs ?? []).map((input) => input.name));
+  assert.equal(asked.includes("language"), false, "the language held by the record is not asked again");
+  assert.equal(asked.includes("gitAuthorName") || asked.includes("gitAuthorEmail"), false, `the Git author held by the record is not asked again: ${asked.join(",")}`);
 });
 
 test("E: per-runner end-to-end greenfield scenario (Claude Windows, Codex, Antigravity) reaches a pushed branch with exactly two PO proofs and zero guard overrides",
