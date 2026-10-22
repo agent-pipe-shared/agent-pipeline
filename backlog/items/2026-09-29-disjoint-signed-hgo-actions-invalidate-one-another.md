@@ -57,5 +57,4 @@ target preimages, so dropping the comparison would also admit target drift.
 
 Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
 
-- **PO-SIGNATURE** — Any change to the protected consume path lands only as a signature-bound patch
-  Changing consumeHumanGuardOverride/repositoryObservation in the protected human-guard-override.mjs needs a PO-signed patch (no commit-scoped override exists; PO commits as human operator). Agent can prepare the patch and tests; the signature is the PO's.
+- **CORRECTED the same day (the survey was wrong):** the v4 native contract is ALREADY IMPLEMENTED in `human-guard-override.mjs` (commits `348b421f3`, `a9aeb9d63`, `32cd213b7`; suite `human-guard-override-disjoint.test.mjs`, 35 cases HGOD001-035 covering the Acceptance bullets, 35 pass measured alone in a clone). No protected patch and no signature is needed. What remains: re-triage (this file still says `status: open`), an independent Opus Critic read of those commits (D119), and PO acceptance.
