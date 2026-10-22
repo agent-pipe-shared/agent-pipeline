@@ -3,7 +3,8 @@
 // PARTIAL (interim): covers the draft-time applicability predicate and the entry-readiness
 // fall-through to the adoption disposition through the real modules. The implementation-entry
 // inspector itself is pinned by lib/architecture-design.test.mjs (hotfix 9 cases) and is not
-// re-pinned here; the net-new ratchet point is NOT covered (see the dispatch report).
+// re-pinned here; the net-new ratchet point is NOT covered (see the dispatch report). Sections (d) and (e) add the
+// project-onboarding-v3 consumer (reopen-design only on ok:false) and the win32-dialect plan-path case.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -190,4 +191,63 @@ test("a deferred established project is NOT admitted, not ready, for a net-new t
     checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }),
     evaluateArchitectureFitness: () => ({ overallStatus: "blocked", outcomes: tenOutcomes(true), summary: {} }) } });
   assert.notEqual(result.status, "ready", "net-new path with a blocking finding is admitted under deferral");
+});
+
+// ---- (d) consumer: lib/project-onboarding-v3.mjs designToImplementationHandoverAction recommends reopen-design only on ok:false ----
+// The real consumer reads a real approved-PRD state file (the same fixture shape as the foreign-worktree pin); only the
+// architecture inspection result is injected through the module's `fs.inspectArchitectureDesign` seam.
+import nodeFs from "node:fs";
+import { designToImplementationHandoverAction } from "../project-onboarding-v3.mjs";
+
+const sha64 = (c) => c.repeat(64);
+function consumerAction(inspect) {
+  const dir = join(repoRoot, "scratch", `p21-01-consumer-${process.pid}-${Math.random().toString(36).slice(2, 8)}`);
+  mkdirSync(dir, { recursive: true });
+  roots.push(dir);
+  const root = nodeFs.realpathSync(dir);
+  const authority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: sha64("a"), runtimeSha256: sha64("b"),
+    receiptSha256: sha64("c"), repositoryFingerprint: sha64("d"), planPath: "prd.md", planSha256: sha64("e"), specPath: "spec.md", specSha256: sha64("f") };
+  writeFileSync(join(root, "state.json"), JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "f1", planPath: "prd.md", phase: "design" }, planApproved: true,
+    planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: "po", approvedAt: "2026-01-01T00:00:00.000Z",
+      specBoundBy: "po", specBoundAt: "2026-01-01T00:00:00.000Z", poGateAuthority: authority },
+    continuity: { authority: { prd: { path: "prd.md", sha256: authority.planSha256 }, spec: { path: "spec.md", sha256: authority.specSha256 } } } }));
+  const fs = { ...nodeFs, resolveProjectAuthorityPaths: () => ({ status: "ready", state: "state.json" }), inspectArchitectureDesign: inspect };
+  return designToImplementationHandoverAction(root, fs);
+}
+
+test("consumer: a not-required design result is never answered with reopen-design; entry moves on to set-phase", () => {
+  const action = consumerAction(() => NOT_REQUIRED);
+  assert.ok(action, "the approved state must publish a next action");
+  const text = JSON.stringify(action);
+  assert.equal(text.includes('"reopen-design"'), false, text);
+  assert.equal(text.includes("architecture-design-required"), false, text);
+  assert.ok(text.includes("set-phase"), `the next step is the implementation phase change: ${text}`);
+});
+
+test("consumer: reopen-design is offered only for an ok:false design result with a verified content-drift code", () => {
+  const drift = consumerAction(() => ({ ok: false, status: "design-required", code: "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", prdPath: PLAN }));
+  assert.ok(JSON.stringify(drift).includes('"reopen-design"'), JSON.stringify(drift));
+  const untyped = consumerAction(() => ({ ok: false, status: "design-required", code: "ARCHITECTURE-DESIGN-PATH-INVALID" }));
+  assert.equal(untyped.kind, "architecture-design-required", JSON.stringify(untyped));
+  assert.equal(JSON.stringify(untyped).includes('"reopen-design"'), false);
+});
+
+// ---- (e) win32 dialect: a backslash-spelled plan path is a typed, non-reopen refusal, never the brownfield exemption ----
+test("win32 dialect: a backslash-spelled approved plan path is refused with a typed code and is never exempted as not-required", async () => {
+  const mod = await loadStaged();
+  const root = entryFixture("none");
+  const statePath = join(root, "project", "pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  const win32Plan = PLAN.replaceAll("/", "\\");
+  state.activeFeature.planPath = win32Plan;
+  state.planApproval.poGateAuthority.planPath = win32Plan;
+  state.continuity.authority.prd.path = win32Plan;
+  writeFileSync(statePath, JSON.stringify(state));
+  const result = mod.inspectArchitectureDesign(root, win32Plan, {});
+  assert.equal(result.ok, false, JSON.stringify(result));
+  assert.notEqual(result.status, "not-required");
+  assert.match(String(result.code), /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u, "a closed typed code, never exception text");
+  assert.equal(mod.ARCHITECTURE_DESIGN_REOPEN_CODES.includes(result.code), false, `${result.code} must not recommend discarding the approval`);
+  const posix = mod.inspectArchitectureDesign(entryFixture("none"), PLAN, {});
+  assert.deepEqual(posix, NOT_REQUIRED, "the POSIX spelling of the same fixture is the brownfield exemption");
 });
