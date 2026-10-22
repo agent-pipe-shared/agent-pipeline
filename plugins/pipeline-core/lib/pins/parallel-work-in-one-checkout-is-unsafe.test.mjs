@@ -598,4 +598,4 @@ test("PARWORK-M4a: the real producer CLI makes Critic evidence for an older comm
 // real hook sessions against one registry); M4a only shows the producer itself never takes the registry lock.
 // DEFERRED, out of scope of this item's functional delivery (PO decision item): the liveness readback for open dispatch
 // records ("Observed again 2026-10-05 (round 3b)"); no case for it is pinned here. Its guard-side check belongs to the
-// protected guard-dispatch hook and is reported as an operator patch note instead.
+// protected guard-dispatch hook and needs a decision on the liveness signal first (pid, heartbeat or runner task state).
