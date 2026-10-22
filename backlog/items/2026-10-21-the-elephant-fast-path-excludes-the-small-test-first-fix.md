@@ -65,6 +65,14 @@ forbidden:
 In every option the check must be able to verify the declaration mechanically (a trailer that
 names the class or the decision id, plus a one-line reason), not by reading chat.
 
+## PO decision (2026-10-22, D95)
+
+Option 3 is chosen: widen the fast-path by the named test-first-pair class AND record each Elephant
+exception with an `Elephant-Exception:` trailer. Implementation (rule text in `roles/elephant.md`, the
+generated bootstrap block, the commit-guard trailer and the authorship-check report) is scheduled
+after 0.7.0, not in the test candidate. The design principle above stands: a declared deviation is
+cheap and visible, an undeclared one is reported, never refused.
+
 ## Acceptance
 
 - `roles/elephant.md` EL-01 (and its generated bootstrap block) names the chosen exception class or
