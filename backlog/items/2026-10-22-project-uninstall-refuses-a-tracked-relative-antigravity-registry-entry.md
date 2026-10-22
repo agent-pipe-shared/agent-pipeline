@@ -34,3 +34,13 @@ relative entry, which is why the suites are green.
 - Whether the real Antigravity host resolves a relative `entries[].path` against the
   workspace is verified on a native host; until then the installer behavior is marked
   unverified.
+
+## Triage
+
+- **Agent work (2026-10-22):** implemented. `observeAntigravityWorkspaceBindings` takes `trackedRelative`
+  (uninstall callers only): a repo-relative entry that resolves strictly inside the workspace to a readable plugin
+  directory is classified by its manifest name like an absolute one; a relative entry that resolves elsewhere or is
+  unreadable stays unavailable, and `PU-WORKSPACE-UNVERIFIABLE` now carries a typed `instructions` repair. The refresh
+  paths keep their rule (a tracked entry is never owned or removed). RED-first pins: `UC02C018` to `UC02C020` in
+  `plugins/pipeline-core/lib/project-uninstall.test.mjs` (the plan refused with `PU-WORKSPACE-UNVERIFIABLE` before the
+  change). The native-host check of the relative `entries[].path` resolution stays open and is not an agent task.

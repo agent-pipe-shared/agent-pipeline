@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 // Physically verified workspace ownership; unrelated JSON spans stay exact.
-import {basename,dirname,isAbsolute,join} from 'node:path';
+import {basename,dirname,isAbsolute,join,resolve} from 'node:path';
 import {isDeepStrictEqual} from 'node:util';
 import {readPhysicalFootprint,physicalFootprintPath,footprintSha256,footprintIdentity,footprintFail} from './git-hook-footprint.mjs';
 import {parseStrictJson} from './governance-event.mjs';
@@ -14,7 +14,7 @@ export function deriveUninstallWorkspaceFootprint({rootDir,workspace}){
  function record(path,row,after){observations.push({path,sha256:row.sha256,identity:row.identity});if(after&&!after.equals(row.bytes))actions.push({path,kind:'owned-keys',beforeSha256:row.sha256,beforeIdentity:row.identity,afterBytes:after.toString('utf8'),afterSha256:footprintSha256(after),mode:row.mode});}
  if(workspace.status==='observed'){
   const path='.agents/plugins.json',row=readPhysicalFootprint(join(rootDir,path),{max:262144}),value=parseStrictJson(row.bytes);
-  roots.push(...workspace.ownedIndexes.map(i=>value.entries[i].path));
+  roots.push(...workspace.ownedIndexes.map(i=>isAbsolute(value.entries[i].path)?value.entries[i].path:resolve(rootDir,value.entries[i].path)));
   // The publisher owns only the original {path} registration element. A
   // matching manifest does not authorize deleting user-added entry fields.
   const modified=workspace.ownedIndexes.some(i=>Object.keys(value.entries[i]).length!==1||!Object.hasOwn(value.entries[i],'path'));
@@ -72,7 +72,7 @@ export function requireUninstallPostconditions(journal,{rootDir,scope,stages=jou
   }
   for(const entry of journal.plan.footprint.observations){if(uninstallWorkspacePath(entry)!==(stage==='workspace')||journal.actions.some(a=>a.path===entry.path))continue;if(readPhysicalFootprint(join(rootDir,entry.path))?.sha256!==entry.sha256)footprintFail(stage==='workspace'?'PU-WORKSPACE-DRIFT':'PU-KEY-DRIFT');}
   if(stage==='workspace'){
-   const current=observeAntigravityWorkspaceBindings({workspaceRoot:rootDir});if(current.status==='unavailable'||current.ownedIndexes.length)footprintFail('PU-WORKSPACE-DRIFT');
+   const current=observeAntigravityWorkspaceBindings({workspaceRoot:rootDir,trackedRelative:true});if(current.status==='unavailable'||current.ownedIndexes.length)footprintFail('PU-WORKSPACE-DRIFT');
    const wiring=deriveUninstallWorkspaceFootprint({rootDir,workspace:current});if(wiring.conflicts.length||wiring.actions.length)footprintFail('PU-WORKSPACE-DRIFT');
   }
  }

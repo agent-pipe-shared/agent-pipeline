@@ -95,11 +95,12 @@ export function observeAntigravityLoadedTopologyWithWiring(args){
  try{const observation=observeAntigravityPluginTopology({configRoot:args.configRoot,workspaceRoot:args.workspaceRoot,approvedSourceRoot:result.sourcePluginRoot});const plans=wiring(observation,args.configRoot,args.workspaceRoot);return Object.freeze({...result,status:result.status==='current'&&plans.some(p=>p.changes>0)?'refresh-required':result.status,wiringStatus:plans.some(p=>p.changes>0)?'stale-owned':'current-or-foreign'});}
  catch(e){return Object.freeze({...result,status:'unavailable',reason:/^ATR-[A-Z-]+$/.test(e?.message)?e.message:'ATR-WIRING-OWNERSHIP-UNVERIFIABLE',wiringStatus:'unverifiable'});}
 }
-export function observeAntigravityWorkspaceBindings({workspaceRoot}){
+// `trackedRelative` (uninstall only): a tracked, path-free (repo-relative) entry is resolved against the workspace, must lie strictly inside it, and is then classified by its manifest name like an absolute one. Without the flag a relative entry stays unavailable (the refresh paths never own or remove a tracked entry). A relative entry that resolves elsewhere or cannot be read stays unavailable.
+export function observeAntigravityWorkspaceBindings({workspaceRoot,trackedRelative=false}){
  const path=join(workspaceRoot,'.agents','plugins.json');
  try{directory(workspaceRoot);const f=read(path);if(f.status==='absent')return {schema:'pipeline.antigravity-workspace-bindings.v1',status:'absent',path,sha256:null,ownedIndexes:[],foreignIndexes:[]};
   if(!Array.isArray(f.value?.entries)||f.value.entries.length>128)throw Error('ATR-REGISTRY');const ownedIndexes=[],foreignIndexes=[];
-  f.value.entries.forEach((entry,index)=>{if(typeof entry?.path!=='string')throw Error('ATR-REGISTRY');directory(entry.path);const manifest=read(join(entry.path,'plugin.json'));if(manifest.status!=='observed'||typeof manifest.value?.name!=='string')throw Error('ATR-REGISTRY');(manifest.value.name===NAME?ownedIndexes:foreignIndexes).push(index);});
+  f.value.entries.forEach((entry,index)=>{if(typeof entry?.path!=='string')throw Error('ATR-REGISTRY');let target=entry.path;if(trackedRelative&&!isAbsolute(target)){target=resolve(workspaceRoot,target);if(within(workspaceRoot,target)===null)throw Error('ATR-REGISTRY');}directory(target);const manifest=read(join(target,'plugin.json'));if(manifest.status!=='observed'||typeof manifest.value?.name!=='string')throw Error('ATR-REGISTRY');(manifest.value.name===NAME?ownedIndexes:foreignIndexes).push(index);});
   return {schema:'pipeline.antigravity-workspace-bindings.v1',status:'observed',path,sha256:f.sha256,ownedIndexes,foreignIndexes};
  }catch{return {schema:'pipeline.antigravity-workspace-bindings.v1',status:'unavailable',path,sha256:null,ownedIndexes:[],foreignIndexes:[]};}
 }

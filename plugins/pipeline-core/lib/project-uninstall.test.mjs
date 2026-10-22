@@ -239,9 +239,31 @@ test('AC216-B4: an oversized log.jsonl is validated to its last byte: a bad reco
  writeFileSync(log,big);assert.deepEqual(f.controller.plan({rootDir:f.root}).conflicts,[]);
 });
 
+// D79 follow-up: the installer writes a repo-relative Pipeline entry into the tracked workspace registry.
+function relativeRegistry(f,relativePath){
+ f.put('plugins/pipeline-core/plugin.json',JSON.stringify({name:'agent-pipeline-core',version:'0.7.0'}));
+ const registry=' \n{ "custom" : "\\u00df", "entries" : [ {"path":'+JSON.stringify(relativePath)+'},\n { "path" : '+JSON.stringify(f.foreign)+', "enabled" : false } ], "tail" : 1 }\n';
+ f.put('.agents/plugins.json',registry);return registry;
+}
+test('D79: a tracked repo-relative Pipeline registry entry inside the workspace is an owned binding that the uninstall removes and reads back',t=>{
+ const f=fixture(t),registry=relativeRegistry(f,'plugins/pipeline-core'),before=readFileSync(join(f.root,'plugins/pipeline-core/plugin.json'));
+ const plan=f.controller.plan({rootDir:f.root});assert.deepEqual(plan.conflicts,[]);assert.deepEqual(plan.workspace.ownedIndexes,[0]);assert.deepEqual(plan.workspace.foreignIndexes,[1]);
+ assert(plan.footprint.actions.some(a=>a.path==='.agents/plugins.json'));
+ const r=f.controller.apply(plan,options(plan));assert.equal(r.status,'uninstalled');completed(f,plan);
+ const after=readFileSync(join(f.root,'.agents/plugins.json'),'utf8'),value=JSON.parse(after);
+ assert.deepEqual(value.entries,[{path:f.foreign,enabled:false}]);assert(after.startsWith(' \n{ "custom" : "\\u00df"'));assert(after.endsWith('], "tail" : 1 }\n'));assert.notEqual(after,registry);
+ assert.deepEqual(readFileSync(join(f.root,'plugins/pipeline-core/plugin.json')),before,'the plugin directory itself is project content and stays');
+});
+for(const [name,relativePath] of [['resolves outside the workspace','../foreign-plugin'],['names a directory that does not exist','plugins/missing']])test('D79: a tracked relative registry entry that '+name+' stays unavailable with a runnable repair and nothing changes',t=>{
+ const f=fixture(t),registry=relativeRegistry(f,relativePath),bytes=f.digests(),config=readFileSync(join(f.root,'.git/config'));
+ assert.throws(()=>f.controller.plan({rootDir:f.root}),e=>e.code==='PU-WORKSPACE-UNVERIFIABLE'&&e.instructions.path==='.agents/plugins.json'&&e.instructions.removed===false&&/re-runs the uninstall/.test(e.instructions.attendedStep)&&!/\/home\/|[A-Z]:\\/.test(e.instructions.attendedStep));
+ assert.equal(readFileSync(join(f.root,'.agents/plugins.json'),'utf8'),registry);assert.deepEqual(f.digests(),bytes);assert.deepEqual(readFileSync(join(f.root,'.git/config')),config);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
+});
+
 // Each original sibling callback is registered individually; no envelope case. The count is the fifteen originals plus the
-// two oversized-log cases above (UC02C016, UC02C017); the originals keep their ids because new cases are appended.
-if (completionCases.length !== 17) throw new Error("Required completion declared case count drift");
+// two oversized-log cases above (UC02C016, UC02C017) plus the three D79 relative-entry cases (UC02C018-UC02C020); the originals
+// keep their ids because new cases are appended.
+if (completionCases.length !== 20) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
