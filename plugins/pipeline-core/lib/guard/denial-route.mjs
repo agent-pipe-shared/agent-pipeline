@@ -7,7 +7,7 @@ import { isSessionCapabilityFailurePhase } from "../codex-onboarding-capabilitie
 import { placeholder, renderHumanCopySafeCommand } from "../copy-safe-command.mjs";
 import { consumeHumanGuardOverride, humanGuardRouteUnavailableReason, recordHumanGuardDenial } from "../human-guard-override.mjs";
 import { readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
-import { CONTROLLING_NON_READY_STATUSES, INTAKE_LIFECYCLE_STATUSES, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, PLUGIN_ROOT } from "./constants.mjs";
+import { AUTHORITY_RESTORE_SCRIPT, CONTROLLING_NON_READY_STATUSES, INTAKE_LIFECYCLE_STATUSES, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, PLUGIN_ROOT } from "./constants.mjs";
 import { GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, GRAMMAR_DENIAL_REMEDY_SHORT, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY } from "./grammar-denials.mjs";
 import { verdict } from "./verdict.mjs";
 
@@ -255,7 +255,9 @@ export function protectedStateWriterOnly() {
 // prevents the drift, it does not offer any new way to lift the class once reached.
 const AUTHORITY_DOCUMENT_BOUND_CODE = "GUARD-LIFECYCLE-AUTHORITY-BOUND";
 
-export function protectedAuthorityDocumentWriteOnly(matchedRelativePath) {
+export function protectedAuthorityDocumentWriteOnly(matchedRelativePath, root) {
+  // D31 / AC-115: the pre-edit warning. Named before the edit, not discovered after it.
+  const restoreCommand = `node ${AUTHORITY_RESTORE_SCRIPT} restore --root ${typeof root === "string" ? root : "<project root>"}`;
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
@@ -272,7 +274,12 @@ export function protectedAuthorityDocumentWriteOnly(matchedRelativePath) {
       + "If the only problem is a missing/incorrect PO plan acknowledgement marker on an "
       + "otherwise-correct bound PRD, the narrower `po-authority-acknowledge-plan` / "
       + "`po-authority-acknowledge-apply` route (NVA-W4-2B) records the acknowledgement "
-      + "without reopening design or editing the file directly.\n",
+      + "without reopening design or editing the file directly.\n"
+      + "If an edit gets through anyway (any route that bypasses this refusal), the approval is invalidated: the file no "
+      + "longer matches its approved digest and the design lock engages (readiness drops to partial).\n"
+      + "Undo an edit that already happened, with no PO round trip and no new design review: "
+      + `\`${restoreCommand}\` restores the exact approved bytes from git (add \`--commit <full sha>\` to name another source) `
+      + "and refuses, writing nothing, when those bytes are not the approved ones.\n",
   );
 }
 

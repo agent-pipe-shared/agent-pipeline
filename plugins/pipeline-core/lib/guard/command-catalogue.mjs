@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
-import { ARCHITECTURE_BASELINE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+import { AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
 import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
@@ -210,6 +210,25 @@ function sanctionedArchitectureBaselineArgs(args, root) {
   return !(has("--diff") && (has("--from") || has("--through"))) && has("--from") === has("--through");
 }
 
+// AC-245 (D139): scripts/dispatch-recovery.mjs keeps ONE bounded recovery state file per dispatch under
+// <root>/evidence (it validates its own inputs and refuses with a repair). Admitted as exactly three argv shapes,
+// all bound to this root; the packet and result are repository-relative regular .json paths without a dot segment.
+const RECOVERY_DISPATCH_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/u;
+const RECOVERY_INPUT = /^(?:scratch|evidence)\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\.json$/u;
+function sanctionedDispatchRecoveryArgs(args, root) {
+  if (!exactRoot(args, root, 1)) return false;
+  const rest = args.slice(3);
+  if (args[0] === "inspect") return rest.length === 2 && rest[0] === "--dispatch-id" && RECOVERY_DISPATCH_ID.test(rest[1]);
+  if (args[0] === "clear") {
+    return rest[0] === "--dispatch-id" && RECOVERY_DISPATCH_ID.test(rest[1] ?? "")
+      && (rest.length === 2 || (rest.length === 3 && rest[2] === "--discard-corrupt"));
+  }
+  if (args[0] !== "record") return false;
+  const input = (value) => RECOVERY_INPUT.test(value ?? "") && !value.split("/").some((part) => part === "." || part === "..");
+  return rest[0] === "--packet" && input(rest[1]) && rest[2] === "--result" && input(rest[3])
+    && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
@@ -269,6 +288,13 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   // `eligibility()` (pure) and reaches `recordHumanGuardDenial()` only on the branch that
   // returns before `storage()` -- its own AC-5 test pins that it writes nothing.
   if (script === REPAIR_MAP_SCRIPT) return args.length === 0;
+  if (script === DISPATCH_RECOVERY_SCRIPT) return sanctionedDispatchRecoveryArgs(args, root);
+  // D31 / AC-115: the typed self-revert of an edited bound PRD/Spec. One closed shape per verb: `--root <this root>` and an
+  // optional full-length `--commit` revision; the script itself refuses (no state written) unless the restored bytes hash to the approved digest.
+  if (script === AUTHORITY_RESTORE_SCRIPT) {
+    return ["inspect", "restore"].includes(args[0]) && exactRoot(args, root, 1)
+      && (args.length === 3 || (args[3] === "--commit" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(args[4] ?? "") && args.length === 5));
+  }
   if (script === SESSION_CAPABILITY_DIAGNOSE_SCRIPT) return args[0] === "--repo" && args[1] === root && args.length === 2;
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
   if (script === SESSION_CRITIC_FINALIZER_SCRIPT) return sanctionedSessionCriticFinalizerArgs(args, root);

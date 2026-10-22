@@ -303,7 +303,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       }
       const boundAuthority = boundAuthorityDocumentPath(root, requested);
       if (boundAuthority !== null) {
-        return withLifts(lifts, protectedAuthorityDocumentWriteOnly(boundAuthority));
+        return withLifts(lifts, protectedAuthorityDocumentWriteOnly(boundAuthority, root));
       }
       const hooksDisableFinding = hooksDisableSettingsWriteFinding({
         filePath: requested,

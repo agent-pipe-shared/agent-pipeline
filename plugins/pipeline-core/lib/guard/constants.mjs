@@ -167,6 +167,11 @@ export const OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("..
 export const TRANSCRIPT_RECOVERY_SCRIPT = fileURLToPath(new URL("../../scripts/runner-transcript-recovery.mjs", import.meta.url));
 
 export const REPAIR_MAP_SCRIPT = fileURLToPath(new URL("../../scripts/repair-map.mjs", import.meta.url));
+// AC-245 (D139): the dispatch recovery verb, admitted as three exact argv shapes (sanctionedDispatchRecoveryArgs).
+export const DISPATCH_RECOVERY_SCRIPT = fileURLToPath(new URL("../../scripts/dispatch-recovery.mjs", import.meta.url));
+
+// D31 / AC-115: the typed self-revert of an edited, bound authority document (digest-checked restore of the approved bytes).
+export const AUTHORITY_RESTORE_SCRIPT = fileURLToPath(new URL("../../scripts/authority-restore.mjs", import.meta.url));
 
 export const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../../scripts/codex-host-repository-init.mjs", import.meta.url));
 
