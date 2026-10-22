@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Pins the API of `lib/scratch-retention.mjs` (PO decision P, sprint-alfred
  * slice C-S1): a read-only durability assessment of `scratch/` and a sweep

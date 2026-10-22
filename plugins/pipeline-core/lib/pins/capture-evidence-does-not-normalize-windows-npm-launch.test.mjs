@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Pin: pipeline.capture-evidence-does-not-normalize-windows-npm-launch (AC-122, ALF-C-P7-06).
 //
 // The original item body is not public (portable-original-requirements.json: association

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Controlled METHOD tests only: no Human, native or installed authority claim.
 import assert from 'node:assert/strict';
 import {after} from 'node:test';

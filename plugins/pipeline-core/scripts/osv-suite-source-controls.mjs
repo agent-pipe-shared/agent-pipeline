@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Test task DATA for the genuine Source-owned authoring producer. These strings
 // carry no course, identity, registration, requester or verification authority.
 // Root alone executes a suite after the real production association is issued.

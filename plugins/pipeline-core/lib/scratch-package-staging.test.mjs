@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Root-only substantive controls. Source author has not executed this file.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';

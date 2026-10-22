@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes } from 'node:crypto';
 import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -21,7 +22,6 @@ import * as afk from './afk-ledger.mjs';
 import * as power from './session-power.mjs';
 import * as worker from './local-worker-supervisor.mjs';
 import * as windowsAuthority from './windows-owned-authority-backend.mjs';
-
 export const SESSION_AUTHORITY_LIMITS = Object.freeze({ maxParticipants:12,maxNamespaceEntries:4096,maxRecordBytes:1048576,maxSourceEntryBytes:1048576,maxJournalEntryBytes:67108864,maxSourceTotalBytes:16777216,maxDirectoryDepth:6,maxModelFamilyReceipts:4096,maxNativePendingBytes:131072,maxNativeRequestBytes:7340032,maxRequesterBindingBytes:16384,maxTransportFrameBytes:16384,transportReadTimeoutMs:2000 });
 export const SESSION_AUTHORITY_EVENT_STAGES = Object.freeze(['after-reservation-published-before-effects','after-owner-effects-readback','after-terminal-readback-before-release','after-release-published-before-member-update','after-member-release-published']);
 const KINDS = Object.freeze(['continuity','override','ceremony','dispatch','armed-capability']);

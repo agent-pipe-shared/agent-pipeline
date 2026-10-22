@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import nodeFs from "node:fs";
 
 const WIN32_UNSUPPORTED = new Set(["EPERM", "EINVAL", "EISDIR", "EACCES", "ENOTSUP"]);

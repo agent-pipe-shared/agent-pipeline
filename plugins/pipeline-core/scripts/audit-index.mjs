@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 // Generated audit index: one machine-readable record of the source, commit and
 // gate digests behind a change, with every step that cannot be evidenced named
 // explicitly as missing (never silently omitted).

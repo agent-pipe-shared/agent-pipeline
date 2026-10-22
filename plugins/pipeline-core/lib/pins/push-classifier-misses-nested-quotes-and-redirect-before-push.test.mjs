@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Pin: pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push (ALF-C-P4-04, AC-238).
 // Exercises the real `commandIsGitPush` (the shared classifier behind guard-push and the Codex pretool route).
 // Acceptance points (backlog item Description/Proposal):

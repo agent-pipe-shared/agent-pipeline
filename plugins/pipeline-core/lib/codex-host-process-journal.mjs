@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: SUL-1.0
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation, nativeManagedPostTerminalRecord } from './native-managed-authority-support.mjs';
 import { withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord } from './session-authority-registry.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectManagedCodexAuthorityTerminal, readManagedCodexTerminalJournal } from './codex-host-process-supervisor.mjs';
-// SPDX-License-Identifier: SUL-1.0
 // Linux process journal for owned Codex readiness sessions.
 import { createHash, randomBytes } from 'node:crypto';
 import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync,

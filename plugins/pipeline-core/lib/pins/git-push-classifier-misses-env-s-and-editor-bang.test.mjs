@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Pin for backlog 2026-10-08-git-push-classifier-misses-env-s-and-editor-bang (AC-180).
 // Acceptance: `commandIsGitPush` refuses (classifies as a push) both
 //   - `env -S 'git push origin main'`

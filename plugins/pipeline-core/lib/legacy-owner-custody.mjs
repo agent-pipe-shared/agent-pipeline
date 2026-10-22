@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // RV-2 (specs/sprint-alfred-epic/spec.md lines 1201-1203): CAS-conflict
 // classification of a legacy session-cleanup receipt. classifyLegacyReceipt()
 // is classify-only and read-only: it never creates, writes, renames or deletes

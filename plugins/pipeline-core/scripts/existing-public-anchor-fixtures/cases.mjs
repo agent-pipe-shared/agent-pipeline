@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, lstatSync, realpathSync, readdirSync, chmodSync, unlinkSync, symlinkSync, linkSync } from 'node:fs';
 import { join, dirname } from 'node:path';

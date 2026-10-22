@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Typed, plan-bound repair for the per-user session-power address root (PO decisions D71 and D72,
 // correction cluster K1, AC-203: no dead end in the session-authority domain).
 //

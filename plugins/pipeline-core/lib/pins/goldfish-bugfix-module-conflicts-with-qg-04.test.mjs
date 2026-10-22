@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Pin: the Goldfish BUGFIX template module must not conflict with QG-04 (AC-186).
  * Item: pipeline.goldfish-bugfix-module-conflicts-with-qg-04.

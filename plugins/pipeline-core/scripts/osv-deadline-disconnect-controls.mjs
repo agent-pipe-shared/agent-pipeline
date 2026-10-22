@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Real elapsed-time and real owning-lifetime controls. No clock, transport,
 // spawn, backend, or authority callback is supplied to product code.
 import assert from 'node:assert/strict';

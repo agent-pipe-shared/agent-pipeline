@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // ALF-C-P14-01 / AC-203: host crash during Verify leaves a descriptor that no recovery verb can clear.
 // Pins the recovery routes for an orphaned descriptor whose owner is unobservable (ownerPid -1 =>
 // status `unavailable`): a zero-authority one is archived by the typed verb; a resource-bearing one

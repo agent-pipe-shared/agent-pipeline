@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 // Source-owned, dispatch-bound Critic notes writer (AC-143 / PO decision AC-144 option (a)).
 //
 // A Critic has no Write tool outside its notes route and the closed shell grammar admits neither `openssl`

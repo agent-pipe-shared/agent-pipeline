@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";

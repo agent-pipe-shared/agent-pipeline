@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Real subprocess negative controls. This module does not issue an OSV context.
 // It is evaluated only by Root in a coherent selected Source closure.
 import assert from 'node:assert/strict';

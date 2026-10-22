@@ -7203,8 +7203,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     assert.equal(appServerFirst.continuity.status, "absent-pristine");
     assert.equal(appServerFirst.nextAction, null);
 
-    // Onboarding now seeds docs/adr/ (D80), so docs/ already exists in an onboarded root.
-    mkdirSync(join(pristine, "docs"), { recursive: true });
+    mkdirSync(join(pristine, "docs"), { recursive: true }); // onboarding seeds docs/adr/ (D80)
     writeFileSync(join(pristine, "docs", "state.md"), "manual handover\n", { flag: "wx" });
     const damaged = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: pristine,

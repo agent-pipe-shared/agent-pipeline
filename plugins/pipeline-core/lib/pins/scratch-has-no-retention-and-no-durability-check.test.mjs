@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Regression pin for backlog item pipeline.scratch-has-no-retention-and-no-durability-check
  * (Alfred AC-246). Two original acceptance points:

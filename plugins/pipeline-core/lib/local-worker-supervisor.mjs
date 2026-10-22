@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: SUL-1.0
 
 import {fileURLToPath as authorityFileURLToPath} from 'node:url';
 import {authorityOwnerFailure, actualAuthorityRepository as authorityActualRepository, authorityRepositoryFromRoot, createDomainAuthorityOwner as authorityCreateDomainOwner, scanAuthorityDomain as authorityScanDomain, classifyAuthorityLifetime as authorityClassifyLifetime, mergeAuthoritySnapshots as authorityMergeSnapshots, readAuthoritySourceFile as authorityReadSource, publishSourceOwnedAuthorityRoot as authorityPublishRoot, authorityDomainDigest as authorityDigest} from './session-authority-domain-owner.mjs';
-// SPDX-License-Identifier: SUL-1.0
 /**
  * Functional Nova B1-I same-host worker supervisor.
  *

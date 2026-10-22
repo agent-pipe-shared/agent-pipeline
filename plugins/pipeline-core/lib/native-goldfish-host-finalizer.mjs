@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE, nativeGoldfishHostStateInternals } from "./native-goldfish-host-state.mjs";
 import { validateNativeGoldfishFinal } from "./native-goldfish-host-return.mjs";
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
@@ -6,7 +7,6 @@ import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal
 import { readNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
 import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, writeSync, fsyncSync, readdirSync } from 'node:fs';
 import { parseStrictJson } from './governance-event.mjs';
-// SPDX-License-Identifier: SUL-1.0
 /** Host-owned Claude/Codex Goldfish completion: validate, commit, receipt, then v4 record. */
 import { realpathSync } from "node:fs";
 import { resolve, dirname, isAbsolute, join } from "node:path";

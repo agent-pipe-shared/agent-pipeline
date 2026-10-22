@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Domain-specific physical source adapters. No handles or authority callbacks are minted here.
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, realpathSync } from 'node:fs';

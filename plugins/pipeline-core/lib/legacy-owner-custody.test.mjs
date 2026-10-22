@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // RV-2 pins (Spec 20.3, "RV-2"): CAS-conflict classification of a legacy
 // session-cleanup receipt requires matching bounded status/schema/digest AND
 // matching compare flags; a mismatch or an ambiguity preserves the bytes and

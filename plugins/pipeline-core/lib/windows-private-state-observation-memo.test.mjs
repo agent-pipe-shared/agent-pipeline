@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // ALF-C-LAT-01: the native Windows DACL observation is memoized per process, keyed by exact path
 // AND lstat identity, never for failures, and never when a test seam (run/environment) is injected.
 import assert from "node:assert/strict";

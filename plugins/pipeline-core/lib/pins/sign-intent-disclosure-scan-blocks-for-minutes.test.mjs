@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Pin for pipeline.sign-intent-disclosure-scan-blocks-for-minutes (AC-257).
 // Proposal points: (1) signed quality package disclosed directly, before the GMW/HGO resolvers;
 // (2) HGO lookup digest-keyed, never a store scan; (3) readiness before any resolver work;

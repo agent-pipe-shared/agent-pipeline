@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Physical custody for Source-created, disposable AFK method repositories.
 // This module grants no requester, operation, member, State, METHOD, or approval authority.
 import { spawnSync } from "node:child_process";

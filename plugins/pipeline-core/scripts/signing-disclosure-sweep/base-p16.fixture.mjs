@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Mechanical extraction of the only base export used by the signing controls.
 import {readFileSync} from 'node:fs';
 import {statePath} from '../pipeline-state.mjs';

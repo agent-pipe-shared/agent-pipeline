@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Pin: pipeline.push-classifier-misreads-backslash-escaped-quotes (AC-237, ALF-C-P4-03).
 // Acceptance points (backlog item Proposal): fail closed on a backslash-escaped quote beside a git word, with
 // GL-B13, the plain echo-wrapped shape and the quoted-executable shape pinned as classified pushes; harmless

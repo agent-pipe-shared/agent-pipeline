@@ -1,9 +1,9 @@
+// SPDX-License-Identifier: SUL-1.0
 import {observeNativePlatformProcess} from './native-platform-process-observer.mjs';
 import { nativeManagedRepository } from './native-managed-authority-support.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { observeManagedCodexAuthorityRunning, completeManagedCodexAuthority } from './codex-host-process-journal.mjs';
 import { createManagedCodexRequesterRuntime } from './session-requester-bridge.mjs';
-// SPDX-License-Identifier: SUL-1.0
 // Owned POSIX process supervision; final receipts belong to readiness composition.
 import { spawn } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';

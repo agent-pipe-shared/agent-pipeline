@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Original OSV001–008, prospective executable callbacks. The supplied factory is
 // ONLY the genuine approved-course fixture constructor selected and pinned by
 // Root. It is not a Source backend and cannot issue a brand or bypass a check.

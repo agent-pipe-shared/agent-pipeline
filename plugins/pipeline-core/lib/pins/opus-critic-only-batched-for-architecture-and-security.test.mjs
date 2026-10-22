@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Pin for pipeline.opus-critic-only-batched-for-architecture-and-security (AC-222).
 // Reads the real canon/route files and calls the real dispatch-policy module; no mocks.
 //

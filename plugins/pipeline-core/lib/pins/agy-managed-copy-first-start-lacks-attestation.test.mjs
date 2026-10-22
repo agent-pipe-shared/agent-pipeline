@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Pin: pipeline.agy-managed-copy-first-start-lacks-attestation (AC-111, slice ALF-C-P18-02).
 // Qualifies the original acceptance of backlog item 2026-09-29 against the real installer,
 // refresh host and preflight. Only documented injection seams are used (observeSource,

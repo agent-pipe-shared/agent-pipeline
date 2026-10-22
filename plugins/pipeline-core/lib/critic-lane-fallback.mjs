@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Codex Critic lane fallback decision (design note
 // specs/sprint-alfred-epic/design/codex-critic-lane-2026-10-08.md section 4).
 // Pure: no I/O. N1 = B (the receipt carries only digests of the native lane

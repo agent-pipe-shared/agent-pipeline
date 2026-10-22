@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 // Repair route for the session-power address root named by the SP-ADDRESS refusal (D71, D72).
 //
 //   node <plugin-root>/scripts/session-power-address-repair.mjs plan

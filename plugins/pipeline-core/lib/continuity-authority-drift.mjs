@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Pure projection of PRD/Spec digest drift against a continuity object's recorded authority.
  * No filesystem access: the caller supplies observeSha256(repoRelativePath), which returns a

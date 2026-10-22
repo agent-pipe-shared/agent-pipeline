@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Actual source-owned setup. Loaded only by a Root-authorized isolated child.
 // Requires a staged genuine base fixture and actual closed I03 source bridge.
 import assert from 'node:assert/strict';

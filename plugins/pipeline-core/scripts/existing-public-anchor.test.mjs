@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import { after } from 'node:test';
 import { mkdtempSync, chmodSync, lstatSync, realpathSync, rmSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';

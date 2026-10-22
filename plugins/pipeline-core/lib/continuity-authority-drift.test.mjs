@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * RED pins for R6-2 (AC-31): continuity PRD/Spec digest drift, pure projection half.
  * Task R6-T0a-20261008 (test-only, QG-04). Design note:

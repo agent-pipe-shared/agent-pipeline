@@ -1,9 +1,9 @@
+// SPDX-License-Identifier: SUL-1.0
 import {authorityRepositoryFromRoot} from './session-authority-domain-owner.mjs';
 import {withAfkAuthorityLifetime,executeSourceOwnedAfkProjectionLifetime,readSourceOwnedAfkProjectionPhysicalSnapshot} from './afk-ledger.mjs';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {readAuthoritySourceFile} from './session-authority-domain-owner.mjs';
 import {readSourceOwnedOnboardingAfkAdmission,settleSourceOwnedOnboardingAfkProjection,observeSourceOwnedControlledMethodAfkHostCheckpoint} from './onboarding-continuity.mjs';
-// SPDX-License-Identifier: SUL-1.0
 import { hostname } from "node:os";
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";

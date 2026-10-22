@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Slice AL-T: pins for the Codex Critic lane fallback decision (design note
 // specs/sprint-alfred-epic/design/codex-critic-lane-2026-10-08.md section 4).
 // Fixture-only: no runner is launched; preflight/scratch/readback are injected spies.

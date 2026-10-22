@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Test-only synthetic original chat event; no real human proof is claimed.
 // Production original-approval producer/observer and physical hashes are used.
 import assert from 'node:assert/strict';

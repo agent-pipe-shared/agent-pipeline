@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Regression pin (ALF-C-P4-05, AC-268): vim/vi/ex ex-mode and busybox shell applets fed a here-document are NOT data to the
 // push classifier. Backlog item:
 // backlog/items/2026-10-07-vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.md

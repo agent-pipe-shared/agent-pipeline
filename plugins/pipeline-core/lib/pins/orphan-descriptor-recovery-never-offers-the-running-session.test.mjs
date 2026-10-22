@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // ALF-C-ORPHAN-DESCRIPTOR3 / AC-203 (PO decision 2026-10-17): session-cleanup must never offer or archive
 // the RUNNING session's own descriptor. The Claude hook creates that descriptor as `claude-<id>` with a null
 // owner runtime, so its owner status is `unavailable` and, without an identity check, it is indistinguishable

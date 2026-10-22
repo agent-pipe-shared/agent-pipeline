@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Regression pin: ALF-C-P7-03 / AC-199
 // Item: pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier (PO decision AF).
 // Acceptance: a heredoc / here-string received by a command RUNNER (xargs, at, batch, ed, ex, sqlite3, php, lua,

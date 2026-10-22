@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Regression pin: pipeline.semgrep-offline-default-version-check (AC-251).
 // The Semgrep adapter must force SEMGREP_ENABLE_VERSION_CHECK=0 AFTER the caller/process
 // environment merge, so an offline local-rules scan never blocks on the version check, while

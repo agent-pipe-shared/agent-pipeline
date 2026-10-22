@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Regression pin: pipeline.codex-bootstrap-in-the-typed-next-action (AC-131).
 //
 // The original item is deliberately conditional: "After verifying the premise, include the design-readiness

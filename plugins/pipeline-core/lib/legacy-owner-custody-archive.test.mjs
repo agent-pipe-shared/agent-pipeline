@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // RV-4 pins (Spec 20.3, "RV-4", spec.md 1207-1211; design note
 // specs/sprint-alfred-epic/design/recovery-availability-rv-2026-10-08.md, slice
 // S5 "RV-4 replay/archive"): a valid matching receipt keeps its exact bytes and
@@ -71,7 +72,6 @@ const RV4_CODES = Object.freeze({
   targetUnsafe: "LOC-TARGET-UNSAFE",
   receiptAmbiguous: "LOC-RECEIPT-AMBIGUOUS",
 });
-
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Pin for backlog item pipeline.push-classifier-does-not-model-powershell-backtick-escapes (AC-236, ALF-C-P4-02).
 //
 // Acceptance (item Proposal): on the PowerShell lane a backtick escapes the next character, a here-string is one span

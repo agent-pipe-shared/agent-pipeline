@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * ALF-C-HK-01F: one planSessionCleanupRecovery call loads each session
  * descriptor once per distinct argument tuple, even though the retirement,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Source-owned observer assembly. This grants no operation/requester authority.
 // Resolve factory exports only when called, after cyclic owner modules initialize.
 import * as onboarding from './onboarding-continuity.mjs';

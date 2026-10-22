@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // K1 / D71 / D72: the typed repair verb for the session-power address root. Every case uses a private
 // temporary home passed to the library; nothing here touches the real home or the real address root.
 // The test never removes anything either: fixtures stay in the runner's private TMPDIR.

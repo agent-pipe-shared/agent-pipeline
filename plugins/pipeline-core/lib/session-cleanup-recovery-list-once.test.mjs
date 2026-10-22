@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * ALF-C-HK-01D: one planSessionCleanupRecovery call lists the active session
  * descriptors once, even when the archive offer re-reads them. Fully injected

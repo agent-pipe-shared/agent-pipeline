@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 // Recovery refusal registry (RV-7): maps each typed refusal code to what a
 // recovery caller may do next.
 //

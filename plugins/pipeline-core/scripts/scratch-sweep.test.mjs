@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Pins the CLI `scripts/scratch-sweep.mjs` (PO decision P, sprint-alfred slice
  * C-S2): the explicitly invoked front end of `lib/scratch-retention.mjs`
@@ -45,7 +46,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-
 import { assessScratchDurability, planSweep } from '../lib/scratch-retention.mjs';
 import { privateMkdtemp } from '../lib/test-private-tmp.mjs';
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Pin: Goldfish briefs carry targeted and quick command routes (AC-187).
  * Item: pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import {registerTestCaseCompletion} from "./test-case-completion.mjs";
 import {spawnSync} from "node:child_process";
