@@ -25,8 +25,15 @@
 - PO list: chat-mode `approve-push` with a catalogue still has no shell route and its refusal names an empty `inspect`;
   `TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE` should name the missing home directory; WINACL001 possible product defect; orphan node.exe;
   MFHS023/028 cross-process ownership (post-0.7.0); stale "still open" backlog item texts.
-- Open before any acceptance: independent Critic batch, Full Verify (WSL, then Windows per D133), Reader 2+1 course (D140), native
-  Windows and installed-host clauses, PO acceptance. Greenfield tests start on the installed candidate.
+- Path to close 0.7.0 (ordered; owner in brackets; a finding in any step goes back to a fix and a re-stamp before the next step):
+  1 [PO] install stamp `9355151ff`, rsync later commits, restart; [agent] guard smoke check right after the restart, before any work.
+  2 [agent, PO away] the post-resume block above (K53, remeasure, `agent` clauses, PO list).
+  3 [PO] greenfield happy-path tests on the installed candidate (Claude/Windows, Codex/WSL, Antigravity); findings feed back into fixes.
+  4 [agent] Windows efficiency without native runs (D133: typed skips, canary set, WINACL001), then WSL Full Verify once, counted.
+  5 [agent, cost estimate to the PO first] independent Opus Critic batch (D86/D119), then delta Critics on fixes.
+  6 [agent] Reader 2+1 course at content freeze (D140; the two documentation findings first).
+  7 [agent] final remeasure of the matrix; [PO] decision tiles (29), signature ceremonies (5), native-host runs (101), acceptance lists
+  in blocks (144). 8 [PO call] final stamp, push signature, release decision. Nothing here is accepted before step 7.
 
 **Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
 Read these three files first, in this order, before any other work:
