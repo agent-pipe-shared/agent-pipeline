@@ -63,7 +63,7 @@ import { isPhysicalScratchTarget } from "./physical-scratch-boundary.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { isGitIndexOnlyInvocation, parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
+import { isGitIndexOnlyInvocation, parseGuardCommand, sedWriteTargets } from "../hooks/guard-command-grammar.mjs";
 import { scanShell } from "./git-cmd.mjs";
 import {
   LEGACY_GUARD_CONFIG,
@@ -926,8 +926,8 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
         continue;
       }
 
-      const inPlace = IN_PLACE_EXECUTABLES.has(executable)
-        && argv.some((arg) => IN_PLACE_FLAGS.has(arg) || /^-[a-z]*i[a-z]*$/u.test(arg));
+      const sed = executable === "sed" ? sedWriteTargets(argv) : null;
+      const inPlace = IN_PLACE_EXECUTABLES.has(executable) && (sed?.inPlace || argv.some((arg) => IN_PLACE_FLAGS.has(arg) || /^-[a-z]*i[a-z]*$/u.test(arg)));
       const isGit = executable === "git";
       const verbIndex = isGit ? gitVerbIndex(argv) : 0;
       const verb = isGit ? (argv[verbIndex] ?? null) : null;
@@ -953,7 +953,7 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       // gitWriteTargetOperands()); the prior whole-argv `operands()` walk stays exactly as
       // before for every non-git writer.
       const postVerbArgv = gitWrite ? argv.slice(verbIndex + 1) : [];
-      const targetOperands = gitWrite ? gitWriteTargetOperands(verb, postVerbArgv) : writeTargetOperands(executable, argv);
+      const targetOperands = gitWrite ? gitWriteTargetOperands(verb, postVerbArgv) : (sed ? sed.targets : writeTargetOperands(executable, argv));
       for (const operand of targetOperands) {
         targets.push({ candidate: operand, lane: gitWrite ? "git-working-tree-write" : "write-command" });
       }
@@ -994,7 +994,7 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
     throw new Error("mutating git apply has unbound patch targets");
   }
   const inPlaceNamed = [...IN_PLACE_EXECUTABLES].some((name) =>
-    containsWholeToken(lowered, name) && (/(?:^|\s)-(?:[a-z]*i[a-z]*|-[a-z]*in-place)(?:[\s=]|$)/u.test(lowered))
+    containsWholeToken(lowered, name) && (/(?:^|\s)-(?:[a-z]*i[^\s]*|-[a-z]*in-place)(?:[\s=]|$)/u.test(lowered))
   );
   const opaqueCodeNamed = [...OPAQUE_CODE_FLAGS.entries()].some(([name, flags]) =>
     containsWholeToken(lowered, name) && flags.some((flag) => (new RegExp(`(?:^|\\s)${flag}(?:[\\s=]|$)`, "u")).test(lowered))

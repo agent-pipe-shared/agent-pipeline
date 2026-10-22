@@ -528,3 +528,72 @@ export function isGitIndexOnlyInvocation(verb, args) {
   }
   return seenRequired;
 }
+
+/**
+ * Backlog pipeline.git-stash-list-classified-as-working-tree-write (PF-16): which operands of a `sed` invocation are
+ * FILES. GNU sed takes the first non-option operand as the SCRIPT unless a script is given by `-e`/`-f`/`--expression`/
+ * `--file`, in which case every non-option operand is a file; the old whole-argv walk reported the script (and the value
+ * of `-e`/`-f`) as the written file, so a denial named `s/^...` instead of the real target. Options with a value are
+ * consumed (`-e S`, `-eS`, `--expression=S`, `-f F`, `-l N`, `--line-length=N`, an unambiguous long-option prefix); `-i[SUFFIX]`
+ * and `--in-place[=SUFFIX]` take a GLUED suffix only and end their short cluster (`-ni`, `-i.bak`, `-ie` = suffix `e`).
+ * A bare `-i` followed by an empty argument is the BSD detached empty suffix and the GNU empty script at once, so both
+ * readings stay candidates. An unrecognised option is a boolean. With `-i`, the filenames of `w`/`W` commands and of an
+ * `s///w` flag in a script are written too and are returned as targets. `inPlace` is the parsed fact; callers OR it with
+ * their own looser detection, so nothing that was refused before stops being refused.
+ */
+const SED_LONG_OPTIONS = new Map([
+  ["expression", "script"], ["file", "script-file"], ["line-length", "value"], ["in-place", "in-place"],
+  ["binary", null], ["debug", null], ["follow-symlinks", null], ["null-data", null], ["zero-terminated", null],
+  ["posix", null], ["quiet", null], ["silent", null], ["regexp-extended", null], ["sandbox", null],
+  ["separate", null], ["unbuffered", null], ["version", null], ["help", null],
+]);
+
+function sedScriptWriteFiles(script) {
+  const files = [];
+  const command = /(?:^|[;{}\n])[\s\d,$~+!]*(?:\/(?:\\.|[^/\\])*\/[\s!]*)?[wW][ \t]*([^\s;}]+)/gu;
+  const flag = /(?:^|[\s;{}!])s(.)(?:\\.|(?!\1).)*?\1(?:\\.|(?!\1).)*?\1[gpiImMeE0-9]*w[ \t]*([^\s;}]+)/gu;
+  for (const match of script.matchAll(command)) files.push(match[1]);
+  for (const match of script.matchAll(flag)) files.push(match[2]);
+  return files;
+}
+
+export function sedWriteTargets(argv) {
+  let inPlace = false, scriptByOption = false, ambiguousSuffix = false, afterDashDash = false;
+  const operands = [], scripts = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (afterDashDash || arg === "-" || !arg.startsWith("-")) { operands.push(arg); continue; }
+    if (arg === "--") { afterDashDash = true; continue; }
+    if (arg.startsWith("--")) {
+      const equals = arg.indexOf("=");
+      const given = arg.slice(2, equals === -1 ? undefined : equals);
+      const name = SED_LONG_OPTIONS.has(given) ? given : [...SED_LONG_OPTIONS.keys()].filter((key) => key.startsWith(given)).length === 1
+        ? [...SED_LONG_OPTIONS.keys()].find((key) => key.startsWith(given)) : null;
+      const kind = name === null ? null : SED_LONG_OPTIONS.get(name);
+      if (kind === "in-place") inPlace = true;
+      if (kind === "script" || kind === "script-file" || kind === "value") {
+        const value = equals === -1 ? argv[index += 1] : arg.slice(equals + 1);
+        if (kind === "script") { scriptByOption = true; scripts.push(value ?? ""); }
+        if (kind === "script-file") scriptByOption = true;
+      }
+      continue;
+    }
+    for (let at = 1; at < arg.length; at += 1) {
+      const flag = arg[at], rest = arg.slice(at + 1);
+      if (flag === "i") {
+        inPlace = true;
+        if (rest === "" && argv[index + 1] === "") { ambiguousSuffix = true; index += 1; }
+        break;
+      }
+      if (flag === "e" || flag === "f" || flag === "l") {
+        const value = rest !== "" ? rest : argv[index += 1];
+        if (flag !== "l") scriptByOption = true;
+        if (flag === "e") scripts.push(value ?? "");
+        break;
+      }
+    }
+  }
+  if (!scriptByOption && operands.length > 0) scripts.push(operands[0]);
+  const files = scriptByOption || ambiguousSuffix ? operands : operands.slice(1);
+  return { inPlace, targets: inPlace ? [...files, ...scripts.flatMap(sedScriptWriteFiles)] : files };
+}
