@@ -119,3 +119,87 @@ test('exact rendered recovery text: the denial spelling is observed against the 
   assert.equal(bare, false);
   assert.equal(prefixed, false);
 });
+
+// --- Extension (2026-10-22): every OTHER guard denial that names a command ---
+// The cases above cover the design-advisory emitter. These cover the remaining denial texts in hooks/ and lib/guard/ that print a
+// "Run ..." style command, found by a source scan so that a NEW denial naming a command fails the inventory until it is classified.
+// Cases marked `todo` pin a defect that needs a protected guard file; the exact fix is a JSON patch for the operator and the
+// case turns green when it is applied (it is then to be un-marked). Reported as patch h1-patch-01 (not a tracked file).
+const pluginDir = fileURLToPath(new URL('../../', import.meta.url)).replace(/[\\/]$/u, '');
+const NAMED_COMMAND_LINE = /(?:Run exactly:|[Tt]hen run:|\bRun:|\bRun `|\brun `|\bRun \w+ \w+:)\s*(?:node\b|["`]?[\w.${}/-]+\.mjs)|\buse plugins\/pipeline-core\/scripts\/[\w-]+\.mjs/u;
+const { readdirSync } = await import('node:fs');
+function namedCommandHits() {
+  const hits = [];
+  for (const rel of ['hooks', 'lib/guard']) {
+    const dir = join(pluginDir, ...rel.split('/'));
+    for (const name of readdirSync(dir).filter(n => n.endsWith('.mjs') && !n.endsWith('.test.mjs'))) {
+      readFileSync(join(dir, name), 'utf8').split('\n').forEach((line) => {
+        if (/^\s*(\/\/|\*|\/\*)/u.test(line)) return;
+        const match = NAMED_COMMAND_LINE.exec(line);
+        if (match) hits.push(`${rel}/${name} :: ${match[0]}`);
+      });
+    }
+  }
+  return hits.sort();
+}
+const buildPushInit = async (options) => {
+  const { buildPushInitArgv } = await import(new URL('../../scripts/push-init.mjs', import.meta.url));
+  return buildPushInitArgv({ root, by: 'tester', remote: 'origin', destination: 'refs/heads/feat-x', ...options });
+};
+const pushInitCommand = (argv) => `node "${join(pluginDir, 'scripts', 'push-init.mjs')}" ${argv.join(' ')}`;
+
+test('inventory: the denial texts that name a command are exactly the classified ones', () => {
+  assert.deepEqual(namedCommandHits(), [
+    'hooks/guard-git.mjs :: then run: node',
+    'hooks/guard-push.mjs :: Run: push-init.mjs',
+    'lib/guard/bootstrap-receipt.mjs :: Run exactly: node',
+    'lib/guard/dispatch-record-lane.mjs :: use plugins/pipeline-core/scripts/capture-evidence.mjs',
+  ], 'a denial that names a command is new or was removed: classify it in this file (admitted, or a todo with its patch)');
+});
+
+test('GUARD-BOOTSTRAP-RECEIPT-MISSING: the named preflight command is sanctioned and not lane-refused in the blocked state', async () => {
+  const { START_PREFLIGHT_SCRIPT } = await import(new URL('../guard/constants.mjs', import.meta.url));
+  const source = readFileSync(fileURLToPath(new URL('../guard/bootstrap-receipt.mjs', import.meta.url)), 'utf8');
+  assert.ok(source.includes('Run exactly: node "${START_PREFLIGHT_SCRIPT}"'), 'the denial no longer names the preflight script as pinned');
+  const command = `node "${START_PREFLIGHT_SCRIPT}"`;
+  assert.equal(isSanctionedLifecycleCommand(command, root, {}), true);
+  assert.equal(devPlanShellRefusalHit(command, root, blockedDraft), null);
+});
+
+test('guard-push checkpoint denial: control, the default push-init argv is sanctioned', async () => {
+  assert.equal(isSanctionedLifecycleCommand(pushInitCommand(await buildPushInit({})), root, {}), true);
+  assert.equal(isSanctionedLifecycleCommand(pushInitCommand(await buildPushInit({ base: 'main' })), root, {}), true);
+});
+
+test('guard-push checkpoint denial: the argv push-init emits for --checkpoint is sanctioned by the shell lane',
+  { todo: 'needs a protected guard file: sanctionedPushInitArgs() does not admit --checkpoint/--candidate/--record-ref (patch h1-patch-01)' },
+  async () => {
+    const argv = await buildPushInit({ checkpoint: true });
+    assert.equal(isSanctionedLifecycleCommand(pushInitCommand(argv), root, {}), true, `refused: ${argv.join(' ')}`);
+    assert.equal(devPlanShellRefusalHit(pushInitCommand(argv), root, blockedDraft), null);
+  });
+
+test('guard-push checkpoint denial: the text names a complete, runnable push-init invocation',
+  { todo: 'needs a protected guard file: guard-push.mjs prints the bare "push-init.mjs --checkpoint" (patch h1-patch-01)' },
+  async () => {
+    const source = readFileSync(join(pluginDir, 'hooks', 'guard-push.mjs'), 'utf8');
+    const named = /"Run: (node <plugin-root>\/scripts\/push-init\.mjs --root <project-dir> --by <name> --remote <remote> --destination refs\/heads\/<branch> --checkpoint) prints/u.exec(source)?.[1];
+    assert.ok(named, 'the checkpoint denial must name the full invocation, not only the script name');
+    const concrete = named.replace('<plugin-root>', pluginDir).replace('<project-dir>', root).replace('<name>', 'tester')
+      .replace('<remote>', 'origin').replace('<branch>', 'feat-x');
+    assert.equal(isSanctionedLifecycleCommand(concrete, root, {}), true, `named command refused: ${concrete}`);
+  });
+
+test('observed limit: the commands GG-22 and the dispatch-record lane name are refused only while the lifecycle gate blocks', () => {
+  // Neither script is in the sanctioned catalogue; both are admitted in the states that produce those denials (a commit and a
+  // dispatch-record write, which need an approved plan) because the opaque-script lane only fires on a blocking gate verdict.
+  const allow = { devPlanGateVerdictFn: () => ({ verdict: 'allow', reason: 'fixture' }) };
+  for (const command of [
+    'node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate',
+    `node "${join(pluginDir, 'scripts', 'capture-evidence.mjs')}" --out scratch/evidence/x.txt --label x -- node --version`,
+  ]) {
+    assert.equal(isSanctionedLifecycleCommand(command, root, {}), false, `not sanctioned: ${command}`);
+    assert.equal(devPlanShellRefusalHit(command, root, blockedDraft)?.lane, 'opaque-script-execution');
+    assert.equal(devPlanShellRefusalHit(command, root, allow), null);
+  }
+});
