@@ -23,3 +23,9 @@ PO-Auftrag: Die Pipeline muss den Wechsel selbst ausführen, nicht nur vorschlag
 - Echte Runner-Verfügbarkeit und benötigter Effort bleiben überprüft; unbekannte Versionierung, unvollständige Kataloge und fehlende aktuelle Modelle liefern einen konkreten Fehler statt einer stillen alten oder fremden Zuordnung.
 - Migration bestehender signierter Exact-ID-Policies bewahrt deren Beweis und verlangt keine neue Versionsfreigabe; Familienzuordnung, expliziter Pin und tatsächlich gewählte ID bleiben prüfbar. Neue und entfernte Rollenslots bleiben eigene Entscheidungen.
 - Regressionen prüfen beide genannten Wechsel, `6.2` gegen `6.10`, Pin und Pin-Aufhebung, neue Familie, fehlenden Effort, Offline/Compact, echte Dispatch-ID und alle drei Runner. Source, Installed-Host und Kandidatenabnahme sind getrennt nachzuweisen.
+
+## PO decision D99 (2026-10-22): versions inside a family are automatic, a new family is the PO's call
+
+Decision register: `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md` row D99. Within one model family (for
+example Opus, Sonnet, Haiku) the newest version is selected automatically, without a new confirmation. Only a NEW
+family needs the PO's decision. This item's rule therefore stands as written; it is the authoritative rule for version bumps. The opposed item `2026-10-16-model-role-bootstrap-ignores-version-bumps-within-a-family` is amended accordingly (its "propose, then accept" acceptance applies to a new family only).

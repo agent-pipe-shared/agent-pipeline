@@ -40,3 +40,9 @@ the miss with the mechanic-tier Haiku case, then fix the detection.
 - None recorded; the exact version-ordering rule per family is left to the implementation spec.
 
 Source: PO decision #22, 2026-10-16
+
+## PO decision D99 (2026-10-22): versions inside a family are automatic, a new family is the PO's call
+
+Decision register: `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md` row D99. Within one model family (for
+example Opus, Sonnet, Haiku) the newest version is selected automatically, without a new confirmation. Only a NEW
+family needs the PO's decision. This item's acceptance is AMENDED: the earlier "propose the newer version and change nothing until the PO accepts" (PO decision #22) now applies only when the newer model belongs to a NEW family. For a version bump inside an already assigned family the bootstrap follows the automatic rule of `2026-09-30-model-family-approval-with-automatic-version-upgrades`; the defect to fix stays that the bootstrap currently ignores such a bump.
