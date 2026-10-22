@@ -110,8 +110,8 @@
     {
       "rule": "over-line-bound",
       "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
-      "maxLines": 12380,
-      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows; guard-lifecycle-ready.test.mjs now 12380 (raised for the 2026-10-22 content wave (protected diffs of the 0.7.0 candidate), temporary: owner Elephant, expiry 2026-11-30, split and lower this entry in 0.7.1)"
+      "maxLines": 12425,
+      "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows; guard-lifecycle-ready.test.mjs now 12425 (12380 at the first raise; +45 lines of the native-Windows portability fixes, k31; raised for the 2026-10-22 content wave (protected diffs of the 0.7.0 candidate), temporary: owner Elephant, expiry 2026-11-30, split and lower this entry in 0.7.1)"
     },
     {
       "rule": "over-line-bound",
@@ -218,8 +218,8 @@
     {
       "rule": "over-line-bound",
       "path": "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
-      "maxLines": 2084,
-      "reason": "over the bound when the check was adopted on 2026-10-20 (2070 lines); raised to 2084 by PO decision D88 (2026-10-22) for the data lines the transitive kernel-closure rule adds to NEVER_LIFTABLE_KERNEL_PATHS (operator patches 25, 32, 33, 44), no logic. Owner: PO, expires with the 0.7.1 release: move NEVER_LIFTABLE_KERNEL_PATHS into its own kernel module and lower this entry back to the default bound"
+      "maxLines": 2086,
+      "reason": "over the bound when the check was adopted on 2026-10-20 (2070 lines); raised to 2084 by PO decision D88 (2026-10-22) and to 2086 for the two kernel-list lines of the dispatch-record liveness wiring (k39, D110), all for the data lines the transitive kernel-closure rule adds to NEVER_LIFTABLE_KERNEL_PATHS (operator patches 25, 32, 33, 44), no logic. Owner: PO, expires with the 0.7.1 release: move NEVER_LIFTABLE_KERNEL_PATHS into its own kernel module and lower this entry back to the default bound"
     },
     {
       "rule": "over-line-bound",
