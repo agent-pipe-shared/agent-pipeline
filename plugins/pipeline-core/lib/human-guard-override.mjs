@@ -4934,6 +4934,7 @@ function consumeHumanGuardOverrideCore({
   let replanRequired = false;
   let driftReplanRequired = false;
   let inputMismatch = null;
+  const nonMatching = [];
   // NVA-SIGDISCLOSE-1 Finding 6: a capability file this process cannot read or validate
   // at all (unreadable, malformed JSON, a stale/wrong schema version, a bad MAC) is
   // SKIPPED and RECORDED here, never treated as a whole-store failure. Before this fix,
@@ -4948,6 +4949,61 @@ function consumeHumanGuardOverrideCore({
   try {
     files.push(...readdirSync(paths.capabilities).filter((name) => name.endsWith(".json")).sort());
   } catch { return { status: "absent" }; }
+  // The full verdict for one authenticated capability against this call: plugin-install shape,
+  // expiry and every drift check. Moved out of the scan loop unchanged (ALF-K22) so the matching
+  // candidate and the no-match fallback below evaluate a capability through ONE code path.
+  const examineCapability = (capability) => {
+    const plugin = pluginIdentity(pluginRoot, provider);
+    const policy = policyIdentity(repo.root, pluginRoot, denials);
+    const isLocalPluginInstall = capability.mode === "global-plugin-install";
+    if (isLocalPluginInstall && !exactLocalPluginInstall(toolName, toolInput, repo.root)) {
+      return { shapeRefused: true };
+    }
+    const repository = isLocalPluginInstall
+      ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
+      : repositoryObservation(repo.root, spawn);
+    const expired = new Date(capability.expiresAt).getTime() <= nowMs;
+    let nativeTargetDrift = false;
+    if (capability.schema === NATIVE_CAPABILITY_SCHEMA) {
+      try {
+        // ALF-B6-HGO: the tool call is reclassified from the SAME vantage point
+        // recordHumanGuardDenial() classified it from. Under the cross-repository class that
+        // is the coordinating session's own root, not the bound target repository: against
+        // the target the identical absolute paths read as an in-root patch with relative
+        // paths and could never equal the recorded set. Every other class keeps the bound
+        // root. The kind must also be the recorded kind, not merely any admissible kind: a
+        // standard capability needs a standard reclassification of its recorded command
+        // class, an author-repair capability needs the fully resolved author-repair
+        // reclassification over its own bound source root.
+        const reclassified = eligibility(
+          capability.commandClass === "cross-repository-target" ? physicalRoot(rootDir) : repo.root,
+          toolName, toolInput, { selectedAuthorSourceRoot: capability.authorSourceRoot });
+        const sameKind = capability.mode === "pipeline-author-repair"
+          ? reclassified.mode === "pipeline-author-repair" && reclassified.sourceRoot === capability.authorSourceRoot
+          : reclassified.mode === "standard"
+            && (reclassified.commandClass ?? "exact-project-action") === capability.commandClass;
+        if (!reclassified.eligible || canonical(reclassified.paths) !== canonical(capability.eligiblePaths) || !sameKind) nativeTargetDrift = true;
+        assertNativeTargets(repo.root, capability);
+      } catch { nativeTargetDrift = true; }
+    }
+    const driftChecks = {
+      status: capability.status !== "armed",
+      root: capability.root !== repo.root,
+      toolName: capability.toolName !== toolName,
+      toolInputSha256: capability.toolInputSha256 !== toolInputSha256,
+      denials: canonical(capability.denials) !== canonical(currentDenialDigests),
+      plugin: canonical(capability.plugin) !== canonical(plugin),
+      policy: canonical(capability.policy) !== canonical(policy),
+      repository: capability.schema === NATIVE_CAPABILITY_SCHEMA
+        ? !nativeRepositoryMatches(capability.repository, repository)
+        : canonical(capability.repository) !== canonical(repository),
+      ...(capability.schema === NATIVE_CAPABILITY_SCHEMA ? { nativeTargets: nativeTargetDrift } : {}),
+      authorEligiblePaths: capability.mode === "pipeline-author-repair"
+        && authorEligiblePaths(repo.root, capability.eligiblePaths, capability.authorSourceRoot) === null,
+    };
+    const drifted = Object.entries(driftChecks).some(([check, changed]) => check !== "toolInputSha256" && changed);
+    return { shapeRefused: false, expired, driftChecks, drifted };
+  };
   for (const name of files) {
     const planSha256 = name.slice(0, -5);
     if (!SHA256.test(planSha256)) continue;
@@ -4960,6 +5016,16 @@ function consumeHumanGuardOverrideCore({
     }
     if (capability.status !== "armed" || capability.toolName !== toolName
       || canonical(capability.denials) !== canonical(currentDenialDigests)) continue;
+    // ALF-K22 (PO decision 2026-10-22, "skip non-matching capabilities first"): a capability bound
+    // to a DIFFERENT tool input is not the requested action. It is set aside here, before any lock,
+    // drift computation or audit row, so a sibling signed for another action can neither be
+    // reclassified against this call's input (a spurious [toolInputSha256, nativeTargets] HGO-DRIFT
+    // row) nor mask the matching capability's own expired/drifted verdict. If nothing matches, the
+    // set-aside records are evaluated read-only after this loop.
+    if (capability.toolInputSha256 !== toolInputSha256) {
+      nonMatching.push({ path });
+      continue;
+    }
     const lock = join(paths.locks, `${planSha256}.lock`);
     let lockFd;
     try { lockFd = openSync(lock, "wx", 0o600); }
@@ -4972,55 +5038,9 @@ function consumeHumanGuardOverrideCore({
       if (!authorized) {
         return { status: "invalid", code: "HGO-AUDIT" };
       }
-      const plugin = pluginIdentity(pluginRoot, provider);
-      const policy = policyIdentity(repo.root, pluginRoot, denials);
-      const isLocalPluginInstall = capability.mode === "global-plugin-install";
-      if (isLocalPluginInstall && !exactLocalPluginInstall(toolName, toolInput, repo.root)) {
-        return { status: "replan", code: "HGO-PLUGIN-INSTALL-SHAPE" };
-      }
-      const repository = isLocalPluginInstall
-        ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
-        : repositoryObservation(repo.root, spawn);
-      const expired = new Date(capability.expiresAt).getTime() <= nowMs;
-      let nativeTargetDrift = false;
-      if (capability.schema === NATIVE_CAPABILITY_SCHEMA) {
-        try {
-          // ALF-B6-HGO: the tool call is reclassified from the SAME vantage point
-          // recordHumanGuardDenial() classified it from. Under the cross-repository class that
-          // is the coordinating session's own root, not the bound target repository: against
-          // the target the identical absolute paths read as an in-root patch with relative
-          // paths and could never equal the recorded set. Every other class keeps the bound
-          // root. The kind must also be the recorded kind, not merely any admissible kind: a
-          // standard capability needs a standard reclassification of its recorded command
-          // class, an author-repair capability needs the fully resolved author-repair
-          // reclassification over its own bound source root.
-          const reclassified = eligibility(
-            capability.commandClass === "cross-repository-target" ? physicalRoot(rootDir) : repo.root,
-            toolName, toolInput, { selectedAuthorSourceRoot: capability.authorSourceRoot });
-          const sameKind = capability.mode === "pipeline-author-repair"
-            ? reclassified.mode === "pipeline-author-repair" && reclassified.sourceRoot === capability.authorSourceRoot
-            : reclassified.mode === "standard"
-              && (reclassified.commandClass ?? "exact-project-action") === capability.commandClass;
-          if (!reclassified.eligible || canonical(reclassified.paths) !== canonical(capability.eligiblePaths) || !sameKind) nativeTargetDrift = true;
-          assertNativeTargets(repo.root, capability);
-        } catch { nativeTargetDrift = true; }
-      }
-      const driftChecks = {
-        status: capability.status !== "armed",
-        root: capability.root !== repo.root,
-        toolName: capability.toolName !== toolName,
-        toolInputSha256: capability.toolInputSha256 !== toolInputSha256,
-        denials: canonical(capability.denials) !== canonical(currentDenialDigests),
-        plugin: canonical(capability.plugin) !== canonical(plugin),
-        policy: canonical(capability.policy) !== canonical(policy),
-        repository: capability.schema === NATIVE_CAPABILITY_SCHEMA
-          ? !nativeRepositoryMatches(capability.repository, repository)
-          : canonical(capability.repository) !== canonical(repository),
-        ...(capability.schema === NATIVE_CAPABILITY_SCHEMA ? { nativeTargets: nativeTargetDrift } : {}),
-        authorEligiblePaths: capability.mode === "pipeline-author-repair"
-          && authorEligiblePaths(repo.root, capability.eligiblePaths, capability.authorSourceRoot) === null,
-      };
-      const drifted = Object.entries(driftChecks).some(([check, changed]) => check !== "toolInputSha256" && changed);
+      const examined = examineCapability(capability);
+      if (examined.shapeRefused) return { status: "replan", code: "HGO-PLUGIN-INSTALL-SHAPE" };
+      const { expired, driftChecks, drifted } = examined;
       if (expired || drifted) {
         appendAudit(paths, {
           type: expired ? "expired" : "rejected",
@@ -5040,20 +5060,6 @@ function consumeHumanGuardOverrideCore({
         // An authenticated stale match is refused and audited, but cannot hide
         // a separately authorized matching capability later in the store.
         driftReplanRequired = true;
-        continue;
-      }
-      // Only authenticated, current-context authority may disclose bound hashes.
-      // Keep searching so a later exact capability retains consumption precedence.
-      if (driftChecks.toolInputSha256) {
-        inputMismatch ??= {
-          schema: "pipeline.human-guard-override-input-mismatch.v1",
-          code: "HGO-INPUT-MISMATCH",
-          requestSha256: capability.requestSha256,
-          planSha256: capability.planSha256,
-          expectedToolInputSha256: capability.toolInputSha256,
-          observedToolInputSha256: toolInputSha256,
-          differingInputs: ["toolInputSha256"],
-        };
         continue;
       }
       const consumedCore = {
@@ -5084,6 +5090,36 @@ function consumeHumanGuardOverrideCore({
       if (lockFd !== undefined) closeSync(lockFd);
       try { unlinkSync(lock); } catch {}
     }
+  }
+  // ALF-K22: no capability matched the presented input. Only now are the set-aside, differently
+  // bound capabilities evaluated, through the same examineCapability() and in the same order as
+  // before, to derive the same no-match refusal as before (HGO-DRIFT, HGO-EXPIRED, HGO-INPUT-MISMATCH
+  // or absent) -- but READ-ONLY: no lock, no audit row, no write. They rank below any verdict a
+  // matching capability already produced (the loop above only reaches here with none consumed), so
+  // they can no longer mask a matching capability's expired/drifted result. Bound hashes are still
+  // disclosed only for an authenticated capability whose own context is current.
+  for (const { path } of driftReplanRequired || replanRequired ? [] : nonMatching) {
+    let capability;
+    try { capability = validatedCapability(paths, path); }
+    catch { continue; }
+    if (capability.status !== "armed") continue;
+    let authorized = false;
+    try { authorized = hasAuthorizedAuditEntry(paths, capability); }
+    catch { return { status: "invalid", code: "HGO-AUDIT" }; }
+    if (!authorized) return { status: "invalid", code: "HGO-AUDIT" };
+    const examined = examineCapability(capability);
+    if (examined.shapeRefused) return { status: "replan", code: "HGO-PLUGIN-INSTALL-SHAPE" };
+    if (examined.expired) { replanRequired = true; continue; }
+    if (examined.drifted) { driftReplanRequired = true; continue; }
+    inputMismatch ??= {
+      schema: "pipeline.human-guard-override-input-mismatch.v1",
+      code: "HGO-INPUT-MISMATCH",
+      requestSha256: capability.requestSha256,
+      planSha256: capability.planSha256,
+      expectedToolInputSha256: capability.toolInputSha256,
+      observedToolInputSha256: toolInputSha256,
+      differingInputs: ["toolInputSha256"],
+    };
   }
   return {
     ...(driftReplanRequired ? { status: "replan", code: "HGO-DRIFT" }
