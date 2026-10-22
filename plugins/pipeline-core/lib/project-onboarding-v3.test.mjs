@@ -4796,7 +4796,7 @@ test("a real fresh local kickoff is immediately a valid canonical PO authority",
     assert.equal(authority.ok, true, JSON.stringify(authority));
     const kickoffPlanPath = JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath;
     acknowledgePoGatePlan(path, kickoffPlanPath);
-    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-AUTHORITY" });
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-AUTHORITY", admitSpecCriterion: true });
     const stderr = [];
     const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
       dir: path,
@@ -4845,7 +4845,7 @@ test("kickoff choosing a language different from the portable-seed default reach
     assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: localDeps, runner: "codex" }).status, "ready");
     const kickoffPlanPath = JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath;
     acknowledgePoGatePlan(path, kickoffPlanPath);
-    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-LANGUAGE" });
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-LANGUAGE", admitSpecCriterion: true });
     const stderr = [];
     const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
       dir: path,
@@ -4900,7 +4900,7 @@ test("promoting a PRD whose language differs from kickoff's own answer reaches a
       rootDir: path, profile: "feature", featureId: "promo-lang-work", planPath: prdPath,
       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
     };
-    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROMO-LANG-DESIGN" });
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROMO-LANG-DESIGN", admitSpecCriterion: true });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({
       runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true,
@@ -5164,7 +5164,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
       rootDir: path, profile: "feature", featureId: "gated-work", planPath: prdPath,
       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
     };
-    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-GATED-DESIGN" });
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-GATED-DESIGN", admitSpecCriterion: true });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true });
     assert.equal(promoted.status, "ready");
@@ -5274,7 +5274,7 @@ for (const runner of ["claude", "codex", "antigravity"]) {
         rootDir: path, profile: "feature", featureId: `handover-${runner}`, planPath: prdPath,
         prdPath, specPath, designInputPath, runner, deps: localDeps,
       };
-      materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: `TEST-HANDOVER-${runner}` });
+      materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: `TEST-HANDOVER-${runner}`, admitSpecCriterion: true });
       const planned = planProjectOnboardingKickoffPromotionV4(promotion);
       const promoted = applyProjectOnboardingKickoffPromotionV4({ ...promotion, planSha256: planned.planSha256, activate: true });
       assert.equal(promoted.status, "ready");
@@ -5479,7 +5479,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
       rootDir: path, profile: "feature", featureId: "projdrift-work", planPath: prdPath,
       prdPath, specPath, designInputPath, runner, deps: localDeps,
     };
-    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROJDRIFT-DESIGN" });
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROJDRIFT-DESIGN", admitSpecCriterion: true });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner, ...promotion, planSha256: planned.planSha256, activate: true });
     assert.equal(promoted.status, "ready");

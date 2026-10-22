@@ -87,6 +87,27 @@ function addEphemeralSignatureAnchor(root, decisionRef) {
 }
 
 /**
+ * AC-264 / D85: a governed project's submit-plan also checks the delivery hand-off, which needs a Spec with one normative acceptance-criterion
+ * row the host parser admits. This does what a real agent does when it authors the generated Spec: it replaces the skeleton's placeholder
+ * criterion (a leading-zero id the parser cannot locate) with a supported one, or appends a criterion table to a hand-written Spec, and moves
+ * the PRD's `technical-spec-sha256` binding to the authored bytes. Idempotent: a Spec that already carries the authored row is left as is.
+ */
+function authorAdmittedSpecCriterion(root, planPath) {
+  const specFile = resolve(root, dirname(planPath), "spec.md");
+  const prdFile = resolve(root, planPath);
+  const spec = readFileSync(specFile, "utf8");
+  const skeleton = "- AC-01: WHEN <trigger>, the system SHALL <observable result>.";
+  const authored = "WHEN the PO reviews the fixture, the system SHALL show it.";
+  if (spec.includes(authored)) return;
+  const next = spec.includes(skeleton)
+    ? spec.replace(skeleton, `- **AC-1:** ${authored}`)
+    : `${spec.trimEnd()}\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | ${authored} |\n`;
+  writeFileSync(specFile, next, "utf8");
+  const prd = readFileSync(prdFile, "utf8");
+  writeFileSync(prdFile, prd.replace(/(technical-spec-sha256\s*:\s*)[a-f0-9]{64}/iu, `$1${createHash("sha256").update(next).digest("hex")}`), "utf8");
+}
+
+/**
  * Materialize a deliberately small but real design package.  It has a
  * physical map, valid fitness/baseline data, a declared JS implementation
  * path, and a real chat-mode adoption authority.  It does not bypass the
@@ -99,6 +120,7 @@ export function materializeArchitectureDesignFixture({
   decisionScope = null,
   decisionRef = "TEST-ARCHITECTURE-DESIGN",
   by = "Test PO",
+  admitSpecCriterion = false,
 } = {}) {
   const root = resolve(rootDir);
   if (typeof planPath !== "string" || planPath === "" || planPath.startsWith("/") || planPath.includes("\\") || planPath.split("/").some((part) => part === "" || part === "." || part === "..")) {
@@ -110,6 +132,7 @@ export function materializeArchitectureDesignFixture({
   const moduleId = "application";
   const plan = resolve(root, planPath);
   if (!existsSync(plan)) throw new Error(`plan fixture is missing: ${planPath}`);
+  if (admitSpecCriterion) authorAdmittedSpecCriterion(root, planPath);
   const currentPlan = readFileSync(plan, "utf8");
   if (!currentPlan.includes(sourcePath)) writeFileSync(plan, `${currentPlan.trimEnd()}\n\nImplementation surface: \`${sourcePath}\`.\n`, "utf8");
   // Existing project source is committed before the Pipeline's hooks apply; a
