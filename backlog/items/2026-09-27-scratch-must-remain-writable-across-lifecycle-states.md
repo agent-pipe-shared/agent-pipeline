@@ -192,3 +192,15 @@ The unchanged installed guard applies that marker rule without physical
 Scratch classification; the staged Source successor adds the contained-Scratch
 condition and targeted tests. The refusal did not edit the fixture or Source.
 The installed candidate still needs a live native readback before closure.
+
+## Sampling statement (D116)
+
+PO decision D116 (2026-10-22): the pin `plugins/pipeline-core/lib/pins/scratch-must-remain-writable-across-lifecycle-states.test.mjs`
+keeps its rotation sampling instead of taking the full cross-product (the outside-root refusal alone costs about 12 s per
+call). What the sample guarantees is now pinned as data, not as a comment: the sampled (state, item) pairs of points 1, 2, 3
+and 3b come from one builder that the tests run and the case `AC-247 sampling coverage (D116)` counts. That case proves that,
+for each of those points, every readiness state it ranges over (the controlling non-ready statuses, `unavailable` and
+`ready` where the point sweeps all states) runs at least one item, and every tool shape or refusal class of its set (Write,
+Edit and mkdir; the four near-miss classes and the outside-root class; both shell lanes; the four redirect captures) runs in
+at least one state. What the sample does not claim: each tool shape in each state. Points 4 to 6 and the predicate checks
+are exhaustive over their own listed inputs. This is a statement about the pin's coverage only; it does not close the item.

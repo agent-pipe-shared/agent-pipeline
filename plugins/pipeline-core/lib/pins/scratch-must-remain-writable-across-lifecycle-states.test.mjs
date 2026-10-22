@@ -60,20 +60,58 @@ const stateDeps = (projectDir, status) => ({
   },
 });
 const ALL_STATES = [...PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES, "unavailable", "ready"];
+const NON_READY_STATES = [...PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES];
+
+// The rotation sampling, as data (PO decision D116: the sampling stays, and a coverage pin proves it covers every
+// state and every tool shape). One pure builder produces each test's sampled (state, item) pairs, so the tests below
+// run exactly what the coverage pin counts: `full(index)` states run every item in `all`; every other state runs the one
+// item `rotate[index % rotate.length]`.
+function sampleStates(states, { all, rotate = all, full }) {
+  return states.flatMap((status, index) => (full(index) ? all : [rotate[index % rotate.length]]).map((item) => ({ status, item })));
+}
+const firstAndLast = (states) => (index) => index === 0 || index === states.length - 1;
+const onlyFirst = (index) => index === 0;
+const SHAPES = ["write", "edit", "mkdir"];
+const NEAR_MISSES = ["dotdot-escape", "prefix-lookalike", "src-write", "src-mkdir"];
+const LANES = ["redirect", "interpreter"];
+const CAPTURES = ["redirect-scratch", "capture-scratch", "capture-src", "capture-outside"];
+const SAMPLING = {
+  shapes: sampleStates(ALL_STATES, { all: SHAPES, full: firstAndLast(ALL_STATES) }),
+  nearMisses: sampleStates(NON_READY_STATES, { all: [...NEAR_MISSES, "outside-root"], rotate: NEAR_MISSES, full: onlyFirst }),
+  lanes: sampleStates(NON_READY_STATES, { all: LANES, full: onlyFirst }),
+  captures: sampleStates(ALL_STATES, { all: CAPTURES, full: firstAndLast(ALL_STATES) }),
+};
+
+test("AC-247 sampling coverage (D116): the rotation sampling reaches every lifecycle state and every tool shape at least once", () => {
+  // The sampling is rotation, not the full cross-product (the outside-root refusal alone costs ~12 s per call). This pin
+  // proves what the rotation still guarantees: for each sampled test, every state it ranges over runs at least one
+  // item, and every item of its tool-shape set runs in at least one state.
+  assert.deepEqual(ALL_STATES.slice(-2), ["unavailable", "ready"], "the sweep covers the unavailable and ready states as well as the controlling non-ready ones");
+  assert.ok(NON_READY_STATES.length > 0);
+  const plans = [
+    ["point 1 tool shapes", SAMPLING.shapes, ALL_STATES, SHAPES],
+    ["point 2 near-miss classes", SAMPLING.nearMisses, NON_READY_STATES, [...NEAR_MISSES, "outside-root"]],
+    ["point 3 shell lanes", SAMPLING.lanes, NON_READY_STATES, LANES],
+    ["point 3b redirect captures", SAMPLING.captures, ALL_STATES, CAPTURES],
+  ];
+  for (const [name, plan, states, items] of plans) {
+    const statesRun = new Set(plan.map((entry) => entry.status));
+    const itemsRun = new Set(plan.map((entry) => entry.item));
+    for (const state of states) assert.ok(statesRun.has(state), `${name}: state ${state} runs at least one item`);
+    for (const item of items) assert.ok(itemsRun.has(item), `${name}: item ${item} runs in at least one state`);
+    assert.equal(new Set(plan.map((entry) => `${entry.status}/${entry.item}`)).size, plan.length, `${name}: no sampled pair is listed twice`);
+  }
+});
 
 test("AC-247 point 1: Write/Edit/mkdir of contained scratch is admitted in every readiness state (at least one tool shape per state, all three in first and ready states)", (t) => {
   const root = fixture(t);
   // Runtime: every readiness state is exercised at least once; the three tool shapes rotate across
-  // states, and the first and last (ready) states run all three.
-  const inputs = [write("scratch/nested/report.md"), edit("scratch/nested/report.md"), bash("mkdir -p scratch/nested")];
-  ALL_STATES.forEach((status, index) => {
-    const deps = stateDeps(root, status);
-    const full = index === 0 || index === ALL_STATES.length - 1;
-    for (const input of full ? inputs : [inputs[index % inputs.length]]) {
-      const result = evaluateLifecycleReadyGuard(input, deps);
-      assert.equal(result.exitCode, 0, `${status}/${input.tool_name}: ${result.stderr}`);
-    }
-  });
+  // states, and the first and last (ready) states run all three (SAMPLING.shapes, proven by the coverage pin).
+  const inputs = { write: write("scratch/nested/report.md"), edit: edit("scratch/nested/report.md"), mkdir: bash("mkdir -p scratch/nested") };
+  for (const { status, item } of SAMPLING.shapes) {
+    const result = evaluateLifecycleReadyGuard(inputs[item], stateDeps(root, status));
+    assert.equal(result.exitCode, 0, `${status}/${inputs[item].tool_name}: ${result.stderr}`);
+  }
   assert.ok(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length > 0);
 });
 
@@ -82,20 +120,16 @@ test("AC-247 point 2: near-miss paths escaping scratch/ and machine state stay r
   // Runtime: the outside-root refusal class costs ~12 s per call (override planning), so it runs in the
   // first state only. The first state runs every near-miss class; each later state runs one of the
   // cheap classes in rotation, so every state is refused at least once.
-  const nearMisses = [
-    () => write("scratch/../src/escape.md"), () => write("scratch-evil/x.md"),
-    () => write("src/not-scratch.md"), () => bash("mkdir -p src/not-scratch"),
-  ];
-  const outsideRoot = () => write("../outside.md");
-  PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.forEach((status, index) => {
-    const deps = stateDeps(root, status);
-    const cases = index === 0 ? [...nearMisses, outsideRoot] : [nearMisses[index % nearMisses.length]];
-    for (const make of cases) {
-      const input = make();
-      const result = evaluateLifecycleReadyGuard(input, deps);
-      assert.equal(result.exitCode, 2, `${status}/${JSON.stringify(input.tool_input)}`);
-    }
-  });
+  const nearMisses = {
+    "dotdot-escape": write("scratch/../src/escape.md"), "prefix-lookalike": write("scratch-evil/x.md"),
+    "src-write": write("src/not-scratch.md"), "src-mkdir": bash("mkdir -p src/not-scratch"),
+    "outside-root": write("../outside.md"),
+  };
+  for (const { status, item } of SAMPLING.nearMisses) {
+    const input = nearMisses[item];
+    const result = evaluateLifecycleReadyGuard(input, stateDeps(root, status));
+    assert.equal(result.exitCode, 2, `${status}/${JSON.stringify(input.tool_input)}`);
+  }
   for (const target of ["scratch/../src/x", "scratch-evil/x", "../x", "src/x", "scratch2/x", "/etc/x"]) {
     assert.equal(isPhysicalScratchTarget(target, { rootDir: root, liveRoots: [] }), false, target);
   }
@@ -105,15 +139,13 @@ test("AC-247 point 2: near-miss paths escaping scratch/ and machine state stay r
 test("AC-247 point 3: no arbitrary shell mutation - opaque interpreter and redirect lanes stay refused (typed host boundary; both lanes in the first non-ready state, one rotated lane in each later one)", (t) => {
   const root = fixture(t);
   // Runtime: both lanes run in the first state; each later state runs one lane in rotation.
-  const lanes = ["printf x > scratch/out.txt", "node -e \"require('fs').writeFileSync('scratch/a','b')\""];
-  PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.forEach((status, index) => {
-    const deps = stateDeps(root, status);
-    for (const command of index === 0 ? lanes : [lanes[index % lanes.length]]) {
-      const result = evaluateLifecycleReadyGuard(bash(command), deps);
-      assert.equal(result.exitCode, 2, `${status}/${command}`);
-      assert.match(result.stderr, /GUARD-/u, command);
-    }
-  });
+  const lanes = { redirect: "printf x > scratch/out.txt", interpreter: "node -e \"require('fs').writeFileSync('scratch/a','b')\"" };
+  for (const { status, item } of SAMPLING.lanes) {
+    const command = lanes[item];
+    const result = evaluateLifecycleReadyGuard(bash(command), stateDeps(root, status));
+    assert.equal(result.exitCode, 2, `${status}/${command}`);
+    assert.match(result.stderr, /GUARD-/u, command);
+  }
   assert.equal(isBoundedScratchOnlyWords(["mkdir", "-p", "scratch/a"], { rootDir: root, liveRoots: [] }), true);
   assert.equal(isBoundedScratchOnlyWords(["touch", "src/a"], { rootDir: root, liveRoots: [] }), false);
   assert.equal(isBoundedScratchOnlyWords(["rm", "scratch/a"], { rootDir: root, liveRoots: [] }), false);
@@ -125,21 +157,18 @@ test("AC-247 point 3b: redirect capture boundary - a shell redirect is refused a
   // output INTO scratch/ is refused with the typed code and no scratch carve-out exists; scratch writes go through the
   // Write/Edit/mkdir -p lanes (point 1). An outside-root target is refused by the cross-repo rule. Sampled: the first and
   // the last (ready) state run every case; each other state runs one case chosen by rotation.
-  const cases = [
-    { command: "printf x > scratch/out.txt", code: /GUARD-REDIRECT-UNAPPROVED/u },
-    { command: "rg -n needle scratch/a.txt > scratch/out.txt", code: /GUARD-REDIRECT-UNAPPROVED/u },
-    { command: "rg -n needle scratch/a.txt > src/out.txt", code: /GUARD-REDIRECT-UNAPPROVED/u },
-    { command: "rg -n needle scratch/a.txt > ../out.txt", code: /GUARD-CROSS-REPO-MUTATION/u },
-  ];
-  ALL_STATES.forEach((status, index) => {
-    const deps = stateDeps(root, status);
-    const full = index === 0 || index === ALL_STATES.length - 1;
-    for (const { command, code } of full ? cases : [cases[index % cases.length]]) {
-      const result = evaluateLifecycleReadyGuard(bash(command), deps);
-      assert.equal(result.exitCode, 2, `${status}/${command}`);
-      assert.match(result.stderr, code, `${status}/${command}`);
-    }
-  });
+  const cases = {
+    "redirect-scratch": { command: "printf x > scratch/out.txt", code: /GUARD-REDIRECT-UNAPPROVED/u },
+    "capture-scratch": { command: "rg -n needle scratch/a.txt > scratch/out.txt", code: /GUARD-REDIRECT-UNAPPROVED/u },
+    "capture-src": { command: "rg -n needle scratch/a.txt > src/out.txt", code: /GUARD-REDIRECT-UNAPPROVED/u },
+    "capture-outside": { command: "rg -n needle scratch/a.txt > ../out.txt", code: /GUARD-CROSS-REPO-MUTATION/u },
+  };
+  for (const { status, item } of SAMPLING.captures) {
+    const { command, code } = cases[item];
+    const result = evaluateLifecycleReadyGuard(bash(command), stateDeps(root, status));
+    assert.equal(result.exitCode, 2, `${status}/${command}`);
+    assert.match(result.stderr, code, `${status}/${command}`);
+  }
 });
 
 test("AC-247 point 4: inert marker quotation in scratch is admitted; real authority, aliases and traversal are not", (t) => {
