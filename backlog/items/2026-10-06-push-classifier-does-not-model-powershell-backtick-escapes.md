@@ -3,12 +3,18 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-classifier-does-not-model-powershell-backtick-escapes
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-10-06
+closed_at: 2026-10-22
+closure_repository: self
+closure_commit: 35455319327d44d5519671a13f0956583dd99a21
+closure_evidence: backlog/items/2026-10-06-push-classifier-deny-list-does-not-converge.md
 source: "GPGL-7 dispatch report (residual gap after the PowerShell literal-backslash reading), 2026-10-06."
 sprint: alfred
 done_when: manual
 ---
+
+**Rejected as a duplicate (backlog grooming 2026-10-22):** merged into `backlog/items/2026-10-06-push-classifier-deny-list-does-not-converge.md`. The canonical's own Proposal says the allowlist inversion (Q12 option B) supersedes these two narrower shape-specific items; option B was chosen and implemented (git-cmd.mjs header: commandIsGitPush is an ALLOWLIST, shape-specific checks replaced), and all three share fix commits d9b4bf031 / 49d6f928d. One owner (the classifier's fail-closed marker rule) closes all three. All content of this item is carried over verbatim into that item's section "Merged from `2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes`"; nothing is lost.
 
 # The push classifier does not model PowerShell's backtick escape, here-strings or `$(...)` in double quotes
 

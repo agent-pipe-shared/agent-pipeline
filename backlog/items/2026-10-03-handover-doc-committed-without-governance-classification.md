@@ -3,12 +3,18 @@ schema: pipeline.backlog-item.v1
 id: pipeline.handover-doc-committed-without-governance-classification
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-10-03
+closed_at: 2026-10-22
+closure_repository: self
+closure_commit: 35455319327d44d5519671a13f0956583dd99a21
+closure_evidence: backlog/items/2026-10-16-verify-does-not-run-the-observation-governance-checker.md
 source: "Bootstrap F6 finding, Claude Code session on Windows, 2026-10-03: `check-observation-governance.mjs` reported `OG-DOC-UNCLASSIFIED docs/0.7-recovery-2026-10-03.md` at HEAD a0d83ce78."
 sprint: alfred
 done_when: manual
 ---
+
+**Rejected as a duplicate (backlog grooming 2026-10-22):** merged into `backlog/items/2026-10-16-verify-does-not-run-the-observation-governance-checker.md`. Both describe the same observable defect: a new governed docs/*.md (handover) can be committed unclassified and is caught only at the next session-start bootstrap (F6). The 2026-10-03 item's proposal (commit-time check in the pre-commit hook) is already implemented (checkStagedObservationDocumentation in pre-commit-hook-install.mjs, line 975); the remaining gap, a clone without the hook, is exactly the 2026-10-16 item's Verify second line, which has the fuller acceptance. All content of this item is carried over verbatim into that item's section "Merged from `2026-10-03-handover-doc-committed-without-governance-classification`"; nothing is lost.
 
 # Handover document committed without its governance classification
 

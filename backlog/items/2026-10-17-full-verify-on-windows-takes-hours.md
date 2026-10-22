@@ -3,12 +3,18 @@ schema: pipeline.backlog-item.v1
 id: pipeline.full-verify-on-windows-takes-hours
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-10-17
+closed_at: 2026-10-22
+closure_repository: self
+closure_commit: 35455319327d44d5519671a13f0956583dd99a21
+closure_evidence: backlog/items/2026-10-20-verify-test-economy-rebuild.md
 source: "Sprint Alfred Claude continuation 2026-10-17, stopped candidate Full Verify on native Windows; PO decision 2026-10-17 (after the 0.7.0 local candidate)."
 sprint: alfred
 done_when: manual
 ---
+
+**Rejected as a duplicate (backlog grooming 2026-10-22):** merged into `backlog/items/2026-10-20-verify-test-economy-rebuild.md`. The canonical (PO decision D69, ADR-0088) states in its Description that it bundles the Windows Full Verify runtime item; one owner and one Verify rebuild close both. All content of this item is carried over verbatim into that item's section "Merged from `2026-10-17-full-verify-on-windows-takes-hours`"; nothing is lost.
 
 # Full Verify on native Windows takes hours and is unusable for daily work
 

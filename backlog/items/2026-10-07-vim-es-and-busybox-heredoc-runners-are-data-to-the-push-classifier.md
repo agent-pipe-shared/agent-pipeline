@@ -3,13 +3,19 @@ schema: pipeline.backlog-item.v1
 id: pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-10-07
+closed_at: 2026-10-22
+closure_repository: self
+closure_commit: 35455319327d44d5519671a13f0956583dd99a21
+closure_evidence: backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md
 source: "Critic Q12 delta 1, finding F-E (specs/sprint-alfred-epic/evidence/critic-2026-10-07/q12-delta1.md)"
 sprint: alfred
 done_when: manual
 due: 2026-10-20
 ---
+
+**Rejected as a duplicate (backlog grooming 2026-10-22):** merged into `backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md`. Both are the same defect: the heredoc-receiver list of commandIsGitPush (decision AF) omits some runner that executes its stdin; the vim/busybox item is an explicit extension of the same list in the same function and is already covered in source (HEREDOC_VI_NAMES, HEREDOC_RUNNER_NAMES in git-cmd.mjs). One list/test change closes both. All content of this item is carried over verbatim into that item's section "Merged from `2026-10-07-vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier`"; nothing is lost.
 
 # vim/vi `-es` and busybox applets fed a heredoc are data to the push classifier
 

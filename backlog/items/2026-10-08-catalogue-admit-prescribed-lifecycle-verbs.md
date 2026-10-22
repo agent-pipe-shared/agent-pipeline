@@ -3,13 +3,19 @@ schema: pipeline.backlog-item.v1
 id: pipeline.catalogue-admit-prescribed-lifecycle-verbs
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-10-08
+closed_at: 2026-10-22
+closure_repository: self
+closure_commit: 35455319327d44d5519671a13f0956583dd99a21
+closure_evidence: backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md
 source: "admin-step inventory (docs/admin-steps-inventory.md), decision AO"
 sprint: alfred
 done_when: manual
 due: 2026-10-31
 ---
+
+**Rejected as a duplicate (backlog grooming 2026-10-22):** merged into `backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md`. Both ask that every command the Pipeline itself prescribes in a lifecycle phase (present-plan, continuity-cas, integrate-final, design-course-session, route selection, receipt producers) is admitted by the dev-plan/lifecycle guard instead of being refused as opaque-script-execution, so the PO needs no override; one catalogue/admission change plus the zero-override end-to-end test closes both. The canonical is the older and broader item (table of 10 cases, acceptance list, 2026-10-18/20 observations). All content of this item is carried over verbatim into that item's section "Merged from `2026-10-08-catalogue-admit-prescribed-lifecycle-verbs`"; nothing is lost.
 
 # Catalogue-admit prescribed lifecycle verbs
 

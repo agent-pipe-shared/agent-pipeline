@@ -3,12 +3,18 @@ schema: pipeline.backlog-item.v1
 id: pipeline.lifecycle-read-scope-blocks-host-declared-system-skill
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-28
+closed_at: 2026-10-22
+closure_repository: self
+closure_commit: 35455319327d44d5519671a13f0956583dd99a21
+closure_evidence: backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md
 source: "Installed 0.7 recovery guard refused a single read of the host-declared openai-docs SKILL.md with GUARD-READ-SCOPE-OUTSIDE-ROOT while ordinary Implementation admission was valid."
 sprint: alfred
 done_when: manual
 ---
+
+**Rejected as a duplicate (backlog grooming 2026-10-22):** merged into `backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md`. Same observable defect and same fix: the lifecycle guard refuses (GUARD-READ-SCOPE-OUTSIDE-ROOT) a read of a host-declared system skill SKILL.md and offers only a PO-signature route; one bound read authority for the declared skill instruction files closes both. Both were deferred together by the PO decision of 2026-10-16 (AC-147 and AC-209), so the canonical absorbs the PO decision. All content of this item is carried over verbatim into that item's section "Merged from `2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill`"; nothing is lost.
 
 # Required host skill read has no ordinary lifecycle admission
 

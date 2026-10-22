@@ -3,12 +3,18 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critic-scratch-name-randomness-has-no-admitted-command
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-10-06
+closed_at: 2026-10-22
+closure_repository: self
+closure_commit: 35455319327d44d5519671a13f0956583dd99a21
+closure_evidence: backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md
 source: "Observed live during the Alfred night run, 2026-10-06 (two Opus Critic dispatches, GPGL-5/6 delta and FANOUT bundle remainder)."
 sprint: alfred
 done_when: manual
 ---
+
+**Rejected as a duplicate (backlog grooming 2026-10-22):** merged into `backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md`. Both describe the Critic having no admitted route to create its own scratch directory and persist critic-notes.md; both carry the identical triage (fixed in source, commit f95fc6998) and the randomness item's 2026-10-22 verification lives in the notes-write item's registered pin test (lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs). One admitted Write/Edit notes route closes both. All content of this item is carried over verbatim into that item's section "Merged from `2026-10-06-critic-scratch-name-randomness-has-no-admitted-command`"; nothing is lost.
 
 # A Critic's scratch-directory randomness has no admitted command, and one improvisation never terminated
 
