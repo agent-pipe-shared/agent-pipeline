@@ -37,7 +37,23 @@ Owner: pipeline; due 2026-10-31.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** needs-verification.
+- **Decision:** needs-verification (2026-10-08); premise refuted on verification (2026-10-22), disposition below.
 - **Rationale:** decision AO: automatable admin step.
 - **Assignment (if accepted):** post-0.7.0 automation lane unless pulled in.
 - **Date:** 2026-10-08
+
+## Verification of the premise (agent, 2026-10-22)
+
+Premise refuted on two independent grounds, pinned in `plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs`:
+
+1. The script is not a host setup step. `codex-design-readiness-bootstrap.mjs` is a per-design-package readiness producer: its
+   usage needs `--repo-root`, `--dispatch-id`, `--queue-revision`, `--session-id`, `--expected-descriptor-sha256`, `--receipt`,
+   five `--source` entries and an advisor preparation. A fresh host has none of these, so there is no fresh-host action to fold it into.
+2. ADR-0085 retired the design course behaviorally. `runCodexDesignReadinessBootstrap` returns `DESIGN-COURSE-RETIRED` before
+   parsing, state access, dispatch or publication, and `runDesignCourseV2` returns the same retirement. Nothing runs, so nothing
+   needs automating.
+
+The deferral pin is retargeted to this state (it still fails if the preflight starts naming the script). Recommended disposition for the
+Elephant triage: close as obsolete (premise refuted, route retired). The inventory row `docs/admin-steps-inventory.md` line 54 and
+candidate 6 still describe the step as automatable and are stale; correcting them was left to the triage because the inventory
+carries row counts.
