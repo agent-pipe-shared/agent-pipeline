@@ -100,7 +100,7 @@ function capture(fn) {
   finally { console.log = beforeLog; console.error = beforeError; }
 }
 /** A submitted feature-profile root whose Spec is `spec`; the PRD carries the matching marker. */
-function submittedRoot(spec) {
+function submittedRoot(spec, { governed = true } = {}) {
   const scratch = resolve(pluginRoot, "../../scratch");
   mkdirSync(scratch, { recursive: true });
   const root = mkdtempSync(join(scratch, "alf-k11-d64-"));
@@ -113,7 +113,8 @@ function submittedRoot(spec) {
   mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, `specs/${FEATURE}`), { recursive: true });
   mkdirSync(join(root, ".agent-pipeline"), { recursive: true });
-  writeFileSync(join(root, ".agent-pipeline/onboarding-consent.json"), JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: now }));
+  // The consent marker is what makes this disposable root a governed project (AC-264 / D85: a governed project's submit-plan also checks the delivery hand-off).
+  if (governed) writeFileSync(join(root, ".agent-pipeline/onboarding-consent.json"), JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: now }));
   const plan = `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${sha(spec)} -->\n# PRD\n${FEATURE}\n`;
   writeFileSync(join(root, planPath), plan);
   writeFileSync(join(root, specPath), spec);
@@ -134,8 +135,8 @@ function submittedRoot(spec) {
   writeFileSync(join(root, "evidence/review-1.json"), "{}\n");
   return { root, deps, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
-function presentPlan(spec) {
-  const f = submittedRoot(spec);
+function presentPlan(spec, options) {
+  const f = submittedRoot(spec, options);
   try { return capture(() => run(["present-plan", "--by", "Fixture", "--review-receipt", "evidence/review-1.json"], f.deps)); }
   finally { f.cleanup(); }
 }
@@ -143,7 +144,7 @@ const SUPPORTED_SHAPE_NAMES = [/\| # \| Criterion \| Evidence \|/u, /AC-<n>/u, /
 
 test("D64 present-plan: an unsupported criterion shape or id is refused before present-plan with the supported shapes named", () => {
   for (const [label, spec, id] of [["four-column table", FOUR_COLUMN, "AC-1"], ["leading-zero id", LEADING_ZERO, "AC-01"]]) {
-    const refused = presentPlan(spec);
+    const refused = presentPlan(spec, { governed: false });
     assert.equal(refused.code, 2, label);
     assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, `${label}: ${refused.stderr}`);
     assert.ok(refused.stderr.includes(id), `${label}: names the offending id`);
@@ -153,11 +154,23 @@ test("D64 present-plan: an unsupported criterion shape or id is refused before p
 
 test("D64 present-plan (RED mirror): the refusal is scoped; a supported Spec and a Spec with no criterion rows are not refused by it", () => {
   for (const [label, spec] of [["supported three-column", THREE_COLUMN], ["supported two-column", TWO_COLUMN], ["no criterion rows at all", "# Technical Spec\nGuard admission regression.\n"]]) {
-    const result = presentPlan(spec);
+    const result = presentPlan(spec, { governed: false });
     assert.equal(result.code, 2, `${label}: the later receipt check still stops the bare fixture`);
     assert.doesNotMatch(result.stderr, /CAC-CRITERION-UNSUPPORTED/u, `${label}: ${result.stderr}`);
     assert.match(result.stderr, /present-plan refused \(DRR-/u, `${label}: ${result.stderr}`);
   }
+});
+
+// AC-264 / D85 (PO decision 2026-10-22): a GOVERNED project's submit-plan also checks the delivery hand-off, so a Spec with no admitted row never reaches
+// present-plan there (the cases above run an ungoverned root, with the Spec bytes and assertions unchanged). D64 stays reachable in a governed root when
+// the Spec has at least one admitted row beside the unsupported one, and an unready hand-off is refused at submit-plan with its typed code.
+test("D64 present-plan with the delivery hand-off wired: governed root, one admitted row beside an unsupported one is still refused by D64; a Spec with no admitted row is refused at submit-plan", () => {
+  const mixed = `${LEADING_ZERO}\n| # | Criterion |\n| --- | --- |\n| 1 | A supported row beside the unsupported AC-01 |\n`;
+  assert.deepEqual(scanAcceptedCriterionRows(mixed).map((row) => row.id), ["AC-1"], "control: exactly one row is admitted, AC-01 is not");
+  const refused = presentPlan(mixed);
+  assert.equal(refused.code, 2);
+  assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, refused.stderr);
+  assert.throws(() => presentPlan(FOUR_COLUMN), /PLR-HANDOFF-NO-CRITERION/u, "submit-plan stops a governed Spec with no admitted row, before present-plan");
 });
 
 test("D64 criterion inspection: the located and the unsupported rows come from the parser's own scan", () => {
