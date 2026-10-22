@@ -141,9 +141,9 @@ function deliver(root, action, file, opts) {
 
 /**
  * A sibling is never refused for ITS OWN drift. Consuming a different action examines every armed capability, and the
- * module audits a 'rejected' row against each non-matching one (driftedChecks always names toolInputSha256 because the
- * presented tool input is not that capability's). Such cross-examination rows are tolerated here (see the TODO cases
- * at the end of the file); a row WITHOUT toolInputSha256 would mean the sibling itself drifted.
+ * module no longer audits anything against a non-matching one (ALF-K22; the cases after the per-action matrix pin
+ * that). The tolerance of a cross-examination row naming toolInputSha256 is kept as a weaker, historical bound; a row
+ * WITHOUT toolInputSha256 would mean the sibling itself drifted.
  */
 function assertNoOwnDrift(root, action) {
   for (const event of eventsFor(root, action, "rejected")) {
@@ -301,7 +301,7 @@ for (const [toolName, build] of TOOLS) {
       const later = 200_000; // past the short window (61 s), far inside the default 30 minute window
       const expired = consume(root, short, { nowMs: later });
       assert.equal(expired.status, "replan", JSON.stringify(expired));
-      // The result CODE is not asserted here: with armed siblings it reads HGO-DRIFT (see the TODO case below).
+      // The result CODE is pinned in the "reports HGO-EXPIRED even while unexpired siblings are armed" case below.
       assert.equal(eventsFor(root, short, "expired").length >= 1, true, "the expiry must be audited against the short action");
       deliver(root, second, "existing-b.md", { nowMs: later });
       deliver(root, third, "existing-c.md", { nowMs: later });
@@ -354,15 +354,13 @@ for (const [toolName, build] of TOOLS) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Open contract gaps found by this matrix (no sibling is ever invalidated; the diagnostics of a
-// consumption are what leaks across siblings). Registered as node:test `todo` so the file stays green
-// while the desired contract is documented; a fix flips them to passing without editing the cases.
+// Diagnostics of a consumption must not leak across siblings (ALF-K22, PO decision 2026-10-22: skip
+// non-matching capabilities first). These two cases were registered as node:test `todo` by ALF-K17
+// while the module audited a spurious HGO-DRIFT row for every non-matching sibling; they now pass.
 // ---------------------------------------------------------------------------------------------
 
 for (const [toolName, build] of TOOLS) {
-  test(`${toolName}: an expired action reports HGO-EXPIRED even while unexpired siblings are armed`, {
-    todo: "consumeHumanGuardOverride() examines every armed capability and audits a 'rejected' HGO-DRIFT row for each non-matching sibling; driftReplanRequired then masks replanRequired, so the expired action reads HGO-DRIFT",
-  }, () => {
+  test(`${toolName}: an expired action reports HGO-EXPIRED even while unexpired siblings are armed`, () => {
     const root = fixture();
     try {
       const short = signAndArm(root, { toolName, toolInput: build("existing-a.md"), ttlMs: 60_000 });
@@ -375,20 +373,58 @@ for (const [toolName, build] of TOOLS) {
     }
   });
 
-  test(`${toolName}: delivering one action audits no rejection against its undisturbed siblings`, {
-    todo: "the non-matching sibling is reclassified against the PRESENTED tool input and audited as rejected with driftedChecks [toolInputSha256, nativeTargets] before the input check skips it",
-  }, () => {
+  test(`${toolName}: delivering one action audits no rejection against its undisturbed siblings`, () => {
     const root = fixture();
     try {
       const armed = ["existing-a.md", "existing-b.md", "existing-c.md"].map((file) => ({
         file, ...signAndArm(root, { toolName, toolInput: build(file) }),
       }));
       // Capabilities are examined in file-name (plan digest) order and the scan stops at the match, so deliver the
-      // action that sorts LAST: that makes every sibling a candidate examined (and, today, audited) first.
+      // action that sorts LAST: that makes every sibling a candidate passed over before the match.
       armed.sort((x, y) => (x.plan.planSha256 < y.plan.planSha256 ? -1 : 1));
       const last = armed.pop();
       deliver(root, last, last.file);
       for (const sibling of armed) assert.deepEqual(eventsFor(root, sibling, "rejected"), []);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // ALF-K22 additions (new cases; no existing case was changed).
+  test(`${toolName}: a call matching no signed action is refused as before but audits nothing against any armed sibling`, () => {
+    const root = fixture();
+    try {
+      const actions = ["existing-a.md", "existing-b.md", "existing-c.md"].map((file) => signAndArm(root, { toolName, toolInput: build(file) }));
+      const before = capabilityBytes(root);
+      const eventsBefore = auditEvents(root).length;
+      const refused = consume(root, { toolName, toolInput: build("never-signed.md") });
+      assert.equal(refused.status, "replan", JSON.stringify(refused));
+      // The refusal verdict is unchanged (a different native target reads as drift of the bound target set) ...
+      assert.equal(refused.code, "HGO-DRIFT");
+      // ... but it is derived read-only: no audit row, no capability rewrite.
+      assert.equal(auditEvents(root).length, eventsBefore, "a call matching no signed action must append no audit row");
+      assert.deepEqual(capabilityBytes(root), before, "a call matching no signed action must not rewrite any capability");
+      for (const [index, action] of actions.entries()) deliver(root, action, ["existing-a.md", "existing-b.md", "existing-c.md"][index], { nowMs: 11_000 });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test(`${toolName}: an expired sibling is neither audited nor reported for a call that is not its action`, () => {
+    const root = fixture();
+    try {
+      const short = signAndArm(root, { toolName, toolInput: build("existing-a.md"), ttlMs: 60_000 });
+      const live = signAndArm(root, { toolName, toolInput: build("existing-b.md") });
+      const later = 200_000;
+      // The unexpired action matches and is consumed; the expired sibling is passed over without an audit row.
+      deliver(root, live, "existing-b.md", { nowMs: later });
+      assert.deepEqual(eventsFor(root, short, "expired"), []);
+      assert.deepEqual(eventsFor(root, short, "rejected"), []);
+      // The expired action itself still reads HGO-EXPIRED and is audited as expired.
+      const expired = consume(root, short, { nowMs: later });
+      assert.equal(expired.status, "replan", JSON.stringify(expired));
+      assert.equal(expired.code, "HGO-EXPIRED");
+      assert.equal(eventsFor(root, short, "expired").length, 1);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
