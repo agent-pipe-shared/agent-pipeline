@@ -5,10 +5,10 @@
 //   P1 the ready-gate yields a valid observation for every lifecycle state the writer can produce, `approved` included;
 //   P2 the recovery command a denial names is admitted in the state that emits it;
 //   P3 backlog/, docs/ and scratch/ writes stay admitted in every lifecycle state.
-// Host limitation (PO decision K7): directory symlink/junction escape cases need link creation, which is unavailable
-// on this native Windows host; the case is skipped below with owner Coordinator and due date 2026-10-19.
+// Host limitation (PO decision K7): the directory symlink/junction escape case needs link creation. It runs wherever a
+// link can be created and skips itself with a typed host-limitation reason on a host that cannot create one.
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import test from "node:test";
@@ -193,6 +193,23 @@ test("P2 the recovery command named by the PORG-INVALID-OBSERVATION denial is ad
   }
 });
 
-test("link-escape under docs/ stays refused (junction/symlink creation)", {
-  skip: "host-limitation: directory symlinks/junctions unavailable on this native Windows host; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7); adjacent QW04-5 covers it where links exist",
-}, () => {});
+test("link-escape under docs/ stays refused (junction/symlink creation)", (t) => {
+  for (const [name, stateObject] of Object.entries(STATES)) {
+    const root = guardRoot(stateObject);
+    const outside = scratchDir("alf-c-p19-02-outside-");
+    try { symlinkSync(outside, join(root, "docs"), "junction"); }
+    catch (error) {
+      // Typed conditional skip: only a host that cannot create a directory link (native Windows without the privilege).
+      t.skip(`host-limitation: directory symlink/junction cannot be created on this host (${error?.code ?? "unknown"}); the escape is covered wherever links exist`);
+      return;
+    }
+    for (const tool of ["Write", "Edit"]) {
+      const r = run(root, tool, { file_path: "docs/alf-c-p19-02-escape.md" });
+      assert.equal(r.exitCode, 2, `${name}/${tool}: a write through a docs/ link that leaves the repository must be refused: ${JSON.stringify(r)}`);
+    }
+    // The same state still admits the ordinary docs/ write once the link is gone (the refusal is about the link, not the path).
+    rmSync(join(root, "docs"), { recursive: true, force: true });
+    mkdirSync(join(root, "docs"), { recursive: true });
+    assert.equal(run(root, "Write", { file_path: "docs/alf-c-p19-02-ok.md" }).exitCode, 0, `${name}: plain docs/ write`);
+  }
+});
