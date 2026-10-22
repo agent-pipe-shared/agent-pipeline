@@ -343,7 +343,10 @@ test('AC-241 point 3: drift after the actual turn refuses publication and the pr
 
 // Acceptance 5 (historical preservation): the old not-ready reports stay as recorded failures. Byte digests pin them as unchanged
 // public receipts; no ready report may reuse a not-ready report's dispatch or candidate (a manual conversion would have to).
-// Final package validation of a not-ready report is counted coverage of design-workflow-package.test.mjs (DWP02, DWP-READINESS-BINDING).
+// Final package validation (acceptance 4) is counted coverage of two suites that drive validateDesignWorkflowPackage itself:
+// lib/design-workflow-package.test.mjs ("requires fresh independent readiness over the exact source set and candidate": a not-ready
+// report is refused DWP-READINESS-BINDING) and lib/pins/design-workflow-package-omits-contract.test.mjs (AC3 mismatched, failed and
+// replayed Readiness or Advisor evidence; DWP-ADVISOR-QUESTION, DWP-ADVISOR-RECEIPT-BINDING). The case below keeps those citations from rotting.
 const HISTORICAL = {
   'design-readiness-08ef241a-20260928a.json': ['2145305cef32223b27030446e22cc88f7de51f47d63804bab256e61ea2896920', 'not-ready'],
   'design-readiness-3b05a045-20260928.json': ['a40d44e3dcb8149fb059a349f5640b0de44ea75ee08ff1693cd1175b17533252', 'not-ready'],
@@ -374,4 +377,21 @@ test('AC-241 point 5: old not-ready Readiness reports are preserved unchanged an
   const codes = file => notReady.find(entry => entry.file === file).report.findings.map(f => f.code);
   assert.deepEqual(codes('design-readiness-9a416793-20260928b.json'), ['CURRENT_ADVISOR_BINDING_MISSING', 'SUBMISSION_ACK_GATE_CONFLICT']);
   assert.deepEqual(codes('design-readiness-628df5aa-20260928c.json'), ['ADVISOR-CURRENT-BINDING-MISSING']);
+});
+
+// Acceptance 4 (final package validation): the cited coverage must still exist. The cited suites run separately; this case only fails
+// when a cited case is renamed or removed, and a mirror without the citation proves the detector is not vacuous.
+const CITED = [
+  ['../design-workflow-package.test.mjs', 'requires fresh independent readiness over the exact source set and candidate', 'DWP-READINESS-BINDING'],
+  ['./design-workflow-package-omits-contract.test.mjs', 'AC3 failed evidence: a readiness outcome other than ready-for-po-review, or a blocking finding, is refused', 'DWP-READINESS-BINDING'],
+  ['./design-workflow-package-omits-contract.test.mjs', 'AC3 mismatched evidence: readiness bound to other sources or another candidate is refused', 'DWP-ADVISOR-QUESTION'],
+  ['./design-workflow-package-omits-contract.test.mjs', 'AC3 replayed evidence: readiness or Advisor evidence reusing the authoring dispatch is refused', 'DWP-ADVISOR-RECEIPT-BINDING'],
+];
+const citationHolds = (text, title, code) => text.includes(title) && text.includes(code);
+test('AC-241 point 4: final package validation of Advisor and Readiness provenance is counted by the cited suites that still exist', () => {
+  for (const [file, title, code] of CITED) {
+    const text = readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8');
+    assert.ok(citationHolds(text, title, code), `${file}: cited case or code ${code} is gone`);
+  }
+  assert.equal(citationHolds('', CITED[0][1], CITED[0][2]), false, 'RED mirror: an empty suite does not satisfy the citation');
 });
