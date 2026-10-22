@@ -59,7 +59,7 @@ export const DISPATCH_RECORD_PATH_DENIAL_CODE = "GUARD-DISPATCH-RECORD-PATH";
 //   - a FINAL-terminal record (any terminal outcome except the interim one) is immutable: only the owner's identical-content re-write is admitted
 //     (a no-op, so a retried finalising write is not mistaken for a failure); an Edit can never prove identity and is refused.
 // An UNCLAIMED record (created by the orchestrator, before this fix, or by a runner whose payload carries no agent identity) keeps the previous
-// logic unchanged. No identity is ever guessed.
+// logic, plus one PO-decided admission (ALF-K34, see dispatchRecordInterimExtension): the next post-commit checkpoint of an interim record. No identity is ever guessed.
 export const DISPATCH_RECORD_OWNER_SCHEMA = "pipeline.dispatch-record-owner.v1";
 
 export const DISPATCH_RECORD_INTERIM_OUTCOME = "committed-pending-report";
@@ -181,6 +181,22 @@ export function claimDispatchRecordOwnership({ relPath, requested, root, input, 
   }
 }
 
+// PO decision 2026-10-22 (ALF-K34, "align the unclaimed path"): an UNCLAIMED record now admits what the claimed path already admits for a multi-commit
+// package -- the next post-commit checkpoint. The validator forces candidateCommit to the last commit, so the second checkpoint changes candidateCommit
+// against an interim record that the denylist calls terminal. Admitted only when the existing record is the INTERIM outcome, the incoming write is JSON
+// for the same task id that is still the interim outcome (not final, not in-progress), and its commits strictly EXTEND the existing list (prefix and
+// order preserved, nothing removed). Everything else keeps the previous refusal: a final record, another task id, a shrunk/reordered/replaced list,
+// an Edit-shaped (non-JSON) payload.
+function dispatchRecordInterimExtension({ taskId, existing, incoming }) {
+  const interim = (outcome) => String(outcome).trim().toLowerCase() === DISPATCH_RECORD_INTERIM_OUTCOME;
+  if (incoming === null || typeof incoming !== "object" || Array.isArray(incoming)) return false;
+  if (!interim(existing.outcome) || !interim(incoming.outcome)) return false;
+  if (incoming.taskId !== taskId || existing.taskId !== taskId) return false;
+  if (!Array.isArray(existing.commits) || !Array.isArray(incoming.commits)) return false;
+  if (incoming.commits.length <= existing.commits.length) return false;
+  return existing.commits.every((sha, index) => incoming.commits[index] === sha);
+}
+
 export function checkDispatchRecordCollision({ relPath, requested, payload, root, input = null, dependencies = {} }) {
   const match = /^evidence\/dispatch-record-([A-Za-z0-9._-]+)\.json$/.exec(relPath);
   if (!match) {
@@ -217,7 +233,7 @@ export function checkDispatchRecordCollision({ relPath, requested, payload, root
 
     if (existing && typeof existing === "object") {
       const isTerminalFn = dependencies.isTerminalOutcomeFn ?? isTerminalOutcome;
-      if (isTerminalFn(existing.outcome)) {
+      if (isTerminalFn(existing.outcome) && !dispatchRecordInterimExtension({ taskId, existing, incoming })) {
         if (!incoming || incoming.outcome === "in-progress" || (incoming.candidateCommit && incoming.candidateCommit !== existing.candidateCommit)) {
           return {
             taskId,
