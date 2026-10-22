@@ -276,8 +276,11 @@ test("AP10 git show <HEAD|hex>:<path> | head -N of a contained in-repo path is a
 
 test("AP11 the git-show lane fails closed: other sinks, no sink, hidden/dash/traversal/backslash/aliased/credential paths, extra operands, other revisions", () => withLaneFixture((path, { aliased }) => {
   // The sink and the line bound do not depend on how a host reads `<rev>:<path>`: refused at the guard entry on every host.
+  // QG-04 (PO tile decision 2026-10-22, D114 as written: `tail` admitted in the bounded git read pipeline): the entry
+  // "git show HEAD:docs/state.md | tail -5" is no longer refused at the guard entry; it moved to `tailAdmitted` below. The dedicated
+  // git-show LANE stays head-only (its predicate assertion is kept: `tail` is not this lane), so the admission comes from the
+  // generic git-pipeline lane. Every other sink and bound in this list is unchanged.
   const sinkOrBound = [
-    "git show HEAD:docs/state.md | tail -5",
     "git show HEAD:docs/state.md | sort",
     "git show HEAD:docs/state.md | rg apply",
     "git show HEAD:docs/state.md | head -501",
@@ -304,8 +307,13 @@ test("AP11 the git-show lane fails closed: other sinks, no sink, hidden/dash/tra
   ];
   // Lane-only: the pre-existing generic git-pipeline lane judges the `..` spelling itself, so only the lane predicate is pinned.
   const laneOnly = ["git show HEAD:docs/../docs/state.md | head -5", "git show HEAD:docs/state.md"];
-  for (const command of [...sinkOrBound, ...pathOrOperand, ...laneOnly]) {
+  const tailAdmitted = ["git show HEAD:docs/state.md | tail -5"];
+  for (const command of [...sinkOrBound, ...pathOrOperand, ...laneOnly, ...tailAdmitted]) {
     assert.equal(gitShowLane(command, path), false, `lane: ${command}`);
+  }
+  for (const command of tailAdmitted) {
+    const r = verdict(bash(command), path);
+    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
   }
   for (const command of sinkOrBound) {
     const r = verdict(bash(command), path);
