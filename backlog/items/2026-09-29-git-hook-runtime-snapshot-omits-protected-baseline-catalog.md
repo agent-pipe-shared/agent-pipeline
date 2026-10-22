@@ -76,6 +76,22 @@ committed or registered yet because the current product commit is held at the
 normal protected-path backstop. Do not mark it closed from the static diagnosis
 or an isolated snapshot test.
 
+## Counted runs 2026-10-22 (Linux/WSL2, commit `f3a9f02cb`, one suite at a time)
+
+- `lib/project-onboarding-v3.test.mjs` (the sharded ORIGINAL184 harness): 216 cases across 2 sequential chunks of 6
+  shards, 0 shards failed, 216 PASS lines and 0 fail, skip, cancel or timeout outcomes; wrapper duration 467 s (the
+  earlier prepared attempt stopped at 900 s with 149 passed, 1 failed, 34 unobserved). The onboarding handover cases
+  `the public onboarding handover is executable for every runner with baseline-only and configured verify`
+  (codex, antigravity, claude) all PASS: the handover commit runs through the installed hook and the snapshot-local
+  protected-baseline catalog.
+- `lib/git-hook-runtime-snapshot.test.mjs`: 8 cases, 8 pass, 0 fail, 0 skip (exact catalog and digest in the snapshot;
+  missing, changed, removed, symlinked and hard-linked catalog refused; no other root file copied).
+- `scripts/pre-commit-hook-install.test.mjs` (the original hook suite): 59 cases, 59 pass, 0 fail, 0 skip (55/55 at the
+  time of the Intake status above).
+
+Still open and not agent work: Full Verify and the candidate-bound closure checks on the Linux/WSL host, the independent
+Critic review, and PO acceptance. The item status stays `open`.
+
 ## Triage
 
 - **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
