@@ -3,6 +3,7 @@
 // denial names must be admitted by the shell lane in the state that produced that denial.
 // Verbs are captured from the real emitter text (designAdvisoryRemediation); each command is spelled
 // exactly as the catalogue's own definition (sanctioned-args-scripts.mjs) requires.
+import { registerTestCaseCompletion } from '../test-case-completion.mjs';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -18,8 +19,6 @@ const blockedDraft = { devPlanGateVerdictFn: () => ({ verdict: 'block', reason: 
 
 // Fixture: an existing single-link regular review receipt under scratch/ (relative path, as the catalogue demands).
 const receiptRel = 'scratch/denial-diagnosis-pin-receipt.json';
-mkdirSync(join(root, 'scratch'), { recursive: true });
-writeFileSync(join(root, receiptRel), '{}');
 const SHAPES = {
   'reopen-design': '--by tester',
   'present-plan': `--by tester --review-receipt ${receiptRel}`,
@@ -27,35 +26,47 @@ const SHAPES = {
   'set-phase': '--phase implementation',
 };
 const build = (verb, tail = SHAPES[verb]) => `node "${script}" ${verb} ${tail}`.trim();
-try {
-  let namedTotal = 0;
-  const seen = new Set();
-  for (const code of CODES) {
-    const text = designAdvisoryRemediation(code);
-    const named = VERBS.filter(verb => text.includes(verb));
-    assert.ok(named.length > 0, `${code}: remediation names no recovery verb`);
-    for (const verb of named) {
-      namedTotal += 1; seen.add(verb);
-      const command = build(verb);
-      const sanctioned = isSanctionedLifecycleCommand(command, root, {});
-      const hit = devPlanShellRefusalHit(command, root, blockedDraft);
-      assert.ok(sanctioned === true && hit === null,
-        `${code}: named command "${verb}" is refused in the state that produced the denial (sanctioned=${sanctioned}, lane=${hit?.lane ?? 'none'})`);
+
+// Every case below is registered through the case-completion protocol (registerTestCaseCompletion at the end of
+// this file). Ids are stable and in registration order; never renumber, append new cases at the end.
+const cases = [];
+const check = (id, name, run) => cases.push({ id, name, run });
+
+// The original module-level block of this pin (it ran before any node:test case, outside any case): the
+// emitted-verb admission check over the four design-advisory denial codes. It is now declared case DND001, so an
+// assertion failure here is a failed case and no longer ends the file before the cases below are registered.
+check('DND001', 'the four design-advisory denials name only recovery verbs the shell lane admits, and a misspelt verb is refused', () => {
+  mkdirSync(join(root, 'scratch'), { recursive: true });
+  writeFileSync(join(root, receiptRel), '{}');
+  try {
+    let namedTotal = 0;
+    const seen = new Set();
+    for (const code of CODES) {
+      const text = designAdvisoryRemediation(code);
+      const named = VERBS.filter(verb => text.includes(verb));
+      assert.ok(named.length > 0, `${code}: remediation names no recovery verb`);
+      for (const verb of named) {
+        namedTotal += 1; seen.add(verb);
+        const command = build(verb);
+        const sanctioned = isSanctionedLifecycleCommand(command, root, {});
+        const hit = devPlanShellRefusalHit(command, root, blockedDraft);
+        assert.ok(sanctioned === true && hit === null,
+          `${code}: named command "${verb}" is refused in the state that produced the denial (sanctioned=${sanctioned}, lane=${hit?.lane ?? 'none'})`);
+      }
     }
+    assert.ok(namedTotal >= CODES.length);
+    assert.ok(seen.has('reopen-design'), 'reopen-design must be named by at least one denial');
+    // Meaningful-RED mirror: a wrongly spelled named command (missing receipt flag value) is NOT admitted,
+    // so the admission assertion above discriminates spelling rather than passing vacuously.
+    assert.equal(isSanctionedLifecycleCommand(build('present-plan', '--by tester --review-receipt scratch/does-not-exist.json'), root, {}), false);
+    assert.equal(isSanctionedLifecycleCommand(build('set-phase', '--by tester'), root, {}), false);
+    console.log(`ok: ${namedTotal} named recovery commands admitted across ${CODES.length} denial codes (verbs: ${[...seen].join(',')})`);
+  } finally {
+    rmSync(join(root, receiptRel), { force: true });
   }
-  assert.ok(namedTotal >= CODES.length);
-  assert.ok(seen.has('reopen-design'), 'reopen-design must be named by at least one denial');
-  // Meaningful-RED mirror: a wrongly spelled named command (missing receipt flag value) is NOT admitted,
-  // so the admission assertion above discriminates spelling rather than passing vacuously.
-  assert.equal(isSanctionedLifecycleCommand(build('present-plan', '--by tester --review-receipt scratch/does-not-exist.json'), root, {}), false);
-  assert.equal(isSanctionedLifecycleCommand(build('set-phase', '--by tester'), root, {}), false);
-  console.log(`ok: ${namedTotal} named recovery commands admitted across ${CODES.length} denial codes (verbs: ${[...seen].join(',')})`);
-} finally {
-  rmSync(join(root, receiptRel), { force: true });
-}
+});
 
 // --- AC-148 correction (Critic C6b F2), added 2026-10-16 ---
-const { test } = await import('node:test');
 const { readFileSync } = await import('node:fs');
 const policySource = readFileSync(fileURLToPath(new URL('../guard-devplan-policy.mjs', import.meta.url)), 'utf8');
 // Every denial code the emitter file knows (quoted DAA-/DWP- literals), plus an unknown code (fallthrough branch)
@@ -64,7 +75,7 @@ const ALL_CODES = [...new Set([...policySource.matchAll(/"((?:DAA|DWP)-[A-Z0-9-]
 const inspectCommand = `node "${fileURLToPath(new URL('../../scripts/design-advisory-admission.mjs', import.meta.url))}" inspect --repo-root ${root} --feature f --plan p --spec s`;
 const refusedNames = text => /design-advisory-admission|\binspect\b|\.mjs\b|\bnode\b/u.test(text);
 
-test('headline case: the diagnosis command the original defect named is refused, so no rendered denial may name it', () => {
+check('DND002', 'headline case: the diagnosis command the original defect named is refused, so no rendered denial may name it', () => {
   // Precondition: under the denial-producing state the guard really refuses it (opaque-script-execution).
   const hit = devPlanShellRefusalHit(inspectCommand, root, blockedDraft);
   assert.equal(hit?.lane, 'opaque-script-execution');
@@ -77,7 +88,7 @@ test('headline case: the diagnosis command the original defect named is refused,
   }
   assert.ok(!refusedNames(designAdvisoryRemediation()), 'undefined code: rendered denial names a refused script command');
 });
-test('DLR035 receipt: a DLR035 denial has no dedicated emitter and names only admitted recovery verbs', () => {
+check('DND003', 'DLR035 receipt: a DLR035 denial has no dedicated emitter and names only admitted recovery verbs', () => {
   const text = designAdvisoryRemediation('DLR035');
   assert.ok(text.includes('(DLR035)'), 'DLR035 receipt is rendered in the denial header');
   assert.ok(!refusedNames(text));
@@ -91,7 +102,7 @@ test('DLR035 receipt: a DLR035 denial has no dedicated emitter and names only ad
     } finally { rmSync(join(root, receiptRel), { force: true }); }
   }
 });
-test('all denial codes: every recovery verb a rendered denial names is admitted in the producing state', () => {
+check('DND004', 'all denial codes: every recovery verb a rendered denial names is admitted in the producing state', () => {
   mkdirSync(join(root, 'scratch'), { recursive: true });
   writeFileSync(join(root, receiptRel), '{}');
   try {
@@ -107,7 +118,7 @@ test('all denial codes: every recovery verb a rendered denial names is admitted 
     assert.ok(named >= ALL_CODES.length, 'every code must name at least one recovery verb');
   } finally { rmSync(join(root, receiptRel), { force: true }); }
 });
-test('exact rendered recovery text: the denial spelling is observed against the guard, not a hand-built spelling', () => {
+check('DND005', 'exact rendered recovery text: the denial spelling is observed against the guard, not a hand-built spelling', () => {
   const text = designAdvisoryRemediation('DAA-DESIGN-SOURCE-DRIFT');
   const rendered = /Run (reopen-design --by <human attribution>)/u.exec(text)?.[1];
   assert.equal(rendered, 'reopen-design --by <human attribution>', 'denial text no longer renders the pinned recovery spelling');
@@ -148,7 +159,7 @@ const buildPushInit = async (options) => {
 };
 const pushInitCommand = (argv) => `node "${join(pluginDir, 'scripts', 'push-init.mjs')}" ${argv.join(' ')}`;
 
-test('inventory: the denial texts that name a command are exactly the classified ones', () => {
+check('DND006', 'inventory: the denial texts that name a command are exactly the classified ones', () => {
   assert.deepEqual(namedCommandHits(), [
     'hooks/guard-git.mjs :: then run: node',
     'hooks/guard-push.mjs :: Run: node',
@@ -157,7 +168,7 @@ test('inventory: the denial texts that name a command are exactly the classified
   ], 'a denial that names a command is new or was removed: classify it in this file (admitted, or a todo with its patch)');
 });
 
-test('GUARD-BOOTSTRAP-RECEIPT-MISSING: the named preflight command is sanctioned and not lane-refused in the blocked state', async () => {
+check('DND007', 'GUARD-BOOTSTRAP-RECEIPT-MISSING: the named preflight command is sanctioned and not lane-refused in the blocked state', async () => {
   const { START_PREFLIGHT_SCRIPT } = await import(new URL('../guard/constants.mjs', import.meta.url));
   const source = readFileSync(fileURLToPath(new URL('../guard/bootstrap-receipt.mjs', import.meta.url)), 'utf8');
   assert.ok(source.includes('Run exactly: node "${START_PREFLIGHT_SCRIPT}"'), 'the denial no longer names the preflight script as pinned');
@@ -166,21 +177,21 @@ test('GUARD-BOOTSTRAP-RECEIPT-MISSING: the named preflight command is sanctioned
   assert.equal(devPlanShellRefusalHit(command, root, blockedDraft), null);
 });
 
-test('guard-push checkpoint denial: control, the default push-init argv is sanctioned', async () => {
+check('DND008', 'guard-push checkpoint denial: control, the default push-init argv is sanctioned', async () => {
   assert.equal(isSanctionedLifecycleCommand(pushInitCommand(await buildPushInit({})), root, {}), true);
   assert.equal(isSanctionedLifecycleCommand(pushInitCommand(await buildPushInit({ base: 'main' })), root, {}), true);
 });
 
-test('guard-push checkpoint denial: the argv push-init emits for --checkpoint is sanctioned by the shell lane',
-  { todo: false },
+// DND009 and DND010 were registered with `{ todo: false }` (the explicit "not a todo" form of the node:test option;
+// it changes nothing). A defect that needs a protected guard file is pinned by setting `mode: 'todo'` on the case.
+check('DND009', 'guard-push checkpoint denial: the argv push-init emits for --checkpoint is sanctioned by the shell lane',
   async () => {
     const argv = await buildPushInit({ checkpoint: true });
     assert.equal(isSanctionedLifecycleCommand(pushInitCommand(argv), root, {}), true, `refused: ${argv.join(' ')}`);
     assert.equal(devPlanShellRefusalHit(pushInitCommand(argv), root, blockedDraft), null);
   });
 
-test('guard-push checkpoint denial: the text names a complete, runnable push-init invocation',
-  { todo: false },
+check('DND010', 'guard-push checkpoint denial: the text names a complete, runnable push-init invocation',
   async () => {
     const source = readFileSync(join(pluginDir, 'hooks', 'guard-push.mjs'), 'utf8');
     const named = /"Run: (node <plugin-root>\/scripts\/push-init\.mjs --root <project-dir> --by <name> --remote <remote> --destination refs\/heads\/<branch> --checkpoint) prints/u.exec(source)?.[1];
@@ -190,7 +201,7 @@ test('guard-push checkpoint denial: the text names a complete, runnable push-ini
     assert.equal(isSanctionedLifecycleCommand(concrete, root, {}), true, `named command refused: ${concrete}`);
   });
 
-test('observed limit: the commands GG-22 and the dispatch-record lane name are refused only while the lifecycle gate blocks', () => {
+check('DND011', 'observed limit: the commands GG-22 and the dispatch-record lane name are refused only while the lifecycle gate blocks', () => {
   // Neither script is in the sanctioned catalogue; both are admitted in the states that produce those denials (a commit and a
   // dispatch-record write, which need an approved plan) because the opaque-script lane only fires on a blocking gate verdict.
   const allow = { devPlanGateVerdictFn: () => ({ verdict: 'allow', reason: 'fixture' }) };
@@ -208,7 +219,7 @@ test('observed limit: the commands GG-22 and the dispatch-record lane name are r
 // An approved feature whose approval cannot be re-verified degrades to ONE advisory instead of locking every write. The lane-level
 // proof (both lanes, real state, negative controls) is hooks/guard-devplan-approval-unverified.test.mjs; these cases pin the
 // advisory's own contract against the diagnosis rule this file exists for. They are green only with the D117 guard change applied.
-test('D117 advisory: typed code, what was not verified, one repair verb that is admitted, and no refused script command', async () => {
+check('DND012', 'D117 advisory: typed code, what was not verified, one repair verb that is admitted, and no refused script command', async () => {
   const policy = await import(new URL('../guard-devplan-policy.mjs', import.meta.url));
   const advisory = policy.unverifiedApprovalAdvisory({ ok: false, code: 'DWP-PACKAGE-PHYSICAL' }, { planApproval: { designWorkflowPackagePath: 'evidence/package.json' } });
   assert.ok(advisory, 'DWP-PACKAGE-PHYSICAL (the code this item was filed for) must degrade to an advisory');
@@ -226,9 +237,11 @@ test('D117 advisory: typed code, what was not verified, one repair verb that is 
     assert.equal(devPlanShellRefusalHit(build(verb), root, blockedDraft), null);
   } finally { rmSync(join(root, receiptRel), { force: true }); }
 });
-test('D117 advisory: the other codes of the former denial still block (the denial keeps naming only admitted verbs)', async () => {
+check('DND013', 'D117 advisory: the other codes of the former denial still block (the denial keeps naming only admitted verbs)', async () => {
   const policy = await import(new URL('../guard-devplan-policy.mjs', import.meta.url));
   for (const code of ['DWP-APPROVAL-DIGEST-DRIFT', 'DAA-PO-APPROVAL-TRUST-MISMATCH', 'DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP', 'DAA-DESIGN-SOURCE-DRIFT']) {
     assert.equal(policy.unverifiedApprovalAdvisory({ ok: false, code }, {}), null, `${code} must not degrade`);
   }
 });
+
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
