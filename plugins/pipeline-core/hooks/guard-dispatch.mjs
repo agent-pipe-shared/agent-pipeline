@@ -84,6 +84,7 @@ import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../
 import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
+import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchModel } from "../lib/dispatch-model-enforcement.mjs";
 import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
@@ -673,6 +674,17 @@ if (isDirectInvocation(import.meta.url)) {
   const codexDispatch = input?.tool_name === "spawn_agent";
   const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? toolInput.agent_type ?? (codexDispatch ? "default" : "");
   const prompt = toolInput.prompt ?? toolInput.message ?? "";
+
+  // D84: the model of a Claude subagent dispatch comes from the configured routing, never from inheritance.
+  if (["Task", "Agent"].includes(input?.tool_name)) {
+    const modelCheck = evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model });
+    const modelWarnings = dispatchModelWarningText(modelCheck);
+    if (modelWarnings !== "") process.stderr.write(modelWarnings);
+    if (!modelCheck.ok) {
+      process.stderr.write(dispatchModelRefusalText(modelCheck));
+      process.exit(2);
+    }
+  }
 
   let dispatches;
   if (Array.isArray(toolInput.Subagents)) {

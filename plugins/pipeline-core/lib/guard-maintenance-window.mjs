@@ -793,6 +793,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // writers; orphan-member-step <- onboarding-continuity; budget-notice <- hooks/guard-dispatch-budget;
   // answered-receipt <- scripts/advisory-host-bridge; sandbox-probe <- scripts/pipeline-start-preflight.
   "plugins/pipeline-core/lib/advisory-answered-receipt.mjs",
+  "plugins/pipeline-core/lib/dispatch-model-enforcement.mjs",
   "plugins/pipeline-core/lib/dispatch-briefing-build.mjs",
   "plugins/pipeline-core/lib/dispatch-budget-notice.mjs",
   "plugins/pipeline-core/lib/node-sandbox-probe.mjs",
