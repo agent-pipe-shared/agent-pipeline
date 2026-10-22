@@ -493,3 +493,287 @@ test("E3 D99 an unreleased or unrecognised newer version changes nothing: the as
 });
 
 test("C5 genuinely installed runner acceptance (host-held)", { skip: "native-pending: owner Elephant/PO host, due before AC-212 PO acceptance, host = a machine with qualified installed codex/claude/antigravity runners; the real readInstalledResult/verifyInstalledQualification ports behind createModelFamilyAcceptanceHost (model-family-acceptance.mjs) and the real createModelFamilyRuntimeHost resolveCurrentInvocationIdentity are not available in this session" }, () => {});
+
+// ======================================================================================================
+// Extension ALF-K20 (PO decision D99, 2026-10-22): the LEGACY V3 bootstrap (family activation inactive) follows a
+// new VERSION inside an approved FAMILY automatically; a NEW family still needs the PO. Also pins the open defect
+// pipeline.model-role-bootstrap-ignores-version-bumps-within-a-family. The family and the version order are
+// DECLARED (signed policy entries carry familyId + version tuple; the host supplies the catalogue records of the
+// existing pipeline.model-family-discovery.v1 shape) and compared with compareModelFamilyVersions; no model id string
+// is ever parsed for a family or a version. Old-style policies (no declaration) keep today's behaviour byte for byte.
+// The model-role-session.mjs / model-role-host-session.mjs source is kernel-protected: these cases are green only
+// with the protected diff applied.
+// ======================================================================================================
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { admitModelRoleBootstrap, modelRoleBootstrapReadback, resolveModelRoleBootstrap, resolveModelRoleSession,
+  validateModelRoleSessionReceipt } from "../model-role-session.mjs";
+import { admitModelRoleHostBootstrap, prepareModelRoleHostBootstrap } from "../model-role-host-session.mjs";
+import { createModelRoleHostStore } from "../model-role-host-store.mjs";
+import { verifyModelRoleApprovedPolicy } from "../model-role-approved-policy.mjs";
+import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from "../model-role-route-source.mjs";
+
+const V3_EVIDENCE = "a".repeat(64);
+const V3_COMMIT = "b".repeat(40);
+const V3_AT = "2026-10-22T12:00:00.000Z";
+const V3_ROUTES = [{ runner: "claude", role: "frontier", effort: "high" }];
+// An approved policy entry; the family declaration is optional and always a (familyId, version) pair.
+const v3Entry = (modelId, rank, familyId, version, evidence = V3_EVIDENCE) => ({ modelId, rank, efforts: ["high"],
+  compatibilityEvidenceSha256: evidence, ...(familyId === undefined ? {} : { familyId, version }) });
+// One release record of a normalized discovery (pipeline.model-family-discovery.v1 records[] shape).
+const v3Release = (familyId, version, modelId, { record = {}, variant = {} } = {}) => ({
+  releaseId: `${familyId}-${version.join(".")}`, familyId, version, released: true, groupingEvidenceSha256: sha("grouping"),
+  variants: [{ modelId, canonicalModelId: null, aliasEvidenceSha256: null, visible: true, selectable: true,
+    efforts: ["high"], capabilityEvidenceSha256: sha("capability"), compatibilityBySlotSha256: {}, ...variant }],
+  ...record });
+const v3Route = ({ sessionId, approved, available, catalogue }) => ({ runner: "claude", role: "frontier", effort: "high",
+  sessionId, candidateCommit: V3_COMMIT, observedAt: V3_AT,
+  policy: { schema: "pipeline.model-role-policy.v1", runner: "claude", role: "frontier", approved },
+  availableModelIds: available, ...(catalogue === undefined ? {} : { familyCatalogue: catalogue }) });
+const v3Boot = (o, previousReceipts = []) => resolveModelRoleBootstrap({ sessionId: o.sessionId, configuredRoutes: V3_ROUTES,
+  routes: [v3Route(o)], previousReceipts });
+const v3Receipt = (o) => resolveModelRoleSession(v3Route(o)).receipt;
+const v3Readback = (current, previous) => modelRoleBootstrapReadback({ sessionId: current.sessionId, receipts: [current],
+  previousReceipts: [previous] });
+const OPUS_48 = v3Entry("claude-opus-4-8", 1, "opus", [4, 8]);
+const OPUS_CATALOGUE = [v3Release("opus", [4, 8], "claude-opus-4-8"), v3Release("opus", [4, 9], "claude-opus-4-9"),
+  v3Release("opus", [4, 10], "claude-opus-4-10")];
+
+test("F1 an in-family bump is followed automatically: no review candidate, no acknowledgement, numeric order, catalogue order irrelevant", () => {
+  const first = v3Boot({ sessionId: "s-old", approved: [OPUS_48], available: ["claude-opus-4-8"],
+    catalogue: [OPUS_CATALOGUE[0]] });
+  assert.equal(first.ok, true, first.code);
+  assert.equal(first.receipts[0].modelId, "claude-opus-4-8");
+  assert.equal(first.receipts[0].familyId, "opus"); assert.deepEqual(first.receipts[0].version, [4, 8]);
+  for (const catalogue of [OPUS_CATALOGUE, [...OPUS_CATALOGUE].reverse()]) {
+    const next = v3Boot({ sessionId: "s-new", approved: [OPUS_48],
+      available: ["claude-opus-4-8", "claude-opus-4-9", "claude-opus-4-10"], catalogue }, first.receipts);
+    assert.equal(next.ok, true, next.code);
+    assert.equal(next.receipts[0].modelId, "claude-opus-4-10", "4.10 beats 4.9 numerically, not lexicographically");
+    assert.deepEqual(next.reviewCandidates, [], "an in-family model is not a review candidate");
+    assert.equal(next.readback.mappings[0].change, "unchanged");
+    assert.equal(next.readback.mappings[0].previousModelId, "claude-opus-4-8");
+    assert.equal(next.readback.mappings[0].modelId, "claude-opus-4-10");
+    assert.equal(next.readback.acknowledgementRequired, false);
+    assert.equal(validateModelRoleSessionReceipt(next.receipts[0]), true);
+    const admitted = admitModelRoleBootstrap({ sessionId: "s-new", configuredRoutes: V3_ROUTES, receipts: next.receipts,
+      previousReceipts: first.receipts });
+    assert.equal(admitted.ok, true, admitted.code); assert.equal(admitted.readbackSha256, next.readback.readbackSha256);
+  }
+});
+
+test("F2 a NEW family is never followed or grouped by name: it stays a review candidate and the receipt does not move", () => {
+  const first = v3Boot({ sessionId: "s-old", approved: [OPUS_48], available: ["claude-opus-4-8"], catalogue: [OPUS_CATALOGUE[0]] });
+  const next = v3Boot({ sessionId: "s-new", approved: [OPUS_48],
+    available: ["claude-opus-4-8", "claude-sonnet-5", "claude-opus-5"],
+    // "claude-opus-5" LOOKS like Opus but the catalogue declares another family: it must not be grouped by its name.
+    catalogue: [OPUS_CATALOGUE[0], v3Release("sonnet", [5], "claude-sonnet-5"), v3Release("opus-next", [5], "claude-opus-5")] },
+  first.receipts);
+  assert.equal(next.ok, true, next.code);
+  assert.equal(next.receipts[0].modelId, "claude-opus-4-8");
+  assert.deepEqual(next.reviewCandidates.map((c) => c.modelId), ["claude-opus-5", "claude-sonnet-5"]);
+  assert.equal(next.readback.mappings[0].change, "unchanged");
+  assert.equal(next.readback.acknowledgementRequired, false, "no receipt moved, so nothing to acknowledge; the PO sees the candidates");
+});
+
+test("F3 an unreleased, hidden, unselectable, effort-incapable, unrecognised or catalogue-less newer version changes nothing", () => {
+  const first = v3Boot({ sessionId: "s-old", approved: [OPUS_48], available: ["claude-opus-4-8"], catalogue: [OPUS_CATALOGUE[0]] });
+  const never = (label, catalogueNewer, available = ["claude-opus-4-8", "claude-opus-4-9"], catalogue) => {
+    const next = v3Boot({ sessionId: "s-new", approved: [OPUS_48], available,
+      catalogue: catalogue ?? [OPUS_CATALOGUE[0], ...catalogueNewer] }, first.receipts);
+    assert.equal(next.ok, true, `${label}: ${next.code}`);
+    assert.equal(next.receipts[0].modelId, "claude-opus-4-8", label);
+    assert.equal(next.readback.mappings[0].change, "unchanged", label);
+    assert.deepEqual(next.reviewCandidates.map((c) => c.modelId), ["claude-opus-4-9"], `${label}: still reported, never followed`);
+  };
+  never("unreleased", [v3Release("opus", [4, 9], "claude-opus-4-9", { record: { released: false }, variant: { selectable: false } })]);
+  never("hidden", [v3Release("opus", [4, 9], "claude-opus-4-9", { variant: { visible: false, selectable: false } })]);
+  never("unselectable", [v3Release("opus", [4, 9], "claude-opus-4-9", { variant: { selectable: false } })]);
+  never("effort not supported", [v3Release("opus", [4, 9], "claude-opus-4-9", { variant: { efforts: ["low"] } })]);
+  never("effort unknown", [v3Release("opus", [4, 9], "claude-opus-4-9", { variant: { efforts: null, capabilityEvidenceSha256: null } })]);
+  never("not in the catalogue", []);
+  // catalogued but not offered by this host: nothing to follow and nothing to report
+  const absent = v3Boot({ sessionId: "s-new", approved: [OPUS_48], available: ["claude-opus-4-8"],
+    catalogue: [OPUS_CATALOGUE[0], OPUS_CATALOGUE[1]] }, first.receipts);
+  assert.equal(absent.receipts[0].modelId, "claude-opus-4-8"); assert.deepEqual(absent.reviewCandidates, []);
+  // no catalogue at all: today's behaviour, the name alone proves nothing
+  const bare = v3Boot({ sessionId: "s-new", approved: [OPUS_48], available: ["claude-opus-4-8", "claude-opus-4-9"] }, first.receipts);
+  assert.equal(bare.receipts[0].modelId, "claude-opus-4-8");
+  assert.deepEqual(bare.reviewCandidates.map((c) => c.modelId), ["claude-opus-4-9"]);
+});
+
+test("F4 negative controls: a different family, a downgrade, a one-sided declaration or a changed policy still require acknowledgement", () => {
+  // same policy, rank decides: sonnet (rank 2) wins when it is available, opus (rank 1) otherwise -> family changes.
+  const crossFamily = [OPUS_48, v3Entry("claude-sonnet-5", 2, "sonnet", [5])];
+  const opus = v3Receipt({ sessionId: "p1", approved: crossFamily, available: ["claude-opus-4-8"] });
+  const sonnet = v3Receipt({ sessionId: "p2", approved: crossFamily, available: ["claude-opus-4-8", "claude-sonnet-5"] });
+  assert.equal(opus.policySha256, sonnet.policySha256);
+  const family = v3Readback(sonnet, opus);
+  assert.equal(family.mappings[0].change, "changed"); assert.equal(family.acknowledgementRequired, true);
+  // same family, both versions signed, the lower one is the survivor now -> downgrade
+  const both = [OPUS_48, v3Entry("claude-opus-4-9", 2, "opus", [4, 9])];
+  const high = v3Receipt({ sessionId: "p1", approved: both, available: ["claude-opus-4-8", "claude-opus-4-9"] });
+  const low = v3Receipt({ sessionId: "p2", approved: both, available: ["claude-opus-4-8"] });
+  assert.equal(high.policySha256, low.policySha256);
+  assert.equal(v3Readback(low, high).mappings[0].change, "changed");
+  assert.equal(v3Readback(low, high).acknowledgementRequired, true);
+  assert.equal(v3Readback(high, low).mappings[0].change, "unchanged", "the same two receipts in the upgrade direction need no acknowledgement");
+  // one entry declares the pair, the other does not
+  const oneSided = [OPUS_48, v3Entry("claude-opus-4-9", 2)];
+  const declared = v3Receipt({ sessionId: "p1", approved: oneSided, available: ["claude-opus-4-8"] });
+  const bare = v3Receipt({ sessionId: "p2", approved: oneSided, available: ["claude-opus-4-8", "claude-opus-4-9"] });
+  assert.equal(declared.policySha256, bare.policySha256);
+  assert.equal(Object.hasOwn(bare, "familyId"), false);
+  assert.equal(v3Readback(bare, declared).mappings[0].change, "changed");
+  // same family, higher version, but the signed policy itself changed -> the existing policy-change contract holds
+  const previous = v3Receipt({ sessionId: "p1", approved: [OPUS_48], available: ["claude-opus-4-8"], catalogue: [OPUS_CATALOGUE[0]] });
+  const revised = v3Receipt({ sessionId: "p2", approved: [v3Entry("claude-opus-4-8", 1, "opus", [4, 8], "c".repeat(64))],
+    available: ["claude-opus-4-8", "claude-opus-4-9"], catalogue: [OPUS_CATALOGUE[0], OPUS_CATALOGUE[1]] });
+  assert.equal(revised.modelId, "claude-opus-4-9");
+  assert.notEqual(revised.policySha256, previous.policySha256);
+  assert.equal(v3Readback(revised, previous).mappings[0].change, "changed");
+  assert.equal(v3Readback(revised, previous).acknowledgementRequired, true);
+  // a previous old-style receipt against a new-style policy is one acknowledged adoption step
+  const oldStyle = v3Receipt({ sessionId: "p0", approved: [v3Entry("claude-opus-4-8", 1)], available: ["claude-opus-4-8"] });
+  assert.equal(v3Readback(previous, oldStyle).acknowledgementRequired, true);
+});
+
+test("F5 an old-style policy behaves exactly as before: same receipt keys, same receipt digest, a catalogue changes nothing", () => {
+  const route = v3Route({ sessionId: "golden-session", available: ["claude-opus-4-8", "claude-opus-4-9"],
+    approved: [v3Entry("claude-opus-4-8", 1), v3Entry("claude-opus-4-9", 2)] });
+  const plain = resolveModelRoleSession(route);
+  // golden values measured on the unchanged code at base ffdd0e812
+  assert.equal(plain.receipt.receiptSha256, "07d3ab0b433f715eb7fc2043b46cec543dd267baf237797a3f2df153b07140ce");
+  assert.equal(plain.receipt.policySha256, "59dc1f6a229e08dcbf859e85480dd07714b2899c7edba3c5d27ef393cd873291");
+  assert.deepEqual(Object.keys(plain.receipt).sort(), ["candidateAtBootstrap", "compatibilityEvidenceSha256", "effort",
+    "modelId", "observedAt", "policySha256", "receiptSha256", "role", "runner", "schema", "sessionId"]);
+  const withCatalogue = resolveModelRoleSession({ ...route, familyCatalogue: [v3Release("opus", [4, 9], "claude-opus-4-9"),
+    v3Release("opus", [4, 11], "claude-opus-4-11")], availableModelIds: [...route.availableModelIds, "claude-opus-4-11"] });
+  assert.equal(withCatalogue.receipt.receiptSha256, plain.receipt.receiptSha256, "no declaration -> the catalogue is inert");
+  assert.deepEqual(withCatalogue.unapprovedAvailableModelIds, ["claude-opus-4-11"]);
+  assert.equal(Object.hasOwn(withCatalogue, "familyFollow"), false);
+});
+
+test("F6 the policy declaration is a strict optional pair: malformed, one-sided or duplicate declarations are refused", () => {
+  const base = { sessionId: "s", available: ["claude-opus-4-8"] };
+  const ok = resolveModelRoleSession(v3Route({ ...base, approved: [OPUS_48] }));
+  assert.equal(ok.ok, true, ok.code);
+  assert.equal(validateModelRoleSessionReceipt(ok.receipt), true);
+  const refused = (entry) => resolveModelRoleSession(v3Route({ ...base, approved: [entry] })).code;
+  const { familyId, version, ...bare } = OPUS_48;
+  for (const bad of [
+    { ...bare, familyId: "opus" }, { ...bare, version: [4, 8] },
+    { ...OPUS_48, version: [] }, { ...OPUS_48, version: [4, -1] }, { ...OPUS_48, version: [4, 1.5] },
+    { ...OPUS_48, version: [1, 2, 3, 4, 5, 6, 7, 8, 9] }, { ...OPUS_48, version: "4.8" }, { ...OPUS_48, version: [4, "8"] },
+    { ...OPUS_48, familyId: "Opus" }, { ...OPUS_48, familyId: "" }, { ...OPUS_48, familyId: "o".repeat(33) },
+    { ...OPUS_48, familyId: 4 }, { ...OPUS_48, extra: true },
+  ]) assert.equal(refused(bad), "MODEL-ROLE-INPUT-INVALID", JSON.stringify(bad));
+  // two entries of one family may not claim the same version (zero padding is the same version)
+  const twin = resolveModelRoleSession(v3Route({ ...base, available: ["claude-opus-4-8", "claude-opus-4-8b"],
+    approved: [OPUS_48, v3Entry("claude-opus-4-8b", 2, "opus", [4, 8, 0])] }));
+  assert.equal(twin.code, "MODEL-ROLE-INPUT-INVALID");
+  // a forged receipt pair does not validate
+  assert.equal(validateModelRoleSessionReceipt({ ...ok.receipt, version: [9] }), false);
+  const { receiptSha256, familyId: dropped, ...rest } = ok.receipt;
+  assert.equal(validateModelRoleSessionReceipt({ ...rest, receiptSha256 }), false, "a half pair is not a receipt");
+});
+
+test("F7 a malformed catalogue or one that contradicts the signed declaration is refused concretely, never guessed around", () => {
+  const route = (catalogue) => v3Route({ sessionId: "s", approved: [OPUS_48],
+    available: ["claude-opus-4-8", "claude-opus-4-9"], catalogue });
+  const code = (catalogue) => resolveModelRoleSession(route(catalogue)).code;
+  assert.equal(code([OPUS_CATALOGUE[0], OPUS_CATALOGUE[1]]), "MODEL-ROLE-SESSION-SELECTED");
+  for (const bad of [
+    "opus", {}, [{}], [{ ...OPUS_CATALOGUE[0], extra: 1 }], [{ ...OPUS_CATALOGUE[0], version: [] }],
+    [{ ...OPUS_CATALOGUE[0], released: "yes" }], [{ ...OPUS_CATALOGUE[0], variants: [] }],
+    [{ ...OPUS_CATALOGUE[0], familyId: "Opus" }],
+    [OPUS_CATALOGUE[0], OPUS_CATALOGUE[0]],                                         // duplicate release
+    [OPUS_CATALOGUE[0], v3Release("opus", [4, 9], "claude-opus-4-8")],              // duplicate model id
+    [OPUS_CATALOGUE[0], v3Release("opus", [4, 9], "claude-opus-4-9"),
+      v3Release("opus", [4, 9, 0], "claude-opus-4-9b", { record: { releaseId: "other" } })], // ambiguous version
+  ]) assert.equal(code(bad), "MODEL-ROLE-FAMILY-CATALOGUE-INVALID", JSON.stringify(bad).slice(0, 80));
+  // the catalogue places the approved model in another family or at another version than the PO declared
+  assert.equal(code([v3Release("sonnet", [4, 8], "claude-opus-4-8"), OPUS_CATALOGUE[1]]), "MODEL-ROLE-FAMILY-DECLARATION-MISMATCH");
+  assert.equal(code([v3Release("opus", [4, 7], "claude-opus-4-8"), OPUS_CATALOGUE[1]]), "MODEL-ROLE-FAMILY-DECLARATION-MISMATCH");
+  // the approved model is simply not in the catalogue: nothing to anchor on, nothing followed
+  const unanchored = resolveModelRoleSession(route([OPUS_CATALOGUE[1]]));
+  assert.equal(unanchored.receipt.modelId, "claude-opus-4-8");
+  assert.deepEqual(unanchored.unapprovedAvailableModelIds, ["claude-opus-4-9"]);
+});
+
+test("F8 a rollback to an older in-family version is a change that needs acknowledgement", () => {
+  const followed = v3Boot({ sessionId: "s-1", approved: [OPUS_48], available: ["claude-opus-4-8", "claude-opus-4-9"],
+    catalogue: [OPUS_CATALOGUE[0], OPUS_CATALOGUE[1]] });
+  assert.equal(followed.receipts[0].modelId, "claude-opus-4-9");
+  const rolledBack = v3Boot({ sessionId: "s-2", approved: [OPUS_48], available: ["claude-opus-4-8"],
+    catalogue: [OPUS_CATALOGUE[0]] }, followed.receipts);
+  assert.equal(rolledBack.receipts[0].modelId, "claude-opus-4-8");
+  assert.equal(rolledBack.readback.mappings[0].change, "changed");
+  assert.equal(rolledBack.readback.acknowledgementRequired, true);
+});
+
+test("F9 a signed policy carrying the declaration verifies, an old-style signed policy still verifies, and tampering with the pair is refused", () => {
+  const rows = (selector) => [{ taskRoute: "duty.read", runner: "claude", role: "frontier", effort: "high", selector }];
+  const routeSource = source(rows("claude-opus-4-8"));
+  const sign = (approvedPolicies) => {
+    const approvalIntent = createModelRolePolicyApprovalIntent({ routeSource, approvedPolicies, candidateAtApproval: candidate });
+    return { schema: "pipeline.model-role-approved-policy.v1", candidateAtApproval: candidate, approvedPolicies, approvalIntent,
+      proof: proofFor(approvalIntent.sha256) };
+  };
+  const policyOf = (approved) => [{ runner: "claude", role: "frontier", effort: "high",
+    policy: { schema: "pipeline.model-role-policy.v1", runner: "claude", role: "frontier", approved } }];
+  const verify = (bundle) => verifyModelRoleApprovedPolicy({ bundle, routeSource, trustAnchors });
+  const declared = sign(policyOf([OPUS_48]));
+  assert.equal(verify(declared).ok, true, verify(declared).code);
+  assert.equal(verify(sign(policyOf([v3Entry("claude-opus-4-8", 1)]))).ok, true, "old-style signed policy: unchanged behaviour");
+  const tampered = structuredClone(declared); tampered.approvedPolicies[0].policy.approved[0].version = [4, 99];
+  assert.equal(verify(tampered).ok, false); assert.equal(verify(tampered).code, "MODEL-ROLE-POLICY-INTENT");
+  const stripped = structuredClone(declared); delete stripped.approvedPolicies[0].policy.approved[0].familyId;
+  delete stripped.approvedPolicies[0].policy.approved[0].version;
+  assert.equal(verify(stripped).ok, false, "removing the declaration after signing breaks the proof");
+  const swapped = structuredClone(declared); swapped.approvedPolicies[0].policy.approved[0].familyId = "sonnet";
+  assert.equal(verify(swapped).ok, false);
+});
+
+test("F10 the host bootstrap carries the observed catalogue to the resolver and a real private store admits the followed receipt", () => {
+  const sourceCodex = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "codex");
+  const routeEntries = sourceCodex.configuredRoutes.map((route) => ({ ...route, modelId: `model-${route.runner}-${route.role}-${route.effort}`,
+    family: `${route.role}-${route.effort}` }));
+  const policyByRole = new Map();
+  for (const route of routeEntries) {
+    const key = `${route.runner}:${route.role}`;
+    if (!policyByRole.has(key)) policyByRole.set(key, { schema: "pipeline.model-role-policy.v1", runner: route.runner, role: route.role, approved: [] });
+    const list = policyByRole.get(key).approved;
+    list.push({ modelId: route.modelId, rank: list.length + 1, efforts: [route.effort], compatibilityEvidenceSha256: V3_EVIDENCE,
+      familyId: route.family, version: [1] });
+  }
+  const approvedPolicies = routeEntries.map(({ modelId, family, selector, ...route }) => ({ ...route, policy: policyByRole.get(`${route.runner}:${route.role}`) }));
+  const observationsFor = (withNext) => routeEntries.map(({ modelId, family, selector, ...route }) => ({ ...route, ok: true,
+    assurance: "installed-host-observed",
+    availableModelIds: withNext ? [modelId, `${modelId}-v2`] : [modelId],
+    familyCatalogue: [v3Release(family, [1], modelId, { variant: { efforts: [route.effort] } }),
+      ...(withNext ? [v3Release(family, [2], `${modelId}-v2`, { variant: { efforts: [route.effort] } })] : [])] }));
+  const input = (id, withNext, previousReceipts = []) => ({ sessionId: id, candidateCommit: "a".repeat(40), observedAt: "2026-10-22T00:00:00.000Z",
+    routeSource: sourceCodex, approvedPolicies, observations: observationsFor(withNext), previousReceipts });
+  const first = prepareModelRoleHostBootstrap(input("store-1", false));
+  assert.equal(first.ok, true, first.code);
+  const commonDir = mkdtempSync(join(tmpdir(), "model-role-k20-"));
+  try {
+    const verifyAuthority = () => ({ ok: true, approvedPolicies });
+    const store = createModelRoleHostStore(commonDir, { verifyAuthority });
+    const authority = { routeSource: sourceCodex };
+    const ack = { sessionId: "store-1", confirmed: true, readbackSha256: first.readback.readbackSha256 };
+    assert.equal(admitModelRoleHostBootstrap({ proposal: first, acknowledgement: ack, store, authority }).ok, true);
+    const next = prepareModelRoleHostBootstrap(input("store-2", true, first.receipts));
+    assert.equal(next.ok, true, next.code);
+    assert.ok(next.receipts.every((r) => r.modelId.endsWith("-v2")), "every route followed its family to version 2");
+    assert.deepEqual(next.reviewCandidates, []);
+    assert.equal(next.readback.acknowledgementRequired, false);
+    const admitted = admitModelRoleHostBootstrap({ proposal: next, acknowledgement: null, store, authority });
+    assert.equal(admitted.ok, true, admitted.code);
+    const held = store.read("store-2");
+    assert.equal(held.ok, true, held.code);
+    assert.ok(held.receipts.every((r) => typeof r.familyId === "string" && r.version.length === 1 && r.version[0] === 2),
+      "the stored receipts carry the followed family version");
+  } finally { rmSync(commonDir, { recursive: true, force: true }); }
+});
