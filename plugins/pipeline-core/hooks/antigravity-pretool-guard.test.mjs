@@ -359,15 +359,39 @@ check("normalizeAntigravityToolInput: identifies read-only tools", () => {
 });
 
 // 2. Direct Guard Decisions
-check("Antigravity pretool guard allows read-only tools immediately", () => {
-  const root = unregisteredFixture();
-  const res = decision(run({
+// QG-04 restatement (PO decision D87). This case used to pin "every read-only native tool is allowed
+// immediately". Its original criterion was that a read-only tool needs no heavyweight guard run (no
+// lifecycle, git or dispatch spawn) and must not block ordinary reading. That criterion still holds and
+// is asserted below: an ordinary project file is allowed at once. What changed is the premise that
+// ALL native reads are harmless: acceptance 1 of backlog item
+// read-blocks-and-misleading-denial-texts-across-runners requires credential roots to stay denied on
+// every runner, so a native read of a credential file is now refused with the Claude typed code
+// GUARD-READ-TARGET. The un-enrolled folder keeps its unconditional allow (no governance applies there).
+// The behavioural matrix lives in antigravity-native-read-credential-roots.test.mjs.
+check("Antigravity pretool guard allows ordinary read-only tools immediately and refuses credential-root reads", () => {
+  const unenrolled = unregisteredFixture();
+  const free = decision(run({
     toolCall: {
       name: "view_file",
-      args: { AbsolutePath: join(root, "README.md") },
+      args: { AbsolutePath: join(unenrolled, "README.md") },
     },
-  }, root));
-  assert.equal(res.decision, "allow");
+  }, unenrolled));
+  assert.equal(free.decision, "allow");
+  rmSync(unenrolled, { recursive: true, force: true });
+
+  const root = fixture();
+  mkdirSync(join(root, "vault"), { recursive: true });
+  writeFileSync(join(root, "README.md"), "readme\n");
+  writeFileSync(join(root, "vault", "id_rsa"), "private\n");
+  for (const path of [join(root, "README.md"), "README.md"]) {
+    const ordinary = decision(run({ toolCall: { name: "view_file", args: { AbsolutePath: path } } }, root));
+    assert.equal(ordinary.decision, "allow", path);
+  }
+  for (const path of [join(root, "vault", "id_rsa"), "vault/id_rsa"]) {
+    const secret = decision(run({ toolCall: { name: "view_file", args: { AbsolutePath: path } } }, root));
+    assert.equal(secret.decision, "deny", path);
+    assert.match(secret.reason, /GUARD-READ-TARGET/u, path);
+  }
   rmSync(root, { recursive: true, force: true });
 });
 
