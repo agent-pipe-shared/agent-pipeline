@@ -7,7 +7,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 const cases = [];
-function test(name, run) { cases.push({ id: `MFI${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+// D66(a): `test(name, { todo: "<typed reason naming the backlog item>" }, run)` registers a TYPED PENDING case (completion mode
+// "todo"): the body still runs unchanged and its failure is reported as todo, never as a pass; the reason is source-visible.
+function test(name, optionsOrRun, maybeRun) {
+  const options = typeof optionsOrRun === "function" ? {} : optionsOrRun;
+  const run = typeof optionsOrRun === "function" ? optionsOrRun : maybeRun;
+  if (options.todo !== undefined && !/^typed-pending: .*backlog item pipeline\.[a-z0-9-]+/.test(options.todo)) throw new Error(`pending case without a typed backlog binding: ${name}`);
+  cases.push({ id: `MFI${String(cases.length + 1).padStart(3, "0")}`, name, ...(options.todo === undefined ? {} : { mode: "todo" }), run });
+}
 import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
 import { createModelFamilyInvocationEntry } from "./model-family-invocation.mjs";
 import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
