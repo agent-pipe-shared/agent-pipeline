@@ -169,3 +169,33 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **HOST-SESSION-NEEDED** — One end-to-end greenfield run each on Claude, Codex and Antigravity reaching a pushed branch with exactly two PO proofs is missing
   Three authenticated host sessions (Claude Windows, Codex, Antigravity app) with the PO giving exactly the plan and push approvals; agents may not drive model turns or sign. Observed: pushed feature branch, two proofs, zero guard overrides. The 2026-10-17 Codex WSL P0-1 delivery-state defect must be fixed in source first.
+
+## Reconciled 2026-10-23
+
+Text sweep K60-BACKLOG-TEXT-SWEEP-4. The section "Agent measurement of the added 0.7.0 acceptance (2026-10-22)" above
+stays as history; its count and three bullets are superseded. Fresh count, run alone on 2026-10-23 with `node --test` over
+`plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs`: 22 cases, 21 pass, 0 fail,
+1 skipped, 0 todo (the skip is case E, the per-runner end-to-end host run, typed `E-HOLD`).
+
+- "re-counted ... 21 cases, 17 pass, 0 fail, 1 typed skip ... 3 typed todo": now 22 / 21 / 0 / 1 / 0 as above. No todo
+  case is left in the pin.
+- "Course writer for German-table Specs and `.test.js` checks: PARTLY delivered ... NOT met: the shipped briefing
+  generator ... refused `DBG-CRITERION-MISSING`": delivered. Commit `74055b194` (2026-10-22) made the table branch of
+  `findCriterionOccurrences` in `scripts/dispatch-briefing.mjs` accept a numbered or `R-n` row of a two-column table; the
+  typed todo became the strict case "the briefing generator binds a numbered or R-n row of a two-column German table".
+- "Delivery hand-off at plan readiness ... no code calls the inspection ... Deferred to 0.7.x by PO decision D85":
+  superseded by D134 (2026-10-22, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`; amends D85), which pulled the
+  hand-off into 0.7.0. `scripts/pipeline-state.mjs` now calls `inspectPlanDeliveryHandoff` and `planHandoffRefusal` in the
+  `submit-plan` and `present-plan` handlers (not in `approve-plan`). Commit `3bbbaafca` (2026-10-22) added the refusal text
+  and the strict wiring case "submit-plan and present-plan call the plan-readiness hand-off inspection"; that commit's
+  cases are green only with the protected `pipeline-state.mjs` wiring, which is present in this tree.
+- "Onboarding answers surviving the restart ... Not met: ... still publishes `gitAuthorName`/`gitAuthorEmail` as pending
+  asks": delivered under D98 (2026-10-22, same decisions file). Commit `fccaf118d` (2026-10-22): an intake record that
+  holds the Git author counts as resolved, the author readers moved to `lib/project-onboarding-v3-author-identity.mjs`
+  (the line-bound blocker is gone), and the strict cases "the answers live in one typed intake record ..." and "the next
+  session does not ask again for an answer the intake record already holds" pass.
+- "Not covered: the per-runner end-to-end runs, the fix for the two todo points, PO acceptance": the fixes for the two
+  todo points are built (above); the per-runner end-to-end runs and PO acceptance stay not covered.
+
+The Triage block above stays empty: D134 and D98 settle single clauses, and this sweep located no decision that settles
+the item as a whole. The status stays `open`.

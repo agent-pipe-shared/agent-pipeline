@@ -68,10 +68,10 @@ Added acceptance (0.7.0, major):
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** D125 (PO tiles, 2026-10-22): ADR-0085 supersedes the Advisor-plus-readiness design course for this item; its acceptance is restated against the single-review route.
+- **Rationale:** the acceptance "the course accepts that result as the role's evidence" named a course that ADR-0085 retired, so fallback evidence goes to the present-plan review-receipt route instead.
+- **Assignment (if accepted):** none recorded by D125 beyond the restatement; the clauses below that are built are listed under "Reconciled 2026-10-23".
+- **Date:** 2026-10-23
 
 ### Blocker analysis 2026-10-22
 
@@ -81,3 +81,28 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
   Acceptance says 'the course accepts the fallback result as the role's evidence', but the course it names is retired; the target for that acceptance is undefined.
 - **HOST-SESSION-NEEDED** — Check the host-boundary route against a live Codex sandbox
   The spawnSync EPERM at the Codex default sandbox edge and the declared host boundary only occur inside a live Codex session (codex app/CLI turn); an agent may not drive an authenticated Codex turn. Observed: admitted test commands route to the host boundary from the first call with no EPERM.
+
+## Reconciled 2026-10-23
+
+Text sweep K60-BACKLOG-TEXT-SWEEP-4. The Acceptance, the 2026-10-17 section and the Blocker analysis above stay as
+history; these sentences are superseded. All case names below are in
+`plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs`.
+
+- Blocker analysis "Decide how the retired course is re-targeted so it can consume a fallback result as role evidence"
+  (open question) and the Acceptance sentence "The course accepts that result as the role's evidence": decided by D125
+  (2026-10-22, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`). ADR-0085 supersedes the Advisor-plus-readiness
+  course for this item; the acceptance is restated against the single-review route and fallback evidence goes to the
+  present-plan review-receipt route. The Triage block above is filled from D125.
+- Acceptance "Failing producers surface their stderr and exit code in the session result": built. Commit `3c2eedb87`
+  (2026-10-16) and the cases "point 4a" and "point 4b" (surfaced stderr bounded to 4096 bytes, path-free).
+- Acceptance "a typed, read-only route preflight per runner reports native or fallback-self-dispatch with a reason code"
+  and "a fallback never lets the implementor review itself": the cases "point 1", "point 2a", "point 2b" and "point 3"
+  of the pin carry them (RRP-* codes, honest labels, producer equal to authorRole refused).
+- Added acceptance 1 (a Goldfish or Critic preflight never carries an executable Elephant/Coordinator action): built,
+  commit `b59e44303` (2026-10-19, "withhold coordinator actions from a Goldfish or Critic preflight").
+- Added acceptance 2 (admitted test commands routed to the declared host boundary from the first call): the briefing
+  route is built, commit `dd8845e39` (2026-10-22) and the three "point 6" cases. The live Codex-session confirmation
+  stays host-session work (Blocker analysis, HOST-SESSION-NEEDED); no agent can drive that turn.
+- Added acceptance 3 (an explicit, atomic recovery state keeping task identity and attempt history): built, commit
+  `642b2df02` (2026-10-22) and the seven "point 5" cases (append-only attempts, compare-and-swap write, a renamed task
+  cannot continue another task's state, a tampered state is refused).

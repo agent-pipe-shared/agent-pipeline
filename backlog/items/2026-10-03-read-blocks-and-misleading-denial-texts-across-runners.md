@@ -84,3 +84,17 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **WINDOWS-INTEROP-RUN** — Run the WSL UNC exact-file admission case (U3) on native Windows or WSL, where it is not skipped
   U3 (pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs line 306) skips on a non-win32 host (typed Linux-host skip) and runs on win32; run that pin with Windows node via cmd.exe on a /mnt/d clone against a \\wsl.localhost path reachable through interop. Minutes.
+
+## Reconciled 2026-10-23
+
+Text sweep K60-BACKLOG-TEXT-SWEEP-4. The Evidence 2026-10-22 section above stays as history; one bullet in it is
+superseded:
+
+- M6 ("the Codex-surfaced `GUARD-READ-COMMAND-UNSUPPORTED` text tells the agent to 'use the Read, Glob or Grep tools' ...
+  a runner-neutral wording patch is prepared"): the patch is applied. Commit `e382eb43f` (2026-10-22) changed
+  `READ_COMMAND_UNSUPPORTED_NOTE` in `plugins/pipeline-core/lib/guard/grammar-denials.mjs` to the conditional wording
+  "where the runner offers native Read, Glob or Grep tools, those cover reads inside the project". The M6 case in
+  `plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs` is a plain test now
+  (no `todo` marker; it asserts the Codex denial carries `GUARD-READ-COMMAND-UNSUPPORTED` and does not contain "use the
+  Read, Glob or Grep tools"). M7 is unchanged by this entry and is still open as written; the Triage block above stays
+  empty because this sweep located no decision that settles the item as a whole.

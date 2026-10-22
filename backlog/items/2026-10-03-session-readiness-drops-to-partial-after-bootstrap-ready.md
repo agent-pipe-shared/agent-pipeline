@@ -49,10 +49,10 @@ read-only calls see one consistent readiness snapshot.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** D112 (PO tiles, 2026-10-22): the residual flap is fixed in 0.7.0; the cleanup inspector treats a descriptor deleted between listing and reading as already removed.
+- **Rationale:** the residual (a listed-then-retired descriptor only absorbed by the three-attempt re-observation) was a measured source of `partial` under concurrent agents, so the inspector now skips it like the listing does.
+- **Assignment (if accepted):** done as commits `1307d47d4` (fix) and `458d8d450` (pins AC7b to AC7e); acceptance of the item as a whole stays with the PO.
+- **Date:** 2026-10-23
 
 ## Observed again 2026-10-05
 
@@ -84,3 +84,26 @@ required load). A listed descriptor retired before `inspectSessionRetirement` lo
 re-observation, not skipped. Real sessions hold a descriptor for far longer than a plan takes, so this is a stress bound,
 not the measured 2-of-60 schedule; whether the inspector should skip a listed-then-retired descriptor like the listing
 does is a design question for the owner of `session-cleanup-recovery.mjs`.
+
+## Reconciled 2026-10-23
+
+Text sweep K60-BACKLOG-TEXT-SWEEP-4. The section "Covered and measured 2026-10-22" above stays as history; its Residual
+paragraph is superseded:
+
+- "A listed descriptor retired before `inspectSessionRetirement` loads it is only absorbed by the three-attempt
+  re-observation, not skipped ... whether the inspector should skip a listed-then-retired descriptor like the listing
+  does is a design question": decided and built later the same day. PO decision D112 (2026-10-22,
+  `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`). Commit `1307d47d4` made `inspectListedDescriptors()` in
+  `lib/session-cleanup-recovery.mjs` drop a descriptor whose load answers `WT-SESSION-MISSING`; any other failure
+  (malformed, binding, digest mismatch) still throws, so a present descriptor keeps its fail-closed verdict. Commit
+  `458d8d450` pinned it in `lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs`: AC7c (retirement
+  inspector) and AC7d (external-archive inspector) retire the descriptor inside the injected inspector seam, AC7e is the
+  control that a malformed descriptor still fails closed, and AC7b now needs one plan call instead of two (QG-04 note in
+  that commit). The bounded re-observation itself is untouched.
+- The residual figures ("26 of 46 raw plans", "about 25 percent of raw plan calls", "2 of 28-31 observations") describe
+  the state before D112 and are not the current behaviour of the dense create/retire loop.
+- The Description's complaint that the guard demands an `inspect --intent session` that the preflight does not name:
+  the pin cases AC1 to AC4 of the same file assert that a bootstrap-ready but session-partial state makes the preflight
+  emit the read-only `inspect --intent session` action, and commit `0963e8087` (2026-10-16) gave a partial readiness a
+  typed reason; AC6 covers real parallel preflight processes. The `SKILL.md` prose is named in the pin header as not covered.
+- The empty Triage block: filled above from D112 (it settles the residual flap; the item stays `open` for PO acceptance).
