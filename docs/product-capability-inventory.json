@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "0bf80bb4971ca44ae03c9048c2cf7adac3ee4124",
-    "tree": "19002b2a932f4f63cd2c87b3d26a077075933b73"
+    "commit": "85d46b825074a14a99263a9d3a35a3a1901b8b56",
+    "tree": "9af51be113ba028a0180162c71c42c652e0d11c7"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -649,6 +649,7 @@
         "verify-phase:harness/scripts/verify.mjs:osv-scanner-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
         "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
+        "verify-phase:harness/scripts/verify.mjs:partial-readiness-restore-advice-tests",
         "verify-phase:harness/scripts/verify.mjs:passive-read-credential-follow-tests",
         "verify-phase:harness/scripts/verify.mjs:passive-read-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-check",
