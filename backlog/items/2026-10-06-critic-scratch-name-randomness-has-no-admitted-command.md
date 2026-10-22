@@ -48,3 +48,20 @@ improvise a randomness source.
 - **Rationale:** commit(s) `f95fc6998`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+
+## Verification 2026-10-22: the pin the item asked for
+
+`templates/prompts/critic-review.md`, its vendored copy and `plugins/pipeline-core/agents/critic.md` carry no random-name,
+`openssl`, `/dev/urandom`, `mktemp` or CSPRNG instruction, and each names the single admitted route (Write/Edit only, the
+guard-allocated `critic-<authenticated-native-agent-id>` target, persistence reported as unavailable when admission is
+missing). Nine cases were added to `plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs`
+(the registered pin of the same notes lane): the no-randomness and route checks for each of the three texts, canonical
+versus vendored paragraph equality, a mirror that proves the detector catches the old instruction, and a check that the
+closed shell grammar still admits no randomness command. Counted result, run alone on 2026-10-22: 28 cases, 26 pass,
+0 fail, 2 skipped (the two typed host-limitation skips for synthetic mode bits), 0 todo.
+
+Residual, not changed here: `roles/critic.md` CR-03 (standard stage) still tells the Critic to create a
+`scratch/dispatch/critic-<task-or-codename>-a1/` directory with a bare `mkdir`, and three texts say the Critic "already
+creates" a per-dispatch subdirectory, while the template and agent now say the native dispatch guard allocates the notes
+directory on the first admitted Write. The role text predates the guard-owned route and should be reconciled by the
+role owner.

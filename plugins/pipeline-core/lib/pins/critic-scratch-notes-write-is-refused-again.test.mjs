@@ -203,7 +203,55 @@ test("injected platform linux: a wrong-mode receipt (synthetic 0666) is refused 
   assert.match(second.stderr, /DISPATCH-BUDGET-CRITIC-NOTES-UNAVAILABLE: critic-notes-binding-unavailable/u);
 });
 
-test("own directory is created with mode 0700 and the receipt with 0600", { skip: IS_WINDOWS ? HOST_LIMIT : false }, async () => {
+// --- pipeline.critic-scratch-name-randomness-has-no-admitted-command: the Critic-facing text names no randomness source ---
+// The closed shell grammar admits neither `openssl` nor a bare `mkdir` of a scratch subdirectory, and an improvised
+// `/dev/urandom` read once hung a dispatch. The only notes target is guard-allocated (critic-<native-agent-id>), so the
+// Critic's text must carry no instruction to draw a random suffix and must name the Write/Edit route.
+const CRITIC_TEXTS = [
+  "templates/prompts/critic-review.md",
+  "plugins/pipeline-core/templates/prompts/critic-review.md",
+  "plugins/pipeline-core/agents/critic.md",
+];
+const RANDOMNESS_INSTRUCTION = /openssl|urandom|rand\s+-hex|CSPRNG|random[- ]hex|\$RANDOM|uuidgen|mktemp/iu;
+const readText = (rel) => readFileSync(join(REPO_ROOT, ...rel.split("/")), "utf8").replace(/\s+/gu, " ");
+
+for (const rel of CRITIC_TEXTS) {
+  test(`randomness: ${rel} carries no random-name or openssl instruction`, () => {
+    const text = readText(rel);
+    assert.doesNotMatch(text, RANDOMNESS_INSTRUCTION, "a Critic must never be told to draw a random scratch suffix");
+    assert.doesNotMatch(text, /<random-hex>|<random>/iu);
+  });
+
+  test(`randomness: ${rel} names the Write/Edit route, the guard-allocated target and the unavailable-persistence fallback`, () => {
+    const text = readText(rel);
+    assert.match(text, /scratch\/dispatch\/critic-<authenticated-native-agent-id>\/critic-notes\.md/u);
+    assert.match(text, /Write\/Edit only; no Bash notes or random-name command/u);
+    assert.match(text, /the native dispatch guard creates the exact private notes directory exclusively/u);
+    assert.match(text, /return the report as text and disclose persistence as unavailable/u);
+  });
+}
+
+test("randomness: the canonical and vendored Critic templates carry the identical scratchpad paragraph", () => {
+  const paragraph = (rel) => /\*\*Scratchpad isolation[\s\S]*?native Windows behavior\./u.exec(readText(rel))?.[0];
+  const canonical = paragraph(CRITIC_TEXTS[0]);
+  assert.ok(canonical, "the scratchpad isolation paragraph must be present");
+  assert.equal(paragraph(CRITIC_TEXTS[1]), canonical);
+});
+
+test("randomness: the detector is meaningful, a template carrying the old openssl instruction is caught (RED mirror)", () => {
+  const mutant = `${readText(CRITIC_TEXTS[0])} Create scratch/dispatch/<codename>-<random-hex>/ with at least 8 hex characters from a CSPRNG (e.g. openssl rand -hex 4).`;
+  assert.match(mutant, RANDOMNESS_INSTRUCTION);
+  assert.match(mutant, /<random-hex>/u);
+});
+
+test("randomness: the shell grammar still admits no randomness command, so the text cannot reintroduce one", async () => {
+  const { isReadOnlyDiagnosticCommand } = await import("../guard/shell-grammar.mjs");
+  for (const command of ["openssl rand -hex 4", "head -c 4 /dev/urandom", "mktemp -d scratch/dispatch/critic-XXXXXXXX"]) {
+    assert.equal(isReadOnlyDiagnosticCommand(command, REPO_ROOT), false, command);
+  }
+});
+
+test("own directory is created with mode 0700 and the receipt with 0600",{ skip: IS_WINDOWS ? HOST_LIMIT : false }, async () => {
   const { statSync } = await import("node:fs");
   const root = criticRoot();
   assert.equal(write(root, notesRel()).status, 0);
