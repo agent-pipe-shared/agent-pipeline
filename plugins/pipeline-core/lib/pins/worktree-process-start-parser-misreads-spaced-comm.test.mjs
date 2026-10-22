@@ -17,13 +17,14 @@
 // L-* observe it through the module's exported routes against real /proc and are skipped off Linux with a typed reason.
 //
 // QG-06 skip record (a documented, owned, dated exception, not a silent decay): L-1 and L-2 are SKIPPED, not run, on every
-// non-Linux host, and no Linux/WSL run of this pin has been recorded yet.
-//   pending : one Linux or WSL run of this file in which L-1 and L-2 execute and pass (not skipped)
+// non-Linux host (native Windows); they are not skipped on Linux, where they run against the real /proc.
+//   recorded: the Linux/WSL run is counted in specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md (commit
+//             1e2592108): this file, 7 cases, 6 pass, 0 fail, 1 skip, 0 todo. L-1 and L-2 executed and passed (not skipped);
+//             the one skip is H-1, a typed Linux-only skip ("/proc is readable on Linux"; the unreadable-stat path is S-3).
 //   owner   : Coordinator
-//   due     : 2026-10-19
+//   due     : 2026-10-19 (met by the recorded run above)
 //   decision: PO decision K7
-// At the due date the recorded Linux/WSL run replaces the skip, or the skip is promoted to a blocking failure or deleted; the
-// date is never extended silently. Until then S-1..S-4 run on every host and carry A1, A2 and A4 at source level.
+// The native-Windows skip of L-1 and L-2 stays by design: S-1..S-4 run on every host and carry A1, A2 and A4 at source level.
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -47,11 +48,11 @@ const repoRoot = join(here, "..", "..", "..", "..");
 const SOURCE_PATH = join(here, "..", "worktree-lifecycle.mjs");
 const SOURCE = readFileSync(SOURCE_PATH, "utf8");
 
-// QG-06 skip record (see the header): pending Linux/WSL run, owner Coordinator, due 2026-10-19, PO decision K7.
+// QG-06 skip record (see the header): the Linux/WSL run is recorded; the skip applies off Linux only.
 const HOST_LIMITATION_SKIP = process.platform === "linux"
   ? false
   : "host-limitation: real /proc/<pid>/stat process identity exists only on Linux; this host is " + process.platform
-    + "; pending Linux/WSL run, owner Coordinator, due 2026-10-19, PO decision K7, QG-06";
+    + "; the Linux/WSL run is recorded in pin-counted-results-2026-10-22.md, owner Coordinator, PO decision K7, QG-06";
 
 const SPACED_COMM = "a (b) c";
 const roots = [];
