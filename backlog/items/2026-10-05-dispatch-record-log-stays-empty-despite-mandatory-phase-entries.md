@@ -49,7 +49,31 @@ Added acceptance (0.7.0, minor):
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted and built; the empty-log rule is decided by D77 (K6, 2026-10-21): a new terminal v3/v4 record with an empty log is refused at write, committed v3 history stays readable.
+- **Rationale:** the check belongs on the write path (`dispatch-record-write.mjs`) so a record cannot end empty, while history written before the rule remains readable; the cause measurement and the generated skeleton are covered by the pin. See "Reconciled 2026-10-23".
+- **Assignment (if accepted):** none open; the F-06 skeleton acceptance is delivered by `init-dispatch-record`. Independent Critic read and PO acceptance pending.
+- **Date:** 2026-10-23 (filled from D77 of 2026-10-21)
+
+## Reconciled 2026-10-23
+
+Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
+
+- Description and Proposal ("left the dispatch record's `log` empty"; "consider a mechanical check at dispatch close that
+  rejects a terminal record with an empty `log`"): built. Commit `f7321f418` (`fix(dispatch-record): refuse an empty
+  terminal log at write, keep v3 history readable (AC-163, D77)`) makes `writeDispatchRecordObject` refuse a NEW terminal
+  v3/v4 record with `log: []` (code `record-log`) and leaves no file; a terminal v4 record with an empty log is also
+  rejected at read; committed terminal v3 history stays readable; the completed-undelivered observation keeps its
+  documented empty-log exception. Earlier related commit: `edfc80d4c`.
+- Proposal ("measure why entries are skipped (budget pressure vs. ordering vs. wording)"): measured in commit `8753e566c`
+  (`fix(dispatch-record): measure why log entries are skipped and carry them on existing record writes`), which also
+  changes the three Goldfish agent definitions, `roles/goldfish.md` and `templates/prompts/goldfish-task.md` so log
+  entries ride on writes the Goldfish already makes. The ordering cause (a record opened after the first commit that cites
+  its task id is refused) is pinned as "MEASURED ordering (a)/(b)".
+- "Added acceptance (0.7.0, minor): A dispatch record and a design review can be started from a generated, valid
+  skeleton" and the sentence "no scaffolder exists. There is no `init-dispatch-record`": the dispatch-record skeleton is
+  `plugins/pipeline-core/scripts/init-dispatch-record.mjs` (commit `d4b792e73`, AC-163; case "init-dispatch-record prints
+  a valid opening v4 record ..." in `plugins/pipeline-core/scripts/dispatch-briefing.test.mjs`); the design-review half
+  is the receipt producer `scripts/design-review-receipt.mjs` (digests derived from disk, case "a design review receipt
+  is generated with every digest derived from disk" in the pin file).
+- All of the above is pinned in `plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs`.
+  Independent Critic read and PO acceptance remain pending; no status change is made here.
