@@ -233,8 +233,14 @@ function unregisteredGuard() {
   return join(dir, "hooks", "guard-dispatch.mjs");
 }
 
-function hook(fx, script, args, payload) {
-  const out = spawnSync(process.execPath, [script, ...args], { input: JSON.stringify(payload), encoding: "utf8", timeout: 50000,
+// The host commit is the one slow hook (at the SubagentStop, and at the foreground PostToolUse that carries a final return): it enters the session-authority registry boundary several times
+// (host commit, record, terminal release, item checks, integration) and every entry heals and re-reads all twelve producer
+// ports, each of which re-inspects the repository with a handful of git spawns -- measured ~1,450 inspections (~7,000 git
+// spawns) per stop, 40-65 s on a WSL2 machine (658 inspections / ~40 s before f52d20a12, which added the PF-55 heal at every
+// boundary entry). It is slow, not stuck, so it gets its own bound; every other hook keeps the 50 s bound.
+const HOST_COMMIT_HOOK_TIMEOUT_MS = 300000;
+function hook(fx, script, args, payload, timeout = 50000) {
+  const out = spawnSync(process.execPath, [script, ...args], { input: JSON.stringify(payload), encoding: "utf8", timeout,
     env: { ...process.env, CLAUDE_PROJECT_DIR: fx.root, GIT_CEILING_DIRECTORIES: fx.parent, HOME: fx.home, USERPROFILE: fx.home } });
   return { status: out.status, stdout: out.stdout ?? "", stderr: out.stderr ?? "" };
 }
@@ -242,7 +248,7 @@ const toolInput = (fx, extra) => ({ subagent_type: fx.binding.role, model: "sonn
 const call = (fx, event, toolUseId, extra, more = {}) => ({ hook_event_name: event, cwd: fx.root, session_id: SESSION, tool_name: "Agent",
   tool_use_id: toolUseId, tool_input: toolInput(fx, extra), ...more });
 const preToolUse = (fx, toolUseId, extra, guard = GUARD) => hook(fx, guard, [], call(fx, "PreToolUse", toolUseId, extra));
-const postToolUse = (fx, toolUseId, extra, tool_response) => hook(fx, HOST, ["--runner", "claude"], call(fx, "PostToolUse", toolUseId, extra, { tool_response }));
+const postToolUse = (fx, toolUseId, extra, tool_response) => hook(fx, HOST, ["--runner", "claude"], call(fx, "PostToolUse", toolUseId, extra, { tool_response }), HOST_COMMIT_HOOK_TIMEOUT_MS);
 const context = (result) => JSON.parse(result.stdout.trim()).hookSpecificOutput.additionalContext;
 const stateDirectory = (fx) => join(fx.root, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
 const pendingFiles = (fx) => existsSync(stateDirectory(fx)) ? readdirSync(stateDirectory(fx)).filter((name) => name.startsWith("pending-")) : [];
@@ -254,7 +260,7 @@ function stopHook(fx, toolUseId) {
   mkdirSync(join(fx.stopDir, "session", "subagents"), { recursive: true });
   writeFileSync(join(fx.stopDir, "session", "subagents", `agent-${AGENT_ID}.meta.json`), JSON.stringify({ spawnDepth: 1, agentType: "goldfish-deep", toolUseId }));
   return hook(fx, HOST, ["--runner", "claude"], { hook_event_name: "SubagentStop", session_id: SESSION,
-    transcript_path: join(fx.stopDir, "session.jsonl"), cwd: fx.root, agent_id: AGENT_ID, agent_type: fx.binding.role, last_assistant_message: finalText(fx) });
+    transcript_path: join(fx.stopDir, "session.jsonl"), cwd: fx.root, agent_id: AGENT_ID, agent_type: fx.binding.role, last_assistant_message: finalText(fx) }, HOST_COMMIT_HOOK_TIMEOUT_MS);
 }
 const hostCommits = (fx) => fx.gitOk("log", "--fixed-strings", `--grep=Dispatch: ${fx.dispatchId} (goldfish)`, "--format=%H", `${fx.candidate}..HEAD`).split("\n").filter(Boolean);
 
