@@ -4,9 +4,10 @@
 // never from a win32 "NUL" literal (Git for Windows 2.56 rejects NUL).
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import { courseGitBytes } from "./critic-verify-lifecycle.mjs";
@@ -69,6 +70,19 @@ check("GND008", "real git runs through courseGitBytes with the constant", (conte
   if (!gitAvailable) { context.skip("git not on PATH"); return; }
   const out = courseGitBytes(dirname(fileURLToPath(import.meta.url)), ["--version"]);
   assert.match(out.toString("utf8"), /^git version /u);
+});
+
+check("GND009", "real git status accepts core.excludesFile=GIT_NULL_DEVICE in a temp repository (exit 0)", (context) => {
+  if (!gitAvailable) { context.skip("git not on PATH"); return; }
+  const dir = mkdtempSync(join(tmpdir(), "gnd009-"));
+  try {
+    const env = { ...process.env, GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_NOSYSTEM: "1" };
+    const init = spawnSync("git", ["init", "-q"], { cwd: dir, encoding: "utf8", env });
+    assert.equal(init.status, 0, init.stderr);
+    const status = spawnSync("git", ["-c", `core.excludesFile=${GIT_NULL_DEVICE}`, "status", "--short"], { cwd: dir, encoding: "utf8", env });
+    assert.equal(status.error, undefined);
+    assert.equal(status.status, 0, status.stderr);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
