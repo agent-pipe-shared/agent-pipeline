@@ -20,7 +20,11 @@ test("B2-ii admits one append batch without rewriting previous registrations", (
 test("B2-ii rejects deletion, reorder, changed coverage and presentation-only edits", () => {
   assert.equal(check(prior, prior).code, "VSA-NO-APPEND");
   assert.equal(check(next, prior).code, "VSA-NO-APPEND");
-  assert.equal(check(prior, { ...next, suites: [next.suites[1], next.suites[0]] }).code, "VSA-PRIOR-ENTRY-CHANGED");
+  // D103: a new row in front of a retained prior row is an insertion, no longer a rewrite.
+  // Reordering rows that already existed stays refused (see the D103 test below).
+  const reordered = [...next.suites, { name: "third-tests", file: "lib/third.test.mjs" }];
+  reordered.splice(0, 2, reordered[1], reordered[0]);
+  assert.equal(check(next, { ...next, suites: reordered }).code, "VSA-PRIOR-ENTRY-CHANGED");
   assert.equal(check(prior, { ...next, suites: [{ ...prior.suites[0], file: "lib/weakened.test.mjs" }, next.suites[1]] }).code,
     "VSA-PRIOR-ENTRY-CHANGED");
 });
