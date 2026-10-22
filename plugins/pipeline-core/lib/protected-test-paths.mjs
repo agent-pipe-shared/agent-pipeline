@@ -63,7 +63,7 @@ import { isPhysicalScratchTarget } from "./physical-scratch-boundary.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
+import { isGitIndexOnlyInvocation, parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import { scanShell } from "./git-cmd.mjs";
 import {
   LEGACY_GUARD_CONFIG,
@@ -931,7 +931,7 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       const isGit = executable === "git";
       const verbIndex = isGit ? gitVerbIndex(argv) : 0;
       const verb = isGit ? (argv[verbIndex] ?? null) : null;
-      const gitWrite = isGit && GIT_WRITE_VERBS.has(verb ?? "");
+      const gitWrite = isGit && GIT_WRITE_VERBS.has(verb ?? "") && !isGitIndexOnlyInvocation(verb, argv.slice(verbIndex + 1));
       if (!WRITE_EXECUTABLES.has(executable) && !inPlace && !gitWrite) continue;
       // Match only the direct, closed stash readers; every other stash form stays a writer.
       if (gitWrite && verb === "stash" && verbIndex === 0) {

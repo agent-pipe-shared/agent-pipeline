@@ -499,3 +499,32 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
   if (!sinkOk) return false;
   return gitShowObject || validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
 }
+
+/**
+ * D64 (backlog: lifecycle-coordination-commands-refused-as-implementation-writes): index changes, working-tree
+ * changes and pure observations are classified separately. Unstaging Pipeline-generated files
+ * (`git restore --staged`, a soft or mixed `git reset`, `git rm --cached`) rewrites the index and never a
+ * working-tree byte, so the write-target classifier does not treat it as a working-tree write. ALLOWLIST of flags
+ * per verb, fail closed: any other flag (an abbreviated long option such as `--stag`, `--worktree`, `-W`, `-SW`,
+ * `--hard`, `--patch`) keeps the verb a writer. Operands (revisions, pathspecs, a `--source` value) are not flags
+ * and are not inspected; a staged protected path is still judged by the commit-time evaluators. `args` are the
+ * tokens after the subcommand. Precedent: guard/gate-strength-lane.mjs already admits `git rm --cached`.
+ */
+const GIT_INDEX_ONLY_FORMS = new Map([
+  ["restore", { flags: new Set(["--staged", "-S", "--source", "-s", "-q", "--quiet"]), requires: new Set(["--staged", "-S"]) }],
+  ["reset", { flags: new Set(["--soft", "--mixed", "-q", "--quiet"]), requires: null }],
+  ["rm", { flags: new Set(["--cached", "-r", "-q", "--quiet", "-n", "--dry-run", "-f", "--force", "--ignore-unmatch"]), requires: new Set(["--cached"]) }],
+]);
+
+export function isGitIndexOnlyInvocation(verb, args) {
+  const form = GIT_INDEX_ONLY_FORMS.get(verb);
+  if (form === undefined) return false;
+  let seenRequired = form.requires === null;
+  for (const arg of args) {
+    if (arg === "--") break;
+    if (!arg.startsWith("-")) continue;
+    if (!(form.flags.has(arg) || (verb === "restore" && arg.startsWith("--source=")))) return false;
+    if (form.requires?.has(arg)) seenRequired = true;
+  }
+  return seenRequired;
+}
