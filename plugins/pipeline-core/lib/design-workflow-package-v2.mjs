@@ -13,12 +13,12 @@ import {nativeInitialAdvisorNoChildRoute} from './native-initial-advisor-executi
 import {resolvePoGateRepositoryTopology,derivePoGateRepositoryFingerprint} from './po-gate-authority.mjs';
 import {validateAgainstSchema} from './schema-lite.mjs';
 import packageV2Schema from '../schemas/pipeline.design-workflow-package.v2.json' with {type:'json'};
-import {verifyDesignReadinessHostExecution,designReadinessReportSha256} from './design-readiness-host-evidence.mjs';
+import {verifyDesignReadinessHostExecution,designReadinessReportSha256,withDeviceLocalFinding} from './design-readiness-host-evidence.mjs';
 import {validateAdvisoryReceipt} from './advisory-receipt.mjs';
 import {validateDesignReadinessReceipt} from './design-workflow-package.mjs';
 import {resolveV3DutyRoute} from './critic-route-v3.mjs';
 export const DESIGN_WORKFLOW_PACKAGE_V2_SCHEMA='pipeline.design-workflow-package.v2';
-const SHA=/^[a-f0-9]{64}$/u,ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u,fail=code=>({ok:false,code});
+const SHA=/^[a-f0-9]{64}$/u,ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u,fail=code=>withDeviceLocalFinding({ok:false,code});
 const sha=b=>createHash('sha256').update(b).digest('hex');
 function diagnosticFailure(code,value){const diagnostic=projectAdvisorBindingDiagnostic(value);return diagnostic?{...fail(code),diagnostic}:fail(code);}
 const same=(a,b)=>canonicalizeJson(a)===canonicalizeJson(b);

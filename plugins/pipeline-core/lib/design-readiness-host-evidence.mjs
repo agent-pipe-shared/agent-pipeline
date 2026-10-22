@@ -10,6 +10,7 @@ import {rereadReadinessAdvisorContextV2} from './readiness-advisor-context-v2.mj
 import { createHash } from "node:crypto";
 import { readFileSync, realpathSync, lstatSync } from "node:fs";
 import { isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
 import { resolveSystemExecutable } from "./trusted-tool-resolution.mjs";
 import { TextDecoder } from "node:util";
 
@@ -28,7 +29,48 @@ const RUNNER_RECEIPT_ID = /^drh_[a-f0-9]{32}$/u;
 const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const RECEIPT_SCHEMA = JSON.parse(readFileSync(new URL("../schemas/pipeline.design-readiness-receipt.v1.json", import.meta.url), "utf8"));
 
-function fail(code) { return { ok: false, code }; }
+function fail(code) { return withDeviceLocalFinding({ ok: false, code }); }
+
+// Backlog item pipeline.approval-bound-design-package-lives-in-an-ignored-directory (device switch). The
+// bound set of a design approval has two kinds of members. The committed ones (package, Advisor receipt,
+// readiness file, PRD, Spec, the approval record) arrive with a clone. The host-observed readiness receipt
+// and the Advisor course live in private state (`.git/agent-pipeline/`) and never do. An approved plan does
+// not need them again (PO decision BL; the stored-approval reader never consults them), but the
+// pre-approval readers do, and on a second device they used to refuse with a bare code. These codes
+// mean "this device cannot find or re-derive the device-local part"; they are NOT tamper codes, which
+// (MISMATCH, DRIFT, digest codes) deliberately get no finding. The finding is additive: `code` and `ok` never change.
+const DEVICE_LOCAL_CODES = Object.freeze({
+  "DWP-READINESS-HOST-RECEIPT-UNAVAILABLE": { part: "readiness-host-receipt", location: ".git/agent-pipeline/design-readiness/" },
+  "DWP-READINESS-HOST-REPOSITORY-MISMATCH": { part: "repository-identity", location: ".git/agent-pipeline/design-readiness/" },
+  "DWP2-REPOSITORY-IDENTITY": { part: "repository-identity", location: ".git/agent-pipeline/design-advisor-courses/" },
+  "DWP2-DURABLE-COURSE": { part: "advisor-course", location: ".git/agent-pipeline/design-advisor-courses/" },
+  "DWP2-DURABLE-FAILURE": { part: "advisor-course", location: ".git/agent-pipeline/design-advisor-courses/" },
+});
+export const DEVICE_LOCAL_BOUND_SET_FINDING_SCHEMA = "pipeline.device-local-bound-set-finding.v1";
+
+/** The typed device-local finding for a refusal code, or null when the code is not a missing-device-local-part code. */
+export function deviceLocalFindingForCode(code) {
+  const entry = typeof code === "string" && Object.hasOwn(DEVICE_LOCAL_CODES, code) ? DEVICE_LOCAL_CODES[code] : null;
+  if (entry === null) return null;
+  const script = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+  return {
+    schema: DEVICE_LOCAL_BOUND_SET_FINDING_SCHEMA,
+    part: entry.part,
+    location: entry.location,
+    explanation: `The ${entry.part} of this design is device-local private state (${entry.location}); it is not committed, so a checkout on another device does not have it. This is not tampering.`,
+    repair: {
+      argv: [script, "rebind-approval"],
+      text: `Run once from the project root: node ${script} rebind-approval. For an already approved plan it verifies the approval from the committed bound set alone (zero signatures, no State change); if no approval is recorded yet it answers DWP-REBIND-NO-APPROVAL and the design course must be run again on this device.`,
+    },
+  };
+}
+
+/** Adds `deviceLocal` to a refusal whose code names a missing device-local part; every other result is returned as is. */
+export function withDeviceLocalFinding(result) {
+  if (result === null || typeof result !== "object" || result.ok !== false || Object.hasOwn(result, "deviceLocal")) return result;
+  const finding = deviceLocalFindingForCode(result.code);
+  return finding === null ? result : { ...result, deviceLocal: finding };
+}
 function sha(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function exact(value, keys) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
