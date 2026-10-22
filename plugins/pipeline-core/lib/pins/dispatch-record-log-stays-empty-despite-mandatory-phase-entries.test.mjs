@@ -21,6 +21,8 @@ import { dirname, join, resolve } from "node:path";
 import { validateDispatchRecord, validatePreviousDispatchRecord, reportSha256, OUTCOME_CLASSIFICATION_SCHEMA } from "../dispatch-record.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../critic-skip-decision.mjs";
 import { writeDispatchRecordObject } from "../../scripts/dispatch-record-write.mjs";
+import { checkDispatchRecordCollision } from "../guard/dispatch-record-lane.mjs";
+import { CLOSING_ALLOWANCE } from "../dispatch-budget-core.mjs";
 
 const SHA = "a".repeat(40);
 const DONE = "b".repeat(40);
@@ -153,4 +155,125 @@ test("control: the completed-undelivered v4 observation keeps its empty-log exce
   const receipt = writeDispatchRecordObject({ repoRoot: root, target: target(record), record });
   assert.equal(receipt.target, target(record));
   assert.equal(existsSync(join(root, target(record))), true);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// MEASUREMENT (ALF-K24): why were the per-phase log entries skipped - budget pressure, ordering or wording?
+// The item's Proposal asks for this measurement; it was recorded nowhere. Each cause is derived from the code and the
+// briefing texts below and shown on a fixture. Nothing is mocked except the lane's own injection seams.
+// ---------------------------------------------------------------------------------------------------------------------
+const here = dirname(fileURLToPath(import.meta.url));
+const pluginRoot = resolve(here, "../..");
+const text = (relative) => readFileSync(resolve(pluginRoot, relative), "utf8");
+const AGENTS = ["goldfish-implementor", "goldfish-deep", "goldfish-mechanic"];
+const bullet = (source, heading) => source.split("\n").find((line) => line.includes(heading)) ?? "";
+
+// --- ORDERING: the commit-then-record collision (lane code, unclaimed record path) ---------------------------------------
+const ORDER_ID = "ORDER-LOG-1";
+const BASE = "1".repeat(40);
+const COMMIT_1 = "2".repeat(40);
+const COMMIT_2 = "3".repeat(40);
+const RECORD_PATH = `evidence/dispatch-record-${ORDER_ID}.json`;
+const REQUESTED = `/repo/${RECORD_PATH}`;
+// An unclaimed record: no resolvable git common dir means no owner claim (an orchestrator-made record, or a runner whose
+// payload carries no agent identity). The lane then falls back to the git-history and terminal-overwrite tests.
+const lane = (existing, incoming, { priorCommit = null } = {}) => checkDispatchRecordCollision({
+  relPath: RECORD_PATH, requested: REQUESTED, payload: incoming === null ? "not json" : JSON.stringify(incoming), root: "/repo", input: null,
+  dependencies: {
+    resolveGitCommonDirFn: () => null,
+    existsSyncFn: (path) => existing !== null && path === REQUESTED,
+    readFileSyncFn: () => JSON.stringify(existing),
+    gitCommitForTaskIdFn: () => priorCommit,
+  } });
+const interim = (candidateCommit, commits, log) => ({ ...v4Terminal(log), taskId: ORDER_ID, outcome: "committed-pending-report", candidateCommit, commits, resultSha256: reportSha256(reportText), report: { text: reportText, changedFiles: ["plugins/pipeline-core/lib/x.mjs"] } });
+
+test("MEASURED ordering (a): a record opened AFTER the first commit that cites its task id is refused, so only a terminal write remains", () => {
+  const opening = { ...v3Opening(), taskId: ORDER_ID };
+  assert.equal(lane(null, opening), null, "control: the opening written first (before any commit cites the id) is admitted");
+  const hit = lane(null, opening, { priorCommit: COMMIT_1 });
+  assert.ok(hit, "an in-progress opening after a citing commit must be refused");
+  assert.match(hit.reason, /already bound to commit/u);
+});
+
+test("MEASURED ordering (b): an Edit-shaped partial payload can never append to an unclaimed interim record", () => {
+  const existing = interim(COMMIT_1, [COMMIT_1], goodLog);
+  const hit = lane(existing, null);
+  assert.ok(hit, "an Edit payload is not JSON, so on an unclaimed terminal-by-denylist record it cannot prove identity");
+  assert.match(hit.reason, /already been used by a completed dispatch/u);
+});
+
+test("MEASURED ordering (c): the SECOND post-commit checkpoint of a multi-commit package is refused on an unclaimed record", () => {
+  const first = interim(COMMIT_1, [COMMIT_1], goodLog);
+  const second = interim(COMMIT_2, [COMMIT_1, COMMIT_2], [...goodLog, { phase: "commit-2", toolUseCount: 20 }]);
+  // The validator itself demands candidateCommit = the last commit for every terminal-by-denylist outcome, the interim one
+  // included - so a checkpoint that follows the template literally MUST move candidateCommit with each commit.
+  assert.deepEqual(validateDispatchRecord(second).commits, [COMMIT_1, COMMIT_2]);
+  assert.equal(lane({ ...first, outcome: "in-progress", candidateCommit: BASE, commits: [], report: null }, first), null, "control: the first checkpoint (existing record still in-progress) is admitted");
+  const hit = lane(first, second);
+  assert.ok(hit, "measured: the lane's unclaimed path refuses the second checkpoint because candidateCommit changed against a terminal-by-denylist record");
+  assert.match(hit.reason, /already been used by a completed dispatch/u);
+});
+
+// The decided behaviour for the unclaimed path is a design decision (lane change, lib/guard/* is protected); the case documents
+// the contract the claimed path already honours (see parallel-work-in-one-checkout-is-unsafe.test.mjs, PARWORK-M2a/M2b).
+test("DESIRED ordering (c): the second checkpoint is admitted on an unclaimed record too", { todo: "needs a lane decision, lib/guard is protected (ALF-K24 report)" }, () => {
+  const first = interim(COMMIT_1, [COMMIT_1], goodLog);
+  const second = interim(COMMIT_2, [COMMIT_1, COMMIT_2], [...goodLog, { phase: "commit-2", toolUseCount: 20 }]);
+  assert.equal(lane(first, second), null);
+});
+
+// --- WORDING: what the texts an agent reads actually say about the log ---------------------------------------------------
+test("MEASURED wording: the briefing names the exact log entry keys the validator accepts (phase, toolUseCount, note)", () => {
+  const marker = bullet(text("templates/prompts/goldfish-task.md"), "**Cheap progress markers");
+  assert.match(marker, /`phase`/u, "the progress-marker bullet must name the phase key");
+  assert.match(marker, /`toolUseCount`/u, "the progress-marker bullet must name the toolUseCount key");
+  assert.match(marker, /`note`/u, "the optional note key is where a command, exit code or artifact pointer fits");
+});
+
+test("MEASURED wording: the role named authoritative for the duty (GF-09-D) states the log entry, not only the briefing", () => {
+  const role = text("roles/goldfish.md");
+  const duty = role.slice(role.indexOf("Report durability (GF-09-D)"), role.indexOf("No new capability"));
+  assert.ok(duty.length > 0, "GF-09-D block located");
+  for (const needle of ["`log`", "`phase`", "`toolUseCount`"]) assert.ok(duty.includes(needle), `GF-09-D must name ${needle}`);
+});
+
+for (const agent of AGENTS) {
+  test(`MEASURED wording: agents/${agent}.md names the log entry keys it asks for`, () => {
+    const duty = bullet(text(`agents/${agent}.md`), "Report durability (GF-09-D");
+    for (const needle of ["`log`", "`phase`", "`toolUseCount`"]) assert.ok(duty.includes(needle), `${agent} must name ${needle}`);
+  });
+}
+
+// --- BUDGET + FOLD: every log entry rides on a record write the protocol already demands ---------------------------------
+// There is no append primitive: the sanctioned CLI "cannot update an existing record" and a model write replaces the whole
+// file, so a log-only append is a full extra tool use against the base cap. The scheduled record writes are the opening, the
+// read-back, one checkpoint per commit and the final write.
+const scheduledRecordWrites = ({ commits }) => 2 + commits + 1;
+const logOnlyWrites = ({ suites }, folded) => (folded ? 0 : suites);
+
+test("MEASURED budget: record maintenance is a function of commits and suites, and a log-only append costs one tool use each", () => {
+  const shape = { commits: 3, suites: 4 };
+  assert.equal(scheduledRecordWrites(shape), 6);
+  assert.equal(logOnlyWrites(shape, false), 4, "unfolded: each suite-finish log append is its own write");
+  const baseCap = 35;
+  assert.ok((scheduledRecordWrites(shape) + logOnlyWrites(shape, false)) / baseCap > 0.25, "unfolded record upkeep takes more than a quarter of a 35-call base cap");
+  assert.equal(CLOSING_ALLOWANCE, 5);
+  // The template's closing arithmetic: message file + git add + git commit + ONE record write = four calls; one call is spare.
+  assert.match(text("templates/prompts/goldfish-task.md"), /message file \+ `git add` \+ `git commit` \+ the record write are four calls/u);
+});
+
+test("ACCEPTANCE fold: the briefing carries each log entry in a record write the protocol already makes - no log-only write is demanded", () => {
+  const shape = { commits: 3, suites: 4 };
+  const template = text("templates/prompts/goldfish-task.md");
+  const checkpoint = bullet(template, "**Report durability (GF-09-D");
+  const marker = bullet(template, "**Cheap progress markers");
+  const folded = /same write/u.test(checkpoint) && /in the same write/u.test(marker) && /never as a log-only write/u.test(marker);
+  assert.equal(logOnlyWrites(shape, folded), 0, "log entries must ride on the checkpoint / finding / final writes");
+  const role = text("roles/goldfish.md");
+  assert.match(role.slice(role.indexOf("Checkpoint-after-every-commit"), role.indexOf("Report-last-act")), /same write/u, "GF-09-D step 2 folds the entry into the checkpoint");
+  for (const agent of AGENTS) assert.match(bullet(text(`agents/${agent}.md`), "Report durability (GF-09-D"), /rather than as a write of its own/u, `${agent} must say the entry is not a write of its own`);
+});
+
+test("the two copies of the briefing template stay byte-identical (the fold edit touches both)", () => {
+  assert.equal(text("templates/prompts/goldfish-task.md"), readFileSync(resolve(pluginRoot, "../../templates/prompts/goldfish-task.md"), "utf8"));
 });
