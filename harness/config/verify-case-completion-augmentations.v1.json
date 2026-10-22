@@ -416,6 +416,605 @@
         ],
         "maxBytes": 65536
       }
+    },
+    {
+      "name": "agy-item-delivery-tests",
+      "file": "plugins/pipeline-core/lib/agy-item-delivery.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "AGYID01",
+          "AGYID02",
+          "AGYID03",
+          "AGYID04",
+          "AGYID05",
+          "AGYID06"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "architecture-entry-required-source-tests",
+      "file": "harness/scripts/architecture-entry-required-source.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "AC19REQ001",
+          "AC19REQ002"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "architecture-prospective-companion-tests",
+      "file": "plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "APMC001",
+          "APMC002",
+          "APMC003"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "architecture-prospective-materialization-tests",
+      "file": "plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "APM001",
+          "APM002",
+          "APM003",
+          "APM004",
+          "APM005",
+          "APM006",
+          "APM007",
+          "APM008",
+          "APM009",
+          "APM010",
+          "APM011",
+          "APM012",
+          "APM013",
+          "APM014",
+          "APM015",
+          "APM016",
+          "APM017",
+          "APM018"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "critic-generic-batch-tests",
+      "file": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CGB001",
+          "CGB002",
+          "CGB003",
+          "CGB004",
+          "CGB005",
+          "CGB006",
+          "CGB007",
+          "CGB008",
+          "CGB009",
+          "CGB010",
+          "CGB011"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "darwin-native-process-observer-tests",
+      "file": "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DNO001",
+          "DNO002",
+          "DNO003",
+          "DNO004"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "darwin-requester-integration-tests",
+      "file": "plugins/pipeline-core/lib/darwin-requester-integration.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DRI001",
+          "DRI002",
+          "DRI003",
+          "DRI004",
+          "DRI005",
+          "DRI006"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "devplan-shell-sanctioned-recovery-tests",
+      "file": "plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DLR001",
+          "DLR002",
+          "DLR003",
+          "DLR004",
+          "DLR005",
+          "DLR006",
+          "DLR007",
+          "DLR008",
+          "DLR009",
+          "DLR010",
+          "DLR011",
+          "DLR012",
+          "DLR013",
+          "DLR014",
+          "DLR015",
+          "DLR016",
+          "DLR017",
+          "DLR018",
+          "DLR019",
+          "DLR020",
+          "DLR021",
+          "DLR022",
+          "DLR023",
+          "DLR024",
+          "DLR025",
+          "DLR026",
+          "DLR027",
+          "DLR028",
+          "DLR029",
+          "DLR030",
+          "DLR031",
+          "DLR032",
+          "DLR033",
+          "DLR034",
+          "DLR035",
+          "DLR036"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "doc-reader-course-budget-tests",
+      "file": "harness/scripts/doc-reader-course-budget.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC02C001",
+          "RC02C002",
+          "RC02C003",
+          "RC02C004",
+          "RC02C005",
+          "RC02C006",
+          "RC02C007",
+          "RC02C008",
+          "RC02C009",
+          "RC02C010",
+          "RC02C011",
+          "RC02C012",
+          "RC02C013",
+          "RC02C014",
+          "RC02C015",
+          "RC02C016",
+          "RC02C017",
+          "RC02C018",
+          "RC02C019",
+          "RC02C020",
+          "RC02C021",
+          "RC02C022",
+          "RC02C023",
+          "RC02C024"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "existing-public-anchor-tests",
+      "file": "plugins/pipeline-core/scripts/existing-public-anchor.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "EPA001",
+          "EPA002",
+          "EPA003",
+          "EPA004",
+          "EPA005",
+          "EPA006",
+          "EPA007",
+          "EPA008",
+          "EPA009",
+          "EPA010",
+          "EPA011",
+          "EPA012",
+          "EPA013",
+          "EPA014",
+          "EPA015"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "git-stash-readonly-tests",
+      "file": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GSR001",
+          "GSR002",
+          "GSR003",
+          "GSR004",
+          "GSR005",
+          "GSR006",
+          "GSR007",
+          "GSR008",
+          "GSR009",
+          "GSR010",
+          "GSR011",
+          "GSR012",
+          "GSR013",
+          "GSR014",
+          "GSR015",
+          "GSR016",
+          "GSR017",
+          "GSR018",
+          "GSR019",
+          "GSR020",
+          "GSR021",
+          "GSR022",
+          "GSR023",
+          "GSR024",
+          "GSR025",
+          "GSR026",
+          "GSR027",
+          "GSR028",
+          "GSR029",
+          "GSR030",
+          "GSR031",
+          "GSR032",
+          "GSR033",
+          "GSR034"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "install-agy-inline-candidate-tests",
+      "file": "plugins/pipeline-core/install-agy.inline-candidate.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "AGYIC001",
+          "AGYIC002",
+          "AGYIC003",
+          "AGYIC004",
+          "AGYIC005",
+          "AGYIC006",
+          "AGYIC007",
+          "AGYIC008",
+          "AGYIC009",
+          "AGYIC010",
+          "AGYIC011"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "installed-bootstrap-import-closure-tests",
+      "file": "plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "IBIC001"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "installed-plugin-attestation-inline-action-tests",
+      "file": "plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "IPAIA01",
+          "IPAIA02",
+          "IPAIA03"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "native-platform-process-observer-tests",
+      "file": "plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NPO001",
+          "NPO002",
+          "NPO003",
+          "NPO004",
+          "NPO005"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "passive-read-credential-follow-tests",
+      "file": "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PCF001",
+          "PCF002",
+          "PCF003",
+          "PCF004",
+          "PCF005",
+          "PCF006",
+          "PCF007",
+          "PCF008",
+          "PCF009",
+          "PCF010",
+          "PCF011",
+          "PCF012",
+          "PCF013",
+          "PCF014",
+          "PCF015",
+          "PCF016",
+          "PCF017",
+          "PCF018",
+          "PCF019",
+          "PCF020",
+          "PCF021",
+          "PCF022",
+          "PCF023",
+          "PCF024",
+          "PCF025",
+          "PCF026",
+          "PCF027",
+          "PCF028",
+          "PCF029",
+          "PCF030",
+          "PCF031",
+          "PCF032",
+          "PCF033",
+          "PCF034",
+          "PCF035",
+          "PCF036"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "phoenix-authority-revision-installed-package-tests",
+      "file": "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PHARI001"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "plan-reopen-current-action-tests",
+      "file": "harness/scripts/plan-reopen-current-action.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RPOP001",
+          "RPOP002",
+          "RPOP003",
+          "RPOP004",
+          "RPOP005",
+          "RPOP006"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "project-onboarding-temp-root-tests",
+      "file": "plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "POTR01",
+          "POTR02",
+          "POTR03",
+          "POTR04"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "scratch-package-staging-tests",
+      "file": "plugins/pipeline-core/lib/scratch-package-staging.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SPC001",
+          "SPC002",
+          "SPC003",
+          "SPC004",
+          "SPC005",
+          "SPC006",
+          "SPC007"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "signed-quality-package-single-link-tests",
+      "file": "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "QSL001",
+          "QSL002",
+          "QSL003",
+          "QSL004",
+          "QSL005",
+          "QSL006"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "signing-disclosure-sweep-tests",
+      "file": "plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SDA001",
+          "SDA002",
+          "SDA003",
+          "SDF001",
+          "SDF002",
+          "SDP001",
+          "SDP002",
+          "SDP003",
+          "SDP004",
+          "SDP005",
+          "SDP006",
+          "SDR001",
+          "SDR002",
+          "SDR003",
+          "SDS001",
+          "SDS002",
+          "SDS003",
+          "SDT001",
+          "SDT002"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "verify-case-completion-augmentation-policy-tests",
+      "file": "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "BCP01",
+          "BCP02",
+          "BCP03",
+          "BCP04",
+          "BCP05",
+          "BCP06",
+          "BCP07",
+          "BCP08"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "administrative-commit-policy-tests",
+      "file": "plugins/pipeline-core/lib/administrative-commit-policy.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ADM001",
+          "ADM002",
+          "ADM003",
+          "ADM004",
+          "ADM005",
+          "ADM006",
+          "ADM007",
+          "ADM008",
+          "ASV001",
+          "ASV002"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "guard-dispatch-model-tests",
+      "file": "plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GDM01",
+          "GDM02",
+          "GDM03"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "native-goldfish-host-state-fanout-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGFO01",
+          "NGFO02",
+          "NGFO03",
+          "NGFO04",
+          "NGFO05",
+          "NGFO06",
+          "NGFO07",
+          "NGFO08"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "signed-spec-descriptor-tests",
+      "file": "plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SSD001",
+          "SSD002",
+          "SSD003",
+          "SSD004",
+          "SSD005",
+          "SSD006"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "pin-devplan-lane-admits-the-producer-materialize-step-tests",
+      "file": "plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DMP001",
+          "DMP002",
+          "DMP003",
+          "DMP004",
+          "DMP005",
+          "DMP006"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "session-authority-repair-tests",
+      "file": "plugins/pipeline-core/scripts/session-authority-repair.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SAR01",
+          "SAR02",
+          "SAR03",
+          "SAR04",
+          "SAR05",
+          "SAR06",
+          "SAR07",
+          "SAR08",
+          "SAR09",
+          "SAR10"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }
