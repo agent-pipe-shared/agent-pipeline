@@ -49,6 +49,28 @@ Concrete cases observed in the Claude/Windows session on 2026-10-03:
   on guard-denied paths.
 - One cross-runner test matrix covers these read shapes.
 
+## Evidence 2026-10-22 (runner rows of the matrix)
+
+The pin `plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs` now carries
+a Codex row and an Antigravity row next to the Claude row; both start the real native adapters
+(`hooks/codex-pretool-guard.mjs`, `hooks/antigravity-pretool-guard.mjs`) as processes. Run: `node --test` on that file,
+18 cases, 14 pass, 0 fail, 1 skip (the WSL UNC case, a Linux-host typed skip), 3 todo.
+
+- Admitted on all three runners (green): in-root `cat`, `head`, `rg`, `rg -g` and scratch reads.
+- Denied on all three runners with a `BLOCKED (guard-...): GUARD-<code>` text and no absence wording (green): `cat` of an
+  in-root credential file and of `~/.ssh/id_rsa`; `cat` of a missing file and `grep -R` are audited when denied.
+- Codex has no native Read, Grep or Glob tool; each is refused by name (green), but that adapter-level text carries no
+  `GUARD-` code.
+- Open, as `todo` cases (real assertions, they flip to plain passes when fixed):
+  - M5: an Antigravity native `view_file` of a credential file is allowed, because the adapter allows every read-only tool
+    at once (its own test pins that as intended). Acceptance 1 says credential roots stay denied on all runners. Needs a
+    product decision: gate the native read tools, or accept the gap and amend the acceptance.
+  - M6: the Codex-surfaced `GUARD-READ-COMMAND-UNSUPPORTED` text tells the agent to "use the Read, Glob or Grep tools",
+    which Codex refuses. Fix site `lib/guard/grammar-denials.mjs` (protected); a runner-neutral wording patch is prepared.
+  - M7: an in-root credential read (`cat vault/id_rsa`) is refused with `GUARD-READ-COMMAND-UNSUPPORTED`, whose text says
+    the refusal is about flags or spelling and not a path. The path is the cause. Needs a distinct typed code or wording
+    (`lib/guard/evaluate.mjs`, protected); the choice of code is a decision.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**

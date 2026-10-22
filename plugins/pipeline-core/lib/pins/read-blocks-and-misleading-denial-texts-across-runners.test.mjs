@@ -10,6 +10,7 @@
 // is not yet delivered (fix site: plugins/pipeline-core/lib/guard/read-scope.mjs readToolScopeVerdict for the Grep
 // glob/type/subtree shapes, plugins/pipeline-core/lib/passive-read-policy.mjs rawCandidate for WSL UNC paths).
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
@@ -167,6 +168,141 @@ test("U2 (PO decision 2026-10-16: REFUSE, SEC-11 exact-file rule stays) native G
       assert.deepEqual(denialProblems(r.text), [], `${target}\n${r.text}`);
     }
   }
+}));
+
+// ---- A3: the cross-runner matrix (Claude row above and in P1-P7; Codex and Antigravity rows below) ------------------
+// The Claude row runs the lifecycle guard in-process. The Codex and Antigravity rows start the REAL native adapters
+// (hooks/codex-pretool-guard.mjs, hooks/antigravity-pretool-guard.mjs) as processes with their own envelope shape,
+// because that is where the text an agent reads is finally assembled. Codex has no native Read/Grep/Glob tool (its
+// adapter accepts Bash, apply_patch, Edit, Write only); Antigravity maps run_command to Bash and treats its native
+// read tools (view_file, list_dir, find_by_name, grep_search, ...) as read-only calls it allows at once.
+const HOOKS_DIR = fileURLToPath(new URL("../../hooks/", import.meta.url));
+const RUNNERS = ["claude", "codex", "antigravity"];
+const ABSENCE_WORDING = /not found|not present|no such file|cannot find|does not exist/iu;
+
+function runnerFixture() {
+  const path = fixture();
+  const init = spawnSync("git", ["init", "-q", path], { encoding: "utf8" });
+  assert.equal(init.status, 0, init.stderr);
+  return path;
+}
+const withRunnerFixture = (fn) => {
+  const path = runnerFixture();
+  try { return fn(path); } finally { rmSync(path, { recursive: true, force: true }); }
+};
+
+/** One call through a runner's real guard surface: { denied, text } where text is what the agent reads. */
+function runnerDecision(runner, toolCall, path) {
+  if (runner === "claude") {
+    const result = run(toolCall.claude, path);
+    return { denied: result.exitCode === 2, text: result.text };
+  }
+  const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
+  const script = join(HOOKS_DIR, runner === "codex" ? "codex-pretool-guard.mjs" : "antigravity-pretool-guard.mjs");
+  const envelope = runner === "codex" ? { cwd: path, session_id: "alf-c-p15-01", ...toolCall.codex } : { cwd: path, ...toolCall.antigravity };
+  const child = spawnSync(process.execPath, [script], {
+    cwd: path, input: JSON.stringify(envelope), encoding: "utf8", timeout: 120000,
+    env: { ...baseEnv, CLAUDE_PROJECT_DIR: path },
+  });
+  let parsed = {};
+  try { parsed = JSON.parse(String(child.stdout).trim().split("\n")[0]); } catch { parsed = {}; }
+  if (runner === "codex") {
+    return {
+      denied: parsed?.hookSpecificOutput?.permissionDecision === "deny",
+      text: String(parsed?.hookSpecificOutput?.permissionDecisionReason ?? ""),
+    };
+  }
+  return { denied: parsed.decision === "deny", text: String(parsed.reason ?? "") };
+}
+
+const shellCall = (command, path) => ({
+  claude: bash(command),
+  codex: { tool_name: "Bash", tool_input: { command } },
+  antigravity: { toolCall: { name: "run_command", args: { CommandLine: command, Cwd: path } } },
+});
+
+test("M1 matrix: ordinary in-root passive shell reads are admitted on Claude, Codex and Antigravity", { timeout: 300000 }, () => withRunnerFixture((path) => {
+  for (const runner of RUNNERS) {
+    for (const command of [
+      "cat docs/2026-09-21-a.md",
+      "head -n 5 docs/2026-09-21-a.md",
+      "rg -n apply docs",
+      `rg -n apply docs -g "*.md"`,
+      `rg -n apply ${fwd(path)}/scratch`,
+    ]) {
+      const decision = runnerDecision(runner, shellCall(command, path), path);
+      assert.equal(decision.denied, false, `${runner}: ${command}\n${decision.text}`);
+    }
+  }
+}));
+
+test("M2 matrix: credential and outside-root shell reads are denied on every runner with a 'BLOCKED (guard ...): GUARD-<code>' text that never implies absence", { timeout: 300000 }, () => withRunnerFixture((path) => {
+  for (const runner of RUNNERS) {
+    for (const command of ["cat vault/id_rsa", "cat ~/.ssh/id_rsa"]) {
+      const decision = runnerDecision(runner, shellCall(command, path), path);
+      assert.equal(decision.denied, true, `${runner}: ${command} must be denied`);
+      assert.deepEqual(denialProblems(decision.text), [], `${runner}: ${command}\n${decision.text}`);
+      assert.doesNotMatch(decision.text, /GUARD-READ-TARGET-MISSING/u, `${runner}: an existing secret must never be reported as missing`);
+    }
+    for (const command of ["cat docs/missing-file.md", "grep -R apply ."]) {
+      const decision = runnerDecision(runner, shellCall(command, path), path);
+      if (!decision.denied) continue; // an admitted shape has no denial text to audit
+      assert.deepEqual(denialProblems(decision.text), [], `${runner}: ${command}\n${decision.text}`);
+    }
+  }
+}));
+
+test("M3 Codex row: native Read, Grep and Glob are not Codex tools; each is refused by name and never as an absent file", { timeout: 300000 }, () => withRunnerFixture((path) => {
+  const doc = join(path, "docs", "2026-09-21-a.md");
+  for (const [name, input] of [
+    ["Read", { file_path: doc }], ["Grep", { pattern: "apply", path: doc }], ["Glob", { pattern: "docs/*" }],
+  ]) {
+    const decision = runnerDecision("codex", { codex: { tool_name: name, tool_input: input } }, path);
+    assert.equal(decision.denied, true, name);
+    assert.match(decision.text, new RegExp(`Codex tool_name "${name}"`, "u"), decision.text);
+    assert.doesNotMatch(decision.text, ABSENCE_WORDING, decision.text);
+  }
+}));
+
+test("M4 Antigravity row: in-root native read tools are allowed by the real adapter", { timeout: 300000 }, () => withRunnerFixture((path) => {
+  const doc = join(path, "docs", "2026-09-21-a.md");
+  for (const [name, args] of [
+    ["view_file", { AbsolutePath: doc }], ["list_dir", { DirectoryPath: join(path, "docs") }],
+    ["find_by_name", { SearchDirectory: path, Pattern: "*.md" }], ["grep_search", { SearchPath: doc, Query: "apply" }],
+  ]) {
+    const decision = runnerDecision("antigravity", { antigravity: { toolCall: { name, args } } }, path);
+    assert.equal(decision.denied, false, `${name}\n${decision.text}`);
+  }
+}));
+
+// The three cases below assert the item's acceptance where the runner rows are NOT yet satisfied. They are `todo`: they
+// run and report, they do not fail the suite, and each flips to a plain pass once its fix site lands (see the item).
+test("M5 (todo: Antigravity native read tools are allowed unconditionally, so a credential file is readable) a native view_file of a credential file is denied on Antigravity (A1: credential roots stay denied)", {
+  todo: "decision needed: hooks/antigravity-pretool-guard.mjs allows every read-only tool call immediately; its own test pins that as intended",
+  timeout: 300000,
+}, () => withRunnerFixture((path) => {
+  const decision = runnerDecision("antigravity", { antigravity: { toolCall: { name: "view_file", args: { AbsolutePath: join(path, "vault", "id_rsa") } } } }, path);
+  assert.equal(decision.denied, true, "a credential file was admitted by the native read tool");
+  assert.deepEqual(denialProblems(decision.text), [], decision.text);
+}));
+
+test("M6 (todo: the note recommends tools the Codex runner refuses) a denial surfaced on Codex does not tell the agent to use native Read, Glob or Grep tools (A2: a truthful, actionable denial)", {
+  todo: "fix site lib/guard/grammar-denials.mjs READ_COMMAND_UNSUPPORTED_NOTE (protected path): runner-neutral wording needed, a source patch is prepared",
+  timeout: 300000,
+}, () => withRunnerFixture((path) => {
+  const decision = runnerDecision("codex", shellCall("cat vault/id_rsa", path), path);
+  assert.equal(decision.denied, true, decision.text);
+  assert.match(decision.text, /GUARD-READ-COMMAND-UNSUPPORTED/u, decision.text);
+  assert.doesNotMatch(decision.text, /use the Read, Glob or Grep tools/u, "Codex refuses Read, Glob and Grep as unsupported tool names");
+}));
+
+test("M7 (todo: a credential target is labelled as a spelling problem) a denied credential read never says the refusal is about flags or spelling and not about a path (A2)", {
+  todo: "decision needed: a distinct typed code for an in-root credential read target; fix site lib/guard/evaluate.mjs (protected)",
+  timeout: 300000,
+}, () => withRunnerFixture((path) => {
+  const decision = runnerDecision("claude", shellCall("cat vault/id_rsa", path), path);
+  assert.equal(decision.denied, true, decision.text);
+  assert.doesNotMatch(decision.text, /refuses the command's own flags or spelling, not a path/u, decision.text);
 }));
 
 test("U3 (PO decision 2026-10-16: ADMIT) native Read of a user-supplied WSL UNC exact file is admitted; UNC credential roots and secret basenames stay denied (A1: WSL UNC paths)", {
