@@ -51,7 +51,7 @@ Agent-executable layers (1b reconcile, `push-init`, `push-prepare`, `approve-pus
 | Update via `/plugins` then `/new` when update is recommended | per session (when notified) | PO | automatable (helper never updates or restarts; operator boundary stays explicit) | `harness/session-bootstrap.md:211` |
 | Select official versus local Pipeline source for the shared Codex App Server (affected sessions closed) | per host | PO | required because one App Server cannot run different Pipeline versions per repository | `harness/session-bootstrap.md:185` |
 | Install and bootstrap only for the runner in use; confirm model routing | install | PO | required because model routes this runner cannot use stay unavailable | `docs/runner-support.md:10-14` |
-| Run Codex design-readiness bootstrap script on a fresh host | per host | PO terminal | automatable (fold into the bootstrap typed next action) | `plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs` (no toil row; cited as existing script only) |
+| Run Codex design-readiness bootstrap script on a fresh host | per host | PO terminal | retired, not counted (premise refuted 2026-10-22: the script is a per-design-package producer, not a host setup step, and ADR-0085 retired it; formerly marked automatable, fold into the bootstrap typed next action) | `plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs` (no toil row; cited as existing script only; it answers `DESIGN-COURSE-RETIRED`) |
 
 ## Antigravity (agy)
 
@@ -62,7 +62,8 @@ Agent-executable layers (1b reconcile, `push-init`, `push-prepare`, `approve-pus
 | Install only for the runner in use; confirm model routing | install | PO | required because unavailable routes stay explicit | `docs/runner-support.md:10-14` |
 
 Counts (rows; C-rows counted once): neutral 12 = 6 required, 6 automatable;
-Claude Code 7 = 6 required, 1 automatable; Codex 4 = 2 required, 2 automatable;
+Claude Code 7 = 6 required, 1 automatable; Codex 3 = 2 required, 1 automatable
+(a fourth Codex row is listed as retired and not counted);
 Antigravity 3 = 3 required, 0 automatable.
 
 ## Planned automation
@@ -79,4 +80,4 @@ to be set by the PO):
 3. **Signing toolchain readiness** (C9, T15/T16): check and resolve openssl in the readiness report with a typed repair per finding.
 4. **Catalogue-admit prescribed lifecycle verbs** (C12, T21/T23/T24): every verb the course prescribes runs for the agent in its state.
 5. **Typed plugin-update next action** (Claude, Codex): bootstrap offers the runner's update command instead of prose.
-6. **Codex bootstrap in the typed next action** (Codex): include the design-readiness bootstrap in the fresh-host action.
+6. ~~**Codex bootstrap in the typed next action** (Codex): include the design-readiness bootstrap in the fresh-host action.~~ Withdrawn 2026-10-22: premise refuted (the script is a per-design-package producer, not a host setup step) and the route is retired by ADR-0085; the backlog item is closed as obsolete.

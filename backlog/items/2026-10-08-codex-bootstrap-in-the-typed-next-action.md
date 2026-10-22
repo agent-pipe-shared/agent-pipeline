@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-bootstrap-in-the-typed-next-action
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-10-08
+closed_at: 2026-10-22
+closure_repository: self
+closure_commit: d1a24c6a6da46232b493138b11d777c42aa1220e
+closure_evidence: plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs
 source: "admin-step inventory (docs/admin-steps-inventory.md), decision AO"
 sprint: alfred
 done_when: manual
@@ -37,10 +41,10 @@ Owner: pipeline; due 2026-10-31.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** needs-verification (2026-10-08); premise refuted on verification (2026-10-22), disposition below.
-- **Rationale:** decision AO: automatable admin step.
-- **Assignment (if accepted):** post-0.7.0 automation lane unless pulled in.
-- **Date:** 2026-10-08
+- **Decision:** needs-verification (2026-10-08); premise refuted on verification (2026-10-22); closed as obsolete (refuted premise, retired route) on 2026-10-22.
+- **Rationale:** decision AO: automatable admin step. On verification the premise does not hold (see "Verification of the premise"): the script is a per-design-package producer, not a host setup step, and ADR-0085 retired it. Closure evidence is the pin that records both grounds; the closure commit is the one that retargeted that pin (`d1a24c6a6`).
+- **Assignment (if accepted):** none; closed. The stale inventory entries were corrected the same day: `docs/admin-steps-inventory.md` row 54 is marked retired and uncounted (Codex count 4 to 3) and candidate 6 is withdrawn.
+- **Date:** 2026-10-08 (opened), 2026-10-22 (closed)
 
 ## Verification of the premise (agent, 2026-10-22)
 
@@ -55,8 +59,7 @@ Premise refuted on two independent grounds, pinned in `plugins/pipeline-core/lib
 
 The deferral pin is retargeted to this state (it still fails if the preflight starts naming the script). Recommended disposition for the
 Elephant triage: close as obsolete (premise refuted, route retired). The inventory row `docs/admin-steps-inventory.md` line 54 and
-candidate 6 still describe the step as automatable and are stale; correcting them was left to the triage because the inventory
-carries row counts.
+candidate 6 described the step as automatable and were stale; they were corrected at triage on 2026-10-22 (the inventory carries row counts, adjusted accordingly).
 
 ### Blocker analysis 2026-10-22
 
