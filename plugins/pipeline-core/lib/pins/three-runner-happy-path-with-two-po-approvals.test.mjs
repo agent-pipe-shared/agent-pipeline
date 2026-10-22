@@ -15,16 +15,18 @@
  * The same file also carries the item's added 0.7.0 acceptance (2026-10-17 P0-1, 2026-10-20 D64), each case
  * driving the real module: the typed absent course, the German-table criterion scan, the `.test.js` check
  * admission, the plan-readiness hand-off inspection, and the onboarding answers held in one intake record
- * across a real restart. Two acceptance points are not met on this head and are typed `todo` cases that flip
- * to passing when delivered: the submit-plan/present-plan call sites of the hand-off inspection (protected
- * file, patch three-runner-patch-01) and the Git author no longer asked once the intake record holds it.
+ * across a real restart. Three acceptance points are not met on this head and are typed `todo` cases (owner
+ * Coordinator, due 2026-10-31) that flip to passing when delivered: the submit-plan/present-plan call sites of
+ * the hand-off inspection (deferred to 0.7.x by PO decision D85; protected file), the briefing generator
+ * binding a numbered or R-n row of a German two-column table (scripts/dispatch-briefing.mjs
+ * findCriterionOccurrences), and the Git author no longer asked once the intake record holds it.
  */
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { devNull } from "node:os";
+import { devNull, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -428,6 +430,58 @@ test("AC-264 added (P0-1): plan readiness proves the delivery hand-off from the 
   assert.equal(refused.code, "PLR-HANDOFF-NO-CRITERION");
 });
 
+// The shipped briefing generator is the route a delivery dispatch takes from a signed Spec to the course writer's input
+// (`prepareGovernedItemQueue` re-runs `parseAcceptedCriticCriterion` on the locator it is handed). Driven through the real
+// `runDispatchBriefing` with injected host facts only (no git, no preflight): the behaviour under test is the generator's own.
+const BRIEFING_SPEC = "specs/orders/spec.md";
+function briefingFor(specText, criterion, check) {
+  const root = mkdtempSync(join(tmpdir(), "tri-briefing-"));
+  const agentsDir = mkdtempSync(join(tmpdir(), "tri-briefing-agents-"));
+  acceptanceRoots.push(root, agentsDir);
+  writeIn(root, BRIEFING_SPEC, specText);
+  writeFileSync(join(agentsDir, "goldfish-implementor.md"), "---\nname: goldfish-implementor\nmodel: sonnet\neffort: medium\nmaxTurns: 50\n---\nFixture agent body.\n");
+  const deps = {
+    agentsDir,
+    observePreflight: () => ({ rulesetSource: { selectedPlugin: { id: "pipeline-core", version: "9.9.9+test" }, loadedIdentity: { status: "available", algorithm: "content-sha256", value: "ab".repeat(32) }, installedIdentity: { status: "unavailable" } } }),
+    git: (_root, args) => (args[0] === "status" ? "" : args[1] === "HEAD^{tree}" ? "2".repeat(40) : "1".repeat(40)),
+    resolveBaseline: () => ({ status: "ready", entries: [] }),
+    defaultSpecPath: () => null,
+  };
+  const argv = ["binding", "--root", root, "--dispatch-id", "ORD-1", "--item", "store-order", "--agent-type", "goldfish-implementor", "--model-id", "claude-sonnet-5-5",
+    "--check", check, "--path", "src/orders.js", "--spec", BRIEFING_SPEC, ...(criterion === null ? [] : ["--criterion", criterion])];
+  return import("../../scripts/dispatch-briefing.mjs").then(({ runDispatchBriefing }) => ({ result: runDispatchBriefing(argv, deps), bytes: Buffer.from(specText) }));
+}
+const GERMAN_AC_SPEC = ["# Spezifikation Bestell-App", "", "## Abnahmekriterien", "", "| # | Criterion | Evidence |", "| --- | --- | --- |",
+  "| AC-1 | WENN ein Besucher das Bestellformular absendet, SPEICHERT das System die Bestellung mit Zeitstempel | Bestelltests |", ""].join("\n");
+
+test("AC-264 added (P0-1): the briefing generator binds a German-text criterion to a .test.js check, and refuses a missing criterion row early with the supported shapes as its repair", async () => {
+  const bound = await briefingFor(GERMAN_AC_SPEC, "AC-1", "tests/orders.test.js");
+  assert.equal(bound.result.ok, true, JSON.stringify(bound.result));
+  const { itemDelivery } = bound.result.binding;
+  assert.equal(validateItemDeliveryBriefing(itemDelivery).ok, true);
+  assert.deepEqual(itemDelivery.checks[0].dependencies.includes("tests/orders.test.js"), true, "the project's own .test.js convention is admitted");
+  assert.match(bound.bytes.subarray(itemDelivery.criterionLocator.startByte, itemDelivery.criterionLocator.endByte).toString("utf8"), /Bestellformular/u);
+  const wrongSuffix = (await briefingFor(GERMAN_AC_SPEC, "AC-1", "tests/orders.spec.js")).result;
+  assert.equal(wrongSuffix.code, "DBG-CHECK-NOT-TEST", "RED mirror: a non-test suffix is still refused");
+  const none = "# Spezifikation\n\nKeine Kriterien hier.\n";
+  const missing = (await briefingFor(none, "AC-1", "tests/orders.test.js")).result;
+  assert.equal(missing.ok, false);
+  assert.equal(missing.code, "DBG-CRITERION-MISSING");
+  assert.ok(missing.message.includes("AC-1") && missing.message.includes(BRIEFING_SPEC) && missing.message.includes("first cell"), "the refusal names the criterion, the Spec and the supported shapes");
+  assert.equal(missing.skeleton, undefined, "no briefing skeleton is handed out after a refusal");
+  assert.equal((await briefingFor(none, null, "tests/orders.test.js")).result.code, "DBG-AC-ROW-MISSING", "without --criterion the Alfred row is required and its absence is typed");
+});
+
+test("AC-264 added (P0-1): the briefing generator binds a numbered or R-n row of a two-column German table, so the signed bytes need no reformatting", {
+  todo: "NOT BUILT, owner Coordinator, due 2026-10-31: scripts/dispatch-briefing.mjs findCriterionOccurrences (table branch) matches only a first cell exactly equal to the AC id, while scanAcceptedCriterionRows (lib/critic-accepted-contract.mjs TWO_COLUMN_NUMBER) and parseAcceptedCriticCriterion already map the rows `n` / `R-n` to AC-n; plan readiness therefore reports PLR-HANDOFF-READY for a Spec the generator cannot bind (DBG-CRITERION-MISSING), and the first item dispatch of the signed German Spec stays unreachable.",
+}, async () => {
+  for (const id of ["AC-1", "AC-2"]) {
+    const { result, bytes } = await briefingFor(germanSpec(), id, "tests/orders.test.js");
+    assert.equal(result.ok, true, `${id}: ${result.code}`);
+    assert.match(bytes.subarray(result.binding.itemDelivery.criterionLocator.startByte, result.binding.itemDelivery.criterionLocator.endByte).toString("utf8"), id === "AC-1" ? /Zeitstempel/u : /Warenkorb/u);
+  }
+});
+
 /** The body of one `case "<verb>": { ... }` handler of the lifecycle CLI, up to the next top-level case label. */
 function lifecycleHandler(source, verb) {
   const start = source.indexOf(`    case "${verb}": {`);
@@ -438,7 +492,7 @@ function lifecycleHandler(source, verb) {
 const pipelineStateSource = readFileSync(join(PLUGIN, "scripts", "pipeline-state.mjs"), "utf8");
 const handoffWired = ["submit-plan", "present-plan"].every((verb) => lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"));
 test("AC-264 added (P0-1): submit-plan and present-plan call the plan-readiness hand-off inspection, so the failure cannot first appear after approval", {
-  todo: handoffWired ? false : "PATCH-FOR-OPERATOR: scripts/pipeline-state.mjs is protected; the call sites are in the patch file three-runner-patch-01.json. lib/plan-handoff-readiness.mjs is delivered and covered above but has no caller.",
+  todo: handoffWired ? false : "deferred to 0.7.x by PO decision D85 (owner Coordinator, due 2026-10-31): the call sites in scripts/pipeline-state.mjs (protected) are not built; lib/plan-handoff-readiness.mjs is delivered and covered above but has no caller, so plan readiness does not yet enforce the hand-off.",
 }, () => {
   for (const verb of ["submit-plan", "present-plan"]) {
     assert.ok(lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"), `${verb} must call inspectPlanDeliveryHandoff before the PO is asked to sign`);
@@ -480,7 +534,7 @@ test("AC-264 added (D64): the answers live in one typed intake record, the first
 });
 
 test("AC-264 added (D64): the next session does not ask again for an answer the intake record already holds", {
-  todo: "BLOCKED-NEEDS-DECISION (measured on this head): the intake record keeps the language and the pending-ask computation honours it, but it still publishes gitAuthorName and gitAuthorEmail as pending asks after the record holds the Git author. lib/project-onboarding-v3.mjs sits exactly on its architecture line bound (7807 lines), so a fix there must first move code out of that file.",
+  todo: "BLOCKED-NEEDS-DECISION (owner Coordinator, due 2026-10-31; measured on this head): the intake record keeps the language and the pending-ask computation honours it, but it still publishes gitAuthorName and gitAuthorEmail as pending asks after the record holds the Git author. lib/project-onboarding-v3.mjs sits exactly on its architecture line bound (7807 lines), so a fix there must first move code out of that file.",
 }, () => {
   const root = codexOnboardedRoot();
   applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });

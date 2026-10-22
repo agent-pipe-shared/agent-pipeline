@@ -123,14 +123,21 @@ Added acceptance (0.7.0, minor; toil, PO 2026-10-18):
 ### Agent measurement of the added 0.7.0 acceptance (2026-10-22)
 
 The pin `plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs` now states the added acceptance
-with one real case per point (19 cases: 16 pass, 0 fail, 1 typed skip for the per-runner host run, 2 typed todo):
+with one real case per point (re-counted 2026-10-22 on the Linux host after the generator cases: 21 cases, 17 pass, 0 fail, 1 typed skip
+for the per-runner host run, 3 typed todo; evidence `scratch/evidence/j4-three-runner-pin.txt` of the dispatch ALF-J4-3RUNNER clone):
 
 - Typed absent course with a repair: delivered (`SQ-DELIVERY-COURSE-ABSENT`, repair names the governed course writer and `slice-queue.json`;
   an unsafe course file still fails closed as `SQ-DELIVERY-STATE-UNAVAILABLE`). The repair is prose naming the writer, not an argv action.
-- Course writer for German-table Specs and `.test.js` checks: delivered (numbered and `R-n` rows under `Abnahmekriterien`, `.test.js` admitted).
-- Delivery hand-off at plan readiness: `lib/plan-handoff-readiness.mjs` is delivered and tested, but no code calls it. `submit-plan` and
-  `present-plan` in the protected `scripts/pipeline-state.mjs` do not invoke it, so the failure can still first appear after approval.
-  Typed todo; the call sites are the patch `three-runner-patch-01.json` (operator applies it in the signature sitting).
+- Course writer for German-table Specs and `.test.js` checks: PARTLY delivered. The criterion parser the writer re-runs
+  (`parseAcceptedCriticCriterion`, via `scanAcceptedCriterionRows`) binds numbered and `R-n` rows under `Abnahmekriterien`, and `.test.js`
+  is admitted. NOT met: the shipped briefing generator `scripts/dispatch-briefing.mjs` (`findCriterionOccurrences`, table branch) matches
+  only a first cell exactly equal to the `AC-n` id, so `--criterion AC-1` on a `Nr. | Kriterium` table with rows `1` / `R-2` is refused
+  `DBG-CRITERION-MISSING` while plan readiness reports `PLR-HANDOFF-READY` for the same Spec; the first item dispatch of such a Spec is
+  unreachable. Typed todo in the pin (owner Coordinator, due 2026-10-31); not built in this dispatch.
+- Delivery hand-off at plan readiness: `lib/plan-handoff-readiness.mjs` is delivered and tested (accepts a normative criterion row, reports
+  `PLR-HANDOFF-NO-CRITERION` for none), and the briefing generator refuses a missing criterion early with the supported shapes. But no code
+  calls the inspection: `submit-plan` and `present-plan` in the protected `scripts/pipeline-state.mjs` do not invoke it, so the failure can
+  still first appear after approval. Deferred to 0.7.x by PO decision D85; typed todo in the pin (owner Coordinator, due 2026-10-31).
 - Onboarding answers surviving the restart: the intake record holds the Git author, language and profile and a fresh process reads
   them back, and no restart plan is offered before the record is complete. Not met: after the record holds the Git author the next
   inspection still publishes `gitAuthorName`/`gitAuthorEmail` as pending asks (language is honoured). Typed todo, blocked on a design
