@@ -47,7 +47,8 @@ export async function sweepPhysicalMethodCases({fixtureRoot,sourceRoot}) {
   return [
     {id:'SDF001',scope:'isolated-METHOD-real-partial-unlink-EBADF',async run(){
       const x=await setup(2),authority=join(x.f.repository.commonDir,'agent-pipeline','session-authority');
-      const protectedRows=[...inventory(x.root,path=>x.requests.some(row=>row.path===path)),...inventory(authority)];
+      const overrideRows=inventory(x.root,path=>x.requests.some(row=>row.path===path)),authorityRows=inventory(authority);
+      const protectedRows=[...overrideRows,...authorityRows];
       const auditBefore=fs.readFileSync(join(x.root,'audit.jsonl'));
       const originals=Object.fromEntries(['openSync','readSync','closeSync','unlinkSync'].map(name=>[name,fs[name]]));
       const descriptors=new Map();let removed=null,reached=0,observedError=null,openedFlags=null,faultRequest=null;
@@ -87,9 +88,23 @@ export async function sweepPhysicalMethodCases({fixtureRoot,sourceRoot}) {
       try{x.f.runtime.run(()=>registry.withSessionAuthorityBoundary({repository:x.f.repository},boundary=>
         registry.inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:x.f.ports.find(row=>row.producerId==='human-guard-override').port})));}
       catch(error){admissionError=error;}
-      assert.equal(admissionError?.name,'SessionAuthorityError');
-      assert(['SDC-AUTHORITY-CAS','SDC-AUTHORITY-UNAVAILABLE'].includes(admissionError?.code),'genuine subsequent admission must fail closed');
-      conserve(protectedRows);assert(!fs.existsSync(removed.path));assert.deepEqual(image(faultRequest.path),faultRequest);
+      // QG-04 restatement (PO tile decision 2026-10-22; D51 / f52d20a12). The earlier claim that a later
+      // admission must refuse for good is obsolete: PF-55/D51 heals a producer namespace that changed outside
+      // its registry baseline when none of its bound members is armed or running. The heal is not silent:
+      // it rewrites the registry records and retains the prior producer record in a drift-heal marker.
+      assert.equal(admissionError,null,'D51: the drifted human-guard-override namespace is healed at the next admission');
+      const abandoned=join(x.f.repository.commonDir,'agent-pipeline','session-authority-abandoned');
+      const markers=fs.readdirSync(abandoned).filter(name=>name.endsWith('-drift-heal'));
+      assert.equal(markers.length,1,'exactly one drift-heal marker');
+      const heal=JSON.parse(fs.readFileSync(join(abandoned,markers[0],'heal.json')));
+      assert.equal(heal.schema,'pipeline.session-authority-drift-heal.v1');
+      assert.deepEqual(heal.healed,[{namespaces:['requests'],producerId:'human-guard-override'}]);
+      const prior=JSON.parse(fs.readFileSync(join(abandoned,markers[0],'human-guard-override.json')));
+      const priorRequests=prior.baseline.find(row=>row.namespaceId==='requests');
+      assert.equal(priorRequests?.entryCount,2,'marker retains the prior producer record: both requests were still present');
+      // Only the registry records the heal legitimately rewrites are excluded; every override-side record,
+      // the removed request and the faulted request stay exactly as before.
+      assert.notEqual(authorityRows.length,0);conserve(overrideRows);assert(!fs.existsSync(removed.path));assert.deepEqual(image(faultRequest.path),faultRequest);
     }},
     {id:'SDF002',scope:'actual-61-per-operation-budget',async run(){
       const x=await setup(62),auditBefore=fs.readFileSync(join(x.root,'audit.jsonl'));
