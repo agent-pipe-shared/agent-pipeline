@@ -22,6 +22,21 @@
   case once (check its `--src` handling); WINACL001 possible product defect; MFHS023/028 cross-process ownership (post-0.7.0);
   backlog item texts with stale "still open" text (K50 found 3 of 4 already pinned, K51 found all 5 stubs already real).
 
+- Stamped at `9355151ff` (`0.7.0+<runner>.20261022204428.79cda46`, basis HEAD `79cda4601`); the PO installs; later commits reach the
+  install by the PO's sync and are not covered by the stamp. NO new work starts until the PO has installed the candidate.
+- Push is NOT done: `pipeline-state.mjs approve-push` is refused with `SDC-AUTHORITY-UNAVAILABLE: state-push-source-requester`
+  whenever `.git/agent-pipeline/session-authority/catalogue.json` exists (no production code binds the source-owned requester
+  context outside the session-power controller). The PO decided: no release with this function broken and no workaround
+  (no catalogue removal, no legacy fallback). Builder K52 (clone `scratch/clones/k52`, briefing `scratch/briefing-k52.md`) diagnoses
+  and, if safe, delivers a protected diff for `pipeline-state.mjs`; the PO applies it as operator. The signature of
+  `79cda4601` is spent and must be repeated on the final HEAD (`push-prepare.mjs --checkpoint`, then `authorize-critical`).
+- First work block after the install (PO-agreed 2026-10-22): move the reusable helpers out of untracked `scratch/` into the tracked
+  `scripts/` folder with usage headers (stamp with the 7-character hash, isolated runner `run-parallel`, `rebaseline-inventory`,
+  `rehearse-held`, the delivery-matrix and gap tools `matrix-gaps`, `delivery-owners`, `delivery-agent-items`, `gap-*`); write a
+  short procedure document for stamp, Linux single runs, inventory rebaseline and matrix remeasure; propose one `CLAUDE.md` line
+  ("Where things live" plus "reusable scripts never stay in scratch/") for the PO's approval; check whether the other PC already
+  has its own stamp script before duplicating.
+
 **Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
 Read these three files first, in this order, before any other work:
 
