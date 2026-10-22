@@ -1,0 +1,351 @@
+[
+  {
+    "itemId": "pipeline.scratch-has-no-retention-and-no-durability-check",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states a counted GREEN for the AC-246 pin (13 of 13, 0 skip) on 1e2592108; its P1 (sanctioned sweep) and P2 (durability warning for untracked scratch *.md/durable files) cover both Proposal bullets, and the exec-bit cases ran on Linux.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "The item matrix names Windows; the pin has no counted native-Windows run."},
+      {"owner": "po-acceptance", "what": "PO acceptance of the sweep and the warn-only durability check is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 11 of 11 GREEN (0 skip) for the AC-247 pin, which drives the real lifecycle, testpath and gate-strength guards over the readiness states, near-miss escapes, inert nested snapshots and shell lanes. Coverage is sampled by rotation, as the pin header states exactly.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/scratch-must-remain-writable-across-lifecycle-states.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "The live readback that a blocked session saves a report without a PO override (and apply_patch lane on Codex) needs an installed-host run."},
+      {"owner": "agent", "what": "The pin samples states and tool shapes by rotation; decide whether the full cross-product or a signed-off sampling statement is required."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 14 of 14 GREEN (0 skip) for the AC-248 pin, covering A1 (integrity check against pins at the commit boundary and after the fact) and A2 (codemod-shaped node script rewriting a protected test file is detected or refused), with RED mirrors.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/script-mediated-writes-bypass-protected-test-paths.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "The original incident was on Windows; no counted native-Windows run of the pin exists."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.security-scanner-failure-provenance",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 12 of 12 GREEN (0 skip) for the AC-249 pin, which covers P1 to P4 (distinguishable outcomes, no failed-to-PASS conversion, bounded sanitized diagnostics, no secrets) with synthetic fixtures; the item itself requires native scanner acceptance to be reported separately.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "Genuine native Semgrep acceptance is not claimed by the synthetic pin and stays open."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.semgrep-console-coverage-note-has-no-test",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 7 of 7 GREEN (0 skip) for the AC-250 pin, which pins the console note through the real runSecurityScan and the exported formatScannerLine and the real CLI, matching the Proposal.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.semgrep-offline-default-version-check",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 11 of 11 GREEN (0 skip) for the AC-251 pin, which captures the real child environment and shows SEMGREP_ENABLE_VERSION_CHECK=0 survives caller and ambient env with argv, deadline and ERROR handling unchanged.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "Native public-PUSHSEED acceptance against the final candidate is a separate obligation the item names; only a focused earlier receipt exists."},
+      {"owner": "po-acceptance", "what": "PO acceptance after the 0.7.0 candidate host checklist is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 19 of 19 GREEN (0 skip) for the AC-252 pin, covering option B as decided: warn-level PartialParsing keeps findings with a named degraded-coverage note, while error-level, timeout and malformed entries stay scanner_error.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/semgrep-partial-parsing-warnings-fail-the-whole-scan.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "A whole-repository native Semgrep run (the original Windows measurement) is not covered by the fake-binary pin."},
+      {"owner": "po-acceptance", "what": "PO acceptance of the option-B gate semantics is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 8 of 8 GREEN (0 skip) for the AC-253 pin: the preflight emits the read-only session inspect, the guard admits it, parallel preflights see one snapshot, and the partial reason is typed. The pin names the real intermittent concurrent cause as uncovered.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "agent", "what": "UNCOVERED-CONCURRENT-CAUSE: the real cleanup_recovery_observation_unavailable flap under concurrent agents has no test over shared on-disk state."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 7 of 7 GREEN (0 skip) for the AC-254 pin, which proves the exact reported heredoc shape raises no fault in every admitted delimiter spelling, keeps real git apply faulting, and has a RED mirror.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/shell-classifier-faults-on-heredoc-body-text.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "The evidence file states 8 of 8 GREEN for the AC-255 pin, which qualifies the kernel-path and capability placement, but the pin discloses that the item's second clause (the shell grammar file's 'fixture issue') is unnamed and not covered, so the original Proposal is not fully qualified.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs"],
+    "open": [
+      {"owner": "po-decision", "what": "Name the fixture issue the item refers to, or declare that clause out of scope; the backlog text never says which fixture."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "No pin named for this item appears in the counted evidence and no commit since base touches the openssl spawn; the decoy-start proof in the signing-toolchain pin covers PATH selection on Linux, not the Windows working-directory lookup, and the item records a residual risk accepted by the PO (decision R).",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+    "open": [
+      {"owner": "agent", "what": "Add a counted regression for the signing spawn's cwd and environment (decoy openssl in the working directory must never start); no pin exists under this item's name."},
+      {"owner": "native-host", "what": "The Windows libuv lookup behavior needs a native-Windows run; it was never machine-verified."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance of the recorded residual risk (key directory kept free of executables) is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "The evidence file states 5 pass and 1 typed skip of 6 for the AC-257 pin, but its cases read production source text and the live store sweep and full CLI ceremony stay an unconditional typed skip, so the 563 s blocking behavior is not shown fixed by a counted run.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs"],
+    "open": [
+      {"owner": "agent", "what": "Replace the source-text assertions and the unconditional skip with a behavioral timing case over a populated request store."},
+      {"owner": "verify-wsl", "what": "The live HGO store sweep and the full sign-intent CLI ceremony need a Linux/WSL run with real private-directory modes."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance after a signing ceremony without the multi-minute wait is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 15 of 16 GREEN (1 skip, a mirror proof that only applies while the protected patch is unstaged) for the AC-258 pin, covering unborn-HEAD signing, one paste-safe command, agent-side preparation and import, the up-front refusal of a PO-signed user.yaml override, and the commit-scoped course with fixture keys.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "The pin signs with an in-memory fixture key; a real PO terminal signature on WSL and PowerShell is not shown. The item also defers its end-to-end proof to the three-runner happy-path item."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "The evidence file states 14 pass and 1 skip of 15 for the AC-259 pin on Linux; the native-Windows case stays a typed skip and the Proposal asks for fixtures on win32 and POSIX, so the Windows route is not qualified by a counted native run.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/signed-quality-package-route-is-not-agent-operable-on-windows.test.mjs"],
+    "open": [
+      {"owner": "native-host", "what": "A native-Windows run of the route and the skipped backslash-path case is missing."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance of a one-signature package route is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 8 of 8 GREEN (0 skip) for the AC-260 pin, which proves the fixture root is fileURLToPath-derived inside scratch/, the five case IDs are kept, RC21C003 carries the strictly reversed member order and the live suite is green.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/signing-default-test-fixture-root-escapes-the-repository.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "The original import failure was on native Windows; the suite has no counted native-Windows run."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.signing-prompt-prints-the-whole-review-package",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 8 pass and 1 typed skip of 9 for the AC-261 pin; P1 to P5, P7 and P8 (bounded block, path plus sha256 reference, hostile text, one-line post-sign result, single describer, real sign-intent route) cover the Proposal. The skip is the P6 directory-custody extra, not an original clause.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "agent", "what": "The P6 directory-mode and symlink custody case is an unconditional skip even on Linux; implement it."},
+      {"owner": "native-host", "what": "A real PowerShell ceremony showing the compact prompt is not shown."},
+      {"owner": "po-acceptance", "what": "PO acceptance of the compact prompt is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.signing-toolchain-readiness",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 14 of 14 GREEN (0 skip) for the AC-262 pin, so the POSIX decoy-start case ran; A1 to A5 (openssl finding, typed repair per finding, named missing executable, probe before any lookup, no repository or cwd executable selected) are covered.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/signing-toolchain-readiness.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "The recurrence was a non-default Git root on a Windows PowerShell PATH; no counted native-Windows run of the pin exists."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 6 of 6 GREEN (0 skip) for the AC-263 pin, which covers one reader, a pending binding that records the maxTurns it used, and source versus installed definitions that differ, with RED mirrors, matching the Proposal and the regression-test requirement.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/source-agent-definition-change-locks-that-agent-until-install.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "The item closes after the 0.7.0 candidate host checklist: a real installed-host dispatch with differing source and installed maxTurns is not shown."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.three-runner-happy-path-with-two-po-approvals",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "The evidence file states 11 pass and 1 typed skip of 12 for the AC-264 pin, a deterministic ceremony inventory; the per-runner end-to-end scenario with exactly two PO proofs stays the typed skip, and 5c746f716 only adds the Codex findings (including new acceptance) to the item.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "5c746f716", "plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs"],
+    "open": [
+      {"owner": "native-host", "what": "One end-to-end greenfield run each on Claude, Codex and Antigravity reaching a pushed branch with exactly two PO proofs is missing."},
+      {"owner": "agent", "what": "Added 0.7.0 acceptance (typed absent-course result with repair, course writer for German-table Specs and .test.js checks, delivery hand-off proven at plan readiness, onboarding answers surviving restart) needs a counted pin of its own; no pin run states it."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance of the two-approval happy path is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.transfer-redaction-alters-digest-bound-files",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 9 of 9 GREEN (0 skip) for the AC-265 pin: digest-bound files are carried byte-exact or held with an origin-device note, and the screen matches real path shapes only (the exact ly:/newline/dash false positive no longer triggers).",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/transfer-redaction-alters-digest-bound-files.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 7 of 7 GREEN (0 skip) for the AC-266 pin: for each of claude, codex and antigravity the fresh seed is declined, the bundled first round asks approved or declined, the answer is bound to source, receipt and replay, and the lifecycle guard admission is driven; consumer cases show a declined or missing field refuses export.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "native-host", "what": "The pin drives the real driver with runner stubs; an installed-host first-answer round on each runner is not shown."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file and 5e215c4a8 both state 7 pass and 1 skip of 8 for the AC-267 pin; the skip is the win32-only observation case, and P1 to P5 (outer code kept, cause chain, typed DrvFs hint, no blanket hint, real permissive-mode directory) ran on Linux.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "5e215c4a8", "plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs"],
+    "open": [
+      {"owner": "verify-wsl", "what": "The item is WSL-only: a Verify run on a real /mnt/<drive> DrvFs checkout showing the typed hint is missing; the pin simulates permissive modes."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance after the 0.7.0 candidate host checklist is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 16 of 16 GREEN (0 skip) for the AC-268 pin: vi/vim/ex ex-mode and busybox sh/ash fed a heredoc with git push are push candidates, controls stay plain, and scratch mirrors prove the pin can fail.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "The evidence file and 5e215c4a8 state 11 pass and 1 skip of 12 for the AC-269 pin on Linux; the pin itself names W5 (a fresh Windows intake) as not covered, and 5e215c4a8 says the win32 branches were not run on a native Windows host.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "5e215c4a8", "plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs"],
+    "open": [
+      {"owner": "native-host", "what": "A native-Windows run of the pin (absolute-path Write and PowerShell New-Item/Set-Content admitted) and a fresh Windows intake are missing."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "The evidence file states only 6 of 14 cases passing with 8 typed skips for the AC-270 pin; the Windows-only cases that prove the hardened private temp root (P1, P2, P5, P6) did not run, so the core fix is not qualified.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.test.mjs"],
+    "open": [
+      {"owner": "native-host", "what": "The eight win32-only cases need a native-Windows run, and the item's check that the v3 suite failure count drops there."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "The evidence file states 7 pass and 2 typed skips of 9 for the AC-271 pin; the drive-letter-case clause of A1 is skipped off win32 and A5 (installed candidate observed in a fresh Windows session) is a manual skip the item requires before closing.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/windows-portable-seed-rolls-back-with-hidden-worktree-error.test.mjs"],
+    "open": [
+      {"owner": "native-host", "what": "A native-Windows run of the drive-letter case and an observation of the installed Claude candidate in a fresh Windows session (A5) are missing."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "The evidence file states 14 of 14 GREEN on Linux for the AC-272 pin, but the item requires install, readback, blocking push and removal to be proven on native Windows, where the writable-descriptor EPERM fix is the point and where no run is counted.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs"],
+    "open": [
+      {"owner": "native-host", "what": "A native-Windows run proving install, marker readback, blocking push and removal, including the read-only descriptor EPERM assertion, is missing."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file states 6 pass and 1 skip of 7 for the AC-273 pin on Linux; the one skip is H-1, which the pin marks as covered by S-3 on Linux, so the real-process cases L-1 and L-2 (spaced and parenthesised comm, reused PID) ran and passed together with the source-level parser cases.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs"],
+    "open": [
+      {"owner": "agent", "what": "The pin header still says no Linux/WSL run has been recorded (QG-06 skip record); update it to cite this counted run."},
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+      {"owner": "po-acceptance", "what": "PO acceptance after the fix is bound to the final 0.7 candidate is missing."}
+    ]
+  },
+  {
+    "itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The evidence file and 5e215c4a8 state 7 of 7 GREEN (0 skip) for the AC-274 pin, which has one case per acceptance clause on disposable two-worktree fixtures; 5e215c4a8 repaired clause 7 (plain non-git folder) as a fixture fix.",
+    "evidence": ["9a12beab7", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "5e215c4a8", "plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs"],
+    "open": [
+      {"owner": "critic", "what": "Independent Critic review of the batch has not finished; the item's own triage still lists it as pending."},
+      {"owner": "verify-wsl", "what": "The 'preserve prior onboarding and uninstall behavior' clause rests on the other onboarding suites being green in a Full Verify."},
+      {"owner": "po-acceptance", "what": "PO acceptance is missing."}
+    ]
+  }
+]

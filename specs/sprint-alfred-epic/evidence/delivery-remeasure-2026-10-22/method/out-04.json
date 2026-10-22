@@ -1,0 +1,239 @@
+[
+ {"itemId": "pipeline.governance-scope-rejects-readonly-host-git-control", "stage": "75", "baselineStage": "75",
+  "reason": "Baseline stands (ce86fc0c0, eb750b36d) and the pin file is now counted GREEN 9 of 9 with 0 skips on 1e2592108; its AC-188 points 1-9 cover both original host callbacks, root binding, mount drift, corrupt history and the fail-closed near misses. No commit since base touches it.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "ce86fc0c0", "eb750b36d"],
+  "open": [
+   {"owner": "native-host", "what": "Run the two original onboarding host callbacks on a real Codex host-managed readonly .git mount; native win32 cannot manufacture the readonly directory."},
+   {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.greenfield-approval-policy-applies-after-intake-transition", "stage": "75", "baselineStage": "75",
+  "reason": "Baseline stands (a37132a91, P6 replay) and the pin is counted GREEN 9 of 9 with 0 skips on 1e2592108; its cases cover the first-round answers per runner and mode, the P6 historical-sequence replay, P5 applyAction admission and negative controls.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "a37132a91"],
+  "open": [
+   {"owner": "native-host", "what": "Live Codex/WSL readback of a fresh greenfield project (item says live Codex readback is pending)."},
+   {"owner": "critic", "what": "Independent Critic review of the batch has not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.greenfield-comparisons-need-reproducible-public-evidence", "stage": "25", "baselineStage": "25",
+  "reason": "No pin file exists for it, no commit since base touches it, and the item is a post-0.7.0 requirement (PO decision D21, AC-190 deferred); analysis only.",
+  "evidence": ["backlog/items/2026-10-19-greenfield-comparisons-need-reproducible-public-evidence.md"],
+  "open": [
+   {"owner": "agent", "what": "Publish sanitised counted evidence per compared greenfield run and a check that comparisons cite only such files (post-0.7.0)."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.greenfield-design-course-cost-and-proportionality", "stage": "50", "baselineStage": "25",
+  "reason": "The pin file is counted GREEN 5 cases, 4 pass, 1 skip on 1e2592108 and covers order, model-free deterministic checks first, evidence reuse and the bounded one-review course, so an implementation exists (baseline 25 missed it). The telemetry clause is a typed deferred skip (PO 2026-10-16) and the fresh small-project demonstration is missing, so it cannot reach 75.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "5948b31c5", "08a3d731b"],
+  "open": [
+   {"owner": "agent", "what": "Record phase wall time, tool time and human wait separately (telemetry case is a deferred skip)."},
+   {"owner": "native-host", "what": "Demonstrate a fresh small-project run on an installed runner that reaches implementation with one final PO gate."},
+   {"owner": "po-decision", "what": "Confirm the original Advisor-plus-readiness acceptance is replaced by the successor policy (one review, no readiness, ADR-0085) and that telemetry stays deferred."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.greenfield-machine-output-and-skill-budget", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 14 of 14 with 0 skips on 1e2592108; its header maps cases to all four acceptance points: each ask once per runner, bounded digest-keyed read-only plan action with reason, scope and recovery inline for claude, codex and antigravity in both modes, concise start skill with lazy runner references, and byte budgets. The help-action clause the baseline doubted is the digest-keyed plan action asserted there.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108"],
+  "open": [
+   {"owner": "native-host", "what": "Measure first-run and denial output on installed Claude, Codex and Antigravity hosts; the pin uses the real CLI with injected seams only."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.guard-override-request-digest-drifts-after-arming", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 9 of 9 with 0 skips on 1e2592108 and its header covers all three acceptance clauses through the real module: A1 cosmetic description excluded from the digest, A2 seed-sign-arm-identical-retry consumes once, A4 a mismatch against an armed capability names the differing digest inputs. The baseline gaps are closed by this pin; 6e6ec10fb, 8981ea9b9 and 71b692e81 remain the code history.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "6e6ec10fb", "8981ea9b9", "71b692e81"],
+  "open": [
+   {"owner": "native-host", "what": "Run the seed-sign-arm-retry sequence on a native Windows host; the acceptance names Windows and POSIX and the counted run is POSIX."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 28 of 28 with 0 skips on 1e2592108; it carries the exact refused shape, the flag combinations and a no-hidden-push control against the real guard-push, which meets the Proposal (git grep in every flag combination is non-push, regression with the exact shape). The baseline claim of no --no-index case was stale.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.guard-push-refuses-read-only-git-without-push", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 16 of 16 with 0 skips on 1e2592108: point 1 (git --version and non-push verbs admitted) and point 3 (real pushes still refused) pass, and point 2 (nested shell naming git) is pinned as a deliberate refusal under PO decision Q12 option B, which supersedes the item's original second clause.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108"],
+  "open": [
+   {"owner": "po-decision", "what": "Acknowledge that the Q12 option B refusal of nested-shell git replaces the item's original second clause as the effective acceptance."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.guard-push-treats-gitleaks-as-a-git-command", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 19 of 19 with 0 skips on 1e2592108; it admits gitleaks calls, still refuses real ambiguous git push forms, treats look-alike tokens as non-push and has a prefix-classifier RED mirror, which covers the item's Proposal. Fix commits per triage are 6b0413700 and 6ca4474d3.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "6b0413700", "6ca4474d3"],
+  "open": [
+   {"owner": "native-host", "what": "The triage closes the item only after the 0.7.0 candidate host checklist."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.guard-suite-fails-60-tests-on-native-windows", "stage": "50", "baselineStage": "50",
+  "reason": "No commit since base touches hooks/guard-lifecycle-ready.test.mjs (git log over 9f9c1a456..HEAD is empty) and the pin-counted evidence has no row for this suite; the baseline orchestrator counts (146d23641 388/392, be7c027c3 389 pass 3 skipped) were not stated as native Windows, so the Windows acceptance is still uncovered.",
+  "evidence": ["146d23641", "be7c027c3"],
+  "open": [
+   {"owner": "native-host", "what": "Run guard-lifecycle-ready.test.mjs on native Windows and state the counted result."},
+   {"owner": "agent", "what": "Commit a recorded baseline count for the suite so later changes can be attributed without a staging experiment."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.handover-doc-committed-without-governance-classification", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 17 of 17 with 0 skips on 1e2592108; P1 (unclassified new docs file refused), P2 (rendered pre-commit hook consults the staged classifier and an installed-hook commit is refused) and P3 (classifying in the same commit admits) are all cases there, plus fail-closed controls.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108"],
+  "open": [
+   {"owner": "po-decision", "what": "Decide whether the pinned residual gap is accepted: a clone without installed hooks still commits an unclassified handover and only the bootstrap catches it later."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 5 of 5 with 0 skips on 1e2592108: every decision-AF runner heredoc shape is a push candidate, non-runner heredocs stay data, the accepted false positive and the busybox boundary are pinned, and a RED mirror without the rule fails. 4838c0efc adds git-cmd.test.mjs 477/477 for neighbouring classifier shapes.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "4838c0efc"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows", "stage": "50", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 12 cases, 11 pass, 1 skip on 1e2592108 and covers P1-P5 on an injected win32 host. The one skip is the native win32 real-host query case, which is the platform-native process query the item requires, so a typed skip leaves that clause unqualified.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "71b692e81"],
+  "open": [
+   {"owner": "native-host", "what": "Run the real-host case (native win32 process query classifies a gone pid dead and a live process ambiguous) on native Windows."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.hgo-patch-preflight-before-signature", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 10 of 10 with 0 skips on 1e2592108 and covers all four acceptance sentences: malformed hunk rejected before signing, corrected patch signs once and applies against the same preimage, changed preimage needs a fresh signature, failed attempt arms nothing. The stored-patch preflight and converter cases (including the End of File marker) pass, and 2d7f4bd3c pins the read-only git apply --check preflight.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "71b692e81", "2d7f4bd3c"],
+  "open": [
+   {"owner": "native-host", "what": "Rehearse hunk order with the real native apply_patch engine against the installed guard; the pin uses real git, not the native engine."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.hgo-stale-capability-shadows-current-authorization", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 8 of 8 with 0 skips on 1e2592108 and covers the acceptance regression set: current capability consumed regardless of sort order, stale-only HGO-DRIFT, expired-only HGO-EXPIRED, mixed precedence, invalid files skipped, per-candidate binding, corrupt audit global failure. 2f69a8d82 repaired the sibling scan test (3 of 3).",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "2f69a8d82"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing; the item closes manually after integration and committed verification."}]},
+
+ {"itemId": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 7 of 7 with 0 skips on 1e2592108 (zero-authority archive verb, typed refusal, signed custody route, ready-with-warning readiness). The D70 recovery work is delivered: d2602f5cf adds the lost-binding route, 5e5c7d8f2 wires it (recovery 37/39, lost-binding 4/4), 917ba8ff8 states lost-binding 7/7 and recovery 39/39; state.md calls D70 implementation complete.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "d2602f5cf", "5e5c7d8f2", "917ba8ff8"],
+  "open": [
+   {"owner": "native-host", "what": "Kill a real Verify mid-run on a Windows host and confirm readiness stays ready with a warning and a typed archive route exists."},
+   {"owner": "critic", "what": "Critic batch with the security read for the D70 recovery route is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.implementation-without-dispatch-escapes-review-coverage", "stage": "50", "baselineStage": "25",
+  "reason": "The pin is counted GREEN 13 of 13 with 0 skips on 1e2592108 against the real reverse-inventory module and CLI (gap reporting, empty range never coverage, ambiguity, non-terminal records, report-only), so an implementation exists (baseline 25 missed it). No public item text exists in backlog/items, so the original acceptance cannot be matched to the pin.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108"],
+  "open": [
+   {"owner": "po-decision", "what": "Confirm that a report-only reverse inventory with no completion effect satisfies the original Alfred acceptance (AC-204); no public item file records it."},
+   {"owner": "native-host", "what": "The pin skips every case on a native Windows host without git in the trusted roots; run it there."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard", "stage": "50", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 11 cases, 10 pass, 1 skip on 1e2592108 and covers the printed examples, both Elephant trailer forms and the shared classification, but its header states a live installed commit-msg hook run is not covered, and the provenance-debt clause is a typed manual skip. Fix commit per triage is 2a466fa59.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "2a466fa59"],
+  "open": [
+   {"owner": "agent", "what": "Add a test that runs every printed commit example through the real installed hooks (command guard and commit-msg), which the acceptance names."},
+   {"owner": "po-decision", "what": "Disposition of existing stage-0-labelled design commits as provenance debt (history is not rewritten)."},
+   {"owner": "native-host", "what": "Triage closes the item only after the 0.7.0 candidate host checklist."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.kernel-closure-check-masks-violations-after-the-first", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 8 of 8 with 0 skips on 1e2592108: A1 the real exported collector reports all violations of one run (RED mutant fails), A2 a red ratchet exits non-zero as a CLI and the live repository passes. The kernel-closure suite is registered in verify.mjs (line 794), which feeds the stamp evidence. 73bc8f117 reported 11 of 11 earlier.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "73bc8f117"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review is missing; the item is security class."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes", "stage": "50", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 25 cases, 24 pass, 1 skip on 1e2592108 and covers acceptance points 1-4 (9dda09720 resume-hint slice, pin 4 of 4 elsewhere), but point 5 (Windows Git Bash design course reaches present-plan with zero overrides) is a typed held skip, and the 2026-10-20 added acceptance (unstage not a working-tree write, recovery-as-state-machine test) has no case and no committed fix.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "9dda09720", "5c746f716"],
+  "open": [
+   {"owner": "agent", "what": "Classify index changes apart from working-tree writes so unstaging generated files is admitted, and add the run-proposed-action-then-retry state-machine test (D64)."},
+   {"owner": "native-host", "what": "Run the design-course end-to-end on Windows Git Bash to present-plan with zero overrides (point 5)."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 14 of 14 with 0 skips on 1e2592108 through the real inspect entry point: A1 changed PRD and A2 changed Spec report PLAN-LIFECYCLE-DIGEST-DRIFT with reopen-design, A3 missing, unreadable, multiply-linked and symlinked sources are never current, A4 an unchanged submission stays current, A5 inspect is read-only.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing; the item closes manually after integration and verification."}]},
+
+ {"itemId": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill", "stage": "50", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 14 cases, 7 pass, 7 skip on 1e2592108; the 7 skips are typed holds for admission, parity and catalog-bound refusals because no host skill-catalog declaration carrier exists in source. The declared-skill admission is deferred past 0.7.0 (PO 2026-10-16) and not implemented.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "32829a645"],
+  "open": [
+   {"owner": "agent", "what": "Build the host skill-catalog declaration carrier and the declared-skill admission with a concrete ordinary retry route (post-0.7.0)."},
+   {"owner": "native-host", "what": "Verify declared-skill admission at the installed Codex lifecycle boundary."},
+   {"owner": "critic", "what": "Security-reviewed independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 8 of 8 with 0 skips on 1e2592108: a returned refusal rolls pre-commit back with MandatoryHookReadinessApplyError carrying the refusal as cause, also from the real installer with a foreign hook planted, no readback-failed mixed state, applied statuses never roll back. This is the Proposal of the item; fix commit per triage is ddabe0ae3.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "ddabe0ae3"],
+  "open": [
+   {"owner": "native-host", "what": "Triage closes the item only after the 0.7.0 candidate host checklist."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.merge-commit-message-skips-conventional-type-check", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 10 cases, 9 pass, 1 skip on 1e2592108; the skip is a typed none-required host note, not a clause. Cases show git merge -m and -F messages reach GIT-01 and GIT-03 inspection, non-committing merges are not inspected, commit behaviour is unchanged and a commit-only mirror fails (RED). The original item body is legacy-origin, so the acceptance is the pin's reconstruction from the title.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108"],
+  "open": [
+   {"owner": "po-decision", "what": "Confirm the acceptance reconstructed from the item title, since the original item body is not in this repository."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.model-family-approval-with-automatic-version-upgrades", "stage": "50", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 18 cases, 17 pass, 1 skip on 1e2592108 and covers the source-level acceptance (A1-A6, bootstrap, dispatch-ID, source-versus-installed separation), but C5 (installed-host acceptance for all three runners, which the item requires separately) is a typed native-pending skip, and the host-store suites last counted red (MFHS002-008, 023, 028, MFI012/013) were not re-measured; the K1 closure moved the model-family cases to the D66 typed-pending row.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "8ab992513", "f54ff439e", "d92874a11"],
+  "open": [
+   {"owner": "agent", "what": "Bring the remaining red host-store and invocation cases (MFHS002-008, MFHS023/028, MFI012/013) to green or to a typed decision, and re-measure them."},
+   {"owner": "po-decision", "what": "Decide the D66 typed-pending row for the model-family cases."},
+   {"owner": "native-host", "what": "Installed-host acceptance on qualified Codex, Claude and Antigravity runners (pin case C5, real dispatch id, Offline/Compact)."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows", "stage": "75", "baselineStage": "50",
+  "reason": "5e215c4a8 states the repaired pin at 14 cases (12 pass, 2 skip) and the pin file is counted GREEN 14/12/2 on 1e2592108 covering P1 (chain starts at the platform root for win32 drive, UNC, POSIX), P2 RED mirror, P3 module and CLI never return the git-common-dir code, and a source scan for POSIX-only path assumptions. The two skips are win32-only realpath-casing cases; the fix is 4cead36e4.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "5e215c4a8", "4cead36e4"],
+  "open": [
+   {"owner": "native-host", "what": "Run the bootstrap and the two win32-only realpath-casing cases on native Windows; 5e215c4a8 states the win32 branches were not run on a native host."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.model-role-confirmation-prompt-obscures-required-digest", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 9 of 9 with 0 skips on 1e2592108 and covers the item's transport-test list through the real bootstrap module: digest shown at the prompt, Confirm rejected with explanation, noninteractive attended command bound to the observed session, previous digest cannot confirm a changed mapping, exact digest admits once, unchanged mapping reuses receipts without asking, V3 fallback intact.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108"],
+  "open": [
+   {"owner": "native-host", "what": "Installed attended acceptance of the confirmation prompt on a real Codex or Claude terminal (item says it remains pending)."},
+   {"owner": "verify-wsl", "what": "Combined Full Verify including this pin on the WSL run is not stated as complete."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.native-patch-rename-drops-protected-content-markers", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 14 of 14 with 0 skips on 1e2592108 and covers acceptance bullets 1 and 2 (marker through plain Update, rename with and without EOF, destination identity, harmless rename admitted, per-operation isolation, inactive repository no-op) plus a check that the committed source keeps the carry-over, with RED mirrors. Fix commit per triage is 26fef9e7d. Bullet 3 (installed guard retains the controls) is not an agent test and stays open.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "26fef9e7d"],
+  "open": [
+   {"owner": "native-host", "what": "Run the controls against the installed guard on the candidate host (acceptance bullet 3); triage says a host run is needed."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]},
+
+ {"itemId": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in", "stage": "75", "baselineStage": "50",
+  "reason": "The pin is counted GREEN 29 of 29 with 0 skips on 1e2592108 and runs the real uninstall controller, hook installers and git: read-only plan, digest-bound apply, content and history kept, declined end state, foreign hook untouched, crash and resume, re-onboarding, shared-worktree refusals, per-unlink and journal-resume layers, per-runner fixtures with archive variant, plugin-cache deletion (B2) and SETUP.md verbs. 5e215c4a8 repaired the PU-ALIAS and PU-PRIVATE-MODE cases (29/29).",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "1e2592108", "5e215c4a8"],
+  "open": [
+   {"owner": "native-host", "what": "The alias and private-mode refusals (PU-ALIAS, PU-PRIVATE-MODE) skip on native Windows; run an uninstall on a real installed host."},
+   {"owner": "critic", "what": "Independent Critic review is missing."},
+   {"owner": "po-acceptance", "what": "PO acceptance is missing."}]}
+]

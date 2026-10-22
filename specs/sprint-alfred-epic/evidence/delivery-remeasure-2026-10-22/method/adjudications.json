@@ -1,0 +1,7 @@
+[
+  {
+    "itemId": "pipeline.native-patch-rename-drops-protected-content-markers",
+    "stage": "50",
+    "basis": "The reader raised it to 75 although acceptance bullet 3 (the installed native guard) has no case; the 75 rule requires the pin to cover the original acceptance, so the Elephant holds it at 50."
+  }
+]

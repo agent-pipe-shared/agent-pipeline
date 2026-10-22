@@ -1,0 +1,146 @@
+[
+{"itemId":"pipeline.node-v24-on-windows-creates-a-real-nul-file","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 13/13 green (0 skip) for the no-NUL-open ratchet (acceptance 1), but the pin explicitly allows the NUL spelling for GIT_CONFIG_GLOBAL and never checks GIT_NULL_DEVICE, so acceptance 2 (Git null-device values use GIT_NULL_DEVICE, never the NUL literal) is not shown qualified. No commit since base touches this subject.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs"],
+ "open":[{"owner":"agent","what":"Pin or cite a counted test that the git-read null-device values use GIT_NULL_DEVICE and not the NUL literal (acceptance 2)."},{"owner":"native-host","what":"A native Windows single-file run must leave no real NUL file in the repository root."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance after the 0.7.0 candidate host checklist."}]},
+
+{"itemId":"pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 9/9 green covering the reader results, typed fail-closed cases and the 23-callback completion policy, but the acceptance clause to qualify the actual Source corpus and the complete original onboarding controller (and reconcile remaining failures) is not shown by any counted result.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","eb750b36d"],
+ "open":[{"owner":"verify-wsl","what":"Run the complete original onboarding controller and Source corpus on Linux/WSL and reconcile remaining failures."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance after the combined candidate acceptance."}]},
+
+{"itemId":"pipeline.onboarding-home-override-does-not-bind-machine-plane","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 7/7 green, 0 skip; the pin's cases A1-A5 cover every acceptance bullet (injected home B vs OS home A, absent/malformed/invalid plane never borrows ambient data, explicit reader override and no-override default retained, source immutability, real CLI override), so the earlier 'override retention not shown' gap is closed.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","plugins/pipeline-core/lib/pins/onboarding-home-override-does-not-bind-machine-plane.test.mjs"],
+ "open":[{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 8 cases, 7 pass, 1 skip: the nineteen-cell matrix, selectable cell and bounded pool are pinned, but the acceptance clause that the full Verify path has a measured lower wall time is the typed measurement-hold skip and is not qualified.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"verify-wsl","what":"Measure the lower wall time of the selected Verify path on Linux/WSL (the AC3 measurement-hold skip)."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.onboarding-test-runner-reports-async-pass-before-settlement","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 12/12 green for criteria 1-3 (settlement ordering, scanner fixture closure, per-child coverage reports) and the 216-case partition check; criterion 4, a final complete-suite run with consistent counts and exit 0, is explicitly out of the pin's scope and not shown.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"verify-wsl","what":"Complete the current full onboarding suite with consistent case counts, all child completions and exit 0 (criterion 4)."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance after the candidate host checklist."}]},
+
+{"itemId":"pipeline.opus-critic-only-batched-for-architecture-and-security","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 15/15 green, 0 skip, covering rules 1-4, the critic-review template batch scope, the Opus-rationale dispatch check, the mechanical re-critic delta check, the German MP-07 half and item (e) Mechanic at Haiku/medium; ff83a1509 closed the runner-profile registry half of item (e). That closes the Triage's 'still open' (c), (d), (e).",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","ff83a1509","86c8c94ac"],
+ "open":[{"owner":"agent","what":"Refresh the item's stale Triage 'STILL OPEN' text and record the pin's named limits (tool-layer Opus override not visible to the guard; re-critic range spellings; due 2026-10-31)."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.outside-root-read-label-skips-option-value-file-tokens","stage":"75","baselineStage":"75",
+ "reason":"Baseline kept: pin evidence file counts 13/13 green, 0 skip, covering rg --ignore-file and grep --exclude-from outside, in-root and non-file values, pattern tokens and a RED mirror; no commit since base changes the picture.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.parallel-work-in-one-checkout-is-unsafe","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 11/11 green for counter-lock (M1), record-collision (M2) and readiness-wait (M3) cases, but the later acceptance is open: restart liveness readback is not implemented, 65452bd6f (producer --commit) states no counted result and no pin for the older-commit/dirty-checkout case or the parallel Critic+Goldfish registry check is shown, and AGY worktree-parallel preparation is not built. 3a267d569 only added findings.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","65452bd6f","3a267d569"],
+ "open":[{"owner":"agent","what":"Implement the liveness readback for open dispatch records that the guard checks before admitting a second writer."},{"owner":"agent","what":"Add a pin that the producer runs for an older commit with a dirty checkout and leaves the checkout bytes unchanged, and one that the session-authority registry stays clean after a parallel Critic and Goldfish."},{"owner":"po-decision","what":"Decide whether AGY isolated-worktree parallel preparation is pulled into 0.7.0 or stays post-0.7.0."},{"owner":"native-host","what":"A live parallel Critic plus Goldfish run on an installed host (and AGY worktree route if pulled in)."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 10/10 green, 0 skip on Linux; the pin covers both acceptance bullets (one shared credential-root constant with a synthetic-home refusal per entry incl. .git-credentials, .pypirc, .netrc, .npmrc, /etc/shadow, host and WSL UNC spellings; rg -L/--follow refused in every spelling) plus RED mirrors, so the earlier 'not this item's clauses' gap is closed.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs"],
+ "open":[{"owner":"native-host","what":"The directory-symlink alias case skips on native Windows and needs a native run there."},{"owner":"critic","what":"Independent security Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 14/14 green, 0 skip (the earlier non-git skip now runs); the pin drives the real hook entrypoints enumerated from the wiring files and covers proposal points 1-8 (one predicate, ungoverned/declined inert, destructive git union always on, process rules only after enrollment, durable decline, fail-closed checks behind the predicate, governed path still enforcing, docs).",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","plugins/pipeline-core/lib/pins/pipeline-hooks-act-in-repositories-that-never-opted-in.test.mjs"],
+ "open":[{"owner":"verify-wsl","what":"Run the full governance-scope suite (23 callbacks) in the permitted stable environment; Triage reports only 21/23."},{"owner":"native-host","what":"Capture real Codex and Antigravity hook payloads and run the inert contract on installed hosts (payloads are approximated; Windows/PowerShell not probed)."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.plan-submission-must-not-require-separate-po-approval","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 21/21 green, 0 skip; the pin drives the real pipeline-state.mjs writer and covers all acceptance bullets (no acknowledgement or signature on submission, no implementation authority, both approval modes, forged/stale authority, drift, incomplete package, replay, Advisor and independent readiness before presentation, unavailable-Advisor exception inside the final decision).",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs"],
+ "open":[{"owner":"native-host","what":"Walk the happy path once on an installed host (greenfield test) to show a single final PO approval."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.powershell-bypasses-onboarding-read-boundary","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 6/6 green, 0 skip; the pin runs the real guard (powerShellScopeVerdict) for acceptance A1-A4: PowerShell and Bash both refuse synthetic outside-root key reads and non-ready commands, returned onboarding actions work on the PowerShell lane, Read/Grep/Glob refuse synthetic outside-root paths, hook registration matches enforced tools.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs"],
+ "open":[{"owner":"native-host","what":"Installed native Windows enforcement and the live host permission boundary of Read/Grep/Glob are named in the pin as not claimed."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 8/8 green, 0 skip; the pin drives the real governance-scope module, preflight envelope and diagnostic script and covers the whole Proposal (bounded path-redacted cause, topologyDiagnostic and typed read-only nextAction in the envelope, non-authoritative, runnable nextAction), so the earlier 'error not surfaced' gap is closed.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","plugins/pipeline-core/lib/pins/preflight-hides-the-git-error-behind-gs-git-unavailable.test.mjs"],
+ "open":[{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt","stage":"75","baselineStage":"75",
+ "reason":"Baseline kept: the Windows count (12 pass, 1 POSIX-only skip, 29984e731/31bd8c354) stands. The new Linux pin run shows 12 cases, 1 pass, 11 typed Windows-only skips, which neither renews nor contradicts it; no commit since base touches this subject.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","29984e731","31bd8c354"],
+ "open":[{"owner":"native-host","what":"Renew the win32 count at current HEAD; the 11 win32 cases are skipped on Linux."},{"owner":"critic","what":"Independent security Critic review of the guard-surface change has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.private-temp-root-not-secure-branch-has-no-test-seam","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 8 cases, 2 pass, 6 typed Windows-only skips: the seam and NOT_SECURE refusal cases (P1/P2 and the RED mirrors) run only on win32, so on the measured Linux run the acceptance is not qualified; no commit since base touches this subject.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"native-host","what":"Run the P1/P2 seam and NOT_SECURE cases on native Windows to get a counted result."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.project-calibration-retains-new-project-placeholder","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 28/28 green, 0 skip, but the pin states its S1-S8 are the Elephant's reconstruction pending PO release (no public original), and S4 (non-placeholder alias accepted as configured-alias) differs from the released R1 wording (aliased identity refused); the pin therefore does not yet qualify a released acceptance.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","specs/sprint-alfred-epic/plans/acceptance-reconstruction/R1.md"],
+ "open":[{"owner":"po-decision","what":"Release the S1-S8 reconstruction, including whether an aliased identity is refused or accepted as configured-alias."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.project-resource-budget-headroom-is-not-reported","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 21 cases, 20 pass, 1 skip, 0 fail; A1-A4 (reporter arithmetic, unknown for missing/stale/malformed, no compliance claim, read-only CLI and guard route) and A5-A8 (run-time budget within/exceeded/unknown, Verify wiring, exit code unchanged) all run green, closing the earlier 'no counted result for A5-A7 and verify wiring' gap. R1 reconstruction is RELEASED (PO 2026-10-16).",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","specs/sprint-alfred-epic/plans/acceptance-reconstruction/R1.md"],
+ "open":[{"owner":"agent","what":"The one skipped case (reporter refuses an input through a symlinked parent or aliased file) has an empty body; give it a real body or a conditional typed skip."},{"owner":"native-host","what":"R1 names five Quick consumers and authentic measurements as still open; show them in a real run."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.protected-baseline-rejects-canonical-discarded-idle-state","stage":"75","baselineStage":"75",
+ "reason":"Baseline kept: pin evidence file counts 7/7 green, 0 skip (AC1-AC3: idle State without closedFeatures is available and empty, malformed/unreadable/escape cases fail closed, valid bindings stay protected); no commit since base changes the picture.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","a90869af9","105ed7b74"],
+ "open":[{"owner":"verify-wsl","what":"Run both original positive guard CLI/fanout tests on actual canonical ready fixtures (Triage: host runs needed)."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance after the 0.7.0 candidate host checklist."}]},
+
+{"itemId":"pipeline.push-classifier-deny-list-does-not-converge","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 28/28 green, 0 skip; the pin covers the Q12 option B proposal (marker allowlist, the Critic's traced GPGL-8 shapes F1-F3 as candidates, narrow loosening branches, both consumers on one shared function, removed shape-specific helpers, RED mirror), so the earlier 'no pass count' gap is closed.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs"],
+ "open":[{"owner":"critic","what":"Independent security Critic review of the inverted allowlist has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.push-classifier-does-not-model-powershell-backtick-escapes","stage":"75","baselineStage":"75",
+ "reason":"Baseline kept: pin evidence file counts 19/19 green, 0 skip (backtick escape, $() in double quotes, here-strings, backtick-spelled git word, fail-closed controls, RED mirror); no commit since base changes the picture.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"critic","what":"Independent security Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.push-classifier-misreads-backslash-escaped-quotes","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 5/5 green, 0 skip; the pin covers the Proposal (GL-B13, echo-wrapped escaped-quote shapes and quoted-executable shapes classified as pushes, harmless controls stay plain, RED mirror, stripQuotedSegments no longer treats an escaped quote as a delimiter), closing the earlier 'no counts' gap.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs"],
+ "open":[{"owner":"critic","what":"The Proposal requires the security Critic route; the independent Critic review has not finished."},{"owner":"native-host","what":"The Codex route relies on the classifier alone and was not measured live on Codex."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push","stage":"75","baselineStage":"50",
+ "reason":"Pin evidence file counts 67/67 green, 0 skip, and commit 4838c0efc states git-cmd.test.mjs 477/477 after pinning redirect-before-push, nested quotes and the two accepted false positives; together they cover the whole Proposal, closing the earlier 'no count' gap.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","4838c0efc"],
+ "open":[{"owner":"critic","what":"Independent security Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.read-blocks-and-misleading-denial-texts-across-runners","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 11 cases, 10 pass, 1 skip: the Claude-guard cases (in-root reads, credential roots denied, blocked-not-absent wording, Grep glob/type/subtree decisions) are green, but the WSL UNC admit clause (U3) is a typed skip and a cross-runner matrix is not shown, since the pin drives evaluateLifecycleReadyGuard only.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"native-host","what":"Run the WSL UNC exact-file admission case (U3) on native Windows or WSL, where it is not skipped."},{"owner":"agent","what":"Add the Codex and Antigravity runner rows to the read-shape test matrix and audit their refusal texts."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.read-only-guard-admits-execution-and-output-options","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 74 cases, 73 pass, 1 skip: the closed per-command grammars (rg, node, git) and credential-root cases are green, but the Windows drive-letter spelling clause is a typed non-win32 skip, and the acceptance requires an independent security Critic with mutation probes.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"native-host","what":"Run the Windows drive-spelling credential denial case on native Windows."},{"owner":"critic","what":"Independent security Critic must inspect the final diff and run mutation/execution negative probes."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.readiness-input-omits-current-advisor-observation","stage":"50","baselineStage":"50",
+ "reason":"a8e203d1a replaced the three typed host-limitation stubs with real cases (commit states AC-241 pin 9/9) and the evidence file counts 9/9 green, 0 skip, so the earlier skip gap is closed; but the pin names points 1,2,3,5,6 only: final-package validation of Advisor and readiness provenance, preservation of old not-ready reports, and the real independent re-run are not covered, and the item states synthetic host fixtures are not real provider acceptance.",
+ "evidence":["a8e203d1a","specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"agent","what":"Pin or cite counted coverage of the final package validation and the historical-not-ready preservation bullets."},{"owner":"native-host","what":"Re-run the actual independent Readiness review on an installed host once the declared Advisor context is available."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 6/6 green, 0 skip, covering empty child output as a typed read-only recovery, valid result, malformed state kept distinct, and a real bootstrap readback on an ordinary root (acceptance bullets 1-3); bullet 4, reconnecting a Codex session and completing the readback, is a native-host clause not shown.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"native-host","what":"Reconnect a real Codex session and complete the prescribed bootstrap readback (acceptance bullet 4)."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.retirement-reader-masks-typed-unsafe-layout-inspection","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 5/5 green, 0 skip, covering typed unsafe results for symlink roots and unsafe descendants, no mutation, and the reader still running on admitted roots (acceptance bullets 1-3); bullet 4, qualifying the complete original onboarding controller (named test exceeded 600 s), is not shown.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"verify-wsl","what":"Run the complete original onboarding controller and the preserved original callback on Linux/WSL."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance after combined candidate acceptance."}]},
+
+{"itemId":"pipeline.revised-native-design-cannot-reach-a-new-advisor-course","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 7/7 green, 0 skip, covering the retired CLI route (ADR-0085), child-course owner-decision binding with reuse refused, and idempotent re-export (acceptance bullets 2 and 3); bullet 1 (one design revision as one emitted step, zero PO interactions) is neither pinned nor re-targeted to the replacement review-receipt route.",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+ "open":[{"owner":"po-decision","what":"Decide whether acceptance bullet 1 is superseded by the ADR-0085 retirement or must be re-targeted to the present-plan review-receipt route."},{"owner":"agent","what":"If re-targeted, pin a single-step design revision with zero PO interactions on the replacement route."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]},
+
+{"itemId":"pipeline.role-route-preflight-with-self-dispatch-fallback","stage":"50","baselineStage":"50",
+ "reason":"Pin evidence file counts 15/15 green, 0 skip, covering per-role route preflight, fallback preparation, no self-review, surfaced producer stderr and the admission function; but the pin itself states the end-to-end course acceptance clause stays HELD (runDesignCourseV2 is retired), and the added acceptance for host-boundary routing of test commands and the atomic recovery state is not shown (b59e44303: recovery verb, live Codex sandbox check and template change open).",
+ "evidence":["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md","b59e44303","203a53687"],
+ "open":[{"owner":"po-decision","what":"Decide how the retired course is re-targeted so it can consume a fallback result as role evidence."},{"owner":"agent","what":"Implement the atomic dispatch recovery state keeping task identity and attempt history, and route admitted test commands to the host boundary from the first call."},{"owner":"native-host","what":"Check the host-boundary route against a live Codex sandbox."},{"owner":"critic","what":"Independent Critic review of the batch has not finished."},{"owner":"po-acceptance","what":"PO acceptance in batch review."}]}
+]

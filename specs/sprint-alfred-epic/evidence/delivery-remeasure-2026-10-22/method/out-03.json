@@ -1,0 +1,241 @@
+[
+ {"itemId": "pipeline.desktop-app-support-is-unverified", "stage": "50", "baselineStage": "50",
+  "reason": "No commit since base touches Desktop support (5e215c4a8 only repairs pin fixtures); the pin shows 15 cases, 10 pass, 5 typed host skips (evidence file), and the item's acceptance is a check on a real Desktop host, which no test can supply.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "5e215c4a8"],
+  "open": [
+   {"owner": "native-host", "what": "Open the repository in the Claude Desktop app (Windows path) and record the bootstrap line, a guard denial, a background Goldfish dispatch and the statusLine identity."},
+   {"owner": "agent", "what": "Confirm the docs slice that states Desktop WSL sessions carry no pipeline protection and PO commands run in a terminal."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance after the Desktop host check."}
+  ]},
+ {"itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another", "stage": "50", "baselineStage": "50",
+  "reason": "No commit since base changes the consume path, and no pin file or counted result exists for the three-disjoint-actions acceptance (native-target consume commits 6e6ec10fb/71b692e81/8981ea9b9 state no count for it).",
+  "evidence": ["6e6ec10fb", "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+  "open": [
+   {"owner": "agent", "what": "Add and run the test with three independently signed disjoint actions, two sequential deliveries and the target-byte, absence, symlink, policy, plugin, expiry, replay and audit drift cases."},
+   {"owner": "critic", "what": "Security Critic review of the native-target consume path is pending."},
+   {"owner": "po-signature", "what": "Any change to the protected consume path lands only as a signature-bound patch."},
+   {"owner": "po-acceptance", "what": "PO acceptance after the above."}
+  ]},
+ {"itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows", "stage": "75", "baselineStage": "50",
+  "reason": "The pin (AC-161) covers all three acceptance clauses: win32/linux owner identity semantics, a budget-counted subagent through Read/Write/Bash under the real hook, and the template bootstrap step; evidence file counts 10 of 10 pass, 0 skip on 1e2592108.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs", "1e2592108"],
+  "open": [
+   {"owner": "native-host", "what": "Run the pin (win32 owner identity and the real-hook subagent case) on native Windows; the counted run was Linux/WSL."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-162 pin covers all three acceptance points (case-preserving roles with not-applicable before parsing, Explore/Plan/general-purpose/pipeline-core batches alone and in parallel, APB-ROLE-UNPARSEABLE naming the value) with RED mirrors; evidence file counts 14 of 14 pass, 0 skip on 1e2592108, after the D84 fixture change cf092afdd.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "57e397b0f", "cf092afdd"],
+  "open": [
+   {"owner": "native-host", "what": "Item triage closes it only after the 0.7.0 candidate host checklist (an Explore dispatch on an installed host)."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries", "stage": "50", "baselineStage": "50",
+  "reason": "Pin AC-163 is 11 of 11 green and f7321f418 refuses an empty terminal log at write, and d4b792e73 adds init-dispatch-record.mjs (dispatch-briefing suite 43/43), but the item's added acceptance also asks for a generated valid design-review skeleton and no init-design-review script exists.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "f7321f418", "d4b792e73"],
+  "open": [
+   {"owner": "agent", "what": "Add the generated valid design-review skeleton with pre-filled digests (only the dispatch-record skeleton exists)."},
+   {"owner": "agent", "what": "Measure why log entries were skipped (budget pressure vs ordering vs wording) and fold appends into existing writes."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-164 pin covers the Proposal (two linked worktrees sharing one claim registry with RC-1/RC-2 holding, and ownership bound to a landed creation); evidence file counts 11 of 11 pass, 0 skip on 1e2592108.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs"],
+  "open": [
+   {"owner": "native-host", "what": "The landed-creation cases (OWN-5, OWN-6) skip on a non-Linux host; run them on native Windows."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.dispatch-records-land-under-specs-evidence", "stage": "75", "baselineStage": "75",
+  "reason": "No commit since base changes it, and the evidence file again counts the pin 15 of 15 pass, 0 skip on 1e2592108.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy", "stage": "50", "baselineStage": "50",
+  "reason": "The AC-166 pin (points A to E, injected scanner seam) is 9 of 9 green per the evidence file, but its header uses a fake scanner binary; the real gitleaks historical reproduction stays held, and the item file is not in backlog/items.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs"],
+  "open": [
+   {"owner": "verify-wsl", "what": "Reproduce the historical domain-shaped finding with the real gitleaks binary on Linux/WSL."},
+   {"owner": "agent", "what": "Locate or restore the item file so the original acceptance can be checked against the pin."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight", "stage": "50", "baselineStage": "50",
+  "reason": "The AC-167 pin is 12 cases, 10 pass, 2 typed skips, and the two skipped cases are the skill's literal ${PIPELINE_PLUGIN_ROOT} spelling (4b and its control), which only the win32 guard dialect runs; a typed skip does not qualify that clause.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "5e215c4a8"],
+  "open": [
+   {"owner": "native-host", "what": "Run the literal ${PIPELINE_PLUGIN_ROOT} spelling cases (point 4b and its control) on native Windows."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads", "stage": "25", "baselineStage": "25",
+  "reason": "No commit since base changes it; the pin (8 of 8 per the evidence file) only checks that the measurement tool reports the causes, while the second acceptance clause (one enforcement measure per cause with before/after numbers) has no evidence.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+  "open": [
+   {"owner": "agent", "what": "Implement one enforcement-layer measure per measured cause (wake-ups, inline reads, refusals, briefing authoring)."},
+   {"owner": "native-host", "what": "Measure before/after on real Elephant sessions against the 10 % administration target."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-169 pin now passes 9 of 9 with no skip, including C6/C7; hooks.json registers subagent-start-receipt.mjs under SubagentStart, so the first write of a fresh dispatch is admitted without the refusal (A1 and A2); the former held protected patch has landed.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/hooks/hooks.json"],
+  "open": [
+   {"owner": "native-host", "what": "The SubagentStart agent_id/agent_type contract was never verified live; confirm on an installed Claude host."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.evidence-artifacts-carry-no-commit-identity", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-170 pin covers the whole Proposal (header records HEAD, tree and dirty flag, JSON binds commit and tree, non-repository reads unavailable); evidence file counts 12 of 12 pass, 0 skip on 1e2592108.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/evidence-artifacts-carry-no-commit-identity.test.mjs"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding", "stage": "75", "baselineStage": "50",
+  "reason": "The pin covers key reuse and fingerprint anchoring (A1/A2), path and Windows spellings (A3), replay (A4), wrong-key refusal (A5) and the plan-digest-bound attended recovery with an unattested audit (A6); evidence file counts 7 of 7 pass, 0 skip on 1e2592108.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "13ff0433b"],
+  "open": [
+   {"owner": "native-host", "what": "Windows spellings and owner-only DACLs are exercised by string spelling on Linux; run on native Windows and drive the attended recovery from a real external terminal."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.feature-branch-push-admitted-without-signature-approval", "stage": "75", "baselineStage": "50",
+  "reason": "The pin covers A1 refusal without a current commit-bound approval, A2 approval-only prerequisites, A3 binding and proof strength, A4 the pre-push hook, A5 chat mode and the non-checkpoint lanes with a mutation canary; evidence file counts 16 of 16 pass, 0 skip on 1e2592108.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/feature-branch-push-admitted-without-signature-approval.test.mjs"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished; it touches the push guard."},
+   {"owner": "po-acceptance", "what": "PO acceptance, including the slimmed non-release push set."}
+  ]},
+ {"itemId": "pipeline.first-enrollment-enters-retirement-before-consent", "stage": "50", "baselineStage": "50",
+  "reason": "The pin is 9 cases, 8 pass, 1 skip; the skipped case (symlinked history refusal ER-HISTORY-UNSAFE) is an unconditional typed host-limitation skip with an empty body, so that clause has no counted evidence; 5e215c4a8 only repaired fixtures.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "5e215c4a8"],
+  "open": [
+   {"owner": "agent", "what": "Give the ER-HISTORY-UNSAFE symlinked-history case a real body instead of the empty skipped stub."},
+   {"owner": "verify-wsl", "what": "Run that case on Linux/WSL, where directory symlinks and mode bits exist."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.foreign-worktree-closes-the-implementation-gate", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-174 pin now has no failing case: all five Proposal points (original error code kept, typed foreign-worktree condition, named diagnosis admitted, reopen-design only for verified drift, ADR-0085 C2 re-read) pass; evidence file counts 18 cases, 17 pass, 1 skip, 0 fail on 1e2592108, so the formerly RED case is green.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs"],
+  "open": [
+   {"owner": "verify-wsl", "what": "The real WSL-registered /mnt foreign-worktree fixture is a typed skip with an empty body; run it on Linux/WSL."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable", "stage": "25", "baselineStage": "25",
+  "reason": "No commit since base addresses forensic export and no pin file exists for it; admitting the export to governed agents still needs a held guard patch.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+  "open": [
+   {"owner": "agent", "what": "Implement and test the forensic and audit evidence export."},
+   {"owner": "po-signature", "what": "Admitting the export to governed agents needs a signature-bound guard patch."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.gh-delivery-classifier-is-not-wired", "stage": "75", "baselineStage": "75",
+  "reason": "No commit since base changes it, and the evidence file again counts the pin 7 of 7 pass, 0 skip on 1e2592108 for the sole acceptance clause (gh pr merge guard-refused).",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul", "stage": "50", "baselineStage": "50",
+  "reason": "12ac0a7af and 2532a96fe route every git null-device value through GIT_NULL_DEVICE and extend the ratchet, but neither commit states a count, and no pin file with a counted result exists for the real-git regression test.",
+  "evidence": ["12ac0a7af", "2532a96fe"],
+  "open": [
+   {"owner": "agent", "what": "Run and record a counted regression test that spawns real git with the shared constant, plus the ratchet scan."},
+   {"owner": "native-host", "what": "Run on native Windows with Git for Windows 2.56.0 to confirm the null-device value is accepted."},
+   {"owner": "po-signature", "what": "Protected sites go through the next signed package."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance after the 0.7.0 host checklist."}
+  ]},
+ {"itemId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog", "stage": "50", "baselineStage": "50",
+  "reason": "No commit since base changes it and no pin file with a counted result exists; the baseline reasons stand (9738cf3bd git-hook-runtime-snapshot 8/8, but the original onboarding handover commit and the full onboarding suite are not shown green).",
+  "evidence": ["9738cf3bd"],
+  "open": [
+   {"owner": "agent", "what": "Show the original onboarding handover commit and the full onboarding suite green with counts."},
+   {"owner": "verify-wsl", "what": "Counted Linux/WSL run of the onboarding suite."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-179 pin covers P1 plugin-identity binding, P2 HOOK-SNAPSHOT-STALE in preflight and commit refusal, P3 cp/install destination-only and mv source refusal, P4 fixtures; evidence file counts 42 of 42 pass, 0 skip on 1e2592108, so the formerly held protected patch has landed.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs"],
+  "open": [
+   {"owner": "native-host", "what": "Counted run was POSIX only; run the win32 fixtures and a real plugin update refresh on native Windows."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance (hook refresh itself is a PO act)."}
+  ]},
+ {"itemId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-180 pin classifies both env -S forms and the vim/vi/nvim ex-bang forms as pushes and keeps non-push wrappers non-push, which is the whole acceptance; evidence file counts 13 of 13 pass, 0 skip on 1e2592108.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished; it touches the push classifier."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.git-stash-list-classified-as-working-tree-write", "stage": "50", "baselineStage": "50",
+  "reason": "The AC-181 pin (33 of 33 pass per the evidence file) covers the stash list/show Proposal, but the Description's second symptom, the sed -i expression read as the write target (also seen again as PF-16), has no case in the pin, and the PO deferred the item past 0.7.0.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+  "open": [
+   {"owner": "agent", "what": "Pin and fix the sed -i operand misparse (wrong File reported, PF-16)."},
+   {"owner": "po-decision", "what": "Triage defers the item past the 0.7.0 candidate (2026-10-17); confirm whether it counts for this delivery."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows", "stage": "50", "baselineStage": "50",
+  "reason": "The pin is 26 cases, 25 pass, 1 skip, and the skipped case is the win32 backslash-relative nested finding (A1/A2), the actual defect shape, which only runs on Windows; a typed skip does not qualify that clause.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md"],
+  "open": [
+   {"owner": "native-host", "what": "Run the backslash-relative nested finding case on native Windows and confirm the 49 retained findings drop."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished (triage asks for one after the fix)."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-183 pin covers the Proposal (a different value at the same path/rule/column refuses with a typed reason, file byte-identical, value still a finding, no secret in the reason, read-only recompute, ambiguous match); evidence file counts 8 of 8 pass, 0 skip on 1e2592108 (synthetic scanner JSON).",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "3f85cff0c", "2c2aafccd"],
+  "open": [
+   {"owner": "verify-wsl", "what": "Run the repair route once against the real gitleaks binary; the pin uses synthetic scanner JSON."},
+   {"owner": "po-signature", "what": "Triage F2: registering the repair suite in protected verify.mjs needs a signature-bound patch if not yet landed."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-184 pin covers shared isDirectInvocation use, the CLI acting as a child process, differently spelled argv[1] (relative, backslash, lower-case drive), no main() on import and loud failures; evidence file counts 9 of 9 pass, 0 skip on 1e2592108; fix commit c30c005d8.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "c30c005d8"],
+  "open": [
+   {"owner": "native-host", "what": "Windows argv spellings are simulated on Linux; run the CLI on native Windows (0.7.0 host checklist)."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-185 pin covers all three Proposal clauses (closing allowance of +5 tool uses, foreground suites, commit producer retries index.lock once) with RED mirrors; evidence file counts 7 of 7 pass, 0 skip on 1e2592108.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "plugins/pipeline-core/lib/pins/goldfish-budgets-omit-the-closing-ceremony.test.mjs"],
+  "open": [
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04", "stage": "75", "baselineStage": "50",
+  "reason": "The AC-186 pin (BUGFIX module vs QG-04, GF-04 parity, byte-identical template copies) is 6 of 6 per the evidence file, and fbd76404d plus db8b8155e cover the 2026-10-21 rewritten acceptance: QG-04 and Operating Model state the test-first order, and the generator prescribes it (dispatch-briefing suite 42/42 then 43/43 at d4b792e73 in commit messages, rendered-order case at line 523).",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "fbd76404d", "db8b8155e", "d4b792e73"],
+  "open": [
+   {"owner": "agent", "what": "The dispatch-briefing suite count is from commit messages only; record a counted run on the current HEAD."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]},
+ {"itemId": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes", "stage": "50", "baselineStage": "50",
+  "reason": "The AC-187 pin passes 7 of 7 on template text only and its header says the emitted-brief consumer is not claimed; db8b8155e now emits briefs with targeted and a 'Quick check: missing' line, but dispatch-briefing.test.mjs has no case on the quick route, and the original item body is absent from the repository.",
+  "evidence": ["specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md", "db8b8155e"],
+  "open": [
+   {"owner": "agent", "what": "Pin the generator-emitted targeted and quick-route lines (targeted -> quick -> final Verify) in dispatch-briefing.test.mjs."},
+   {"owner": "agent", "what": "Restore or re-state the original item body so acceptance is checkable."},
+   {"owner": "critic", "what": "Independent Critic review of the batch is not finished."},
+   {"owner": "po-acceptance", "what": "PO acceptance."}
+  ]}
+]

@@ -1,0 +1,1413 @@
+{
+ "base": "9f9c1a456",
+ "unmappedCommits": [
+  {
+   "sha": "8063c1ce6",
+   "subject": "docs(sprint-alfred-epic): record the 2026-10-20 delivery remeasure",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9fb791dc3",
+   "subject": "docs(sprint-alfred): record the review route to the release (D59)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "cf053e0d3",
+   "subject": "docs(state): record the goal of a content-final local test candidate",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5f138b963",
+   "subject": "docs(sprint-alfred): record the scope pass, Q16, AC-9 and the doc-contract route (D60)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "886729d58",
+   "subject": "chore(backlog): file the missing dispatch route for small fixes",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "d3ab9bf93",
+   "subject": "chore(backlog): reconcile the ledger for the small-fix dispatch item",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "0d734831f",
+   "subject": "docs(sprint-alfred): record the scope pass of the 0.7.0 test candidate",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1b427f20d",
+   "subject": "docs(sprint-alfred): record the scope, host and ceremony route (D61)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "38b50b3bf",
+   "subject": "docs(sprint-alfred): put the two critical Critic-route findings into the candidate (D62)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4d3b6e550",
+   "subject": "docs(state): record the scope route after D60 to D62",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "21e7c640f",
+   "subject": "docs(sprint-alfred): record the last Critic review of the batch and its disposition",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c1771bc98",
+   "subject": "docs(guardrails): name a real ledger append failure as the override stop",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2cf374bbe",
+   "subject": "docs(sprint-alfred): record the per-item re-verification of the open scope",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "27877e88e",
+   "subject": "docs(sprint-alfred): record the deferral, reconstruction and superseded calls (D63)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9aefea94c",
+   "subject": "docs(sprint-alfred): put the Codex happy-path blockers and majors into the candidate (D64)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4838c0efc",
+   "subject": "test(git-cmd): pin redirect-before-push and the accepted false positives",
+   "dispatch": [
+    "ALF-D61-AC238"
+   ]
+  },
+  {
+   "sha": "4a2449276",
+   "subject": "chore(pipeline-state): fold pending push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b0c05999f",
+   "subject": "docs(sprint-alfred): record the second small design calls (D66)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "652cff043",
+   "subject": "docs(sprint-alfred): record the Full Verify measurement of c1771bc98",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2f267d2a9",
+   "subject": "docs(sprint-alfred): cluster the Full Verify reds into a correction plan",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d5c047ed5",
+   "subject": "docs(sprint-alfred): add the cluster closure rule and the first closure",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "895a99105",
+   "subject": "docs(sprint-alfred): enforce a closure after every correction cluster (D67)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c4205d34b",
+   "subject": "docs(sprint-alfred): record the owner route for unowned clusters (D68)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "db930a359",
+   "subject": "fix(critic): name the review-unit route and gate the skill on its arguments",
+   "dispatch": [
+    "ALF-D61-AC142B"
+   ]
+  },
+  {
+   "sha": "991da6f54",
+   "subject": "style(critic): restore the space in the digest helper",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "65452bd6f",
+   "subject": "feat(verify): produce Critic evidence for a named earlier commit",
+   "dispatch": [
+    "ALF-D61-AC224"
+   ]
+  },
+  {
+   "sha": "ac7ce96d1",
+   "subject": "test(verify): parse only the final result in the named-commit CLI case",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c578670d7",
+   "subject": "fix(design): record the review's observed identity instead of the profile model",
+   "dispatch": [
+    "ALF-D61-AC155A"
+   ]
+  },
+  {
+   "sha": "1ae7bf5ad",
+   "subject": "docs(sprint-alfred): close the wave-1 cluster and start K1",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "485b47552",
+   "subject": "docs(adr): accept the test-economy rules as ADR-0088 (D69)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "381aaf77b",
+   "subject": "chore(backlog): add the post-0.7.0 Verify test-economy rebuild",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "b5e0819b6",
+   "subject": "chore(backlog): reconcile the ledger for the test-economy rebuild item",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "ec0999ade",
+   "subject": "test(session): initialize the session-authority registry in the power fixture",
+   "dispatch": [
+    "ALF-K1B-SESSION-POWER"
+   ]
+  },
+  {
+   "sha": "9bf8a8619",
+   "subject": "test(session): bind cleanup cases inside a source-owned requester context",
+   "dispatch": [
+    "ALF-K1C2-SESSION-BINDING"
+   ]
+  },
+  {
+   "sha": "0c884c0c4",
+   "subject": "docs(sprint-alfred): record the second K1 measurement",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "bcfa0bdb2",
+   "subject": "docs(sprint-alfred): record the third K1 measurement",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7ad584f18",
+   "subject": "test(session): bind recovery cases inside a source-owned requester context",
+   "dispatch": [
+    "ALF-K1C3-SESSION-RECOVERY"
+   ]
+  },
+  {
+   "sha": "e0a7d6d80",
+   "subject": "docs(sprint-alfred): record the fourth K1 measurement",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c91fc8c27",
+   "subject": "docs(sprint-alfred): record D70 and triage the descriptor recovery item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ee2919446",
+   "subject": "docs(sprint-alfred): record the fifth K1 measurement",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d82f24747",
+   "subject": "test(session): share the bound-requester fixture of the cleanup suites",
+   "dispatch": [
+    "ALF-K1S-CLEANUP-FIXTURE-SPLIT"
+   ]
+  },
+  {
+   "sha": "d2602f5cf",
+   "subject": "feat(session): add the lost-binding release route and its registry step",
+   "dispatch": [
+    "ALF-K1-LOST-BINDING-RELEASE3"
+   ]
+  },
+  {
+   "sha": "5e5c7d8f2",
+   "subject": "fix(session): release a lost cleanup binding through the recovery verbs",
+   "dispatch": [
+    "ALF-K1-LOST-BINDING-WIRE"
+   ]
+  },
+  {
+   "sha": "3300e5c2f",
+   "subject": "docs(sprint-alfred): record D71 and the sixth K1 measurement",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "44ad2352c",
+   "subject": "docs(state): record the K1 position before the session restart",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "231d1a0b7",
+   "subject": "docs(sprint-alfred): update the K1 next step in the correction ledger",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4d78bb07e",
+   "subject": "chore(pipeline-core): stamp a 0.7.0 Alfred interim build for 231d1a0",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "551f3833a",
+   "subject": "docs(sprint-alfred): record D72",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1bea48f3e",
+   "subject": "docs(state): record the K1 handover for the session restart",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "33fcdf82d",
+   "subject": "fix(session-power): add a repair verb for the address root past its bound",
+   "dispatch": [
+    "ALF-K1R-ADDRESS-ROOT-REPAIR"
+   ]
+  },
+  {
+   "sha": "dbe7cd55d",
+   "subject": "docs(sprint-alfred): record K1 measurement 7",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a34d71697",
+   "subject": "test(afk): initialize the session-authority registry in the host fixture",
+   "dispatch": [
+    "ALF-K1FG-FIXTURE-AUTHORITY"
+   ]
+  },
+  {
+   "sha": "edb60e98c",
+   "subject": "test(session): write the historic legacy binding as a fixture artifact",
+   "dispatch": [
+    "ALF-K1-LEGACY-BINDING-BYTES"
+   ]
+  },
+  {
+   "sha": "4467aa5b0",
+   "subject": "fix(session): release an archived orphan's binding only on its proven archive",
+   "dispatch": [
+    "ALF-K1-RF2A-ARCHIVE-RELEASE4"
+   ]
+  },
+  {
+   "sha": "16677e01d",
+   "subject": "test(native-goldfish): make the host-state fixture a real Git repository",
+   "dispatch": [
+    "ALF-K1FG2-FIXTURE-AUTHORITY"
+   ]
+  },
+  {
+   "sha": "81e09ef3f",
+   "subject": "docs(sprint-alfred): record K1 measurement 8",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "314cd6bb8",
+   "subject": "test(design-workflow): launch the builder's readiness host inside the store repository",
+   "dispatch": [
+    "ALF-K1FG5-DWP-LAUNCH-DIR"
+   ]
+  },
+  {
+   "sha": "c8c4fb947",
+   "subject": "fix(afk): keep prepared worker requests outside the AFK ledger root",
+   "dispatch": [
+    "ALF-K1G-AFK-REQUEST-ROOT"
+   ]
+  },
+  {
+   "sha": "41ba365df",
+   "subject": "fix(afk): refuse a missing projection writer before the authority lifetime",
+   "dispatch": [
+    "ALF-K1G-AFK-WRITER-PRECHECK"
+   ]
+  },
+  {
+   "sha": "68225ea52",
+   "subject": "docs(sprint-alfred): record K1 measurement 9",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "70957cf27",
+   "subject": "fix(session): forward the injected bind seam through apply-recovery",
+   "dispatch": [
+    "ALF-K1C3-BINDING-CD"
+   ]
+  },
+  {
+   "sha": "64bdfd697",
+   "subject": "fix(session): release a lost binding on a root that has no registry yet",
+   "dispatch": [
+    "ALF-K1C4-LOST-BINDING-NO-REGISTRY"
+   ]
+  },
+  {
+   "sha": "177401a89",
+   "subject": "test(session): pin the own-session orphan rule to the D46 recovery split",
+   "dispatch": [
+    "ALF-K1P2-ORPHAN-PIN-D46"
+   ]
+  },
+  {
+   "sha": "2f7615385",
+   "subject": "docs(sprint-alfred): close K1 with a named rest and start K1h",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3dbf81c16",
+   "subject": "docs(sprint-alfred): record K1h measurement 1",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "cb47dff84",
+   "subject": "test(onboarding): bind real cleanup inside a controlled requester",
+   "dispatch": [
+    "ALF-K1H-OBC-CONTROLLED-BIND"
+   ]
+  },
+  {
+   "sha": "6db89a94d",
+   "subject": "docs(sprint-alfred): record K1h measurement 2",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3ed36f2a8",
+   "subject": "docs(sprint-alfred): record the OBC059 measurement and decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "55d6a6eb0",
+   "subject": "test(onboarding): pin OBC059 to the controlled private bind",
+   "dispatch": [
+    "ALF-K1H-OBC059-RESTATE2"
+   ]
+  },
+  {
+   "sha": "fd3449cb1",
+   "subject": "docs(sprint-alfred): record K10 measurement 1",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f863a6337",
+   "subject": "docs(sprint-alfred): record D73 and the first full Verify after K1h",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d17b57396",
+   "subject": "docs(sprint-alfred): record D74, repair hints for refusals in 0.7.0",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b73b423b1",
+   "subject": "fix(verify): give every suite child its own private 0700 TMPDIR",
+   "dispatch": [
+    "ALF-K1H-VERIFY-PRIVATE-TMPDIR2"
+   ]
+  },
+  {
+   "sha": "216a9c78f",
+   "subject": "fix(verify): keep the private suite TMPDIR short enough for sockets",
+   "dispatch": [
+    "ALF-K1H-VERIFY-TMPDIR-SHORT"
+   ]
+  },
+  {
+   "sha": "b2b240f65",
+   "subject": "docs(sprint-alfred): close K1h with a named rest and start K1D",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "85d2bff79",
+   "subject": "docs(sprint-alfred): record K1D measurement 1 and the retired CAS decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4fb40e587",
+   "subject": "fix(onboarding): release a binding whose owner was physically retired",
+   "dispatch": [
+    "ALF-K1D-A-RETIRED-RELEASE4"
+   ]
+  },
+  {
+   "sha": "4bbce7942",
+   "subject": "docs(sprint-alfred): record D75, typed continuation after budget stops",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e179818c6",
+   "subject": "docs(sprint-alfred): record D73 A delivery and the E placement measurement",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "442667f9d",
+   "subject": "docs(sprint-alfred): record the first D73 E slice and a D75 finding",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "063a222bf",
+   "subject": "docs(sprint-alfred): record the E2 measurement and the member-step decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b986b9905",
+   "subject": "docs(sprint-alfred): record the E3 measurement and the member-first decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "231f5b9c7",
+   "subject": "docs(sprint-alfred): record D76, fan-out across clusters",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "799e8d12d",
+   "subject": "docs(sprint-alfred): record the E4 design measurement and the split",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d787c9bae",
+   "subject": "feat(dispatch-budget): summarise a grant record for the budget hook",
+   "dispatch": [
+    "ALF-K11-S1-GRANT-SUMMARY"
+   ]
+  },
+  {
+   "sha": "a71fb829c",
+   "subject": "docs(sprint-alfred): record the backlog closure check for M0, W1, K1, K1h",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "af9c00bcb",
+   "subject": "docs(sprint-alfred): open K13 for the D61 content clauses",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5818e2519",
+   "subject": "docs(sprint-alfred): record the K13 re-verification and the package cut",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f764fc9c6",
+   "subject": "chore(backlog): file the unprotected grammar and classifier under the protected guard",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9a0685688",
+   "subject": "chore(backlog): file the protected file set audit for 0.7.x",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "99e0fba95",
+   "subject": "feat(install-agy): add a planned --refresh entry and document the opt-in contract",
+   "dispatch": [
+    "ALF-K13-A3-AGY-INSTALL-DOCS"
+   ]
+  },
+  {
+   "sha": "917ba8ff8",
+   "subject": "fix(onboarding): release an orphan binding's registry member after the lock (D73 E)",
+   "dispatch": [
+    "ALF-K1D-E5A4-LINE-BOUND"
+   ]
+  },
+  {
+   "sha": "bc90c4834",
+   "subject": "feat(dispatch-budget): announce a recorded grant and teach the continuation card (D75 B)",
+   "dispatch": [
+    "ALF-K11-S3C-SPLIT"
+   ]
+  },
+  {
+   "sha": "06ed415f0",
+   "subject": "test(readiness-store): pin the owner-private parent and the bounded receipt reader (AC-130, AC-134)",
+   "dispatch": [
+    "ALF-K13-A5-READINESS-PINS"
+   ]
+  },
+  {
+   "sha": "25947149e",
+   "subject": "feat(preflight): report the node sandbox probe and serialize AGY Goldfish writes (AC-108, AC-117)",
+   "dispatch": [
+    "ALF-K13-A4B-PROBE-MODULE"
+   ]
+  },
+  {
+   "sha": "ed4a952fe",
+   "subject": "docs(decisions): record D77 (one-grant patch, K6 write-path rule, AC-187/127/148)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4e5d7001b",
+   "subject": "docs(decisions): add the AC-249 deferral to D77",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "24e5d5316",
+   "subject": "test(preflight): pin the AGY start hint field instead of two todo cases (AC-108, AC-117)",
+   "dispatch": [
+    "ALF-K13-A4C-PREFLIGHT-TEST-BOUND"
+   ]
+  },
+  {
+   "sha": "fd2443ee8",
+   "subject": "feat(advisory): bind an answered host receipt to candidate, route, digests and host result (AC-135)",
+   "dispatch": [
+    "ALF-K13-A6-CODEX-ADVISOR-ANSWERED"
+   ]
+  },
+  {
+   "sha": "a8e203d1a",
+   "subject": "test(readiness): replace the three AC-241 host-limitation stubs with real cases",
+   "dispatch": [
+    "ALF-K13-A5B-ADVISOR-OBSERVATION-PIN"
+   ]
+  },
+  {
+   "sha": "686a9ad8e",
+   "subject": "feat(dispatch-budget): refuse a second grant for the same agent (D75 B, D77)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "44eec8b48",
+   "subject": "docs(ledger): start K6 with the D77 write-path rule; K13 wave B next",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f7321f418",
+   "subject": "fix(dispatch-record): refuse an empty terminal log at write, keep v3 history readable (AC-163, D77)",
+   "dispatch": [
+    "ALF-K6-EL1-WRITE-PATH"
+   ]
+  },
+  {
+   "sha": "b097f74e4",
+   "subject": "test(critic): chain a pre-rule feature through the review-unit route to an admitted dispatch (AC-142)",
+   "dispatch": [
+    "ALF-K13-B1B-CRITIC-ROUTE-CHAIN-PIN"
+   ]
+  },
+  {
+   "sha": "c52fbaeb2",
+   "subject": "test(session-start): add the AC-126 RED mirror and make the A6 path control platform-neutral",
+   "dispatch": [
+    "ALF-K13-B2B-SESSION-HINT-RED-MIRROR"
+   ]
+  },
+  {
+   "sha": "978ee3829",
+   "subject": "docs(decisions): record D78, the briefing generator as a default product capability",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "fec42d0aa",
+   "subject": "chore(backlog): file the D78 briefing generator item and the D77 scanner provenance item (0.7.x)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d978443d3",
+   "subject": "test(hooks): admit the three newer runner hooks into the governance scope list (RC03C008)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "57d2a0456",
+   "subject": "test(pipeline-start): follow the kickoff reference's current traceability wording (PSV04)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3662a705d",
+   "subject": "test(design-workflow): pin the retired present-plan route's refusal and its replacement (R4-T0-6)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a12b25837",
+   "subject": "fix(state): classify the two unclassified live State path fields as not bound (R7-3d)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d2dba1158",
+   "subject": "fix(policy): add the SubagentStop row for the native Goldfish host to the control placement table",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ff83a1509",
+   "subject": "fix(config): move the Claude mechanic in the runner profile registry to haiku at medium (Ruling 161)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "74c404eb7",
+   "subject": "test(preflight): expect the pre-push install command to carry the absolute node executable",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d75e8081f",
+   "subject": "test(coherence): pin that schema-lite now executes the nested event contract",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "86c8c94ac",
+   "subject": "test(language-canon): pin the current Critic batch budget in both Operating Model halves",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "336e61167",
+   "subject": "test(gitleaks): pin the near-miss hint for the same secret and the break-safe repair command",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "33a73fb34",
+   "subject": "fix(slice-queue): treat a missing --queue with no resolvable governed course as a usage error (SC15)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f48b65391",
+   "subject": "fix(continuity): keep the caught error and name a runnable recovery in the continuity refusals",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "269cda462",
+   "subject": "fix(configure-verify): name the unmet approval condition with a typed code and a runnable repair",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "817c5553f",
+   "subject": "fix(guard): release the bound authority documents only for an invalidation newer than the current approval",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d021bb8fe",
+   "subject": "fix(configure-verify): surface the typed refusal code and its runnable repair in pipeline-state",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "194c2af73",
+   "subject": "fix(continuity): bind the authority journal to the stable repository identity",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "fa7ee6f35",
+   "subject": "fix(security-scan): raise the default scanner timeout to 300 s",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7c8994e93",
+   "subject": "fix(host-commit): name the unignored Pipeline working paths instead of a bare path mismatch",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "db8b8155e",
+   "subject": "feat(dispatch-briefing): build the complete Goldfish briefing from a closed package (D78 part 1)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d4b792e73",
+   "subject": "feat(dispatch-record): print the valid opening dispatch record from a generated briefing (AC-163)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ff028b6ca",
+   "subject": "feat(guard-dispatch): warn when a governed item briefing is not the generator output (D78 part 2)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b4539015b",
+   "subject": "test(pipeline-state): aim the approve-plan child at the fixture, not the real checkout",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "451761e84",
+   "subject": "docs(state): restore the handover links to the seven retained Sentinel authority files",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "184bf1c60",
+   "subject": "docs(backlog): file four items found while preparing the 0.7.0 candidate",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "851976693",
+   "subject": "docs(backlog): register the four new items in the ledger and regenerate index and status",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6c5f5f934",
+   "subject": "test(rigor-floor): supply the four accepted-dimension observations the floor now requires",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7cc87d860",
+   "subject": "test(architecture): read the structural decision view where a fixture has no retained aggregate",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e11b26971",
+   "subject": "test(architecture): state the adoption-gate verdict in the continuity and baseline suites",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1d34e7ba9",
+   "subject": "test(session-start): declare the Codex runner in the Codex payload case (SSH003)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0f82c1c45",
+   "subject": "test(agy-final-return): pin the named dirty-baseline refusal shape (AFR18)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e1d786ef0",
+   "subject": "test(dispatch-authorship): give the v4 authored fixtures their log entry (K6, D77)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "34b235dd2",
+   "subject": "test(critic-finalizer): pin that a root-authored candidate cannot register a generic batch review unit",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ddaf1c74e",
+   "subject": "test(late-verify): build the approved implementing state through the production writers (E14, AC-150)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "65896ed02",
+   "subject": "fix(capability-inventory): read the split guard library as the admission oracle and skip nested fixtures (PCI24)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2bf6620b7",
+   "subject": "test(capability-inventory): register the generic Critic batch in the HAW-A04c fixture (PCI16, AC-150)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6d244eac1",
+   "subject": "docs(capability-inventory): categorize the 206 surfaces added since the baseline and re-baseline (PCI17)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2fb471b9d",
+   "subject": "test(spec-readiness-host): assert the retirement contract the host now returns (K2, E12, ADR-0085)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "df4ee9625",
+   "subject": "test(pipeline-state-rebind-runner): follow the retired present route and the E13 submission contract (K2)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d4f935cf2",
+   "subject": "docs(backlog): list the rebind-runner approval-rendering case in the E15 item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "08a3d731b",
+   "subject": "test(project-onboarding-e2e): drive the greenfield happy path on present-plan --review-receipt (K2, E12, ADR-0085)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0cdfb88ce",
+   "subject": "test(approval-requests): follow the owned ceremony, the seventh critical kind and the signature-mode admission (K4, E16)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0a94fa410",
+   "subject": "test(push-anchor): create the legacy key-directory namespace owner-private like the product (K4)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a7122297d",
+   "subject": "test(commit-msg-signed-integration): ignore scratch/ in the quality-package fixture (K4)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "da961b61c",
+   "subject": "test(guard-push-architecture): stand the push proof down in the map-debt fixture (K4, PUSHSIG)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7d4c6ecf0",
+   "subject": "test(project-onboarding-e2e): drop the unused readiness-package helper to meet the line bound (K2)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2541facbb",
+   "subject": "test(guard-human-override): follow the native v4 schemas and the attended repair-audit ceremony (K4, E16)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "20ad22be4",
+   "subject": "docs(decisions): record D79 and D80 (PO tiles 2026-10-21)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "38d1d0af2",
+   "subject": "test(guard-git-signed-integration): ignore scratch/ in the quality-package fixture (K4)",
+   "dispatch": []
+  },
+  {
+   "sha": "f83825100",
+   "subject": "test(gate-strength-ledger): use an overridable protected path for the ledger helpers (K4, AC-258)",
+   "dispatch": []
+  },
+  {
+   "sha": "c2ca0aef6",
+   "subject": "test(guard-devplan): expect the live review-receipt remediation for the Advisor lanes (K2, E12, ADR-0085)",
+   "dispatch": []
+  },
+  {
+   "sha": "5add52693",
+   "subject": "test(guard-gate-strength): arm through the signature route and follow only real imports (K4, E16)",
+   "dispatch": []
+  },
+  {
+   "sha": "c4100ebc0",
+   "subject": "feat(onboarding): seed docs/adr with a hint and a template for a fresh project (D80)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ab7dadd9a",
+   "subject": "docs(decisions): record D81 and file the two K3 follow-up items (PO tiles 2026-10-21)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e9f87526f",
+   "subject": "docs(decisions): record D82, the completion target for the delivery matrix (PO 2026-10-21)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2d7f4bd3c",
+   "subject": "test(protected-test-paths): pin the strict read-only git apply --check preflight (worktree admission, half 1)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8d634b6bd",
+   "subject": "docs(decisions): record D83 and D84 and file the dispatch-model enforcement item (PO 2026-10-21)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f1af79a64",
+   "subject": "docs(inventory): categorize the ten verify surfaces patch 27 registered and move the baseline",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "458786f31",
+   "subject": "test(product-capability-inventory): widen PCI30's child timeout so load cannot cut the corpus short",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0285400a6",
+   "subject": "docs(gmw): name the eight kernel closure additions in the threat model's protected assets",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5ef476fd8",
+   "subject": "test(host-suites): repair five suites whose fixtures or anchors predate d02409a8a (K2, K4, ADR-0085)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e6a309968",
+   "subject": "test(registry-group): repair seven suites and anchors that predate the State authority route (K2, K4)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7fcbce5ea",
+   "subject": "feat(dispatch-model): decide a subagent dispatch's model from the configured routing (D84)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5a197beb9",
+   "subject": "test(critic-lineage): follow the delta-only admission from round 2 and record the unreachable rerun (K2, K4)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "553342999",
+   "subject": "fix(agy-installer): keep machine paths out of the tracked workspace plugin registry (D79)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "250c8dc24",
+   "subject": "test(onboarding-v3): follow the docs/adr scaffold targets that c4100ebc0 added (D80)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7ea5ad228",
+   "subject": "test(state-guard-group): repair two suites whose expectations predate moved logic (K2, K4)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1e2592108",
+   "subject": "chore(license): add the SPDX header to the 77 JavaScript sources that lack it (SUL-1.0)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9a12beab7",
+   "subject": "docs(evidence): counted pin results on 1e2592108 (183 of 184 pin files green)",
+   "dispatch": [
+    "stage-0"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "itemId": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since 98b6e5ca2 fits this item; keep-baseline rule, baseline pin coverage stands.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.advertised-git-to-head-pipeline-is-refused",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches git-to-head shapes (801ce9e22 and d233987f9 concern env templates); baseline 56015a99e (57 of 57) stands for the original acceptance.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+   "stageBaseline": "75",
+   "reasonBaseline": "ecaa2dc3d runs the AC-103 export-consent denial case on every host with no skip and states the pin at 15/15 on WSL, closing the only skip-only clause named at baseline.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches this item; the cause-field clause and the policy gate stay uncovered.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+   "stageBaseline": "75",
+   "reasonBaseline": "afa446b8b drives the advisor answered route end to end in the AC-105 pin with seven counted sub-cases and states pin 19/19 and coordinator-v2 3/3; the central end-to-end clause no longer skips on Linux.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+   "stageBaseline": "50",
+   "reasonBaseline": "Only 00ef3108d touched the obligations generator since the base, and it adds the EL-01 exception trailer, not the recommended commit spelling; the pin of that spelling through the whole guard union is still not shown.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since 98b6e5ca2 changes this item (keep-baseline rule); no counted GREEN is stated in the new commits either.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+   "stageBaseline": "50",
+   "reasonBaseline": "AGY test commits (70a419084, d197f213e at 5/7 with tests 1 and 7 open, 077305363) fix fixtures or queue behaviour, not the F-02/F-05 clauses or the Critic/Advisor/Verify routes.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.agy-el01-write-authorization-gap",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches this item; 00ef3108d concerns the Elephant EL-01 trailer, not the AGY write gap, and no authenticated role carrier is shown.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+   "stageBaseline": "50",
+   "reasonBaseline": "c2817beda rewrites dangling Antigravity hook wiring on refresh (pin 29/29, imported-snapshot pin 18/18 unchanged), a refresh-behavior fix only; the spike S1-S6, the lock-version-mismatch reason and the docs clauses are still uncovered.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+   "stageBaseline": "50",
+   "reasonBaseline": "2a51b7cdb keeps the AC-111 first-start receipt inside the fixture home and states the pin at 11 pass, 0 fail, with the AC4 native observation as the one skip; that clause stays uncovered.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches version admission; c2817beda changes refresh wiring on the installed CLI only.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 fits this item; 70e2e724c and a1cd742de retarget or share fixtures of the retired design route without stating counts for this clause.",
+   "mappedCommits": [
+    {
+     "sha": "5e215c4a8",
+     "subject": "test(pins): repair eight pin fixtures that predate the checks they trip (K2, K4)"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches HEAD-versus-candidate binding.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+   "stageBaseline": "75",
+   "reasonBaseline": "Baseline 384e73527 stands for the original acceptance; 9dda09720 admits the resume-hint read in state approved (pin 4/4), a distinct verb that does not change this item.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since 98b6e5ca2 changes this item; baseline 6/6 + 18/18 GREEN stands.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+   "stageBaseline": "50",
+   "reasonBaseline": "4d5bd1af1 makes the mandatory-hook preflight case hermetic (preflight 77/79, 0 fail, 2 todo; AC-117 pin 18/18 reported by the goldfish) but changes no assertion; the non-ready preflight, the confirmation refusal and the model-role readback are still uncovered.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.bounded-reader-terminal-binding",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches this item; the fixture clause GREEN 11/11 stands, the real-course binding clause is uncovered.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 states brownfield or deferred-adoption counts; baseline a6641cce4 stands.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+   "stageBaseline": "75",
+   "reasonBaseline": "Baseline stands; 10819d460 changes only the Critic course-budget refusal text (CDP-COURSE-BUDGET), a different budget, so it does not alter this item.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.capability-inventory-checker-is-red-at-head",
+   "stageBaseline": "75",
+   "reasonBaseline": "Baseline 5cc6b7006 and 71a2c0304 (AC-121 pin 17 of 17) stand; 8ed2def1f changes module-inventory.mjs for the architecture map, not the capability inventory, and I did not run the checker, so there is no concrete reason to lower.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches this item.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+   "stageBaseline": "50",
+   "reasonBaseline": "9dda09720 admits only the bootstrap's resume-hint inspect read (pin 4/4), not the design-course verbs present-plan, --run-v2 and continuity writes that the item names; the catalogue pin stays at 10 pass + 1 skip.",
+   "mappedCommits": [
+    {
+     "sha": "5c746f716",
+     "subject": "chore(backlog): add the Codex happy-path findings to their owning items"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.claude-design-readiness-cannot-start-on-windows",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches the Claude Windows install roots; 70e2e724c retargets the Codex readiness bootstrap to the retirement contract. The R4-9/R4-10 typed sub-reason clause is still absent.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches target selection; the plan-only pin leaves the platform matrix and real apply uncovered.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 touches this item; the RED mirror of da2958311 is not recorded and the Windows symlink failure is environmental.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 changes the V-9, V-10, V-12 or V-13 clauses; baseline 3ed911a79 (124 tests, 117 pass, 1 skip, 6 unrelated GD failures) stands, and 66aacfc2e only fixes the guard-dispatch fixture.",
+   "mappedCommits": [
+    {
+     "sha": "cf092afdd",
+     "subject": "test(dispatch-fixtures): name a configured model in every Claude Task/Agent fixture (D84 prep)"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since 98b6e5ca2 addresses Windows in-repo reads; baseline 8d4b3613e and 1f1991be3 stand with no stated count.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+   "stageBaseline": "50",
+   "reasonBaseline": "Only 44d06eb2d touched the Advisor host suite (fixture registry init; count unchanged 0/1, CADH001 stops at native admission); the 4 green cases stand, three skips and the installed replay remain.",
+   "mappedCommits": []
+  }
+ ]
+}
