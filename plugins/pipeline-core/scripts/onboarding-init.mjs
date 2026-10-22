@@ -112,6 +112,7 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
+import { printOnboardingInitResult } from "../lib/onboarding-driver-output.mjs";
 import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
 import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
 import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
@@ -1781,13 +1782,7 @@ export function main(args = process.argv.slice(2), {
   });
   if (bootstrap) result.bootstrap = bootstrap;
   if (initialAnswers) result.initialAnswers = initialAnswers;
-  const printed = result.outcome === "pending-asks" && Array.isArray(result.pendingAsks)
-    && result.final?.nextAction && Array.isArray(result.final.nextAction.pendingAsks)
-    ? { ...result, final: { ...result.final,
-        nextAction: Object.fromEntries(Object.entries(result.final.nextAction)
-          .filter(([key]) => key !== "pendingAsks")) } }
-    : result;
-  write(`${JSON.stringify(printed)}\n`);
+  write(`${JSON.stringify(printOnboardingInitResult(result))}\n`);
   return result.outcome === "ready"
     || result.outcome === "collect-input"
     || result.outcome === "external-operator"

@@ -645,6 +645,12 @@ orphan-member step of the onboarding continuity), and
 `plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs` (releases a lost
 or archived session-cleanup binding for `lib/session-cleanup-recovery.mjs`).
 
+ALF-K15 (2026-10-22) adds one more first-party module that a kernel file imports:
+`plugins/pipeline-core/lib/onboarding-driver-output.mjs` (the wire shape of the
+onboarding driver result that `scripts/onboarding-init.mjs` prints: each published
+ask and the primary collect-input action are printed once, with a resolver for
+consumers; it imports nothing and executes with kernel authority).
+
 This source closure does not establish protected-source delivery, independent
 review, native qualification or activation.
 
