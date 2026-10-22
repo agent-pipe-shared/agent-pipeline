@@ -191,6 +191,11 @@ function opaqueScriptExecutionCandidate(words, root) {
     const first = args[0] ?? "";
     if (["--version", "--help", "-h"].includes(first)) return null;
     script = first.startsWith("-") ? ".pipeline-opaque-execution" : first;
+  } else if (["perl", "ruby", "php", "lua"].includes(executable.replace(/\.exe$/u, ""))) {
+    // Any other script interpreter is no wider than `node <script>` (approved-lifecycle-state pin, 0.7.0 acceptance).
+    const first = args[0] ?? "";
+    if (["--version", "-v", "-V", "--help", "-h"].includes(first)) return null;
+    script = first.startsWith("-") ? ".pipeline-opaque-execution" : first;
   }
   if (script === null || script === "") return null;
   const absolute = resolve(root, script);

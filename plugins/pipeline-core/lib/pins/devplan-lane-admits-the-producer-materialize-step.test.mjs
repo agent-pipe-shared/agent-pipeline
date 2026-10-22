@@ -46,13 +46,24 @@ check('retired --input spelling is not admitted', () => {
   assert.notEqual(hit, null, 'the retired spelling must not be admitted');
   assert.ok(hit?.fault === true || hit?.verdict === 'block');
 });
-// FINDING (expected failing): the lane returns null for `perl scratch/<file>`, because
-// opaqueScriptExecutionCandidate() only classifies node/python/shell interpreters. Tracked by
-// backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md
-check('todo: opaque perl interpreter route is not admitted (backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md)', () => {
+// Other script interpreters are no wider than `node <scratch script>`: opaqueScriptExecutionCandidate()
+// classifies perl/ruby/php/lua like python and the shells (0.7.0 acceptance of
+// backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md).
+check('opaque perl interpreter route is not admitted', () => {
   const hit = devPlanShellRefusalHit('perl scratch/run-materialize.pl', root, dependencies());
   assert.notEqual(hit, null, `perl route admitted: lane returned ${JSON.stringify(hit)}`);
-}, 'todo');
+});
+check('every other script interpreter (ruby, php, lua, inline perl code) is refused like node', () => {
+  for (const command of ['ruby scratch/run.rb', 'php scratch/run.php', 'lua scratch/run.lua', 'perl.exe scratch/run.pl', 'perl -e "print 1"']) {
+    const hit = devPlanShellRefusalHit(command, root, dependencies());
+    assert.notEqual(hit, null, `${command}: admitted, lane returned ${JSON.stringify(hit)}`);
+  }
+});
+check('interpreter version probes stay admitted', () => {
+  for (const command of ['perl --version', 'ruby --version', 'php --version', 'lua -v']) {
+    assert.equal(devPlanShellRefusalHit(command, root, dependencies()), null, command);
+  }
+});
 check('node scratch script with an extra argument is not admitted', () => {
   const hit = devPlanShellRefusalHit('node scratch/x.mjs extra-arg', root, dependencies());
   assert.notEqual(hit, null, `node scratch with extra arg admitted: lane returned ${JSON.stringify(hit)}`);
