@@ -67,3 +67,16 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **NOT-BLOCKED** — Decide whether the recurring-toil premise is verified or the item is deferred to the post-0.7.0 automation lane
   Premise refuted by the agent on 2026-10-22 (pin codex-bootstrap-in-the-typed-next-action.test.mjs): the script is a per-design-package producer, not a host setup step, and ADR-0085 returns DESIGN-COURSE-RETIRED before it does anything. Recommended disposition is close as obsolete; this is an Elephant triage entry, not a PO question.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1. Superseded sentences above, kept as history:
+
+- Blocker analysis 2026-10-22 bullet "Decide whether the recurring-toil premise is verified or the item is deferred to
+  the post-0.7.0 automation lane" and its "Recommended disposition is close as obsolete": decided and executed the same
+  day. The front matter is `status: closed` (`closed_at: 2026-10-22`, closure commit `d1a24c6a6`, evidence the pin
+  `plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs`) and the Triage Decision records
+  the closure as obsolete (refuted premise, retired route, ADR-0085).
+- The Description and Proposal ("fold it into the bootstrap typed next action for a fresh host") are not open work:
+  there is nothing to implement. Any delivery-remeasure row that still lists these clauses as open agent work should be
+  dropped from the open list.

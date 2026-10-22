@@ -88,3 +88,17 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **NOT-BLOCKED** — A live Critic dispatch must create its notes without an improvised randomness source
   The item was rejected as a duplicate on 2026-10-22 and merged into critic-scratch-notes-write-is-refused-again; the no-randomness checks are pinned there (9 cases, 28 run, 26 pass, 0 fail, 2 typed skips). The remaining live observation is carried by that canonical item's host clause, not this one.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1. Superseded sentence, kept as history:
+
+- Any delivery-remeasure row that still lists this item as open work (the Blocker-analysis bullet "A live Critic
+  dispatch must create its notes without an improvised randomness source" is the clause behind it): this item is
+  `status: closed` (`closed_at: 2026-10-22`, closure commit `35455319327d44d5519671a13f0956583dd99a21`, closure
+  evidence `backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md`), rejected as a duplicate and merged
+  into that item. The remeasure row should be retired or re-pointed to the canonical item
+  `2026-10-06-critic-scratch-notes-write-is-refused-again`, which carries the live-dispatch host clause and the registered
+  pin `plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs`.
+- No randomness source is to be stated or admitted by design: D123 (2026-10-22, `po-decisions-2026-10-18.md` line 149)
+  fixes Write/Edit on the guard-allocated `critic-<agent-id>/critic-notes.md` as the only Critic notes route.

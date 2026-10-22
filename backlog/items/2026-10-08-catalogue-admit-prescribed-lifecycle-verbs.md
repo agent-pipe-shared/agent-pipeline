@@ -85,3 +85,16 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
   The pin has a real case 'AC-123 receipt aliases (directory/file symlink) never gain present-plan admission' (line 326) that creates real symlinks and skips only when the host cannot create a link (native Windows); on this Linux/WSL machine it runs for real.
 - **HOST-SESSION-NEEDED** — Re-run the Codex WSL greenfield on an installed candidate
   Needs the PO-stamped candidate installed and a real Codex/WSL greenfield session with authenticated model turns (chat approval mode); observed is reaching the first implementation dispatch with no chat overrides.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1. Superseded sentence above, kept as history:
+
+- LINUX-RUN bullet, "The pin has no fresh-repository end-to-end case (only per-verb admission cases) ... Tracked in the
+  canonical merged item": true of this item's own pin file only. The case exists in the canonical item's pin:
+  `plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs`, test "D64
+  integration: from a fresh repository to the first implementation dispatch every prescribed command is admitted by the
+  real guards with zero overrides" (line 308, section header at line 243). This item stays closed as a duplicate; no
+  case belongs in this item's pin. The native Windows Git Bash walk (AC-207 point 5, same file line 145) remains a
+  typed host-limitation skip and is not claimed. Whether the absolute-node-path spelling is covered was not checked by
+  this sweep.

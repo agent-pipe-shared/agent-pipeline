@@ -224,3 +224,24 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **HOST-SESSION-NEEDED** — A real Codex/WSL Feature greenfield run must reach package validation with an answer or a governed unavailable exception
   Item acceptance requires a real Codex/WSL Feature greenfield run on the installed candidate with host export approval; the ordinary answer path still reports ordinary-consult-host-callback-unavailable in source, and WSL is typed unavailable for the selected-sandbox route. Observed: final design-package validation passes with an answered or governed-unavailable Advisor receipt instead of stopping at DAC-RECEIPT-MISSING.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1. Superseded sentences above, kept as history:
+
+- Blocker analysis 2026-10-22, "the ordinary answer path still reports ordinary-consult-host-callback-unavailable in
+  source, and WSL is typed unavailable for the selected-sandbox route", and the 2026-09-28 line "An admitted callback still
+  deliberately reports `ordinary-consult-host-callback-unavailable`": true only when no sealed executor is installed or
+  the admission is not `admitted`. Commit `6c3cef860` (ALF-K32, AC-135) gave the Codex CLI branch of
+  `plugins/pipeline-core/scripts/advisory-host-bridge.mjs` a seam: after an explicit `admitted` decision it calls the
+  sealed host-owned `executeAdmittedConsult` and finishes through the new `advisory-admitted-consult.mjs`, which
+  re-verifies the result with `verifyAnsweredAdvisoryReceipt` and reports an answer only when it binds candidate, route,
+  question, evidence, host execution and answer digest (bridge lines 836-839). The `...-callback-unavailable` code is now
+  the fall-through for a missing admission or a missing executor.
+- WSL: with a passing sandbox preflight receipt (`--sandbox-preflight <receipt.json>` on `codex-host-advisor-route.mjs`,
+  PO tile 2026-10-22, same commit) the selected-sandbox route is admitted on WSL; without one it is still
+  `WSL_UNAVAILABLE`, now with a reason and a repair. Measured then: the pin
+  `plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs` 16/16.
+- Not changed: the acceptance needs a real Codex/WSL Feature greenfield run on an installed candidate with host export
+  approval (host session). The Triage block of this item is empty and is left empty: no recorded decision in the
+  repository settles it as a whole.

@@ -54,10 +54,10 @@ Remaining Claude/Windows-specific frictions:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
+- **Decision:** D77 / AC-127 (2026-10-21, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`) for the V-10 clause only; the rest of the item is not decided by it.
+- **Rationale:** the three V-10 gaps dispositioned in the pin header satisfy AC-127 for 0.7.0 and are named in the release note.
 - **Assignment (if accepted):**
-- **Date:**
+- **Date:** 2026-10-23 (filled by the text sweep; the decision itself dates from 2026-10-21).
 
 ### Agent measurement (2026-10-22)
 
@@ -117,3 +117,24 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
   Dispositioned in the item's 2026-10-22 extension (ALF-K35, PO decisions): dynamic Workflow prompt becomes the typed advisory GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED, Critic and non-Goldfish roles are out of scope of V-10 (no slice key), and Codex/Antigravity registration is a source-scan case; the stale header text just needs updating.
 - **HOST-SESSION-NEEDED** — The PO's CAS/missing failure is still not located; reproduce on the new candidate and record the code
   K28 probes found no 'missing' code for continuity-cas on this head and no report text is available; it needs the PO's Windows report or a live Windows Claude run on the new candidate to capture the literal code. Most plausibly V-1 (continuity-cas refusal), already admitted.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1 (item text only; the pin test header is separate work). Superseded sentences above,
+kept as history:
+
+- Description, V-10 ("the dispatch guard demands the full briefing inline, while the continuity route digest binds a
+  briefing file") and Acceptance "V-9, V-10, V-12 and V-13 are fixed or explicitly dispositioned": V-10 is
+  dispositioned. The dynamic Workflow prompt now yields the typed advisory `GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED`
+  (emitted in `plugins/pipeline-core/hooks/guard-dispatch.mjs`, ALF-K35); Critic and other non-Goldfish roles are out of
+  scope of V-10 (no `Slice:` key); Codex and Antigravity registration of `guard-dispatch` is a source-scan case. The
+  disposition is accepted for 0.7.0 by D77 / AC-127 (2026-10-21, `po-decisions-2026-10-18.md`). See "Extension
+  2026-10-22 (PO decisions, ALF-K35)" above.
+- Agent measurement 2026-10-22 and K28, "The other two gaps are still open" / "needs a route-policy decision": answered by
+  the ALF-K35 extension and D77; they are dispositions, no longer open questions. The K28 Workflow-hook observation
+  (host fires the hook for the Workflow call, not provably for each launched `agent()`) is unchanged.
+- Blocker analysis, "the stale header text just needs updating": still owed in the pin test header (lines 32-33 still
+  say "open, owner Coordinator, due 2026-10-31"); that edit is outside this text sweep.
+
+Still open, unchanged: the CAS/"missing" failure is not located, V-10 aside, and the live two-approval Claude/Windows run
+needs a host session. The item stays open.

@@ -44,10 +44,10 @@ Remaining gap: a Bash-based notes write is not admitted in the closing lane; dec
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
+- **Decision:** D123 (2026-10-22, PO tiles, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md` line 149): accepted for the notes route.
+- **Rationale:** Write/Edit on the guard-allocated `critic-<agent-id>/critic-notes.md` is the one and only Critic notes route; no bounded Bash form is admitted.
 - **Assignment (if accepted):**
-- **Date:**
+- **Date:** 2026-10-23 (filled by the text sweep; the decision itself dates from 2026-10-22).
 
 ## Observed again 2026-10-05
 
@@ -64,3 +64,18 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
   Question: is Write/Edit on the guard-allocated critic-<agent-id>/critic-notes.md the one and only Critic notes route, with no bounded Bash form? The Triage block is empty.
 - **HOST-SESSION-NEEDED** — A live Critic dispatch with a security-class diff must complete and persist its notes on an installed host
   Needs a real Critic subagent turn (authenticated model) on an installed Claude host; observe that the review completes within budget and critic-notes.md exists under scratch/dispatch/critic-<agent-id>/. Item itself says this is not producible by an agent test.
+
+## Reconciled 2026-10-23
+
+Text sweep K54-BACKLOG-TEXT-SWEEP-1. Superseded sentences above, kept as history:
+
+- The empty Triage block and the Blocker-analysis question "is Write/Edit ... the one and only Critic notes route, with
+  no bounded Bash form? The Triage block is empty": decided by D123 (2026-10-22), which also orders the Triage fill;
+  the Triage above now carries it. D65 / AC-141 (2026-10-20, same decisions file) already required Write/Edit to be
+  documented as the only route and the template budget number to match the guard.
+- The "no write route for critic-notes.md" class in "Observed again 2026-10-05" is answered by that decision: the route
+  exists (Write/Edit on the allocated path), and a bounded Bash notes write is deliberately not admitted.
+
+Still open, unchanged: the live Critic dispatch with a security-class diff on an installed host (host session) and the
+"no CSPRNG primitive available to the Critic" class, which D123 does not address (see
+`2026-10-06-critic-scratch-name-randomness-has-no-admitted-command`, merged elsewhere). The item stays open.
