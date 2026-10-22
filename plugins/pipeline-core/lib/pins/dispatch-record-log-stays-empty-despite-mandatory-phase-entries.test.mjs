@@ -209,17 +209,76 @@ test("MEASURED ordering (c): the SECOND post-commit checkpoint of a multi-commit
   // included - so a checkpoint that follows the template literally MUST move candidateCommit with each commit.
   assert.deepEqual(validateDispatchRecord(second).commits, [COMMIT_1, COMMIT_2]);
   assert.equal(lane({ ...first, outcome: "in-progress", candidateCommit: BASE, commits: [], report: null }, first), null, "control: the first checkpoint (existing record still in-progress) is admitted");
-  const hit = lane(first, second);
-  assert.ok(hit, "measured: the lane's unclaimed path refuses the second checkpoint because candidateCommit changed against a terminal-by-denylist record");
-  assert.match(hit.reason, /already been used by a completed dispatch/u);
+  // QG-04 (ALF-K34, PO decision 2026-10-22 "align the unclaimed path"): K24 measured here that the unclaimed path REFUSED this write
+  // (candidateCommit changed against a terminal-by-denylist record). The PO decided the unclaimed path must admit it, so the measured
+  // refusal is replaced by the admission; the refusals that remain are pinned by the K34 negative controls below.
+  assert.equal(lane(first, second), null, "the unclaimed path admits the second checkpoint of a multi-commit package (K34)");
 });
 
-// The decided behaviour for the unclaimed path is a design decision (lane change, lib/guard/* is protected); the case documents
-// the contract the claimed path already honours (see parallel-work-in-one-checkout-is-unsafe.test.mjs, PARWORK-M2a/M2b).
-test("DESIRED ordering (c): the second checkpoint is admitted on an unclaimed record too", { todo: "needs a lane decision, lib/guard is protected (ALF-K24 report)" }, () => {
+// Decided by the PO 2026-10-22 (ALF-K34): the unclaimed path honours the contract the claimed path already honours
+// (see parallel-work-in-one-checkout-is-unsafe.test.mjs, PARWORK-M2a/M2b).
+test("DESIRED ordering (c): the second checkpoint is admitted on an unclaimed record too", () => {
   const first = interim(COMMIT_1, [COMMIT_1], goodLog);
   const second = interim(COMMIT_2, [COMMIT_1, COMMIT_2], [...goodLog, { phase: "commit-2", toolUseCount: 20 }]);
   assert.equal(lane(first, second), null);
+});
+
+// K34 negative controls: every refusal the unclaimed path keeps against an interim record.
+const COMMIT_3 = "4".repeat(40);
+const secondCheckpoint = () => interim(COMMIT_2, [COMMIT_1, COMMIT_2], [...goodLog, { phase: "commit-2", toolUseCount: 20 }]);
+const COMPLETED = /already been used by a completed dispatch/u;
+
+test("K34 control: a three-commit chain is admitted checkpoint by checkpoint", () => {
+  const twoCommits = secondCheckpoint();
+  const third = interim(COMMIT_3, [COMMIT_1, COMMIT_2, COMMIT_3], [...goodLog, { phase: "commit-3", toolUseCount: 30 }]);
+  assert.equal(lane(twoCommits, third), null);
+});
+
+test("K34 refusal kept: a FINAL record stays immutable (changed candidateCommit and extended commits)", () => {
+  const final = { ...interim(COMMIT_1, [COMMIT_1], goodLog), outcome: "completed" };
+  const hit = lane(final, secondCheckpoint());
+  assert.ok(hit);
+  assert.match(hit.reason, COMPLETED);
+});
+
+test("K34 refusal kept: a different taskId in the incoming write is refused", () => {
+  const first = interim(COMMIT_1, [COMMIT_1], goodLog);
+  assert.match(lane(first, { ...secondCheckpoint(), taskId: "OTHER-TASK-1" }).reason, COMPLETED);
+  assert.match(lane(first, { ...secondCheckpoint(), taskId: undefined }).reason, COMPLETED);
+});
+
+test("K34 refusal kept: shrinking, reordering or replacing the commit list is refused", () => {
+  const first = interim(COMMIT_2, [COMMIT_1, COMMIT_2], goodLog);
+  const next = (candidateCommit, commits) => interim(candidateCommit, commits, goodLog);
+  for (const [label, incoming] of [
+    ["shrunk", next(COMMIT_1, [COMMIT_1])],
+    ["reordered", next(COMMIT_3, [COMMIT_2, COMMIT_1, COMMIT_3])],
+    ["replaced", next(COMMIT_3, [COMMIT_3, COMMIT_2, COMMIT_1])],
+    ["first commit replaced", next(COMMIT_3, [COMMIT_3, COMMIT_2, COMMIT_3])],
+    ["same length, different last", next(COMMIT_3, [COMMIT_1, COMMIT_3])],
+    ["emptied", next(COMMIT_1, [])],
+  ]) {
+    const hit = lane(first, incoming);
+    assert.ok(hit, `${label} commit list must stay refused`);
+    assert.match(hit.reason, COMPLETED);
+  }
+});
+
+test("K34 refusal kept: an incoming write that is not the interim outcome (final, in-progress) against an interim record with changed candidateCommit", () => {
+  const first = interim(COMMIT_1, [COMMIT_1], goodLog);
+  const grown = secondCheckpoint();
+  assert.match(lane(first, { ...grown, outcome: "completed" }).reason, COMPLETED);
+  assert.match(lane(first, { ...grown, outcome: "in-progress" }).reason, COMPLETED);
+});
+
+test("K34 refusal kept: an Edit-shaped (non-JSON) append to an interim record stays refused", () => {
+  assert.match(lane(interim(COMMIT_1, [COMMIT_1], goodLog), null).reason, COMPLETED);
+});
+
+test("K34 refusal kept: a non-array commits field on either side is refused", () => {
+  const first = interim(COMMIT_1, [COMMIT_1], goodLog);
+  assert.match(lane(first, { ...secondCheckpoint(), commits: COMMIT_2 }).reason, COMPLETED);
+  assert.match(lane({ ...first, commits: undefined }, secondCheckpoint()).reason, COMPLETED);
 });
 
 // --- WORDING: what the texts an agent reads actually say about the log ---------------------------------------------------
