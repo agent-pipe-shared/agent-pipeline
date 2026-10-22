@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
-/** WP-B2-ii: a registration batch may append suites, never rewrite prior gate coverage. */
+/** WP-B2-ii / D103: a registration batch may insert suites at any position,
+ * never change, remove or reorder prior gate coverage. */
 import { parseStrictJson } from "./governance-event.mjs";
 import { canonical } from "./po-approval-proof.mjs";
 
@@ -29,10 +30,19 @@ export function evaluateVerifySuiteAppend({ beforeBytes, afterBytes } = {}) {
   const before = readDocument(beforeBytes);
   const after = readDocument(afterBytes);
   if (!before || !after) return fail("VSA-SHAPE");
-  if (after.suites.length <= before.suites.length) return fail("VSA-NO-APPEND");
-  for (let index = 0; index < before.suites.length; index += 1) {
-    if (canonical(before.suites[index]) !== canonical(after.suites[index])) return fail("VSA-PRIOR-ENTRY-CHANGED");
+  if (after.suites.length < before.suites.length) return fail("VSA-NO-APPEND");
+  // D103: insertion at any position is admitted; every prior row must survive
+  // byte-for-byte (canonical form) in its original relative order. A changed,
+  // removed or reordered prior row leaves the prior sequence unmatched.
+  const keptKeys = after.suites.map(canonical);
+  let next = 0;
+  for (const suite of before.suites) {
+    const key = canonical(suite);
+    while (next < keptKeys.length && keptKeys[next] !== key) next += 1;
+    if (next === keptKeys.length) return fail("VSA-PRIOR-ENTRY-CHANGED");
+    next += 1;
   }
+  if (after.suites.length === before.suites.length) return fail("VSA-NO-APPEND");
   const names = new Set();
   const files = new Set();
   for (const suite of after.suites) {
