@@ -10,8 +10,9 @@ import fs, { mkdtempSync, mkdirSync, writeFileSync, rmSync, renameSync, symlinkS
 import { syncBuiltinESMExports } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readAdvisorPhysicalBytes } from '../design-advisor-provenance.mjs';
+import { readDesignWorkflowPackageV2FromRepository } from '../design-workflow-package-v2.mjs';
 
 const REL = 'evidence/inner/source.json';
 const PAYLOAD = Buffer.from('{"advisor":"source"}\n', 'utf8');
@@ -185,6 +186,32 @@ test('a single ancestor replacement is re-observed on a fresh walk and then read
   try {
     assert.ok(readAdvisorPhysicalBytes(root, REL).equals(PAYLOAD));
     assert.ok(hook.state.targetLstats >= 4, 'a second full attempt happened after the drift');
+  } finally { hook.restore(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('the DWP2-PHYSICAL-OR-GIT relabel keeps the original ancestor-drift cause as a closed, non-authoritative diagnostic', () => {
+  const root = fixture();
+  const git = (...args) => spawnSync('git', ['-c', 'user.name=pin', '-c', 'user.email=pin@example.invalid', ...args], { cwd: root, encoding: 'utf8' });
+  assert.equal(git('init', '-q').status, 0, 'fixture repository');
+  assert.equal(git('add', '-A').status, 0);
+  assert.equal(git('commit', '-q', '-m', 'fixture').status, 0, 'fixture commit (a candidate must exist before the package read)');
+  const hook = hookTargetLstat(root, (n) => {
+    renameSync(join(root, 'evidence'), join(root, `old-evidence-${n}`));
+    mkdirSync(join(root, 'evidence'));
+    renameSync(join(root, `old-evidence-${n}`, 'inner'), join(root, 'evidence', 'inner'));
+  });
+  try {
+    const result = readDesignWorkflowPackageV2FromRepository({ repoRoot: root, packagePath: REL });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'DWP2-PHYSICAL-OR-GIT', 'the stage code is unchanged (it is the authoritative refusal)');
+    assert.equal(hook.state.actions, 3, 'the drift really happened inside the bounded re-observation, not in git');
+    assert.equal(result.diagnostic?.schema, 'pipeline.codex-advisor-binding-diagnostic.v1');
+    assert.equal(result.diagnostic.subcheck, 'source-provenance');
+    assert.equal(result.diagnostic.cause, 'DAP-PHYSICAL-PARENT-DRIFT', 'the underlying cause is kept, not collapsed to a generic label');
+    assert.equal(result.diagnostic.repair.kind, 'repeat-bounded-read');
+    assert.equal(result.diagnostic.repair.automatic, false);
+    assert.equal(result.diagnostic.repair.authority, 'diagnostic-only', 'the cause is advisory and carries no authority');
+    assert.equal(JSON.stringify(result.diagnostic).includes(root), false, 'no path crosses the diagnostic boundary');
   } finally { hook.restore(); rmSync(root, { recursive: true, force: true }); }
 });
 
