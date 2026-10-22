@@ -76,7 +76,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { materializeTestDesignWorkflowPackage } from "../lib/test-design-workflow-fixture.mjs";
 import { createPoApprovalIntent, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
-import { rereadApprovedDesignWorkflowPackage } from "../lib/design-workflow-package.mjs";
+import { readDesignWorkflowPackageFromRepository, rereadApprovedDesignWorkflowPackage } from "../lib/design-workflow-package.mjs";
 import { verifyStoredDesignWorkflowPackageSignature } from "../lib/design-workflow-approval.mjs";
 import { validPlanSubmission, validPreviousCurrentPlanApproval } from "../lib/plan-spec-state-v2.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
@@ -343,6 +343,108 @@ test("R7-5c: a bound artifact absent from the clone yields DWP-REBIND-ARTIFACT-L
   assert.deepEqual([...worktreeSnapshot(clone.dir)], [...treeBefore], "no artifact of any kind is written, nothing is reused or recreated");
   assert.deepEqual(stateBytes(clone.dir), stateBefore, "no State change");
   assert.deepEqual([...privateSnapshot(clone.dir)], [...privateBefore], "no receipt and no prior evidence promoted into private state");
+});
+
+// ALF-K29 / backlog item pipeline.approval-bound-design-package-lives-in-an-ignored-directory, open entry
+// "2026-10-08 recurrence: the private readiness receipt and Advisor course stay device-local; survival of
+// the full bound set across a device switch is not shown". The bound set splits in two:
+//   committed (tracked-required): the package, the Advisor receipt, the readiness file, PRD, Spec and the
+//     approval record in project/pipeline-state.json -- they arrive with a clone;
+//   device-local (private state): the host-observed readiness receipt `.git/agent-pipeline/design-readiness/`
+//     and the Advisor course `.git/agent-pipeline/design-advisor-courses/` -- they never arrive.
+// PO decision BL (R7-5): an approved plan does not need the device-local parts again. R7-5a above reuses the
+// origin's host-execution test seam, so it cannot show that; these cases run the clone with NO seam and
+// with the origin's device-local stores populated, then pin the one remaining place a device-local part is
+// still demanded (the pre-approval reader) to a self-describing refusal with a repair that actually runs.
+function seedDeviceLocalStores(origin) {
+  const readiness = join(origin.dir, ".git", "agent-pipeline", "design-readiness", h("4"));
+  const course = join(origin.dir, ".git", "agent-pipeline", "design-advisor-courses", h("4"));
+  for (const directory of [readiness, course]) mkdirSync(directory, { recursive: true });
+  writeFileSync(join(readiness, `drh_${"a".repeat(32)}.json`), "{\"origin-device-readiness-receipt\":true}\n");
+  writeFileSync(join(course, "dac_origin.json"), "{\"origin-device-advisor-course\":true}\n");
+  return { readiness, course };
+}
+const cloneBareDeps = (clone) => { // the clone's deps WITHOUT the origin's host-execution / candidate test seam
+  const { dir, now, ownerNonce, env, readHumanApprovalMode } = clone.deps;
+  return { dir, now, ownerNonce, env, readHumanApprovalMode };
+};
+function headCandidate(dir) {
+  return { commit: git(dir, ["rev-parse", "HEAD"]), tree: git(dir, ["rev-parse", "HEAD^{tree}"]) };
+}
+
+test("[bound set / device switch] the committed bound set alone verifies the approval on a clone whose device-local stores are absent", async () => {
+  const { classifyBoundPathReference } = await import("../lib/bound-path-classification.mjs");
+  const origin = approvedOrigin("bs-survive");
+  const seeded = seedDeviceLocalStores(origin);
+  assert.equal(existsSync(seeded.readiness) && existsSync(seeded.course), true, "precondition: the origin device holds both device-local stores");
+  const clone = cloneOf(origin, "bs-survive");
+  assert.deepEqual([...privateSnapshot(clone.dir).keys()], [], "precondition: nothing of .git/agent-pipeline arrived by clone");
+  assert.equal(git(clone.dir, ["status", "--porcelain"]), "", "precondition: clone is clean");
+
+  const result = invoke(["rebind-approval"], cloneBareDeps(clone));
+  const payload = rebindPayload(result);
+  assert.equal(result.status, 0, `${result.err} ${result.out}`);
+  assert.equal(payload.status, "verified", "no host-execution seam, no private store: the committed state alone verifies");
+  assert.equal(payload.readinessHostExecution, "not-required-on-rebind");
+
+  const receiptDir = join(clone.dir, ".git", "agent-pipeline", "rebind-approval");
+  const receipt = JSON.parse(readFileSync(join(receiptDir, readdirSync(receiptDir)[0]), "utf8"));
+  assert.ok(receipt.boundSet.length >= 3, "the bound set holds the package, the Advisor receipt, the readiness file and the sources");
+  for (const { path } of receipt.boundSet) {
+    assert.equal(classifyBoundPathReference(path), "tracked-required", `${path} is a committed home`);
+    assert.notEqual(git(clone.dir, ["ls-files", "--", path]), "", `${path} is tracked on the clone`);
+  }
+  assert.equal(readdirSync(join(clone.dir, ".git", "agent-pipeline")).some((name) => /design-readiness|design-advisor-courses/u.test(name)), false,
+    "verification neither needed nor created a device-local readiness or Advisor store");
+});
+
+test("[bound set / device switch] the pre-approval reader names the missing device-local part and ONE repair that runs on the clone", () => {
+  const origin = approvedOrigin("bs-refusal");
+  seedDeviceLocalStores(origin);
+  const clone = cloneOf(origin, "bs-refusal");
+  const read = readDesignWorkflowPackageFromRepository({ repoRoot: clone.dir, packagePath: origin.state.planApproval.designWorkflowPackagePath,
+    readCandidate: () => headCandidate(clone.dir), requireCurrentCandidate: false });
+  assert.equal(read.ok, false, "without the origin's host-observed receipt the default reader cannot admit the package");
+  assert.equal(read.code, "DWP-READINESS-HOST-RECEIPT-UNAVAILABLE", "the existing typed code is unchanged");
+  const finding = read.deviceLocal;
+  assert.ok(finding && typeof finding === "object", `the refusal carries a typed device-local finding; got ${JSON.stringify(read)}`);
+  assert.equal(finding.schema, "pipeline.device-local-bound-set-finding.v1");
+  assert.equal(finding.part, "readiness-host-receipt");
+  assert.match(finding.location, /^\.git\/agent-pipeline\/design-readiness\/?$/u);
+  assert.match(finding.explanation, /device-local/iu);
+  assert.deepEqual(finding.repair.argv.slice(1), ["rebind-approval"], "exactly one repair command");
+  assert.equal(existsSync(finding.repair.argv[0]), true, "the repair names the real script on this device");
+  assert.match(finding.repair.text, /rebind-approval/u);
+
+  // The repair is runnable as given: it verifies the approval on the clone and requests nothing from the PO.
+  const ran = spawnSync(process.execPath, finding.repair.argv, { cwd: clone.dir, encoding: "utf8", env: { ...process.env, ...ENV } });
+  assert.ok(ran.stdout.trim().startsWith("{"), `repair must print one JSON object (exit ${ran.status}; stderr: ${ran.stderr.slice(0, 200)})`);
+  const payload = JSON.parse(ran.stdout);
+  assert.equal(payload.status, "verified", JSON.stringify(payload).slice(0, 400));
+  assert.equal(payload.signaturesRequested, 0);
+});
+
+test("[bound set / device switch] every device-local refusal code maps to a finding; a content refusal code never does", async () => {
+  const evidence = await import("../lib/design-readiness-host-evidence.mjs");
+  assert.equal(typeof evidence.deviceLocalFindingForCode, "function", "design-readiness-host-evidence exports deviceLocalFindingForCode");
+  const expected = new Map([
+    ["DWP-READINESS-HOST-RECEIPT-UNAVAILABLE", "readiness-host-receipt"],
+    ["DWP-READINESS-HOST-REPOSITORY-MISMATCH", "repository-identity"],
+    ["DWP2-REPOSITORY-IDENTITY", "repository-identity"],
+    ["DWP2-DURABLE-COURSE", "advisor-course"],
+    ["DWP2-DURABLE-FAILURE", "advisor-course"],
+  ]);
+  for (const [code, part] of expected) {
+    const finding = evidence.deviceLocalFindingForCode(code);
+    assert.equal(finding?.part, part, code);
+    assert.deepEqual(finding.repair.argv.slice(1), ["rebind-approval"], code);
+  }
+  for (const code of ["DWP-READINESS-HOST-RECEIPT-MISMATCH", "DWP-APPROVAL-DIGEST-DRIFT", "DWP2-PHYSICAL-DRIFT", "DWP-PACKAGE-PHYSICAL"]) {
+    assert.equal(evidence.deviceLocalFindingForCode(code), null, `${code} is a content/tamper refusal, not a missing device-local part`);
+  }
+  const untouched = { ok: false, code: "DWP-READINESS-HOST-RECEIPT-MISMATCH" };
+  assert.deepEqual(evidence.withDeviceLocalFinding(untouched), untouched, "a content refusal passes through unchanged");
+  assert.equal(evidence.withDeviceLocalFinding({ ok: true }).ok, true);
 });
 
 const INSPECT_TODO = "onboarding inspect on the throwaway clone returns status partial (partial_authority, nextAction null) because the clone is not an onboarded project; the ready branch that calls designToImplementationHandoverAction is never reached, so the reopen-design precondition cannot be established on this fixture";
