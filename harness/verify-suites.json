@@ -3736,6 +3736,12 @@
       "file": "plugins/pipeline-core/lib/authority-restore.test.mjs",
       "invariantPinned": "An edited bound PRD or Spec is restored from git only when the bytes equal the approved digest, all documents or none, with one repair and no write on a refusal; the lock denial names the consequence and the restore command (D31, AC-115, D137)",
       "nonOverlapNote": "Unique cases: the typed self-revert of an edited bound authority document and its pre-edit warning"
+    },
+    {
+      "name": "partial-readiness-restore-advice-tests",
+      "file": "plugins/pipeline-core/lib/pins/partial-readiness-names-the-authority-restore-when-the-committed-bytes-match.test.mjs",
+      "invariantPinned": "The inspect output and the reopen-design guidance name the exact authority restore command first when an edited bound PRD or Spec still has committed bytes equal to the approved digest, and name nothing when the committed bytes differ or the working bytes already equal the digest (D31, D137, D141, AC-115)",
+      "nonOverlapNote": "Unique cases: the restore advice in the partial-readiness inspect text"
     }
   ]
 }
