@@ -29,6 +29,10 @@
  *    `unavailable` / `RRP-FALLBACK-ROLE-NOT-ALLOWED`. Each observation kind is
  *    judged against its own route cell: a fallback is not blocked by the
  *    native cell and a native claim is not rescued by the fallback cell.
+ *  - D122: for the Antigravity advisor and critic, whose native route cell is unavailable, a well-formed
+ *    `native` observation resolves to `fallback-self-dispatch` with `RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER`
+ *    (a self-dispatch without an authenticated per-call carrier, never a native route; D63/AC-109). A
+ *    `fallback-self-dispatch` observation on those cells stays `RRP-FALLBACK-ROLE-NOT-ALLOWED`.
  *  - a Critic claimed `native` needs BOTH a hook-recorded start and a
  *    hook-recorded terminal. The design names Claude and Antigravity; this
  *    module applies it to every runner, because a native claim whose hook did
@@ -54,6 +58,7 @@ export const ROLE_ROUTE_PREFLIGHT_CODES = Object.freeze({
   nativeObserved: "RRP-NATIVE-OBSERVED",
   routeCellUnavailable: "RRP-ROUTE-CELL-UNAVAILABLE",
   fallbackAdvisorConsult: "RRP-FALLBACK-ADVISOR-CONSULT",
+  fallbackSelfDispatchNoCarrier: "RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER",
   fallbackRoleNotAllowed: "RRP-FALLBACK-ROLE-NOT-ALLOWED",
   noHostObservation: "RRP-NO-HOST-OBSERVATION",
   roleNotRegistered: "RRP-ROLE-NOT-REGISTERED",
@@ -69,6 +74,9 @@ const NATIVE_ROUTE = Object.freeze({
   readiness: "duty.readiness",
 });
 const FALLBACK_ROUTE = Object.freeze({ advisor: "duty.advisory.fallback" });
+// D122: the roles whose native Antigravity cell is unavailable but whose recorded self-dispatch fallback is admitted.
+// The label (reason code) is honest: a self-dispatch without an authenticated per-call carrier (D63/AC-109), never a native route.
+const NO_CARRIER_FALLBACK = Object.freeze({ antigravity: Object.freeze(["advisor", "critic"]) });
 const CELL_STATES = Object.freeze(["default", "opt-in", "unavailable"]);
 const OBSERVATION_KINDS = Object.freeze(["native", "fallback-self-dispatch"]);
 const OBSERVATION_KEYS = Object.freeze(["evidenceSha256", "hookRecordedStart", "hookRecordedTerminal", "kind"]);
@@ -129,7 +137,7 @@ function classifyObservation(raw) {
   return { kind: raw.kind, evidence: raw.evidenceSha256, start: raw.hookRecordedStart, terminal: raw.hookRecordedTerminal };
 }
 
-function evaluateRole(role, rawObservation, routes) {
+function evaluateRole(role, rawObservation, routes, runner) {
   const observation = classifyObservation(rawObservation);
   if (observation.kind === "fallback-self-dispatch") {
     const fallbackRoute = FALLBACK_ROUTE[role];
@@ -141,6 +149,10 @@ function evaluateRole(role, rawObservation, routes) {
   }
   const nativeRoute = NATIVE_ROUTE[role];
   if (nativeRoute !== undefined && routes.get(nativeRoute) === "unavailable") {
+    if (NO_CARRIER_FALLBACK[runner]?.includes(role) && observation.kind === "native"
+      && (role !== "critic" || (observation.start && observation.terminal))) {
+      return { state: "fallback-self-dispatch", reasonCode: ROLE_ROUTE_PREFLIGHT_CODES.fallbackSelfDispatchNoCarrier, evidence: observation.evidence };
+    }
     return unavailable(ROLE_ROUTE_PREFLIGHT_CODES.routeCellUnavailable);
   }
   if (observation.absent) {
@@ -171,7 +183,7 @@ export function evaluateRoleRoutePreflight(input) {
   }
   const roles = {};
   for (const role of ROLE_ROUTE_PREFLIGHT_ROLES) {
-    roles[role] = evaluateRole(role, Object.hasOwn(observations, role) ? observations[role] : undefined, indexed.routes);
+    roles[role] = evaluateRole(role, Object.hasOwn(observations, role) ? observations[role] : undefined, indexed.routes, runner);
   }
   return { schema: ROLE_ROUTE_PREFLIGHT_SCHEMA, ok: true, runner, roles };
 }
