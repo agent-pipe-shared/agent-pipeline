@@ -300,7 +300,8 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
   return { toolName, toolInput, filePath, command, isReadOnly };
 }
 
-// PO decision D87: the credential-root decision is NOT restated here. It is the one the Claude native
+// PO decision D87 (kept) and D96 (2026-10-22: reading outside the repository is allowed except for credentials): the
+// credential-root decision is NOT restated here, and neither is any outside-the-project rule. It is the one the Claude native
 // Read lane and the shell-read grammar already use -- readToolScopeVerdict (lib/guard/read-scope.mjs)
 // for a file, and isAllowedPassiveReadTarget (lib/passive-read-policy.mjs, the same function that
 // verdict bottoms out in, with its single PASSIVE_READ_CREDENTIAL_ROOTS list) for directory and search

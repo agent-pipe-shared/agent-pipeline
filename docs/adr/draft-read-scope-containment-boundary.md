@@ -27,6 +27,25 @@ are visible. An absolute path outside the active repository is not itself a
 Pipeline denial reason. This rule is runner-neutral and applies to Codex,
 Claude Code and Antigravity through their shared guard policy.
 
+## PO decision D96, 2026-10-22
+
+Status: implemented in the Antigravity adapter's test pin; the protected guard
+changes are handed to the operator as a reviewed diff.
+
+The PO restated the 2026-09-10 correction as a rule: "Reading outside the
+repository should generally be allowed, except credentials. Writing is
+something different. Claude and Codex should become more like Agy." A passive
+read of a path outside the active repository is therefore refused only when it
+is a credential root, a secret file (by basename, lexical and physical), a
+system pseudo root of the single credential list, or a directory holding such a
+file. Execution and output options, mutation, redirects and unsupported
+composition stay refused exactly as before, and no write lane is widened. The
+shared policy (`lib/passive-read-policy.mjs`) is the one place that decides it
+for the shell-read grammar, the native Read/Grep/Glob lane, the Codex adapter
+and the Antigravity adapter alike; the host allow-list of user-visible
+locations and the file-only rule for outside recursive operands are the two
+parts of it that contradicted this decision.
+
 The historical sections below retain the prior decision and its evidence so
 the reversal remains auditable.
 

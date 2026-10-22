@@ -7,7 +7,7 @@
 // check that only handles the other.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -142,6 +142,61 @@ test("D87-7 a second workspace folder keeps its ordinary reads, and its credenti
   const deniedSearch = decide(root, { ...both, ...native("grep_search", { SearchPath: join(other, "vault"), Query: "private" }) });
   assert.equal(deniedSearch.denied, true, deniedSearch.text);
 })));
+
+// PO decision D96 (2026-10-22; the 2026-09-10 correction in docs/adr/draft-read-scope-containment-boundary.md): reading
+// outside the repository is allowed except for credentials. None of the seven D87 cases above asserted "refused because it
+// is outside the project" (every refusal in them is a credential root, a secret file, or a directory holding one), so
+// nothing is weakened or restated here; this case adds the missing POSITIVE control and keeps the credential negative
+// controls next to it. The fixture directory is under /var/tmp and the file under /usr/share on purpose: neither is on the
+// host-visible allow-list the shared policy used before D96, so the case is RED while that list exists.
+test("D96-1 a native read outside the project is admitted unless it is a credential root or secret file", { timeout: 300000 }, () => withFixture((root) => {
+  if (process.platform === "win32") return;
+  let outside;
+  try { outside = realpathSync(mkdtempSync(join("/var/tmp", "agy-read-d96-"))); } catch { return; }
+  try {
+    mkdirSync(join(outside, "clean"), { recursive: true });
+    mkdirSync(join(outside, "vault"), { recursive: true });
+    writeFileSync(join(outside, "clean", "note.md"), "apply\n");
+    writeFileSync(join(outside, "vault", "id_rsa"), "private\n");
+    writeFileSync(join(outside, "clean", ".env"), "TOKEN=synthetic\n");
+    const note = join(outside, "clean", "note.md");
+    const admitted = [
+      ["view_file", { AbsolutePath: note }],
+      ["read_url_content", { Url: pathToFileURL(note).href }],
+      ["list_dir", { DirectoryPath: join(outside, "vault") }],
+      ["find_by_name", { SearchDirectory: outside, Pattern: "*.md" }],
+      ["grep_search", { SearchPath: join(outside, "vault", ".."), Query: "apply" }],
+    ];
+    // The recursive search over the whole fixture is refused (it holds id_rsa and .env); the search over a clean copy is not.
+    mkdirSync(join(outside, "cleandir"), { recursive: true });
+    writeFileSync(join(outside, "cleandir", "a.md"), "apply\n");
+    admitted.splice(4, 1, ["grep_search", { SearchPath: join(outside, "cleandir"), Query: "apply" }]);
+    const hostFile = ["/usr/share/zoneinfo/UTC", "/usr/share/common-licenses/GPL-3", "/usr/bin/env"].find((path) => existsSync(path));
+    if (hostFile !== undefined) admitted.push(["view_file", { AbsolutePath: hostFile }]);
+    for (const [name, args] of admitted) {
+      const d = decide(root, native(name, args));
+      assert.equal(d.allowed, true, `${name} ${JSON.stringify(args)} must be admitted (exit ${d.exit}): ${d.text}`);
+    }
+    const canonical = decide(root, { tool_name: "Read", tool_input: { file_path: note } });
+    assert.equal(canonical.allowed, true, canonical.text);
+    // Negative controls: the credential intent is unchanged outside the project too.
+    const refused = [
+      ["view_file", { AbsolutePath: join(outside, "vault", "id_rsa") }],
+      ["view_file", { AbsolutePath: join(outside, "clean", ".env") }],
+      ["grep_search", { SearchPath: join(outside, "vault"), Query: "private" }],
+      ["grep_search", { SearchPath: outside, Query: "private" }],
+      ["list_dir", { DirectoryPath: join(homedir(), ".ssh") }],
+    ];
+    for (const [name, args] of refused) {
+      const d = decide(root, native(name, args));
+      assert.equal(d.denied, true, `${name} ${JSON.stringify(args)} must stay refused (exit ${d.exit}): ${d.text}`);
+      assert.match(d.text, CODE, `${name} ${JSON.stringify(args)}`);
+    }
+    // A pseudo-root of the single credential list stays refused (the shared list names /etc, /proc, /sys, /dev, /run).
+    const etc = decide(root, native("view_file", { AbsolutePath: "/etc/hostname" }));
+    assert.equal(etc.denied, true, etc.text);
+  } finally { rmSync(outside, { recursive: true, force: true }); }
+}));
 
 test("D87-6 the denial text is the one the Claude native Read produces, so the typed code cannot drift", { timeout: 300000 }, () => withFixture((root) => {
   const key = join(homedir(), ".ssh", "id_rsa");
