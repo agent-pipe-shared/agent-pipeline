@@ -3,7 +3,9 @@
 // The ordinary initial Advisor course is RETIRED by doctrine: the CLI route to a new course is intentionally
 // closed (qualified state, not a gap). This pin holds (i) the retirement, (ii) the surviving child-course
 // owner-decision observer, (iii) child-course open / owner-decision reuse through the library, and
-// (iv) idempotent publication of a re-derived native no-child result. It never restores the ceremony.
+// (iv) idempotent publication of a re-derived native no-child result, and (v) the REPLACEMENT route (ADR-0085):
+// a design revision after a review finding is one delta receipt plus one rebind, with zero PO interactions,
+// zero overrides and no hand-invented identifier. It never restores the ceremony.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,rmSync,realpathSync,symlinkSync} from 'node:fs';
@@ -19,6 +21,8 @@ import {createHash} from 'node:crypto';
 import {dirname} from 'node:path';
 import {advisorHostFixture} from '../codex-advisor-host.fixture.mjs';
 import {DESIGN_ADVISORY_COURSE_RETIRED} from '../retired-design-codes.mjs';
+import {createReceiptFromDisk} from '../../scripts/design-review-receipt.mjs';
+import {createDesignApprovalBinding,createDesignApprovalRequest,verifyDesignApprovalRequest} from '../design-approval-binding.mjs';
 
 const scratchRoot=t=>{const root=realpathSync(mkdtempSync(join(tmpdir(),'revised-native-advisor-pin-')));t.after(()=>rmSync(root,{recursive:true,force:true}));return root;};
 const hex=c=>c.repeat(64);
@@ -190,4 +194,100 @@ test('(iv) re-deriving and publishing a native no-child result is idempotent',as
  // A result that is not an already-existing course passes through unchanged (no export, no state).
  const passthrough={ok:false,status:'recovery-required',code:'X'};
  assert.equal(publishNativeInitialResult({root:f.root,args,runner,route,result:passthrough}),passthrough);
+});
+
+// (v) The replacement route. Acceptance clause 1 of the item (Spec 21.5 R5-6/R5-8): one design revision after a review
+// finding rebinds the sources in a single step, needs zero PO interactions and zero overrides, and does not loop.
+// ADR-0085 retired the Advisor course; the revision route is: delta review receipt (`design-review-receipt.mjs create`,
+// real, from disk) -> one rebind (`createDesignApprovalBinding`) -> one request carrying the single signature intent.
+const sha256Text=text=>createHash('sha256').update(text).digest('hex');
+const FORBIDDEN_IDENTIFIERS=/dispatch|course|advisor|override|continuity|signature|proof/iu;
+const isoAt=hour=>()=>new Date(`2026-10-22T${hour}:00:00.000Z`);
+const CANDIDATE={commit:'a'.repeat(40),tree:'b'.repeat(40)};
+
+function revisionFixture(t){
+ const root=scratchRoot(t),env={CLAUDECODE:'1'};
+ const put=(rel,text)=>{mkdirSync(dirname(join(root,rel)),{recursive:true});writeFileSync(join(root,rel),text);};
+ const ref=rel=>({path:rel,sha256:sha256Text(readFileSync(join(root,rel)))});
+ const sourcesNow=()=>({prd:ref('specs/f1/prd.md'),spec:ref('specs/f1/spec.md'),companions:[ref('specs/f1/design.md')]});
+ const receiptAt=(n,{previous=null,open=[],hour})=>{
+  const made=createReceiptFromDisk({repo:root,featureId:'f1',reportPath:`specs/f1/review/report-${n}.md`,prdPath:'specs/f1/prd.md',specPath:'specs/f1/spec.md',
+   companionPaths:['specs/f1/design.md'],previousPath:previous,openFindingIds:open,outPath:`specs/f1/review/receipt-${n}.json`},{env,now:isoAt(hour)});
+  return made.ok?{ok:true,path:made.path,bytes:readFileSync(join(root,made.path))}:made;
+ };
+ put('specs/f1/prd.md','PRD v1\n');put('specs/f1/spec.md','Spec v1\n');put('specs/f1/design.md','Design v1\n');
+ put('specs/f1/review/report-1.md','Review round 1: F-1 open.\n');put('specs/f1/review/report-2.md','Review round 2: pass.\n');
+ return {root,put,sourcesNow,receiptAt};
+}
+
+// The whole contract, parameterised over the rebind function so mutants can be proven RED against it.
+function assertSingleStepRevision(bind,t){
+ const f=revisionFixture(t);
+ const sources1=f.sourcesNow(),r1=f.receiptAt(1,{open:['F-1'],hour:'10'});
+ assert.equal(r1.ok,true,JSON.stringify(r1));
+ const stale=createDesignApprovalBinding({featureId:'f1',receipts:[r1],currentSources:sources1});
+ assert.equal(stale.ok,true,JSON.stringify(stale));
+ assert.equal(stale.binding.verdict,'open-findings');
+ const staleRequest=createDesignApprovalRequest({binding:stale.binding,candidate:CANDIDATE});
+ assert.equal(staleRequest.ok,true,JSON.stringify(staleRequest));
+ // The revision: the finding is fixed in the Spec, then ONE delta receipt (round 2) is produced from disk.
+ f.put('specs/f1/spec.md','Spec v2 (F-1 fixed)\n');
+ const sources2=f.sourcesNow(),r2=f.receiptAt(2,{previous:'specs/f1/review/receipt-1.json',open:[],hour:'11'});
+ assert.equal(r2.ok,true,JSON.stringify(r2));
+ const receipts=[r1,r2];
+ // A request over the pre-revision chain is stale evidence, refused with a typed code (never silently accepted).
+ const staleVerdict=verifyDesignApprovalRequest({request:staleRequest.request,featureId:'f1',receipts,currentSources:sources2});
+ assert.equal(staleVerdict.ok,false);
+ assert.match(staleVerdict.code,/^DAB-/u);
+ // The single rebind step. Its inputs are only the receipt chain and the current sources: no PO input of any kind.
+ const rebound=bind({featureId:'f1',receipts,currentSources:sources2});
+ assert.equal(rebound.ok,true,JSON.stringify(rebound));
+ assert.deepEqual(rebound.binding.sources,sources2,'the binding rebinds the current (revised) sources');
+ assert.deepEqual(rebound.binding.reviewReceipts.map(r=>r.round),[1,2]);
+ assert.equal(rebound.binding.verdict,'pass');
+ assert.deepEqual(rebound.binding.openFindingIds,[]);
+ assert.equal(Object.hasOwn(rebound.binding,'unreviewedSourceDelta'),false,'nothing changed after the delta review');
+ const request=createDesignApprovalRequest({binding:rebound.binding,candidate:CANDIDATE});
+ assert.equal(request.ok,true,JSON.stringify(request));
+ // One request, one intent to sign; no identifier, course, dispatch, override, continuity or proof is part of it.
+ assert.deepEqual(Object.keys(request.request).sort(),['approvalIntent','binding','bindingSha256','schema']);
+ assert.equal(FORBIDDEN_IDENTIFIERS.test(JSON.stringify(request.request)),false,'the request carries no hand-invented identifier or ceremony artefact');
+ const verified=verifyDesignApprovalRequest({request:request.request,featureId:'f1',receipts,currentSources:sources2});
+ assert.equal(verified.ok,true,JSON.stringify(verified));
+ assert.equal(verified.intentSha256,request.intentSha256);
+ return {f,receipts,sources2,rebound};
+}
+
+test('(v) a design revision on the replacement route is one delta receipt and one rebind with zero PO interactions',t=>{
+ const {f,receipts,sources2,rebound}=assertSingleStepRevision(input=>createDesignApprovalBinding(input),t);
+ // Does not loop: a further edit after the delta review is carried as an unreviewed delta in the SAME binding step,
+ // and a third review round is refused (QG-13) instead of being asked for.
+ f.put('specs/f1/design.md','Design v2 (edited after the delta review)\n');
+ const drifted=createDesignApprovalBinding({featureId:'f1',receipts,currentSources:f.sourcesNow()});
+ assert.equal(drifted.ok,true,JSON.stringify(drifted));
+ assert.deepEqual(drifted.binding.unreviewedSourceDelta.map(entry=>entry.path),['specs/f1/design.md']);
+ assert.equal(drifted.binding.reviewReceipts.length,2);
+ f.put('specs/f1/review/report-3.md','Review round 3.\n');
+ const third=f.receiptAt(3,{previous:'specs/f1/review/receipt-2.json',open:[],hour:'12'});
+ assert.deepEqual([third.ok,third.code],[false,'DRR-ROUND-EXCEEDED']);
+ assert.notDeepEqual(rebound.binding.sources,f.sourcesNow(),'fixture: the drift really changed a source');
+ void sources2;
+});
+
+test('(v-doc) the documented revision route is mechanical agent work and names no Advisor course',()=>{
+ const doc=readFileSync(new URL('../../skills/pipeline-start/references/design-course.md',import.meta.url),'utf8');
+ assert.match(doc,/mechanical agent work, not another PO permission/u);
+ assert.match(doc,/correct the\s+sources with `reopen-design`, `submit-plan`, `present-plan`/u);
+ assert.match(doc,/There is no\s+mandatory initial Advisor course/u);
+ const state=readFileSync(new URL('../../scripts/pipeline-state.mjs',import.meta.url),'utf8');
+ assert.match(state,/present-plan accepts only --by <name> and --review-receipt <repo-relative-json-path>/u,'present-plan takes no dispatch, course or override argument');
+});
+
+test('(v-RED) a rebind that invents an identifier, or drops the delta receipt, is caught by the contract',t=>{
+ const invents=input=>{const made=createDesignApprovalBinding(input);return made.ok?{...made,binding:{...made.binding,dispatchId:'invented-by-hand'}}:made;};
+ assert.throws(()=>assertSingleStepRevision(invents,t),/dispatchId|DAB-SHAPE|Expected values|false/iu);
+ const dropsDelta=input=>createDesignApprovalBinding({...input,receipts:input.receipts.slice(0,1)});
+ assert.throws(()=>assertSingleStepRevision(dropsDelta,t),/DAB-REVIEW-CHAIN|Expected values|false/iu);
+ // The unmutated rebind passes the very same contract.
+ assertSingleStepRevision(input=>createDesignApprovalBinding(input),t);
 });
