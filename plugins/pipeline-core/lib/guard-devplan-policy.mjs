@@ -280,6 +280,33 @@ export function designAdvisoryRemediation(code) {
 
 }
 
+/**
+ * PO decision D117 (decision BI, backlog item denial-names-a-diagnosis-it-refuses): an approved feature whose approval
+ * cannot be RE-VERIFIED degrades to an advisory instead of locking every write. Only a verification INPUT that is
+ * unavailable qualifies -- never a mismatch. Today that is exactly one admission code: `DWP-PACKAGE-PHYSICAL`, the approved
+ * design workflow package file is missing or is not a physical repository file, so its digest cannot be recomputed. Every
+ * code that says a record, digest, signature, candidate or source DIFFERS stays a block with its own code (the package
+ * digest drift is `DWP-APPROVAL-DIGEST-DRIFT`, a wrong signer is `DAA-PO-APPROVAL-TRUST-MISMATCH`, ...), and so does a
+ * missing trust-anchor setup (`DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP`: nothing was ever configured to verify against).
+ * `designAdvisoryAdmission()` itself is NOT changed: its other callers (architecture-design, design-decision-bindings)
+ * need real authority and keep reading `ok:false`; only the two gate call sites consult this function.
+ */
+export const UNVERIFIABLE_APPROVAL_CODES = Object.freeze(["DWP-PACKAGE-PHYSICAL"]);
+export const UNVERIFIED_APPROVAL_ADVISORY_CODE = "GUARD-DEVPLAN-APPROVAL-UNVERIFIED";
+
+/** @returns {null|{code:string,cause:string,text:string}} null unless the refusal is an unavailable verification input. */
+export function unverifiedApprovalAdvisory(admission, state) {
+  if (admission?.ok !== false || !UNVERIFIABLE_APPROVAL_CODES.includes(admission.code)) return null;
+  const packagePath = state?.planApproval?.designWorkflowPackagePath;
+  const where = typeof packagePath === "string" && packagePath !== "" ? ` at ${packagePath}` : "";
+  const text = [
+    `[guard-devplan] ADVISORY (${UNVERIFIED_APPROVAL_ADVISORY_CODE}, cause ${admission.code}): the recorded design approval could not be re-verified, so this write was allowed on the recorded approval alone.`,
+    `What could not be verified: the approved design workflow package${where} is missing or is not a physical repository file, so its digest, signature and bound sources were NOT checked. Nothing was verified.`,
+    "Repair: run reopen-design --by <human attribution>, then finish the sources and obtain the approval again (a package that is present but different still blocks as DWP-APPROVAL-DIGEST-DRIFT).",
+  ].join("\n");
+  return { code: UNVERIFIED_APPROVAL_ADVISORY_CODE, cause: admission.code, text };
+}
+
 
 /**
  * Why `scratch/` is here, and why it is the safest of the five rather than the
@@ -511,6 +538,12 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
 
   if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
     const admission = designAdvisoryAdmission(state, projectDir, planPath, specPath);
+    // D117 / BI: an approval whose verification input is unavailable degrades to ONE advisory instead of blocking.
+    const unverified = admission.ok ? null : unverifiedApprovalAdvisory(admission, state);
+    if (unverified !== null) return {
+      verdict: "allow", advisory: unverified.text, advisoryCode: unverified.code,
+      feature: activeFeature.id, lifecycleStatus: lifecycle.status,
+    };
     if (!admission.ok) return {
       verdict: gate.mode === "warn" ? "warn" : "block",
       reason: designAdvisoryRemediation(admission.code),

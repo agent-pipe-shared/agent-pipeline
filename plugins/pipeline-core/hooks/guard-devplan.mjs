@@ -148,7 +148,7 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
-import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath } from "../lib/guard-devplan-policy.mjs";
+import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
 // NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
 // after-every-conflict.md): the dev-plan gate's ONE relief and its denial disclosure, owned by
 // the policy module both of this gate's lanes already share, never re-decided here. See that
@@ -508,6 +508,10 @@ if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction 
     : hasGeneralizedLedgerBackedPlanApproval(state, projectDir);
   if (resolved) {
     const admission = designAdvisoryAdmission(state, projectDir, planPath, specPath);
+    // D117 / BI: an approval whose verification input is unavailable degrades to ONE advisory (exit 0 + stderr notice,
+    // the same channel as the rebase-admission notice below) instead of a block. Every other refusal is unchanged.
+    const unverified = admission.ok ? null : unverifiedApprovalAdvisory(admission, state);
+    if (unverified !== null) emit(0, [unverified.text]);
     if (!admission.ok) emit(gate.mode === "warn" ? 1 : 2, [designAdvisoryRemediation(admission.code)]);
     process.exit(0);
   }

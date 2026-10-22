@@ -35,10 +35,15 @@ import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinui
  * `devPlanGateVerdict()` itself did not already contain to a "warn") returns a typed fault
  * sentinel rather than silently falling through as "nothing to check".
  *
- * @returns {null|{fault:true,error:Error}|{verdict:"block",reason:string,feature?:string,
+ * D117 / BI: a candidate whose verdict is "allow" but carries an `advisory` (an approval whose
+ * verification input is unavailable) yields, when no candidate blocks, the non-blocking sentinel
+ * `{advisory:true, notice, code, candidate, lane}`; the caller must surface `notice` and must NOT
+ * treat the sentinel as a refusal.
+ *
+ * @returns {null|{fault:true,error:Error}|{advisory:true,notice:string,code:string|null,candidate:string,lane:string}|{verdict:"block",reason:string,feature?:string,
  *   planPath?:string|null,lifecycleStatus?:string,candidate:string,lane:string}} the first
- *   "block" verdict for any candidate (carrying which candidate/lane produced it), or null when
- *   nothing blocks.
+ *   "block" verdict for any candidate (carrying which candidate/lane produced it), the advisory
+ *   sentinel when only an advisory arose, or null when nothing blocks.
  */
 export function devPlanShellRefusalHit(command, root, dependencies = {}, toolName = "Bash", sessionRoots = []) {
   if (typeof command !== "string" || command === "") return null;
@@ -139,6 +144,7 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
         forceLifecycleGate: true,
       });
     }
+    let advisory = null;
     for (const { candidate, lane, forceLifecycleGate = false } of targets) {
       if ((lane === "opaque-interpreter-code" && ["-e", "-D", ".", ".."].includes(candidate))
         || (lane === "powershell-write-cmdlet" && ["-Path", "-D"].includes(candidate))) {
@@ -163,8 +169,12 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
       }
       const result = verdictFn({ filePath: candidate, projectDir: root, ...(forceLifecycleGate ? { forceLifecycleGate: true } : {}) });
       if (result.verdict === "block") return { ...result, candidate, lane };
+      // D117 / BI: the first advisory is remembered, a later block still wins, and one command yields ONE advisory.
+      if (advisory === null && typeof result.advisory === "string") {
+        advisory = { advisory: true, notice: result.advisory, code: result.advisoryCode ?? null, candidate, lane };
+      }
     }
-    return null;
+    return advisory;
   } catch (error) {
     return { fault: true, error };
   }

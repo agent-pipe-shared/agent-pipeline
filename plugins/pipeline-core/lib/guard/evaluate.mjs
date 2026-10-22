@@ -196,9 +196,13 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     const shellCommand = (input.tool_input.command ?? input.tool_input.CommandLine);
     const sanctionedPowerShellLifecycleCall = toolName === "PowerShell"
       && sanctionedPowerShellNodeCall(shellCommand, root);
-    const devPlanHit = sanctionedPowerShellLifecycleCall
+    const devPlanOutcome = sanctionedPowerShellLifecycleCall
       ? null
       : devPlanShellRefusalHit(shellCommand, root, dependencies, toolName, sessionRoots);
+    // D117 / BI: an approval whose verification input is unavailable is an advisory, never a refusal. It rides the
+    // same notice channel as the rebase-admission notice (exit 0 + stderr text carried onto the final verdict).
+    if (devPlanOutcome?.advisory === true) shellLifts.push(verdict(0, `${devPlanOutcome.notice}\n`));
+    const devPlanHit = devPlanOutcome?.advisory === true ? null : devPlanOutcome;
     if (devPlanHit !== null && devPlanHit.fault === true) {
       return devPlanShellFaultBlocked(devPlanHit.error);
     }
