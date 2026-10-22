@@ -785,6 +785,45 @@ describe("V-10 admission wiring: the guard records the route digest of the brief
     assert.equal(readRoute(slice), null);
   });
 
+  // PO decision 2026-10-22 (ALF-K35): the gap above is not closed by a refusal but by a typed advisory. The call is still admitted and
+  // still unrecorded (the case above is unchanged); the hook now says so, names the cause and the one repair.
+  const WARN_CODE = "GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED";
+  test("V-10 typed warning: an unresolvable Goldfish agent() prompt in a Workflow script is admitted with an advisory naming the cause, the missing record and one repair", () => {
+    const slice = "ALF-V10-WIRE-DYNAMIC-WARN";
+    const briefing = v10wBriefing(slice);
+    const cases = {
+      interpolation: { script: `const sliceId = '${slice}';\nawait agent({ agentType: '${V10W_ROLE}', prompt: \`${v10wBriefing("${sliceId}")}\` });`, cause: /\$\{/u },
+      "named const": { script: `const BRIEFING = \`${briefing}\`;\nawait agent({ agentType: '${V10W_ROLE}', prompt: BRIEFING });`, cause: /identifier|expression|variable/iu },
+    };
+    for (const [name, { script, cause }] of Object.entries(cases)) {
+      const res = runHook(dynamicScript(script));
+      assert.equal(res.code, 0, `${name}: still admitted: ${res.stderr.slice(0, 300)}`);
+      assert.ok(res.stderr.includes(WARN_CODE), `${name}: typed advisory code expected: ${res.stderr.slice(0, 300)}`);
+      assert.match(res.stderr, cause, `${name}: names the cause`);
+      assert.ok(res.stderr.includes("no route record was written for this call"), `${name}: says what is missing`);
+      assert.ok(res.stderr.includes("templates/prompts/goldfish-task.md") && res.stderr.includes("static string literal"), `${name}: one repair`);
+      assert.equal(readRoute(slice), null, `${name}: nothing recorded`);
+    }
+  });
+
+  test("V-10 typed warning scope: a static literal, a non-Goldfish role and a script without agent() calls get no advisory; a static literal beside a dynamic one is still recorded", () => {
+    const staticSlice = "ALF-V10-WIRE-DYNAMIC-WARN-STATIC";
+    const quiet = runHook(dynamicScript(staticCall(v10wBriefing(staticSlice))));
+    assert.equal(quiet.code, 0, quiet.stderr.slice(0, 300));
+    assert.ok(!quiet.stderr.includes(WARN_CODE), "a static literal is recorded and needs no advisory");
+    assert.equal(readRoute(staticSlice)?.briefingSha256, sha256Of(v10wBriefing(staticSlice)));
+    const critic = runHook(dynamicScript("const P = 'x';\nawait agent({ agentType: 'pipeline-core:critic', prompt: P });"));
+    assert.ok(!critic.stderr.includes(WARN_CODE), "Critic and other non-Goldfish roles are out of scope of V-10 (PO 2026-10-22)");
+    const plain = runHook(dynamicScript("const n = 1 + 1;"));
+    assert.equal(plain.code, 0);
+    assert.ok(!plain.stderr.includes(WARN_CODE));
+    const mixedSlice = "ALF-V10-WIRE-DYNAMIC-WARN-MIXED";
+    const mixed = runHook(dynamicScript(`${staticCall(v10wBriefing(mixedSlice))}\nconst S = 'a';\nawait agent({ agentType: '${V10W_ROLE}', prompt: \`${v10wBriefing("${S}")}\` });`));
+    assert.equal(mixed.code, 0, mixed.stderr.slice(0, 300));
+    assert.ok(mixed.stderr.includes(WARN_CODE), "the dynamic call beside the static one is flagged");
+    assert.equal(readRoute(mixedSlice)?.briefingSha256, sha256Of(v10wBriefing(mixedSlice)), "the static call is still recorded");
+  });
+
   test("V-10 typed gap RED proof: a guard that did record the run-time prompt, or one that refused it, fails the same check", () => {
     const slice = "ALF-V10-WIRE-DYNAMIC-RED";
     assert.throws(() => checkDynamicWorkflowGap({ send: () => ({ code: 0, stderr: "" }), read: () => ({ sliceId: slice }) }), /records no route/u);
