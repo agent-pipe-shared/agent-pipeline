@@ -519,5 +519,83 @@ test("PARWORK-M3c (control): a different not-ready status is refused on the FIRS
   } finally { fx.cleanup(); }
 });
 
+// ===================================================================================================================
+// MODE 4 -- Critic evidence for an EARLIER commit is produced without touching a checkout a Goldfish is writing in (PF-57, D62)
+// ===================================================================================================================
+// Drives the real CLI (scripts/verify-evidence-producer.mjs --commit) against a checkout with uncommitted edits to two tracked
+// files and an untracked file, and requires every byte of the checkout, HEAD, status and the worktree list to be unchanged, no
+// temporary worktree left behind, and no session-authority registry lock created. The verify command passes only inside a clean
+// checkout of the older commit, so a run against the shared checkout would fail instead of passing.
+import { createHash } from "node:crypto";
+import { prepareConsumerVerify } from "../consumer-verify.mjs";
+
+function git4(root, args) {
+  return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE } }).trim();
+}
+function commit4(root, paths, message) {
+  git4(root, ["add", "--", ...paths]);
+  git4(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+  return git4(root, ["rev-parse", "HEAD"]);
+}
+function bytes4(root, rel = "") {
+  const found = {};
+  for (const entry of readdirSync(join(root, rel), { withFileTypes: true })) {
+    const path = rel === "" ? entry.name : `${rel}/${entry.name}`;
+    if (path === ".git" || path === "evidence") continue;
+    if (entry.isDirectory()) { found[`${path}/`] = "directory"; Object.assign(found, bytes4(root, path)); }
+    else found[path] = createHash("sha256").update(readFileSync(join(root, path))).digest("hex");
+  }
+  return found;
+}
+const observe4 = (root) => ({
+  head: git4(root, ["rev-parse", "HEAD"]),
+  status: git4(root, ["status", "--porcelain=v1", "--untracked-files=all"]),
+  bytes: bytes4(root),
+  worktrees: git4(root, ["worktree", "list", "--porcelain"]).split("\n").filter((line) => line.startsWith("worktree ")),
+});
+
+test("PARWORK-M4a: the real producer CLI makes Critic evidence for an older commit and leaves a dirty checkout, its worktree list and the session-authority registry untouched", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, PO decision K7)" : false, timeout: 300000 }, () => {
+  const root = join(FIXTURE, "m4-root");
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m4", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
+  writeFileSync(join(root, "README.md"), "# Fixture\n");
+  writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+  prepareConsumerVerify({ rootDir: root });
+  git4(root, ["init", "-q"]);
+  const first = commit4(root, ["."], "initial");
+  mkdirSync(join(root, "specs"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Older candidate\n");
+  const older = commit4(root, [".claude/pipeline.yaml", "specs/spec.md"], "older candidate");
+  writeFileSync(join(root, "README.md"), "# Fixture moved on\n");
+  const head = commit4(root, ["README.md"], "head moved on");
+  assert.notEqual(older, head);
+  // The Goldfish is mid-edit: two tracked files and one untracked file differ from HEAD.
+  writeFileSync(join(root, "specs", "spec.md"), "# uncommitted edit of a tracked file\n");
+  writeFileSync(join(root, "README.md"), "# uncommitted edit of another tracked file\n");
+  writeFileSync(join(root, "untracked-note.txt"), "an untracked file the Goldfish is writing\n");
+  const before = observe4(root);
+  assert.match(before.status, /README\.md/u);
+  assert.match(before.status, /\?\? untracked-note\.txt/u);
+
+  const script = fileURLToPath(new URL("../../scripts/verify-evidence-producer.mjs", import.meta.url));
+  const result = spawnSync(process.execPath, [script, "--root", root, "--mode", "critic", "--base", first, "--commit", older, "--out", "evidence/critic-older.json"],
+    { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE }, timeout: 240000 });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const evidence = JSON.parse(readFileSync(join(root, "evidence", "critic-older.json"), "utf8"));
+  assert.equal(evidence.commit, older, "the evidence is bound to the named earlier commit, not HEAD");
+  assert.equal(evidence.exitCode, 0);
+
+  assert.deepEqual(observe4(root), before, "HEAD, status, every tracked and untracked byte and the worktree list are unchanged");
+  assert.deepEqual(readdirSync(join(root, "evidence")), ["critic-older.json"], "the evidence file is the only thing written into the checkout");
+  const commitWorktrees = join(root, ".git", "agent-pipeline", "verify", "commit-worktrees");
+  assert.deepEqual(existsSync(commitWorktrees) ? readdirSync(commitWorktrees) : [], [], "the temporary worktree area is empty again");
+  assert.equal(existsSync(join(root, ".git", "agent-pipeline", "session-authority", "registry.lock")), false, "the producer leaves no session-authority registry lock");
+});
+
+// NOT PINNED HERE (reported to the Elephant, see the item's 2026-10-20 section): the session-authority registry staying readable with
+// no orphaned lock after a Critic and a Goldfish dispatch RAN IN PARALLEL needs a live two-session run (or a harness that drives two
+// real hook sessions against one registry); M4a only shows the producer itself never takes the registry lock.
 // DEFERRED, out of scope of this item's functional delivery (PO decision item): the liveness readback for open dispatch
-// records ("Observed again 2026-10-05 (round 3b)"); no case for it is pinned here.
+// records ("Observed again 2026-10-05 (round 3b)"); no case for it is pinned here. Its guard-side check belongs to the
+// protected guard-dispatch hook and is reported as an operator patch note instead.
