@@ -254,7 +254,11 @@ function findCriterionOccurrences(sourceBytes, id) {
     if (fence !== null) continue;
     if (line.text.trimStart().startsWith("|")) {
       const cells = tableCells(line.text);
-      if (cells.length >= 2 && cells[0].value === id && cells[1].value !== "") {
+      // A two-column acceptance table (`Nr. | Kriterium`) numbers its rows `n` or `R-n`; the host parser maps both to `AC-n`
+      // (scanAcceptedCriterionRows, lib/critic-accepted-contract.mjs), so the generator must find the same row.
+      const twoColumnNumber = cells.length === 2 ? /^(?:R-)?([1-9][0-9]*)$/u.exec(cells[0].value)?.[1] : undefined;
+      const rowIsId = cells.length >= 2 && (cells[0].value === id || (twoColumnNumber !== undefined && `AC-${twoColumnNumber}` === id));
+      if (rowIsId && cells[1].value !== "") {
         found.push({ shape: "table-row", ...span(line, cells[1].from, line, cells[1].to) });
       }
       continue;

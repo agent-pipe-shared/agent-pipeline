@@ -472,9 +472,9 @@ test("AC-264 added (P0-1): the briefing generator binds a German-text criterion 
   assert.equal((await briefingFor(none, null, "tests/orders.test.js")).result.code, "DBG-AC-ROW-MISSING", "without --criterion the Alfred row is required and its absence is typed");
 });
 
-test("AC-264 added (P0-1): the briefing generator binds a numbered or R-n row of a two-column German table, so the signed bytes need no reformatting", {
-  todo: "NOT BUILT, owner Coordinator, due 2026-10-31: scripts/dispatch-briefing.mjs findCriterionOccurrences (table branch) matches only a first cell exactly equal to the AC id, while scanAcceptedCriterionRows (lib/critic-accepted-contract.mjs TWO_COLUMN_NUMBER) and parseAcceptedCriticCriterion already map the rows `n` / `R-n` to AC-n; plan readiness therefore reports PLR-HANDOFF-READY for a Spec the generator cannot bind (DBG-CRITERION-MISSING), and the first item dispatch of the signed German Spec stays unreachable.",
-}, async () => {
+// Was a typed todo (the generator's table branch matched only a first cell equal to the AC id although the host parser maps `n` / `R-n` to AC-n);
+// delivered by the findCriterionOccurrences two-column row mapping in scripts/dispatch-briefing.mjs, so the case is strict.
+test("AC-264 added (P0-1): the briefing generator binds a numbered or R-n row of a two-column German table, so the signed bytes need no reformatting", async () => {
   for (const id of ["AC-1", "AC-2"]) {
     const { result, bytes } = await briefingFor(germanSpec(), id, "tests/orders.test.js");
     assert.equal(result.ok, true, `${id}: ${result.code}`);
