@@ -12,17 +12,22 @@
  *     route is exercised by P7 below)
  *  P7 the real sign-intent route, run against a contained git-initialised fixture
  *     repository, prints only the compact disclosure for a 4000-line review record
+ *  P6 custody of the review file the real route writes beside a --request: single-link
+ *     regular 0600 file named by its own digest; hard link, symlink and linked scratch
+ *     directory refused (mode-bit and symlink variants are typed conditional skips)
  * RED mirrors below prove the assertions can fail.
  */
 import assert from "node:assert/strict";
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign as cryptoSign, verify as cryptoVerify } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { linkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test, { after } from "node:test";
 import { fileURLToPath } from "node:url";
 import { GIT_NULL_DEVICE } from "../git-null-device.mjs";
+import { SIGNED_QUALITY_PACKAGE_SCHEMA, qualityPackageIntentSha256 } from "../signed-quality-package.mjs";
+import { symlinkCapability, symlinkSkip } from "../symlink-capability.mjs";
 import { compactSigningDisclosure, formatHumanApprovalCliResult, runHumanApproval } from "../../scripts/po-human-approval.mjs";
 
 /**
@@ -216,7 +221,128 @@ test("P8: push/critical-action approve and the generic signing command share com
   assert.ok(hgo.slice(0, signOnce).includes("compactSigningDisclosure({ intentSha256, record, materialArtifact })"),"the human-guard-override signing request is rendered by sign-intent through the same compact disclosure");
 });
 
-test("P6 (host limitation): directory-mode / symlink custody cases of the review file", { skip: "host-limitation: Windows has no directory mode bits or directory symlinks; owner Coordinator, due 2026-10-19, Linux/WSL run (PO decision K7)" }, () => {});
+// ---- P6: custody of the review file written beside a --request ----------------------------------------------------------
+// The real sign-intent route, run against a signed-quality-package request in a contained git-initialised fixture, writes the
+// review material beside the request. The case below pin its custody: the file is a single-link regular 0600 file named by the
+// digest of its own bytes, and a symlink, a hard link or a linked scratch directory in its place is refused without writing
+// through it. The mode-bit and symlink variants are typed conditional skips (not an empty body) where the host cannot express them.
+const DIRECTORY_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: "dir" }));
+const FILE_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: "file" }));
+const MODE_BITS_SKIP = process.platform === "win32" && "host-limitation: native Windows reports 0o666 for every file and has no POSIX mode bits; the DACL variant is the separate native-host obligation (PO decision K7)";
+
+function qualityPackageRequest() {
+  const body = { schema: SIGNED_QUALITY_PACKAGE_SCHEMA, baseCommit: "a".repeat(40),
+    unifiedDiff: "diff --git a/x/b.txt b/x/b.txt\n--- a/x/b.txt\n+++ b/x/b.txt\n@@ -1 +1 @@\n-a\n+b\n",
+    expectedDigests: { "x/b.txt": createHash("sha256").update("b\n").digest("hex") } };
+  return { ...body, intentSha256: qualityPackageIntentSha256(body) };
+}
+
+function routeFixture() {
+  const passphrase = "pin-fixture-passphrase";
+  const repoRoot = initFixtureGitRepository(fixtureTemp("pin-p6-repo-"));
+  const directory = fixtureTemp("pin-p6-key-");
+  const home = mkdtempSync(join(tmpdir(), "pin-p6-home-"));
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase }, publicKeyEncoding: { type: "spki", format: "pem" } });
+  writeFileSync(join(directory, "po-private.pem"), privateKey);
+  writeFileSync(join(directory, "po-public.pem"), publicKey);
+  const authority = { keyReference: "pin-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+  writeFileSync(join(directory, "trust-policy.json"), JSON.stringify({ ...authority, humanName: "Pin Operator" }));
+  mkdirSync(join(repoRoot, "project"), { recursive: true });
+  writeFileSync(join(repoRoot, "project/critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["governance-fork-disposition"], waivedKinds: [], trustAnchors: [authority] }));
+  const spawn = (executable, args = []) => {
+    const a = args.map(String);
+    if (executable === "openssl" && a[0] === "pkeyutl" && a.includes("-sign") && a.some((e) => /po-private\.pem/u.test(e))) {
+      writeFileSync(a[a.indexOf("-out") + 1], cryptoSign(null, readFileSync(a[a.indexOf("-in") + 1]), createPrivateKey({ key: privateKey, format: "pem", passphrase })));
+      return { status: 0 };
+    }
+    return healthyOpensslStub(executable, a);
+  };
+  const request = qualityPackageRequest();
+  mkdirSync(join(repoRoot, "scratch"), { recursive: true });
+  const requestPath = join(repoRoot, "scratch", "quality-package-request.json");
+  writeFileSync(requestPath, JSON.stringify(request));
+  const sign = () => {
+    const realWrite = process.stdout.write;
+    let captured = "";
+    process.stdout.write = (chunk) => { captured += chunk; return true; };
+    try {
+      const result = runHumanApproval(["sign-intent", "--repo-root", repoRoot, "--directory", directory, "--request", "scratch/quality-package-request.json"], {
+        spawn, isTTY: true, homedirFn: () => home, stderrWriteFn: () => {},
+        readConfirmation: () => { throw new Error("encrypted key: no typed confirmation expected"); },
+      });
+      return { result, captured };
+    } finally { process.stdout.write = realWrite; }
+  };
+  const reviewFiles = () => readdirSync(join(repoRoot, "scratch")).filter((name) => name.startsWith(`review-${request.intentSha256}-`));
+  const clearOutputs = () => { for (const name of readdirSync(join(repoRoot, "scratch"))) if (name !== "quality-package-request.json") rmSync(join(repoRoot, "scratch", name), { recursive: true, force: true }); };
+  const cleanupAll = () => { for (const d of [repoRoot, directory, home]) rmSync(d, { recursive: true, force: true }); };
+  return { repoRoot, request, requestPath, sign, reviewFiles, clearOutputs, cleanup: cleanupAll };
+}
+
+test("P6: the review file is one regular single-link file named by the digest of its own bytes, beside the request", () => {
+  const item = routeFixture();
+  try {
+    const { result, captured } = item.sign();
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const [name, ...more] = item.reviewFiles();
+    assert.deepEqual(more, [], "exactly one review file is written");
+    const path = join(item.repoRoot, "scratch", name);
+    const metadata = lstatSync(path);
+    assert.equal(metadata.isFile() && !metadata.isSymbolicLink(), true);
+    assert.equal(metadata.nlink, 1);
+    const digest = createHash("sha256").update(readFileSync(path)).digest("hex");
+    assert.equal(name, `review-${item.request.intentSha256}-${digest}.json`, "the file name embeds the digest of the bytes on disk");
+    assert.ok(captured.includes(`scratch/${name}`) && captured.includes(digest), "the operator output names the path and digest of that file");
+  } finally { item.cleanup(); }
+});
+
+test("P6: the review file is private to its owner (mode 0600)", { skip: MODE_BITS_SKIP }, () => {
+  const item = routeFixture();
+  try {
+    assert.equal(item.sign().result.ok, true);
+    const [name] = item.reviewFiles();
+    assert.equal(statSync(join(item.repoRoot, "scratch", name)).mode & 0o777, 0o600);
+  } finally { item.cleanup(); }
+});
+
+test("P6: a hard link planted at the review path is refused and its other name is not written through", () => {
+  const item = routeFixture();
+  try {
+    assert.equal(item.sign().result.ok, true);
+    const [name] = item.reviewFiles();
+    item.clearOutputs();
+    const decoy = join(item.repoRoot, "scratch", "decoy.txt");
+    writeFileSync(decoy, "decoy\n");
+    linkSync(decoy, join(item.repoRoot, "scratch", name));
+    assert.throws(() => item.sign(), /single-link regular artifact/u);
+    assert.equal(readFileSync(decoy, "utf8"), "decoy\n", "the decoy sharing the inode was not written through");
+  } finally { item.cleanup(); }
+});
+
+test("P6: a symlink planted at the review path is refused and its target is not written through", { skip: FILE_SYMLINK_SKIP }, () => {
+  const item = routeFixture();
+  try {
+    assert.equal(item.sign().result.ok, true);
+    const [name] = item.reviewFiles();
+    item.clearOutputs();
+    const decoy = join(item.repoRoot, "scratch", "decoy.txt");
+    writeFileSync(decoy, "decoy\n");
+    symlinkSync(decoy, join(item.repoRoot, "scratch", name), "file");
+    assert.throws(() => item.sign(), /single-link regular artifact/u);
+    assert.equal(readFileSync(decoy, "utf8"), "decoy\n", "the symlink target was not written through");
+  } finally { item.cleanup(); }
+});
+
+test("P6: a scratch directory that is a directory link is refused and nothing is written through it", { skip: DIRECTORY_SYMLINK_SKIP }, () => {
+  const item = routeFixture();
+  try {
+    const moved = join(item.repoRoot, "moved-scratch");
+    renameSync(join(item.repoRoot, "scratch"), moved);
+    symlinkSync(moved, join(item.repoRoot, "scratch"), process.platform === "win32" ? "junction" : "dir");
+    assert.throws(() => item.sign(), /--request must be a path inside this repository's own scratch\/ directory/u);
+    assert.deepEqual(readdirSync(moved).filter((name) => name.startsWith("review-")), [], "no review file was written through the link");
+  } finally { item.cleanup(); }
+});
 
 test("RED mirror: an uncapped renderer fails the P1 bound, so the pin can fail", () => {
   const uncapped = ({ intentSha256, record }) => [`intent sha256: ${intentSha256}`, ...record.lines];
