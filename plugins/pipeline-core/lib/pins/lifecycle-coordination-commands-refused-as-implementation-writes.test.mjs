@@ -12,6 +12,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { run } from '../../scripts/pipeline-state.mjs';
 
 const repo = resolve(fileURLToPath(new URL('../../../../', import.meta.url)));
 const { devPlanShellRefusalHit } = await import(new URL('../guard/devplan-shell-lane.mjs', import.meta.url));
@@ -234,4 +238,104 @@ test('D64 state machine harness fails a recovery whose retry meets the same refu
   });
   assert.equal(outcome.admittedFirst, false);
   assert.equal(outcome.progress, false, 'the same refusal after the recovery is no progress');
+});
+
+// ---- D64 (0.7.0, blocker): one integration walk with the REAL guards from a fresh repository to the first implementation dispatch ----
+// Every command is spelled exactly as the Pipeline itself renders it (the absolute node executable first, then the script and its
+// closed argv) and is put through the real lifecycle-ready guard (guard-lifecycle-ready main) AND the real dev-plan shell lane.
+// There is no override: the recording seam answers `ineligible`, so a refusal is a refusal. Any prescribed command a real guard
+// still refuses makes this test RED with the exact command and code in its message.
+const walkQuote = value => `'${value.replaceAll("'", "'\"'\"'")}'`;
+const walkRender = action => [action.executable, ...action.argv].map(walkQuote).join(' ');
+const walkAction = (...argv) => ({ executable: process.execPath, argv });
+const walkDigest = value => createHash('sha256').update(value).digest('hex');
+
+async function walkSteps(f, { actualGuard }) {
+  const { PIPELINE_STATE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT } = constants;
+  const steps = [];
+  const check = (label, action) => {
+    const rendered = walkRender(action);
+    const guard = actualGuard(action, f.root);
+    const lane = devPlanShellRefusalHit(rendered, f.root, deps);
+    steps.push({ label, rendered, code: guard.code, stderr: guard.stderr, lane: lane?.lane ?? null });
+    return guard.code === 0 && lane === null;
+  };
+  const stateCmd = (...argv) => walkAction(PIPELINE_STATE_SCRIPT, ...argv);
+  const out = [];
+  const capture = fn => { const lines = []; const before = console.log; console.log = (...v) => lines.push(v.join(' ')); try { return { code: fn(), stdout: lines.join('\n') }; } finally { console.log = before; } };
+
+  // 1. the state readback and the next action inspect renders in the submitted (design, awaiting-approval) state
+  check('inspect', stateCmd('inspect'));
+  const inspected = capture(() => run(['inspect'], f.deps));
+  const next = JSON.parse(inspected.stdout).nextAction;
+  if (next?.kind === 'command') check(`inspect next action (${next.code ?? next.kind})`, { executable: next.executable, argv: next.argv });
+  // 2. route selection, architecture materialization and baseline diagnosis, documented help
+  check('route selection', walkAction(MODEL_ROLE_DISPATCH_SELECT_SCRIPT, '--repo-root', f.root, '--runner', 'codex', '--task-route', 'profile.critic.review'));
+  check('architecture materialization', stateCmd('materialize-architecture'));
+  check('architecture baseline diagnosis', walkAction(ARCHITECTURE_BASELINE_SCRIPT, '--root', f.root));
+  check('pipeline-state --help', stateCmd('--help'));
+  // 3. the design-review receipt, produced for real through the spelling the guard admitted
+  mkdirSync(join(f.root, 'specs', f.featureId, 'review'), { recursive: true });
+  const reportPath = `specs/${f.featureId}/review/design-review-1.md`;
+  const receiptPath = `specs/${f.featureId}/review/design-review-receipt-1.json`;
+  writeFileSync(join(f.root, reportPath), '# Critic report\n\nVerdict: PASS\n');
+  const create = walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+    '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', receiptPath);
+  const createAdmitted = check('design-review receipt (initial)', create);
+  if (createAdmitted) {
+    const made = spawnSync(create.executable, create.argv, { cwd: f.root, encoding: 'utf8', env: { ...process.env, CLAUDECODE: '1' } });
+    out.push({ label: 'receipt producer executes', ok: made.status === 0 && existsSync(join(f.root, receiptPath)), detail: `${made.status} ${made.stderr}` });
+  }
+  // sanitized report: the producer's optional original-report form (D64 digest pair) must be admitted too
+  writeFileSync(join(f.root, `specs/${f.featureId}/review/design-review-1.original.md`), 'original report\n');
+  check('design-review receipt (sanitized report pair)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+    '--original-report', `specs/${f.featureId}/review/design-review-1.original.md`, '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', `specs/${f.featureId}/review/design-review-receipt-2.json`));
+  check('design-review receipt (delta)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
+    '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--previous', receiptPath, '--open-finding', 'F-1', '--out', `specs/${f.featureId}/review/design-review-receipt-3.json`));
+  // 4. present-plan, then the approval transport in the spelling inspect renders after a presentation, then the phase switch
+  check('present-plan', stateCmd('present-plan', '--by', 'Fixture', '--review-receipt', receiptPath));
+  mkdirSync(join(f.root, 'scratch'), { recursive: true });
+  const requestPath = `scratch/design-approval-request-${walkDigest('request')}.json`;
+  writeFileSync(join(f.root, requestPath), '{}\n');
+  check('approve-plan (signature transport)', stateCmd('approve-plan', '--design-approval-request', requestPath));
+  check('approve-plan (attributed transport)', stateCmd('approve-plan', '--by', 'Fixture PO', '--design-approval-request', requestPath));
+  check('set-phase implementation', stateCmd('set-phase', '--phase', 'implementation'));
+  // 5. feature-package registration, the last step before the first implementation dispatch
+  check('feature-package registration', walkAction(REGISTER_FEATURE_PACKAGE_SCRIPT, '--root', f.root));
+  return { steps, out };
+}
+
+test('D64 integration: from a fresh repository to the first implementation dispatch every prescribed command is admitted by the real guards with zero overrides', async () => {
+  const hooks = await import(new URL('../../hooks/design-course-command-admission.test.mjs', import.meta.url));
+  const f = hooks.fixture('feature');
+  try {
+    const { steps, out } = await walkSteps(f, hooks);
+    const refusedSteps = steps.filter(step => step.code !== 0 || step.lane !== null);
+    assert.deepEqual(refusedSteps.map(step => `${step.label}: guard exit ${step.code}${step.lane ? `, dev-plan lane ${step.lane}` : ''}; command: ${step.rendered}; ${String(step.stderr).split('\n')[0]}`), [],
+      'a prescribed command is still refused by a real guard: report each with the file that must change');
+    assert.deepEqual(out.filter(entry => !entry.ok).map(entry => `${entry.label}: ${entry.detail}`), []);
+    assert.equal(steps.length >= 13, true, 'the walk covers every prescribed step');
+  } finally { f.cleanup(); }
+});
+
+test('D64 integration (implementation boundary): the next action inspect renders after approval is admitted by the real guards as spelled, absolute node executable included', async () => {
+  const { prepareApprovedItemCourseFixture } = await import(new URL('../test-item-approved-course-fixture.mjs', import.meta.url));
+  const approvedRoot = mkdtempSync(join(repo, 'scratch', 'alf-k11-approved-'));
+  const quiet = fn => { const before = console.log; console.log = () => {}; try { return fn(); } finally { console.log = before; } };
+  try {
+    quiet(() => prepareApprovedItemCourseFixture({ root: approvedRoot }));
+    const lines = [];
+    const before = console.log; console.log = (...v) => lines.push(v.join(' '));
+    try { assert.equal(run(['inspect'], { dir: approvedRoot, architectureEntryReadiness: () => ({ status: 'ready' }) }), 0); } finally { console.log = before; }
+    const inspected = JSON.parse(lines.join('\n'));
+    assert.equal(inspected.status, 'implementing');
+    const next = inspected.nextAction;
+    assert.equal(next.kind, 'command', JSON.stringify(next));
+    assert.equal(next.executable, process.execPath, 'the rendered executable is the absolute node path');
+    const action = { executable: next.executable, argv: next.argv };
+    // The fixture project is not governance-enforced, so the guard hooks would not run at all there; the closed-argv verdict is what an enforced,
+    // not-ready project applies to the same rendered command, and that is what must admit it.
+    assert.equal(isSanctionedLifecycleCommand(walkRender(action), approvedRoot), true, `the closed-argv catalogue refuses the command the Pipeline itself renders after approval: ${walkRender(action)}`);
+    assert.equal(devPlanShellRefusalHit(walkRender(action), approvedRoot, deps), null, `${walkRender(action)} is refused by the dev-plan shell lane after approval`);
+  } finally { rmSync(approvedRoot, { recursive: true, force: true }); }
 });
