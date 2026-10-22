@@ -1,0 +1,158 @@
+[
+ {
+  "id": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+  "owner": "native-host",
+  "clause": "Final integrated and installed-host qualification; Claude and Agy give truthful zero-child unavailability, not a genuine answered initial invocation.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+  "owner": "po-decision",
+  "clause": "PO decision on the security-predicate change (drop mtimeNs/size/nlink for ancestors) is missing.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+  "owner": "native-host",
+  "clause": "An Antigravity greenfield run must complete the happy path; F-05 parallel writes need a live AGY run.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-el01-write-authorization-gap",
+  "owner": "po-decision",
+  "clause": "Decide whether AC-109 is accepted on a documented carrier-unavailable disposition or held until native carrier evidence exists (due 2026-10-19, passed).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-el01-write-authorization-gap",
+  "owner": "native-host",
+  "clause": "Authenticated per-call Antigravity role carrier evidence is not available.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+  "owner": "native-host",
+  "clause": "Spike S1-S6 on a real agy CLI (load precedence, plugins.json root handling, import, restart) and the loaded-root proof.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+  "owner": "po-decision",
+  "clause": "Pick the load topology (workspace-local only or agy-managed) after the spike.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+  "owner": "native-host",
+  "clause": "Native fresh-runner observation of the first Agy session passing attestation without a manual repair step.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+  "owner": "native-host",
+  "clause": "D79 (553342999): whether the real Antigravity host resolves a repo-relative entries[].path in the tracked registry is unverified.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+  "owner": "native-host",
+  "clause": "Re-run the real Agy global update and first greenfield preflight on the newly installed local candidate.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+  "owner": "po-decision",
+  "clause": "A fresh stamp for the three-runner manifest build is a PO call.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.approval-verification-demands-head-equals-candidate",
+  "owner": "native-host",
+  "clause": "Confirm on a stamped installed candidate that an approval stays verifiable after a commit past its candidate (the failure was seen on an installed build).",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+  "owner": "native-host",
+  "clause": "Real hook apply on native Windows is refused with PB-WINDOWS-ASSURANCE; the Windows branch of P3 needs a native run.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.bounded-reader-terminal-binding",
+  "owner": "po-decision",
+  "clause": "Triage decision and owner-policy source for the terminal correction are still pending.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+  "owner": "po-decision",
+  "clause": "Explicit established/active repository state with a ratcheting baseline under deferral (model gap D3/D4) is a model decision.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+  "owner": "po-decision",
+  "clause": "PO confirmation of the AC-122 reconstruction (original item body is not public) is missing.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+  "owner": "native-host",
+  "clause": "The native cmd/npm launch case runs only on a win32 host and is skipped here.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+  "owner": "verify-wsl",
+  "clause": "The receipt-alias symlink case in the pin is a skipped stub; it needs a real case on a Linux run.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+  "owner": "native-host",
+  "clause": "Re-run the Codex WSL greenfield on an installed candidate.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.claude-design-readiness-cannot-start-on-windows",
+  "owner": "po-decision",
+  "clause": "Record that the R4-9/R4-10 typed sub-reason clause is superseded by the ADR-0085 retirement, or keep it.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.claude-design-readiness-cannot-start-on-windows",
+  "owner": "native-host",
+  "clause": "A native Windows run of the retained argv, trust-root and schema behaviours is missing.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+  "owner": "native-host",
+  "clause": "Platform matrix across Claude, Codex, Antigravity on Windows, macOS and Linux hosts.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+  "owner": "native-host",
+  "clause": "Observe the real Claude SessionStart output on an installed Windows host.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+  "owner": "native-host",
+  "clause": "Live interactive Claude/Windows run reaching implementation and push within the two-approval happy path.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+  "owner": "native-host",
+  "clause": "Run AP5 on native Windows and re-run the live read shapes after install.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-advisor-evidence-fails-after-host-update",
+  "owner": "native-host",
+  "clause": "Replay the affected greenfield design package with the installed Codex build.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ }
+]

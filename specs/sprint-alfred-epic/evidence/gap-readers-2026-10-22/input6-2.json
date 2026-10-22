@@ -1,0 +1,158 @@
+[
+ {
+  "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+  "owner": "native-host",
+  "clause": "Installed Codex replay and a productive Advisor integration run are recorded separately by the item and are still missing.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+  "owner": "po-decision",
+  "clause": "Decide whether the recurring-toil premise is verified or the item is deferred to the post-0.7.0 automation lane.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-design-readiness-child-rejects-valid-review",
+  "owner": "native-host",
+  "clause": "A live Codex/WSL readiness run and the authenticated turn after SIGKILL are not proven; 3 pin cases are typed host skips.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-design-readiness-child-rejects-valid-review",
+  "owner": "po-decision",
+  "clause": "Decide whether the retired selected-sandbox route (ADR-0085) makes the live-run and credential-custody clauses moot.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-own-session-audit-export-missing",
+  "owner": "native-host",
+  "clause": "Live-store field spellings and the Windows positive path, named unverified by b6d3c7a91, need a real Codex host run.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+  "owner": "native-host",
+  "clause": "A controlled real Codex child must bind an unknown report's frame, raw and canonical bytes to the registered process.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+  "owner": "native-host",
+  "clause": "A real Codex/WSL Feature greenfield run must reach package validation with an answer or a governed unavailable exception.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+  "owner": "native-host",
+  "clause": "The 0.7.0 candidate host checklist (a real file-free commit on native Windows and the installed hosts) is still outstanding.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+  "owner": "native-host",
+  "clause": "The single-file route was counted on Linux only; the native Windows run is still missing.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+  "owner": "native-host",
+  "clause": "The warning is proven through platform seams on Linux; a real second session on native Windows has not been run.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+  "owner": "po-decision",
+  "clause": "Confirm Write/Edit as the only Critic notes route (the pin encodes it) and triage the item.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+  "owner": "native-host",
+  "clause": "A live Critic dispatch with a security-class diff must complete and persist its notes on an installed host.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+  "owner": "native-host",
+  "clause": "The review-unit route and the argument-gated critic-review skill (PF-34, PF-57) need a replay on an installed host.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+  "owner": "native-host",
+  "clause": "A live Critic dispatch must create its notes without an improvised randomness source.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.critic-scratch-notes-write-is-refused-again",
+  "owner": "native-host",
+  "clause": "The live check that an installed Critic dispatch persists its notes is still open; the native Windows run of the pin is also missing.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+  "owner": "native-host",
+  "clause": "Only the Claude capture adapter has a host-shaped route; a real chat turn capture on installed Claude, Codex and Antigravity hosts is unproven.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.declared-system-skill-read-requires-human-override",
+  "owner": "native-host",
+  "clause": "An installed Codex readback of the declared skill read is needed; the host-catalog producer is Codex-held.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.declared-system-skill-read-requires-human-override",
+  "owner": "po-decision",
+  "clause": "The PO deferral past 0.7.0 stands; scope for the post-0.7.0 release is undecided.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.denial-names-a-diagnosis-it-refuses",
+  "owner": "po-decision",
+  "clause": "Triage the item and decide the scope of PO decision BI (degrade an unverifiable approval to advisory).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+  "owner": "po-decision",
+  "clause": "Decide whether the newer baseline-implementation policy replaces A2 (implementation authority rejects the deferred Verify state).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+  "owner": "po-decision",
+  "clause": "Decide whether retiring the course resolves the item (moot) or the revision path still needs a zero-override test.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-generator-repeats-large-source-material",
+  "owner": "native-host",
+  "clause": "The host response budget for the same large input needs a real host measurement.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-package-parent-metadata-false-drift",
+  "owner": "verify-wsl",
+  "clause": "49c46f755 states the seven registered pins were not individually run in that sitting; the registered suite run inside the WSL Full Verify with the completion count of 21 is missing.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-package-parent-metadata-false-drift",
+  "owner": "native-host",
+  "clause": "Installed-runtime qualification and the historical native refusal attribution stay unproven, as the item states.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+  "owner": "po-signature",
+  "clause": "The protected implementation-boundary guard step for the fitness-model check needs a PO-run ceremony.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-workflow-package-omits-contract",
+  "owner": "native-host",
+  "clause": "Host-verified freshness and read-only evidence is exercised only through the injected verifier seam; a real host review of the package is missing.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ }
+]

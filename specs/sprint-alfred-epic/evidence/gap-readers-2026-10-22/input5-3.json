@@ -1,0 +1,87 @@
+[
+ {
+  "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+  "clause": "Locate or restore the item file so the original acceptance can be checked against the pin.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+  "clause": "Implement one enforcement-layer measure per measured cause (wake-ups, inline reads, refusals, briefing authoring).",
+  "priorDetail": "matrix stage 25 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.first-enrollment-enters-retirement-before-consent",
+  "clause": "Give the ER-HISTORY-UNSAFE symlinked-history case a real body instead of the empty skipped stub.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+  "clause": "Implement and test the forensic and audit evidence export.",
+  "priorDetail": "matrix stage 25 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+  "clause": "Run and record a counted regression test that spawns real git with the shared constant, plus the ratchet scan.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+  "clause": "Show the original onboarding handover commit and the full onboarding suite green with counts.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.git-stash-list-classified-as-working-tree-write",
+  "clause": "Pin and fix the sed -i operand misparse (wrong File reported, PF-16).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+  "clause": "The dispatch-briefing suite count is from commit messages only; record a counted run on the current HEAD.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+  "clause": "Pin the generator-emitted targeted and quick-route lines (targeted -> quick -> final Verify) in dispatch-briefing.test.mjs.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+  "clause": "Restore or re-state the original item body so acceptance is checkable.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+  "clause": "Publish sanitised counted evidence per compared greenfield run and a check that comparisons cite only such files (post-0.7.0).",
+  "priorDetail": "matrix stage 25 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.greenfield-design-course-cost-and-proportionality",
+  "clause": "Record phase wall time, tool time and human wait separately (telemetry case is a deferred skip).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+  "clause": "Commit a recorded baseline count for the suite so later changes can be attributed without a staging experiment.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+  "clause": "Add a test that runs every printed commit example through the real installed hooks (command guard and commit-msg), which the acceptance names.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+  "clause": "Classify index changes apart from working-tree writes so unstaging generated files is admitted, and add the run-proposed-action-then-retry state-machine test (D64).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+  "clause": "Build the host skill-catalog declaration carrier and the declared-skill admission with a concrete ordinary retry route (post-0.7.0).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.model-family-approval-with-automatic-version-upgrades",
+  "clause": "Bring the remaining red host-store and invocation cases (MFHS002-008, MFHS023/028, MFI012/013) to green or to a typed decision, and re-measure them.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ }
+]

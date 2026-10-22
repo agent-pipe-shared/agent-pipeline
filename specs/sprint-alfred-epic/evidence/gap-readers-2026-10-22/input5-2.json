@@ -1,0 +1,87 @@
+[
+ {
+  "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+  "clause": "The PO's CAS/missing failure is still not located; reproduce on the new candidate and record the code.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+  "clause": "Fold the design-readiness bootstrap into the fresh-host typed next action once the premise is verified, and retarget the deferral pin.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+  "clause": "Add a test that drives the productive Readiness host/store path and the package reader with forged and missing custody.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+  "clause": "Build the host-owned executor so the admitted CLI path and the coordinator reach the answered-receipt verifier, and compare the execution's candidate tree.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+  "clause": "Fix or document the --summary/--body requirement and the multi-line copyCommand, and add a pin with a counted result.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+  "clause": "The guard refusals that consume Critic budget (counter-lock-busy, rg/Glob/Grep read-scope) remain untested here.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+  "clause": "Add a pin that the template and agent text carry no random-name or openssl instruction and name the Write/Edit route.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.declared-system-skill-read-requires-human-override",
+  "clause": "Add the protected read-scope seam that binds the exact catalog-declared skill files and invalidates on drift.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.denial-names-a-diagnosis-it-refuses",
+  "clause": "Extend the admitted-recovery-verb pin to every other denial code that names a command.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+  "clause": "If not moot, add a zero-override revision-path test on the ordinary route.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-generator-repeats-large-source-material",
+  "clause": "Compact repeated pendingAsks envelopes on inspect and remove the remaining stored duplication, with a measured before and after.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+  "clause": "Add counted tests for the D64 clauses: criterion parser check at present-plan and the sanitized review-chain round count.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-trailer-verifier-lost-after-closure",
+  "clause": "The item text still lists the trailer-grammar and merge-survival bullets as open; reconcile it with the pin.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.desktop-app-support-is-unverified",
+  "clause": "Confirm the docs slice that states Desktop WSL sessions carry no pipeline protection and PO commands run in a terminal.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+  "clause": "Add and run the test with three independently signed disjoint actions, two sequential deliveries and the target-byte, absence, symlink, policy, plugin, expiry, replay and audit drift cases.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+  "clause": "Add the generated valid design-review skeleton with pre-filled digests (only the dispatch-record skeleton exists).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+  "clause": "Measure why log entries were skipped (budget pressure vs ordering vs wording) and fold appends into existing writes.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ }
+]

@@ -1,0 +1,158 @@
+[
+ {
+  "id": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+  "owner": "native-host",
+  "clause": "A native Windows single-file run must leave no real NUL file in the repository root.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+  "owner": "verify-wsl",
+  "clause": "Run the complete original onboarding controller and Source corpus on Linux/WSL and reconcile remaining failures.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+  "owner": "verify-wsl",
+  "clause": "Measure the lower wall time of the selected Verify path on Linux/WSL (the AC3 measurement-hold skip).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+  "owner": "verify-wsl",
+  "clause": "Complete the current full onboarding suite with consistent case counts, all child completions and exit 0 (criterion 4).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+  "owner": "po-decision",
+  "clause": "Decide whether AGY isolated-worktree parallel preparation is pulled into 0.7.0 or stays post-0.7.0.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+  "owner": "native-host",
+  "clause": "A live parallel Critic plus Goldfish run on an installed host (and AGY worktree route if pulled in).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+  "owner": "native-host",
+  "clause": "The directory-symlink alias case skips on native Windows and needs a native run there.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+  "owner": "verify-wsl",
+  "clause": "Run the full governance-scope suite (23 callbacks) in the permitted stable environment; Triage reports only 21/23.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+  "owner": "native-host",
+  "clause": "Capture real Codex and Antigravity hook payloads and run the inert contract on installed hosts (payloads are approximated; Windows/PowerShell not probed).",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.plan-submission-must-not-require-separate-po-approval",
+  "owner": "native-host",
+  "clause": "Walk the happy path once on an installed host (greenfield test) to show a single final PO approval.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.powershell-bypasses-onboarding-read-boundary",
+  "owner": "native-host",
+  "clause": "Installed native Windows enforcement and the live host permission boundary of Read/Grep/Glob are named in the pin as not claimed.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+  "owner": "native-host",
+  "clause": "Renew the win32 count at current HEAD; the 11 win32 cases are skipped on Linux.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+  "owner": "native-host",
+  "clause": "Run the P1/P2 seam and NOT_SECURE cases on native Windows to get a counted result.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.project-calibration-retains-new-project-placeholder",
+  "owner": "po-decision",
+  "clause": "Release the S1-S8 reconstruction, including whether an aliased identity is refused or accepted as configured-alias.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.project-resource-budget-headroom-is-not-reported",
+  "owner": "native-host",
+  "clause": "R1 names five Quick consumers and authentic measurements as still open; show them in a real run.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+  "owner": "verify-wsl",
+  "clause": "Run both original positive guard CLI/fanout tests on actual canonical ready fixtures (Triage: host runs needed).",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+  "owner": "native-host",
+  "clause": "The Codex route relies on the classifier alone and was not measured live on Codex.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+  "owner": "native-host",
+  "clause": "Run the WSL UNC exact-file admission case (U3) on native Windows or WSL, where it is not skipped.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.read-only-guard-admits-execution-and-output-options",
+  "owner": "native-host",
+  "clause": "Run the Windows drive-spelling credential denial case on native Windows.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.readiness-input-omits-current-advisor-observation",
+  "owner": "native-host",
+  "clause": "Re-run the actual independent Readiness review on an installed host once the declared Advisor context is available.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+  "owner": "native-host",
+  "clause": "Reconnect a real Codex session and complete the prescribed bootstrap readback (acceptance bullet 4).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+  "owner": "verify-wsl",
+  "clause": "Run the complete original onboarding controller and the preserved original callback on Linux/WSL.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+  "owner": "po-decision",
+  "clause": "Decide whether acceptance bullet 1 is superseded by the ADR-0085 retirement or must be re-targeted to the present-plan review-receipt route.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+  "owner": "po-decision",
+  "clause": "Decide how the retired course is re-targeted so it can consume a fallback result as role evidence.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+  "owner": "native-host",
+  "clause": "Check the host-boundary route against a live Codex sandbox.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.scratch-has-no-retention-and-no-durability-check",
+  "owner": "native-host",
+  "clause": "The item matrix names Windows; the pin has no counted native-Windows run.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ }
+]

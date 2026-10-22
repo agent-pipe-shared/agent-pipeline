@@ -1,0 +1,158 @@
+[
+ {
+  "id": "pipeline.greenfield-design-course-cost-and-proportionality",
+  "owner": "native-host",
+  "clause": "Demonstrate a fresh small-project run on an installed runner that reaches implementation with one final PO gate.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.greenfield-design-course-cost-and-proportionality",
+  "owner": "po-decision",
+  "clause": "Confirm the original Advisor-plus-readiness acceptance is replaced by the successor policy (one review, no readiness, ADR-0085) and that telemetry stays deferred.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.greenfield-machine-output-and-skill-budget",
+  "owner": "native-host",
+  "clause": "Measure first-run and denial output on installed Claude, Codex and Antigravity hosts; the pin uses the real CLI with injected seams only.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.guard-override-request-digest-drifts-after-arming",
+  "owner": "native-host",
+  "clause": "Run the seed-sign-arm-retry sequence on a native Windows host; the acceptance names Windows and POSIX and the counted run is POSIX.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.guard-push-refuses-read-only-git-without-push",
+  "owner": "po-decision",
+  "clause": "Acknowledge that the Q12 option B refusal of nested-shell git replaces the item's original second clause as the effective acceptance.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+  "owner": "native-host",
+  "clause": "The triage closes the item only after the 0.7.0 candidate host checklist.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+  "owner": "native-host",
+  "clause": "Run guard-lifecycle-ready.test.mjs on native Windows and state the counted result.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.handover-doc-committed-without-governance-classification",
+  "owner": "po-decision",
+  "clause": "Decide whether the pinned residual gap is accepted: a clone without installed hooks still commits an unclassified handover and only the bootstrap catches it later.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+  "owner": "native-host",
+  "clause": "Run the real-host case (native win32 process query classifies a gone pid dead and a live process ambiguous) on native Windows.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.hgo-patch-preflight-before-signature",
+  "owner": "native-host",
+  "clause": "Rehearse hunk order with the real native apply_patch engine against the installed guard; the pin uses real git, not the native engine.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+  "owner": "native-host",
+  "clause": "Kill a real Verify mid-run on a Windows host and confirm readiness stays ready with a warning and a typed archive route exists.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+  "owner": "po-decision",
+  "clause": "Confirm that a report-only reverse inventory with no completion effect satisfies the original Alfred acceptance (AC-204); no public item file records it.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+  "owner": "native-host",
+  "clause": "The pin skips every case on a native Windows host without git in the trusted roots; run it there.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+  "owner": "po-decision",
+  "clause": "Disposition of existing stage-0-labelled design commits as provenance debt (history is not rewritten).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+  "owner": "native-host",
+  "clause": "Triage closes the item only after the 0.7.0 candidate host checklist.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+  "owner": "native-host",
+  "clause": "Run the design-course end-to-end on Windows Git Bash to present-plan with zero overrides (point 5).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+  "owner": "native-host",
+  "clause": "Verify declared-skill admission at the installed Codex lifecycle boundary.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+  "owner": "native-host",
+  "clause": "Triage closes the item only after the 0.7.0 candidate host checklist.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.merge-commit-message-skips-conventional-type-check",
+  "owner": "po-decision",
+  "clause": "Confirm the acceptance reconstructed from the item title, since the original item body is not in this repository.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.model-family-approval-with-automatic-version-upgrades",
+  "owner": "po-decision",
+  "clause": "Decide the D66 typed-pending row for the model-family cases.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.model-family-approval-with-automatic-version-upgrades",
+  "owner": "native-host",
+  "clause": "Installed-host acceptance on qualified Codex, Claude and Antigravity runners (pin case C5, real dispatch id, Offline/Compact).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
+  "owner": "native-host",
+  "clause": "Run the bootstrap and the two win32-only realpath-casing cases on native Windows; 5e215c4a8 states the win32 branches were not run on a native host.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+  "owner": "native-host",
+  "clause": "Installed attended acceptance of the confirmation prompt on a real Codex or Claude terminal (item says it remains pending).",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+  "owner": "verify-wsl",
+  "clause": "Combined Full Verify including this pin on the WSL run is not stated as complete.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.native-patch-rename-drops-protected-content-markers",
+  "owner": "native-host",
+  "clause": "Run the controls against the installed guard on the candidate host (acceptance bullet 3); triage says a host run is needed.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+  "owner": "native-host",
+  "clause": "The alias and private-mode refusals (PU-ALIAS, PU-PRIVATE-MODE) skip on native Windows; run an uninstall on a real installed host.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ }
+]

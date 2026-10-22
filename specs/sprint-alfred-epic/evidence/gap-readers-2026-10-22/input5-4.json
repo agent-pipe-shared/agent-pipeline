@@ -1,0 +1,82 @@
+[
+ {
+  "id": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+  "clause": "Pin or cite a counted test that the git-read null-device values use GIT_NULL_DEVICE and not the NUL literal (acceptance 2).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+  "clause": "Refresh the item's stale Triage 'STILL OPEN' text and record the pin's named limits (tool-layer Opus override not visible to the guard; re-critic range spellings; due 2026-10-31).",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+  "clause": "Implement the liveness readback for open dispatch records that the guard checks before admitting a second writer.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+  "clause": "Add a pin that the producer runs for an older commit with a dirty checkout and leaves the checkout bytes unchanged, and one that the session-authority registry stays clean after a parallel Critic and Goldfish.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.project-resource-budget-headroom-is-not-reported",
+  "clause": "The one skipped case (reporter refuses an input through a symlinked parent or aliased file) has an empty body; give it a real body or a conditional typed skip.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+  "clause": "Add the Codex and Antigravity runner rows to the read-shape test matrix and audit their refusal texts.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.readiness-input-omits-current-advisor-observation",
+  "clause": "Pin or cite counted coverage of the final package validation and the historical-not-ready preservation bullets.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+  "clause": "If re-targeted, pin a single-step design revision with zero PO interactions on the replacement route.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+  "clause": "Implement the atomic dispatch recovery state keeping task identity and attempt history, and route admitted test commands to the host boundary from the first call.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+  "clause": "The pin samples states and tool shapes by rotation; decide whether the full cross-product or a signed-off sampling statement is required.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+  "clause": "UNCOVERED-CONCURRENT-CAUSE: the real cleanup_recovery_observation_unavailable flap under concurrent agents has no test over shared on-disk state.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+  "clause": "Add a counted regression for the signing spawn's cwd and environment (decoy openssl in the working directory must never start); no pin exists under this item's name.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+  "clause": "Replace the source-text assertions and the unconditional skip with a behavioral timing case over a populated request store.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.signing-prompt-prints-the-whole-review-package",
+  "clause": "The P6 directory-mode and symlink custody case is an unconditional skip even on Linux; implement it.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.three-runner-happy-path-with-two-po-approvals",
+  "clause": "Added 0.7.0 acceptance (typed absent-course result with repair, course writer for German-table Specs and .test.js checks, delivery hand-off proven at plan readiness, onboarding answers surviving restart) needs a counted pin of its own; no pin run states it.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+  "clause": "The pin header still says no Linux/WSL run has been recorded (QG-06 skip record); update it to cite this counted run.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ }
+]

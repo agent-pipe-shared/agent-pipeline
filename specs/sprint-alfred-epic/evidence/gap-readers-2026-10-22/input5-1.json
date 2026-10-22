@@ -1,0 +1,87 @@
+[
+ {
+  "id": "pipeline.advertised-git-to-head-pipeline-is-refused",
+  "clause": "The 2026-10-18 addendum shapes (git -C <repo> show ... -- | head, rg -o --no-filename, rg -c, ls -la) and a refusal text that names the triggering flag are not pinned by this file.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+  "clause": "Pin (and if missing implement) the non-authoritative `cause` field kept at the DWP2-PHYSICAL-OR-GIT relabel.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+  "clause": "Run generate-agent-obligations.test.mjs serially and commit its counted result as evidence (or add the pin file under lib/pins).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+  "clause": "Optional better option of the Proposal: derive the bound in section 1 from the guard export instead of the hand-written 6.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+  "clause": "Show Critic, Advisor and Verify routes on AGY (or the recorded self-dispatch fallback) and an admitted route for the main agent to update the handover in every phase.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-el01-write-authorization-gap",
+  "clause": "Worker-scope and fail-closed clauses cannot be exercised until the tripwire has carrier and scope inputs.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+  "clause": "Known gap from 553342999: a tracked relative workspace registry entry makes project uninstall refuse with PU-WORKSPACE-DRIFT.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+  "clause": "2026-10-08 recurrence: the private readiness receipt and Advisor course under .git/agent-pipeline stay device-local; survival of the full bound set across a device switch is not shown.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+  "clause": "Added 0.7.0 acceptance: an opaque perl (or other interpreter) scratch script must be no wider in devplan than node; that pin case is still a todo (expected failing).",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+  "clause": "The link-escape-under-docs case in the pin is an empty skipped stub; write a real case or point to the covering pin.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.bounded-reader-terminal-binding",
+  "clause": "Integrate the terminal record and checker productively and bind the actual Alfred course (historical states, eight reports, resolution commits).",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+  "clause": "Add the project-onboarding-v3 consumer case (reopen-design only on ok:false) and a win32-dialect fixture the Proposal names.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.capability-inventory-checker-is-red-at-head",
+  "clause": "HAW-A05 goes red at every later commit that adds a suite, hook or skill until the inventory is re-baselined (6d244eac1 says so); keep it current.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+  "clause": "D64: admit route selection, design-review receipt production, architecture materialization and baseline diagnosis, registration and the documented help/readback forms in their prescribing state, absolute node path included.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+  "clause": "D64: one integration test with the real guards from a fresh repository to the first implementation dispatch needing zero human overrides.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+  "clause": "A real-apply test that a Claude-only project gets no .codex files and later multi-runner activation shows no false drift.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+  "clause": "V-10 typed gaps (due 2026-10-31): Critic and unrelated-role dispatches not route-recorded, dynamic Workflow script, Codex/Antigravity registration of guard-dispatch.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ }
+]

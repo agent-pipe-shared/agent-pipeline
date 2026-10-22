@@ -1,0 +1,134 @@
+[
+ {
+  "id": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+  "owner": "native-host",
+  "clause": "The live readback that a blocked session saves a report without a PO override (and apply_patch lane on Codex) needs an installed-host run.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+  "owner": "native-host",
+  "clause": "The original incident was on Windows; no counted native-Windows run of the pin exists.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.security-scanner-failure-provenance",
+  "owner": "native-host",
+  "clause": "Genuine native Semgrep acceptance is not claimed by the synthetic pin and stays open.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.semgrep-offline-default-version-check",
+  "owner": "native-host",
+  "clause": "Native public-PUSHSEED acceptance against the final candidate is a separate obligation the item names; only a focused earlier receipt exists.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+  "owner": "native-host",
+  "clause": "A whole-repository native Semgrep run (the original Windows measurement) is not covered by the fake-binary pin.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+  "owner": "po-decision",
+  "clause": "Name the fixture issue the item refers to, or declare that clause out of scope; the backlog text never says which fixture.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+  "owner": "native-host",
+  "clause": "The Windows libuv lookup behavior needs a native-Windows run; it was never machine-verified.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+  "owner": "verify-wsl",
+  "clause": "The live HGO store sweep and the full sign-intent CLI ceremony need a Linux/WSL run with real private-directory modes.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+  "owner": "native-host",
+  "clause": "The pin signs with an in-memory fixture key; a real PO terminal signature on WSL and PowerShell is not shown. The item also defers its end-to-end proof to the three-runner happy-path item.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+  "owner": "native-host",
+  "clause": "A native-Windows run of the route and the skipped backslash-path case is missing.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+  "owner": "native-host",
+  "clause": "The original import failure was on native Windows; the suite has no counted native-Windows run.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.signing-prompt-prints-the-whole-review-package",
+  "owner": "native-host",
+  "clause": "A real PowerShell ceremony showing the compact prompt is not shown.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.signing-toolchain-readiness",
+  "owner": "native-host",
+  "clause": "The recurrence was a non-default Git root on a Windows PowerShell PATH; no counted native-Windows run of the pin exists.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+  "owner": "native-host",
+  "clause": "The item closes after the 0.7.0 candidate host checklist: a real installed-host dispatch with differing source and installed maxTurns is not shown.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.three-runner-happy-path-with-two-po-approvals",
+  "owner": "native-host",
+  "clause": "One end-to-end greenfield run each on Claude, Codex and Antigravity reaching a pushed branch with exactly two PO proofs is missing.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+  "owner": "native-host",
+  "clause": "The pin drives the real driver with runner stubs; an installed-host first-answer round on each runner is not shown.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+  "owner": "verify-wsl",
+  "clause": "The item is WSL-only: a Verify run on a real /mnt/<drive> DrvFs checkout showing the typed hint is missing; the pin simulates permissive modes.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.windows-greenfield-scratch-write-denied",
+  "owner": "native-host",
+  "clause": "A native-Windows run of the pin (absolute-path Write and PowerShell New-Item/Set-Content admitted) and a fresh Windows intake are missing.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+  "owner": "native-host",
+  "clause": "The eight win32-only cases need a native-Windows run, and the item's check that the v3 suite failure count drops there.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+  "owner": "native-host",
+  "clause": "A native-Windows run of the drive-letter case and an observation of the installed Claude candidate in a fresh Windows session (A5) are missing.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+  "owner": "native-host",
+  "clause": "A native-Windows run proving install, marker readback, blocking push and removal, including the read-only descriptor EPERM assertion, is missing.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+  "owner": "verify-wsl",
+  "clause": "The 'preserve prior onboarding and uninstall behavior' clause rests on the other onboarding suites being green in a Full Verify.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ }
+]

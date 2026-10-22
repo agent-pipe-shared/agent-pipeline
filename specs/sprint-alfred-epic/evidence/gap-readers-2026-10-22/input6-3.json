@@ -1,0 +1,158 @@
+[
+ {
+  "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+  "owner": "native-host",
+  "clause": "A native Windows run of the win32 cases (CRHS-INPUT measurement and the typed skip of RC12C001) is missing.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+  "owner": "po-decision",
+  "clause": "Decide whether the typed host-limitation skip on Windows resolves the item or the host store must work on Windows.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.desktop-app-support-is-unverified",
+  "owner": "native-host",
+  "clause": "Open the repository in the Claude Desktop app (Windows path) and record the bootstrap line, a guard denial, a background Goldfish dispatch and the statusLine identity.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+  "owner": "po-signature",
+  "clause": "Any change to the protected consume path lands only as a signature-bound patch.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+  "owner": "native-host",
+  "clause": "Run the pin (win32 owner identity and the real-hook subagent case) on native Windows; the counted run was Linux/WSL.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+  "owner": "native-host",
+  "clause": "Item triage closes it only after the 0.7.0 candidate host checklist (an Explore dispatch on an installed host).",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+  "owner": "native-host",
+  "clause": "The landed-creation cases (OWN-5, OWN-6) skip on a non-Linux host; run them on native Windows.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+  "owner": "verify-wsl",
+  "clause": "Reproduce the historical domain-shaped finding with the real gitleaks binary on Linux/WSL.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+  "owner": "native-host",
+  "clause": "Run the literal ${PIPELINE_PLUGIN_ROOT} spelling cases (point 4b and its control) on native Windows.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+  "owner": "native-host",
+  "clause": "Measure before/after on real Elephant sessions against the 10 % administration target.",
+  "priorDetail": "matrix stage 25 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+  "owner": "native-host",
+  "clause": "The SubagentStart agent_id/agent_type contract was never verified live; confirm on an installed Claude host.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+  "owner": "native-host",
+  "clause": "Windows spellings and owner-only DACLs are exercised by string spelling on Linux; run on native Windows and drive the attended recovery from a real external terminal.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.first-enrollment-enters-retirement-before-consent",
+  "owner": "verify-wsl",
+  "clause": "Run that case on Linux/WSL, where directory symlinks and mode bits exist.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.foreign-worktree-closes-the-implementation-gate",
+  "owner": "verify-wsl",
+  "clause": "The real WSL-registered /mnt foreign-worktree fixture is a typed skip with an empty body; run it on Linux/WSL.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+  "owner": "po-signature",
+  "clause": "Admitting the export to governed agents needs a signature-bound guard patch.",
+  "priorDetail": "matrix stage 25 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+  "owner": "native-host",
+  "clause": "Run on native Windows with Git for Windows 2.56.0 to confirm the null-device value is accepted.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+  "owner": "po-signature",
+  "clause": "Protected sites go through the next signed package.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+  "owner": "verify-wsl",
+  "clause": "Counted Linux/WSL run of the onboarding suite.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+  "owner": "native-host",
+  "clause": "Counted run was POSIX only; run the win32 fixtures and a real plugin update refresh on native Windows.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.git-stash-list-classified-as-working-tree-write",
+  "owner": "po-decision",
+  "clause": "Triage defers the item past the 0.7.0 candidate (2026-10-17); confirm whether it counts for this delivery.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+  "owner": "native-host",
+  "clause": "Run the backslash-relative nested finding case on native Windows and confirm the 49 retained findings drop.",
+  "priorDetail": "matrix stage 50 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+  "owner": "verify-wsl",
+  "clause": "Run the repair route once against the real gitleaks binary; the pin uses synthetic scanner JSON.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+  "owner": "po-signature",
+  "clause": "Triage F2: registering the repair suite in protected verify.mjs needs a signature-bound patch if not yet landed.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+  "owner": "native-host",
+  "clause": "Windows argv spellings are simulated on Linux; run the CLI on native Windows (0.7.0 host checklist).",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.governance-scope-rejects-readonly-host-git-control",
+  "owner": "native-host",
+  "clause": "Run the two original onboarding host callbacks on a real Codex host-managed readonly .git mount; native win32 cannot manufacture the readonly directory.",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ },
+ {
+  "id": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+  "owner": "native-host",
+  "clause": "Live Codex/WSL readback of a fresh greenfield project (item says live Codex readback is pending).",
+  "priorDetail": "matrix stage 75 at 9a12beab7"
+ }
+]
