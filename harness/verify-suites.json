@@ -3676,6 +3676,42 @@
       "file": "harness/scripts/check-required-evidence-not-ignored.test.mjs",
       "invariantPinned": "Evidence that a tracked index, manifest or check needs is never ignored, untracked or inside the git directory; each violation carries a typed REQ-EVIDENCE code (D101)",
       "nonOverlapNote": "Unique test suite for harness/scripts/check-required-evidence-not-ignored.mjs"
+    },
+    {
+      "name": "antigravity-native-read-credential-roots-tests",
+      "file": "plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs",
+      "invariantPinned": "The Antigravity native read gate refuses every credential root the passive read policy declares, in each spelling, and keeps ordinary outside reads admitted (D96/D105/D109)",
+      "nonOverlapNote": "Unique cases: the native-read credential-root table of the Antigravity pretool guard"
+    },
+    {
+      "name": "guard-devplan-approval-unverified-tests",
+      "file": "plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs",
+      "invariantPinned": "An approved design package that is missing or not a physical file degrades the dev-plan gate to an advisory that names the cause and one repair, while a tampered, revoked or absent approval still blocks (D117)",
+      "nonOverlapNote": "Unique cases: the unverifiable-approval advisory on both lanes and its negative controls"
+    },
+    {
+      "name": "human-guard-override-disjoint-isolation-tests",
+      "file": "plugins/pipeline-core/lib/human-guard-override-disjoint-isolation.test.mjs",
+      "invariantPinned": "A drift of one independently signed disjoint native override action refuses only that action; siblings stay consumable; policy, plugin, state and audit drift are capability-global",
+      "nonOverlapNote": "Isolation matrix; human-guard-override-disjoint.test.mjs proves each drift fails closed, this proves the siblings are not invalidated"
+    },
+    {
+      "name": "pin-design-phase-d64-criterion-parser-and-sanitized-review-chain-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs",
+      "invariantPinned": "present-plan refuses a Spec whose acceptance rows its criterion parser cannot read, and the review receipt binds the sanitized report to the digest of the unpublished original (D64)",
+      "nonOverlapNote": "Unique cases: the present-plan criterion refusal and the sanitized digest pair"
+    },
+    {
+      "name": "session-authority-lock-wait-tests",
+      "file": "plugins/pipeline-core/lib/session-authority-lock-wait.test.mjs",
+      "invariantPinned": "A transient registry lock is waited for within a bounded time and then named as a transient lock instead of degrading the ruleset identity (K12, D-series lock wait)",
+      "nonOverlapNote": "Unique cases: the bounded registry lock wait and its typed transient-lock naming"
+    },
+    {
+      "name": "pin-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.test.mjs",
+      "invariantPinned": "The sign-intent openssl spawn never resolves a bare executable name through the working directory on Windows",
+      "nonOverlapNote": "Unique test suite for the sign-intent openssl spawn on Windows"
     }
   ]
 }
