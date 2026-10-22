@@ -14,17 +14,21 @@
 // The real modules run (commit-message-policy.mjs, dispatch-authorship-verify.mjs); only the
 // verifier's documented dependency seam (readCommitMessage/readChangedPaths) is driven. Fixtures
 // live under the repository's scratch/ (the OS temp root is a protected read scope on this host).
-// Not covered: a live installed git commit-msg hook run (hook install needs a throwaway repository
-// and a trusted git executable; the hook body calls finishedCommitMessageFindings with
-// requireProvenanceWhenSignaled, which is the lane exercised below).
+// The "AC1 (real installed hooks)" cases additionally run the real hooks/guard-git.mjs process and a real
+// `git commit` through the installed commit-msg hook in a throwaway enrolled repository (skipped, typed, when
+// git is not on PATH). Not covered: the commit-msg hook of a Windows host.
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import test, { after } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { commitMessageFindings, finishedCommitMessageFindings } from "../commit-message-policy.mjs";
+import { GIT_NULL_DEVICE } from "../git-null-device.mjs";
+import { createGovernanceScopeController } from "../governance-scope.mjs";
+import { applyInstall, planInstall } from "../../scripts/commit-msg-hook-install.mjs";
 import { verifyCommit, VERDICT, ELEPHANT_STAGE0_MAX_PATHS } from "../../scripts/dispatch-authorship-verify.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
@@ -167,5 +171,81 @@ test("AC3: documentation-only commits during implementation use the same grammar
     assert.deepEqual(codes(backstopLane(messageWith(value))), ["GIT-03-DISPATCH-MALFORMED"], value);
   }
 });
+
+// ---- AC1 against the REAL installed hooks -------------------------------------------------------------
+// A throwaway enrolled repository gets the real commit-msg hook installed by the plugin's own installer; every
+// printed example is then (a) fed to the real hooks/guard-git.mjs process exactly as Claude Code feeds it (tool
+// input JSON on stdin) and (b) committed through a real `git commit`, which runs the installed commit-msg hook.
+const GUARD_GIT = join(REPO_ROOT, "plugins/pipeline-core/hooks/guard-git.mjs");
+const PLUGIN_LIB_DIR = join(REPO_ROOT, "plugins/pipeline-core/lib");
+const realGit = spawnSync("git", ["--version"], { encoding: "utf8" });
+const realGitAvailable = !realGit.error && realGit.status === 0;
+
+function realHookRepository() {
+  const root = mkdtempSync(join(FIXTURES, "real-hooks-"));
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (args) => {
+    const result = spawnSync("git", args, { cwd: root, encoding: "utf8", env });
+    assert.equal(result.status, 0, `git ${args.join(" ")}: ${result.stderr}`);
+    return result.stdout;
+  };
+  git(["init", "-q", "-b", "main"]);
+  git(["config", "user.name", "Fixture"]);
+  git(["config", "user.email", "fixture@example.invalid"]);
+  writeFileSync(join(root, "README.md"), "base\n");
+  git(["add", "README.md"]);
+  git(["commit", "-q", "-m", "chore: base\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)"]);
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-host-state") });
+  const enrollment = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-design-trailer-fixture" });
+  assert.equal(controller.applyDecision(enrollment, { activate: true, planSha256: enrollment.planSha256 }).state, "active");
+  const planned = planInstall({ rootDir: root, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(planned.status, "ready");
+  assert.equal(applyInstall({ rootDir: root, pluginLibDir: PLUGIN_LIB_DIR }).status, "installed");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  return { root, env, git };
+}
+
+let commitSeq = 0;
+/** Runs one dispatch value through the real command guard and then the real `git commit` (installed commit-msg hook). */
+function realHooksVerdict(repo, dispatchValue) {
+  commitSeq += 1;
+  const messageFile = join(repo.root, `message-${commitSeq}.txt`);
+  writeFileSync(messageFile, messageWith(dispatchValue));
+  writeFileSync(join(repo.root, "docs", "x.md"), `revision ${commitSeq}\n`);
+  repo.git(["add", "docs/x.md"]);
+  const command = `git commit -F ${JSON.stringify(messageFile)} -- docs/x.md`;
+  const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
+  const guard = spawnSync(process.execPath, [GUARD_GIT], {
+    input: JSON.stringify({ tool_input: { command } }), encoding: "utf8", cwd: repo.root,
+    env: { ...baseEnv, CLAUDE_PROJECT_DIR: repo.root },
+  });
+  const commit = spawnSync("git", ["commit", "-F", messageFile, "--", "docs/x.md"], {
+    cwd: repo.root, encoding: "utf8", env: repo.env, timeout: 60000,
+  });
+  return { guard, commit };
+}
+
+test("AC1 (real installed hooks): every printed Dispatch example passes the real command guard and the real commit-msg hook",
+  { skip: realGitAvailable ? false : "git not on PATH", timeout: 240000 }, () => {
+    const repo = realHookRepository();
+    const examples = printedDispatchExamples();
+    assert.ok(examples.includes("stage-0 (elephant)") && examples.includes("ALF-C-P1-13 (goldfish)"), "the printed set is not empty");
+    for (const value of [...examples, "design (elephant)"]) {
+      const { guard, commit } = realHooksVerdict(repo, value);
+      assert.equal(guard.status, 0, `real command guard (guard-git.mjs) refused printed example "${value}": ${guard.stderr}`);
+      assert.equal(commit.status, 0, `real commit-msg hook refused printed example "${value}": ${commit.stderr}`);
+    }
+  });
+
+test("AC1 (real installed hooks): the same harness refuses a near-miss in both hooks, so the hooks are proven live",
+  { skip: realGitAvailable ? false : "git not on PATH", timeout: 240000 }, () => {
+    const repo = realHookRepository();
+    const { guard, commit } = realHooksVerdict(repo, "implementation (elephant)");
+    assert.equal(guard.status, 2, `the real command guard must block the near-miss: ${guard.stderr}`);
+    assert.match(guard.stderr, /GIT-03-DISPATCH-MALFORMED/u);
+    assert.notEqual(commit.status, 0, commit.stdout);
+    assert.match(commit.stderr, /BLOCKED \(agent-pipeline commit-msg\)/u);
+    assert.match(commit.stderr, /GIT-03-DISPATCH-MALFORMED/u);
+  });
 
 test("AC4 (host limitation, not claimed): provenance-debt disposition of existing stage-0-labelled history is a history/documentation decision with no executable surface", { skip: "host-limitation: not a behavior; reported as manual disposition, history is not rewritten" }, () => {});

@@ -70,3 +70,14 @@ patch prepared in `scratch/design-trailer-consistency/`, unqualified).
 - **Rationale:** commit(s) `2a466fa59`.
 - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
 - **Date:** 2026-10-08.
+- **Counted evidence (2026-10-22, Linux host, head of the h2 clone):** the first acceptance bullet (a real installed-hook
+  run of every printed commit example) is now pinned in
+  `plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs`: a throwaway enrolled
+  repository gets the real commit-msg hook from `scripts/commit-msg-hook-install.mjs`; every printed `Dispatch:` example
+  plus `design (elephant)` goes through the real `hooks/guard-git.mjs` process and a real `git commit`, and a near-miss
+  (`implementation (elephant)`) is refused by both, which proves the hooks are live in that harness. Run:
+  `node --test plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs`,
+  13 cases, 12 pass, 0 fail, 1 skip (the skip is the fourth acceptance bullet, the provenance-debt disposition of
+  stage-0-labelled history: a documentation decision with no executable surface, still manual). Not verified here: a
+  Windows host run of the commit-msg hook, and a path-based rejection of `design (elephant)` for production files
+  (the pin asserts only the size bound, as the PO decision of 2026-10-16 admits the form without a path grant).
