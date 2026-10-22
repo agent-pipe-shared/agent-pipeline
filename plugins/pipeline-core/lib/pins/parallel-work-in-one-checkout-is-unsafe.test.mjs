@@ -689,7 +689,138 @@ test("PARWORK-M5a: the real producer CLI and the repair inspect run while anothe
   assert.deepEqual(descriptorState(), descriptorsBefore, "the session descriptor is byte-identical and its owner still judged live");
 });
 
-// DEFERRED, out of scope of this item's functional delivery: the GUARD-SIDE check that refuses a second writer while an open record's
-// owner is alive ("Observed again 2026-10-05 (round 3b)"). It belongs to the protected guard-dispatch hook. The liveness READBACK it
-// would consult is delivered and pinned in lib/dispatch-record-liveness.test.mjs (PO decision D110: PID plus process start identity,
-// alive | gone | unjudgeable, read-only).
+// ===================================================================================================================
+// MODE 6 -- the guard refuses a SECOND WRITER while an open record's owner is alive ("Observed again 2026-10-05 (round 3b)", ALF-K39)
+// ===================================================================================================================
+// The liveness READBACK (PO decision D110: PID plus process start identity, alive | gone | unjudgeable, read-only) is pinned in
+// lib/dispatch-record-liveness.test.mjs; here the REAL guard-dispatch hook process consults it before admitting a Goldfish dispatch.
+import { recordConsentGiven } from "../onboarding-consent-marker.mjs";
+import { LANDED_DISPATCH_RECORD_OWNER_SCHEMA, DISPATCH_RECORD_OWNER_SCHEMA } from "../guard/dispatch-record-lane.mjs";
+
+const DISPATCH_GUARD = fileURLToPath(new URL("../../hooks/guard-dispatch.mjs", import.meta.url));
+const SKIP6 = process.platform === "linux" ? false : "linux-only: the process start identity is read from /proc/<pid>/stat; owner Coordinator, due 2026-11-04 (Linux/WSL run, ALF-K39)";
+const sha6 = (text) => createHash("sha256").update(text).digest("hex");
+let seq6 = 0;
+
+function goldfishPrompt6(extra = "") {
+  const raw = readFileSync(join(REPO_ROOT, "templates", "prompts", "goldfish-task.md"), "utf8");
+  const marker = "COPY EVERYTHING BELOW THIS LINE\n-->";
+  let body = raw.slice(raw.indexOf(marker) + marker.length);
+  body = body.replace(/\{\{MODEL_ID\}\}/g, "claude-sonnet-5").replace(/\{\{EFFORT\}\}/g, "medium")
+    .replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium").replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "<=24 tool uses")
+    .replace(/\{\{[^{}]*\}\}/g, "FILLED");
+  return `${body}${extra}`;
+}
+
+/** An enrolled, not item-governed repository (the shape guard-dispatch.test.mjs uses) with an initial commit. */
+function dispatchFixture6() {
+  const root = join(FIXTURE, `m6-repo-${seq6 += 1}`);
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: root, env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE } });
+  recordConsentGiven({ rootDir: root });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
+  writeFileSync(join(root, "README.md"), "# Fixture\n");
+  commit4(root, ["README.md"], "initial");
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true, "fixture precondition: the repository is enrolled");
+  return root;
+}
+
+/** An open record `taskId` plus its v2 owner claim, owned by a session whose descriptor names `ownerPid` (default: this process). */
+function openRecord6(root, taskId, ownerPid) {
+  const nonce = `owner-nonce-${taskId}-0000000001`;
+  const started = startSessionDescriptor(root, { sessionId: `session-${taskId}`, ownerNonce: nonce, ...(ownerPid === undefined ? {} : { ownerPid }) });
+  writeFileSync(join(root, "evidence", `dispatch-record-${taskId}.json`), `${JSON.stringify({ schema: "pipeline.dispatch-record.v4", taskId, outcome: "in-progress" })}\n`);
+  const claimDir = join(inspectSignedDescriptorCustodyRepository(root).commonDir, "agent-pipeline", "dispatch-record-owner");
+  mkdirSync(claimDir, { recursive: true });
+  writeFileSync(join(claimDir, `${taskId}.json`), `${JSON.stringify({ schema: LANDED_DISPATCH_RECORD_OWNER_SCHEMA, taskId, sessionId: started.sessionId,
+    ownerNonceSha256: sha6(nonce), creationDescriptorSha256: sha6("d"), creationInvocationBindingSha256: sha6("b"), recordSha256: sha6("r"),
+    recordIdentity: { dev: 1, ino: 2 }, createdAt: "2026-10-22T00:00:00.000Z", assurance: "physical-readback" }, null, 2)}\n`);
+}
+
+function v1Record6(root, taskId) {
+  writeFileSync(join(root, "evidence", `dispatch-record-${taskId}.json`), `${JSON.stringify({ schema: "pipeline.dispatch-record.v4", taskId, outcome: "in-progress" })}\n`);
+  const claimDir = join(inspectSignedDescriptorCustodyRepository(root).commonDir, "agent-pipeline", "dispatch-record-owner");
+  mkdirSync(claimDir, { recursive: true });
+  writeFileSync(join(claimDir, `${taskId}.json`), `${JSON.stringify({ schema: DISPATCH_RECORD_OWNER_SCHEMA, bindingKind: "attempted-native-write", taskId, agentId: "agent-1", agentType: "goldfish", claimedAt: "2026-10-22T00:00:00.000Z" })}\n`);
+}
+
+/** One REAL guard-dispatch hook process admitting (or refusing) a Goldfish dispatch in `root`. */
+function dispatchHook6(root, prompt = goldfishPrompt6(), toolInputExtra = {}) {
+  const payload = { tool_name: "Task", tool_use_id: `toolu_m6_${seq6}_${Date.now()}`, cwd: root,
+    tool_input: { subagent_type: GOLDFISH, model: "sonnet", prompt, ...toolInputExtra } };
+  return spawnSync(process.execPath, [DISPATCH_GUARD], { input: JSON.stringify(payload), encoding: "utf8", cwd: root, timeout: 120000,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root, GIT_CEILING_DIRECTORIES: FIXTURE } });
+}
+
+const liveChild6 = () => spawn("sleep", ["600"], { stdio: "ignore" });
+
+test("PARWORK-M6a control: with no open dispatch record the same Goldfish dispatch is admitted (the fixture is a valid admission)", { skip: SKIP6, timeout: 180000 }, () => {
+  const root = dispatchFixture6();
+  const result = dispatchHook6(root);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /SECOND-WRITER/u);
+});
+
+test("PARWORK-M6b alive: an open record owned by a live process refuses a second writer, naming the record, its owner and a runnable repair", { skip: SKIP6, timeout: 180000 }, async () => {
+  const root = dispatchFixture6();
+  const owner = liveChild6();
+  try {
+    openRecord6(root, "OWNER-LIVE-1", owner.pid);
+    const result = dispatchHook6(root);
+    assert.equal(result.status, 2, `a second writer beside a live open record must be refused: ${result.stderr}`);
+    assert.match(result.stderr, /GUARD-DISPATCH-SECOND-WRITER/u);
+    assert.match(result.stderr, /evidence\/dispatch-record-OWNER-LIVE-1\.json/u, "names the open record");
+    assert.match(result.stderr, /session-OWNER-LIVE-1/u, "names its owner");
+    assert.match(result.stderr, /dispatch-record-liveness\.mjs --root /u, "the repair names the runnable re-check");
+    assert.match(result.stderr, /dispatch-record-write\.mjs/u, "the repair names the sanctioned finalize route");
+  } finally { owner.kill("SIGKILL"); }
+});
+
+test("PARWORK-M6c gone: an open record whose owner process has exited never blocks a dispatch", { skip: SKIP6, timeout: 180000 }, async () => {
+  const root = dispatchFixture6();
+  const owner = liveChild6();
+  openRecord6(root, "OWNER-GONE-1", owner.pid);
+  owner.kill("SIGKILL");
+  await new Promise((resolve) => owner.on("exit", resolve));
+  const result = dispatchHook6(root);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /SECOND-WRITER/u, "a stale record is neither a refusal nor an advisory");
+});
+
+test("PARWORK-M6d unjudgeable: an open record with no judgeable owner process admits the dispatch AND says so (never a silent pass, never a block)", { skip: SKIP6, timeout: 180000 }, () => {
+  const root = dispatchFixture6();
+  v1Record6(root, "OWNER-UNKNOWN-1");
+  const result = dispatchHook6(root);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /GUARD-DISPATCH-SECOND-WRITER-UNJUDGED/u);
+  assert.match(result.stderr, /evidence\/dispatch-record-OWNER-UNKNOWN-1\.json/u);
+  assert.match(result.stderr, /claim-v1-has-no-owner-process/u);
+  assert.doesNotMatch(result.stderr, /BLOCKED/u);
+});
+
+test("PARWORK-M6e same dispatch: the record of the dispatch being admitted (its own Slice) is never held against it, even with a live owner", { skip: SKIP6, timeout: 180000 }, () => {
+  const root = dispatchFixture6();
+  const owner = liveChild6();
+  try {
+    openRecord6(root, "SAME-1", owner.pid);
+    const own = dispatchHook6(root, goldfishPrompt6("\nSlice: SAME-1\n"));
+    assert.equal(own.status, 0, own.stderr);
+    assert.doesNotMatch(own.stderr, /SECOND-WRITER/u);
+    const other = dispatchHook6(root, goldfishPrompt6("\nSlice: OTHER-1\n"));
+    assert.equal(other.status, 2, "a dispatch of a different slice is still refused by the same live record");
+    assert.match(other.stderr, /GUARD-DISPATCH-SECOND-WRITER/u);
+  } finally { owner.kill("SIGKILL"); }
+});
+
+test("PARWORK-M6f isolated: a dispatch isolated in its own worktree writes in another checkout and is not refused by this checkout's live record", { skip: SKIP6, timeout: 180000 }, () => {
+  const root = dispatchFixture6();
+  const owner = liveChild6();
+  try {
+    openRecord6(root, "OWNER-LIVE-2", owner.pid);
+    const result = dispatchHook6(root, goldfishPrompt6(), { isolation: "worktree" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /SECOND-WRITER/u);
+  } finally { owner.kill("SIGKILL"); }
+});
