@@ -15,11 +15,12 @@
  * The same file also carries the item's added 0.7.0 acceptance (2026-10-17 P0-1, 2026-10-20 D64), each case
  * driving the real module: the typed absent course, the German-table criterion scan, the `.test.js` check
  * admission, the plan-readiness hand-off inspection, and the onboarding answers held in one intake record
- * across a real restart. Three acceptance points are not met on this head and are typed `todo` cases (owner
- * Coordinator, due 2026-10-31) that flip to passing when delivered: the submit-plan/present-plan call sites of
- * the hand-off inspection (deferred to 0.7.x by PO decision D85; protected file), the briefing generator
- * binding a numbered or R-n row of a German two-column table (scripts/dispatch-briefing.mjs
- * findCriterionOccurrences), and the Git author no longer asked once the intake record holds it.
+ * across a real restart. Measured on this head: 22 cases, 21 pass, 1 typed skip (the per-runner host proof
+ * above, E-HOLD), 0 `todo`. The three acceptance points that were once typed `todo` cases are delivered and
+ * strict: the submit-plan/present-plan call sites of the hand-off inspection (the formerly deferred D85 clause,
+ * pulled into 0.7.0 by PO decision 2026-10-22), the briefing generator binding a numbered or R-n row of a German
+ * two-column table (scripts/dispatch-briefing.mjs findCriterionOccurrences), and the Git author no longer asked
+ * once the intake record holds it.
  */
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
