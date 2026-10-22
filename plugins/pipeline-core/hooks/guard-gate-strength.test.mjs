@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -785,6 +785,17 @@ try {
     return [...specifiers];
   }
 
+  // PO decision D89 (2026-10-22, option C): decoupling lib/critic-course-admission.mjs from the read-only preflight is a
+  // six-step cascade through kernel paths and scripts/pipeline-state.mjs (agent analysis ALF-I1-GST33), not one change.
+  // Until it lands (0.7.1) the preflight's import of these two modules is an ACCEPTED, NAMED, EXPIRING exception: the
+  // walk does not descend into them. The preflight only calls their read entry points (readCriticCourseAdmission and
+  // the launch-observation read); that is documented intent, NOT machine-proven. The exception is not a pattern: two
+  // exact plugin-relative paths, each with a reason, an owner and a due date; GST33b fails once a due date has passed.
+  const GST33_ACCEPTED_EXCEPTIONS = new Map([
+    ["lib/critic-course-admission.mjs", { reason: "full admission composer reaches write-capable modules; the preflight calls only its read entry point", owner: "Coordinator", due: "2026-11-30" }],
+    ["lib/dispatch-budget-launch-observation.mjs", { reason: "reaches hooks/guard-dispatch-budget.mjs; the preflight calls only the launch-observation read", owner: "Coordinator", due: "2026-11-30" }],
+  ]);
+
   // Walks a script's source and its transitive PLUGIN-LOCAL relative imports only (bare
   // specifiers like "node:fs" are never followed). AC-3's honesty check: this is what
   // turns "provably write-free" in guard-lifecycle-ready.mjs's comment from a claim into
@@ -798,6 +809,7 @@ try {
       const resolved = resolve(dirname(entryAbsolutePath), specifier);
       const relPath = relative(pluginRoot, resolved);
       if (relPath === "" || relPath.startsWith("..")) continue; // plugin-local only
+      if (GST33_ACCEPTED_EXCEPTIONS.has(relPath.replaceAll("\\", "/"))) continue; // D89: accepted, named, expiring exception
       files.push(...walkPluginLocalSource(resolved, pluginRoot, visited));
     }
     return files;
@@ -819,6 +831,16 @@ try {
           }
         }
       }
+    }
+  });
+
+  check("GST33b every accepted closure exception names an existing module, a reason, an owner and a due date that has not passed", () => {
+    assert.ok(GST33_ACCEPTED_EXCEPTIONS.size <= 2, "the exception list must not grow without a new PO decision");
+    for (const [relPath, entry] of GST33_ACCEPTED_EXCEPTIONS) {
+      assert.ok(existsSync(join(PLUGIN_ROOT, relPath)), `${relPath} no longer exists: remove its exception`);
+      assert.ok(entry.reason.trim() !== "" && entry.owner.trim() !== "", `${relPath} needs a reason and an owner`);
+      assert.match(entry.due, /^\d{4}-\d{2}-\d{2}$/u, `${relPath} needs an ISO due date`);
+      assert.ok(Date.now() < Date.parse(`${entry.due}T00:00:00Z`), `${relPath}: the accepted exception expired on ${entry.due}; finish the decoupling cascade or take a new PO decision`);
     }
   });
 
