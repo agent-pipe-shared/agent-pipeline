@@ -522,12 +522,6 @@ export const ALLOWLIST = Object.freeze([
       "Class A: constructed verdict message returned to the operator naming harness/scripts/pipeline-state.mjs (source-only). Same defect class as the WARN-message entry above; not fixed by this dispatch -- deferred.",
   },
   {
-    file: "plugins/pipeline-core/hooks/guard-el01-tripwire.mjs",
-    match: "rewrite only via harness/scripts/pipeline-state.mjs, never by hand",
-    reason:
-      "Class A: constructed WARN message returned to the operator naming harness/scripts/pipeline-state.mjs (source-only). Same defect class as guard-devplan.mjs's analogous WARN message above; not fixed by this dispatch -- deferred.",
-  },
-  {
     file: "plugins/pipeline-core/lib/decision-reference-dual-evaluation.mjs",
     match: "harness/scripts/pipeline-state.mjs` and any",
     reason: "Class B: source comment (doc block), not an operator-facing message.",
