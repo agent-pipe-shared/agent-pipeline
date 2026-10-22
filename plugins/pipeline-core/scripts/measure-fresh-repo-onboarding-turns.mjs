@@ -48,6 +48,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { renderArchitectureDesignSkeleton } from "../lib/design-authoring.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { driveOnboardingInit } from "./onboarding-init.mjs";
 
@@ -113,6 +114,25 @@ function answerArgvForCollectInput(dir, action) {
   if (names.includes("answersJson")) {
     return publishedActionWithSingleReplacement("<PO_INTAKE_DESIGN_ANSWERS_JSON>", DEFAULT_ANSWERS.answersJson);
   }
+  if (names.includes("textTurnRef")) {
+    // No trusted native UserPromptSubmit reference exists in a disposable measurement, so
+    // use the published regular-file fallback: write the description once, bind its digest.
+    const fallback = action.existingFileApplyAction;
+    if (fallback?.kind !== "command" || typeof fallback.executable !== "string" || !Array.isArray(fallback.argv)) {
+      return { kind: "unanswerable", names, guidance, reason: "textTurnRef action omitted a usable existingFileApplyAction" };
+    }
+    const textFile = "scratch/onboarding-intake.txt";
+    mkdirSync(join(dir, "scratch"), { recursive: true });
+    writeFileSync(join(dir, textFile), DEFAULT_ANSWERS.text);
+    const digest = createHash("sha256").update(Buffer.from(DEFAULT_ANSWERS.text)).digest("hex");
+    const replacements = new Map([["<existing-repository-file>", textFile], ["<sha256-of-existing-file>", digest]]);
+    return {
+      kind: "command",
+      executable: fallback.executable,
+      argv: fallback.argv.map((value) => replacements.get(value) ?? value),
+      publishedAction: true,
+    };
+  }
   if (names.includes("text")) {
     const applyAction = action.applyAction;
     if (applyAction?.kind !== "command" || typeof applyAction.executable !== "string" || !Array.isArray(applyAction.argv)) {
@@ -158,6 +178,29 @@ function answerArgvForCollectInput(dir, action) {
   }
   if (names.includes("verifyCommand")) {
     return publishedActionWithSingleReplacement("<PO_VERIFY_COMMAND>", DEFAULT_ANSWERS.verifyCommand);
+  }
+
+  // The consent step now publishes its own `intake-consent-apply` applyAction with typed
+  // placeholders and no longer names the subcommand in its guidance prose, so follow the
+  // published action and fill only the declared placeholders (same contract as the
+  // design-question and plan-approver stops above).
+  const consentApply = action.applyAction;
+  if (
+    consentApply?.kind === "command" && typeof consentApply.executable === "string" && Array.isArray(consentApply.argv)
+    && consentApply.argv.includes("intake-consent-apply")
+  ) {
+    const replacements = new Map([
+      ["<PO_INTAKE_LANGUAGE>", DEFAULT_ANSWERS.language],
+      ["<PO_INTAKE_PROFILE>", DEFAULT_ANSWERS.profile],
+      ["<PO_GIT_AUTHOR_NAME>", DEFAULT_ANSWERS.gitAuthorName],
+      ["<PO_GIT_AUTHOR_EMAIL>", DEFAULT_ANSWERS.gitAuthorEmail],
+    ]);
+    const argv = consentApply.argv.map((value) => replacements.get(value) ?? value);
+    const unresolved = argv.filter((value) => typeof value === "string" && /^<PO_[A-Z_]+>$/.test(value));
+    if (unresolved.length === 0) {
+      return { kind: "command", executable: consentApply.executable, argv, publishedAction: true };
+    }
+    return { kind: "unanswerable", names, guidance, reason: `intake-consent-apply left placeholders unresolved: ${unresolved.join(",")}` };
   }
 
   if (names.includes("gitAuthorName") || guidance.includes("intake-consent-apply")) {
@@ -233,7 +276,13 @@ function authorArchitectureDesign(dir, prdRelPath) {
       allowedBoundaryCrossings: [], antiFragmentationPolicy: { rejectTrivialFacades: true, rejectDuplicatedFacades: true, minStatementsPerModule: 1 } },
     baseline: { schema: "pipeline.architecture-baseline.v1", baselineRevision: 1, acceptedViolations: [],
       ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 } } };
-  writeFileSync(prdFile, readFileSync(prdFile, "utf8") + "\n\n```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n");
+  // Generation publishes one reserved draft template (carrying the DRAFT TEMPLATE marker);
+  // authoring REPLACES it. Appending a second block beside it leaves the draft in place and
+  // the design stays ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE / PACKAGE-REQUIRED forever.
+  const prd = readFileSync(prdFile, "utf8");
+  const template = renderArchitectureDesignSkeleton().trimEnd();
+  const base = prd.includes(template) ? prd.replace(template, "") : prd;
+  writeFileSync(prdFile, base + "\n\n```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n");
 }
 
 function acknowledgePrd(dir, guidance) {
@@ -441,7 +490,7 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
       const na = result.final.nextAction;
       authorArchitectureDesign(dir, na.prdPath);
       turns += 1;
-      rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "authored-architecture-design" });
+      rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "authored-architecture-design", code: na.code ?? null });
       continue;
     }
 
