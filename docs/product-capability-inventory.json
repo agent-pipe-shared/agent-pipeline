@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "a5762bf45bb29c7397540642ab6af2689fd820f8",
-    "tree": "91c7fc8ce1bb9e95ba70b19ad691cf3cbd34496d"
+    "commit": "2e0b2c928693d80b17a9f3ad22b477992303d639",
+    "tree": "a273299ad48e73d4047ae630c702e5e72be4318a"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -736,6 +736,7 @@
         "verify-phase:harness/scripts/verify.mjs:pin-existing-signing-key-reuse-deadlocks-onboarding-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-feature-branch-push-admitted-without-signature-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-first-enrollment-enters-retirement-before-consent-tests",
+        "verify-phase:harness/scripts/verify.mjs:pin-fitness-model-qualification-observed-at-implementation-boundary-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-foreign-worktree-closes-the-implementation-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-gg11-admits-env-templates-and-test-fixtures-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-gh-delivery-classifier-is-not-wired-tests",
