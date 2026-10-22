@@ -533,6 +533,56 @@ test("the generated briefing prescribes the test-first order in one dispatch (AC
   assert.doesNotMatch(text, /separate test-author dispatch/u);
 });
 
+// AC-187 (item goldfish-test-briefs-lack-targeted-and-quick-command-routes): the emitted briefing carries the three
+// check routes in the order targeted -> quick -> final Verify, never invents a quick command, and leaves the final
+// Verify to the Coordinator. The template wording is pinned in lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs;
+// this case pins what the generator actually emits.
+function checkRouteProblems(text, { verifyCommand }) {
+  const problems = [];
+  const targeted = text.indexOf("- Targeted checks — Goldfish owner:");
+  const quick = text.indexOf("- Quick check: ");
+  const verify = text.indexOf("- Final integrated Verify");
+  if (!(targeted >= 0 && targeted < quick && quick < verify)) problems.push("routes are not in the order targeted, quick, final Verify");
+  const quickLine = text.split("\n").find((line) => line.startsWith("- Quick check: ")) ?? "";
+  if (quickLine !== "- Quick check: missing — unknown, no quick PASS.") problems.push(`quick route is not the honest absent route: ${quickLine}`);
+  if (/Quick check:[^\n]*`/u.test(text)) problems.push("a quick command was invented");
+  const verifyLine = text.split("\n").find((line) => line.startsWith("- Final integrated Verify")) ?? "";
+  if (verifyCommand === null) {
+    if (!verifyLine.includes("this project calibrates no Verify command")) problems.push(`no-Verify route is not stated: ${verifyLine}`);
+  } else if (!(verifyLine.includes("Coordinator owner") && verifyLine.includes(`\`${verifyCommand}\``) && verifyLine.includes("not yours to run"))) {
+    problems.push(`final Verify is not Coordinator-owned: ${verifyLine}`);
+  }
+  return problems;
+}
+
+test("the generated briefing carries the targeted, quick and final Verify routes in order and never invents a quick command (AC-187)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, pkg, argv } = packageFixture({ targeted: [`\`node --test ${CHECK}\` (green)`, `\`node --test --test-name-pattern=first ${CHECK}\` (green)`] });
+  const built = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(built.ok, true, JSON.stringify(built));
+  const { text } = built;
+  assert.deepEqual(checkRouteProblems(text, { verifyCommand: "node verify.mjs" }), []);
+  const block = text.slice(text.indexOf("- Targeted checks — Goldfish owner:"), text.indexOf("- Quick check: "));
+  for (const command of pkg.targeted) assert.ok(block.includes(`  - ${command}`), `every targeted command is listed under the targeted route: ${command}`);
+  assert.match(block, /Record each printed GREEN line with its counts\./u);
+  // RED proof: the checker fails on a briefing whose routes are swapped, whose quick route is invented, and whose Verify is the worker's.
+  const swapped = text.replace("- Quick check: missing — unknown, no quick PASS.\n", "").replace("- Targeted checks — Goldfish owner:", "- Quick check: missing — unknown, no quick PASS.\n- Targeted checks — Goldfish owner:");
+  assert.ok(checkRouteProblems(swapped, { verifyCommand: "node verify.mjs" }).some((problem) => problem.includes("order")));
+  const invented = text.replace("- Quick check: missing — unknown, no quick PASS.", "- Quick check: `npm run quick` PASS.");
+  assert.ok(checkRouteProblems(invented, { verifyCommand: "node verify.mjs" }).length >= 2);
+  const workerVerify = text.replace("; not yours to run", "");
+  assert.ok(checkRouteProblems(workerVerify, { verifyCommand: "node verify.mjs" }).some((problem) => problem.includes("Coordinator")));
+});
+
+test("a project that calibrates no Verify command still gets targeted -> quick -> final Verify, with the absence stated (AC-187)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  writeFileSync(join(fx.root, "project/pipeline.json"), JSON.stringify({ project: "fixture-project", handover: "docs/state.md", verify: null }));
+  const result = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(checkRouteProblems(result.text, { verifyCommand: null }), []);
+});
+
 test("an estimate above the tier cap binds the deep tier; above the deep cap it needs a grant rationale", async () => {
   const { runDispatchBriefing } = await lib();
   const base = packageFixture();

@@ -14,8 +14,9 @@
  *  P4 final integrated Verify is Coordinator-owned; worker results do not certify it;
  *  P5 root template and vendored copy are byte-identical;
  *  P6 the three routes appear in order targeted -> quick -> final Verify.
- * Remaining gap (NOT claimed here): no production code emits briefs, so there is no
- * emitted-brief consumer to exercise; only the template text is pinned.
+ * Emitted briefs: the briefing generator (lib/dispatch-briefing-build.mjs) now renders the same three routes; its
+ * output is pinned in scripts/dispatch-briefing.test.mjs ("... targeted, quick and final Verify routes in order ...").
+ * This file pins the template text only.
  * Reads the real template files; the only mirror is the RED mirror of the checker input.
  */
 import test from "node:test";
