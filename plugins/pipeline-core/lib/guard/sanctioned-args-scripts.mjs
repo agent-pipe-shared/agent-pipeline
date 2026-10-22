@@ -129,15 +129,23 @@ export function sanctionedPushInitArgs(args, root) {
   const isDestinationValue = (value) => typeof value === "string" && /^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(value);
   const isRemoteValue = (value) => typeof value === "string" && /^[A-Za-z0-9._-]{1,80}$/u.test(value);
   const nonEmptyNotFlagValue = (value) => typeof value === "string" && value.trim() !== "" && !value.startsWith("--");
-  return matchFlagSpec(args, {
+  const matched = matchFlagSpec(args, {
     requiredValue: {
       "--root": (value) => value === root,
       "--by": nonEmptyNotFlagValue,
       "--remote": isRemoteValue,
       "--destination": isDestinationValue,
     },
-    optionalValue: { "--base": nonEmptyNotFlagValue },
+    optional: { "--checkpoint": true },
+    optionalValue: {
+      "--base": nonEmptyNotFlagValue,
+      "--candidate": nonEmptyNotFlagValue,
+      "--record-ref": nonEmptyNotFlagValue,
+    },
   });
+  // push-init.mjs usage: [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]]. Its parseArgs() accepts each flag, and
+  // buildPushInitArgv() emits all of them; the two modes never combine, so the guard admits no mix either.
+  return matched && !(args.includes("--checkpoint") && ["--base", "--candidate", "--record-ref"].some((flag) => args.includes(flag)));
 }
 
 export function sanctionedTranscriptRecoveryArgs(args, root) {

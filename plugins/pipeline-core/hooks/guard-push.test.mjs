@@ -2302,7 +2302,7 @@ function freshRepoIn(parentDir, name) {
   writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
   gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
   gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
-  check("PG-CHECKPOINT block configured clean signature-mode checkpoint without an approval record", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["signature mode requires", "CHECKPOINT-APPROVAL-STATE-MISSING", "push-init.mjs --checkpoint"] });
+  check("PG-CHECKPOINT block configured clean signature-mode checkpoint without an approval record", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["signature mode requires", "CHECKPOINT-APPROVAL-STATE-MISSING", "push-init.mjs --root", "--checkpoint prints"] });
   check("PG-CHECKPOINT block main never receives checkpoint relaxation", "git push origin feat/checkpoint:refs/heads/main", dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
   check("PG-CHECKPOINT block release/stable destination remains on strict evidence lane", "git push origin feat/checkpoint:refs/heads/release/0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
   check("PG-CHECKPOINT block tags remain on strict evidence lane", "git push origin feat/checkpoint:refs/tags/v0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });

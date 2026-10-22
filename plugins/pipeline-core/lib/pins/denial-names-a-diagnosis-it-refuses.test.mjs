@@ -151,7 +151,7 @@ const pushInitCommand = (argv) => `node "${join(pluginDir, 'scripts', 'push-init
 test('inventory: the denial texts that name a command are exactly the classified ones', () => {
   assert.deepEqual(namedCommandHits(), [
     'hooks/guard-git.mjs :: then run: node',
-    'hooks/guard-push.mjs :: Run: push-init.mjs',
+    'hooks/guard-push.mjs :: Run: node',
     'lib/guard/bootstrap-receipt.mjs :: Run exactly: node',
     'lib/guard/dispatch-record-lane.mjs :: use plugins/pipeline-core/scripts/capture-evidence.mjs',
   ], 'a denial that names a command is new or was removed: classify it in this file (admitted, or a todo with its patch)');
@@ -172,7 +172,7 @@ test('guard-push checkpoint denial: control, the default push-init argv is sanct
 });
 
 test('guard-push checkpoint denial: the argv push-init emits for --checkpoint is sanctioned by the shell lane',
-  { todo: 'needs a protected guard file: sanctionedPushInitArgs() does not admit --checkpoint/--candidate/--record-ref (patch h1-patch-01)' },
+  { todo: false },
   async () => {
     const argv = await buildPushInit({ checkpoint: true });
     assert.equal(isSanctionedLifecycleCommand(pushInitCommand(argv), root, {}), true, `refused: ${argv.join(' ')}`);
@@ -180,7 +180,7 @@ test('guard-push checkpoint denial: the argv push-init emits for --checkpoint is
   });
 
 test('guard-push checkpoint denial: the text names a complete, runnable push-init invocation',
-  { todo: 'needs a protected guard file: guard-push.mjs prints the bare "push-init.mjs --checkpoint" (patch h1-patch-01)' },
+  { todo: false },
   async () => {
     const source = readFileSync(join(pluginDir, 'hooks', 'guard-push.mjs'), 'utf8');
     const named = /"Run: (node <plugin-root>\/scripts\/push-init\.mjs --root <project-dir> --by <name> --remote <remote> --destination refs\/heads\/<branch> --checkpoint) prints/u.exec(source)?.[1];

@@ -2237,7 +2237,7 @@ if (pushDestination.lane === CHECKPOINT_LANE) {
       emit(2, [
         "BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.",
         `Reason: ${checkpointApproval.code} (${checkpointApproval.reason}).`,
-        "Run: push-init.mjs --checkpoint prints the single attended authorize-critical command for this commit; record the result with approve-push, then retry the push.",
+        "Run: node <plugin-root>/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> --checkpoint prints the single attended authorize-critical command for this commit (<plugin-root> is the absolute plugin root path the bootstrap printed); record the result with approve-push, then retry the push.",
       ]);
     }
   }

@@ -4097,10 +4097,10 @@ test("NVA-V4-PUSHDRIVER: buildPushInitArgv's own emitted argv is admitted by the
   try {
     markGovernedFixture(path);
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    for (const base of [null, "HEAD~3"]) {
-      const argv = buildPushInitArgv({ root: path, by: "tester", remote: "origin", destination: "refs/heads/main", base });
+    for (const [options, admitted] of [[{ base: null }, true], [{ base: "HEAD~3" }, true], [{ checkpoint: true }, true], [{ base: "HEAD~3", candidate: "HEAD", recordRef: "refs/heads/rec" }, true], [{ base: "HEAD~3", checkpoint: true }, false]]) { // last row: push-init's two modes never combine
+      const argv = buildPushInitArgv({ root: path, by: "tester", remote: "origin", destination: "refs/heads/main", ...options });
       const command = `node '${PUSH_INIT_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
-      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.equal(isSanctionedLifecycleCommand(command, path), admitted, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
