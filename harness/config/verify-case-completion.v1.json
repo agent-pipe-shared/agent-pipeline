@@ -2,6 +2,11 @@
   "schema": "pipeline.verify-case-completion-registry.v1",
   "entries": [
     {
+      "name": "administrative-commit-policy-tests",
+      "path": "plugins/pipeline-core/lib/administrative-commit-policy.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "advisory-route-selection-tests",
       "path": "plugins/pipeline-core/lib/advisory-route-selection.test.mjs",
       "disposition": "required"
@@ -674,6 +679,12 @@
       "disposition": "required"
     },
     {
+      "name": "git-null-device-sites-tests",
+      "path": "plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
       "name": "git-stash-readonly-tests",
       "path": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
       "disposition": "required"
@@ -737,6 +748,11 @@
     {
       "name": "guard-dispatch-budget-checkpoint-tests",
       "path": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "guard-dispatch-model-tests",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs",
       "disposition": "required"
     },
     {
@@ -812,6 +828,12 @@
       "name": "human-guard-override-capability-scan-tests",
       "path": "plugins/pipeline-core/lib/human-guard-override-capability-scan.test.mjs",
       "disposition": "required"
+    },
+    {
+      "name": "human-guard-override-disjoint-tests",
+      "path": "plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
       "name": "human-role-label-tests",
@@ -1062,6 +1084,11 @@
       "disposition": "required"
     },
     {
+      "name": "native-goldfish-host-state-fanout-tests",
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "native-goldfish-host-state-regression-tests",
       "path": "plugins/pipeline-core/lib/native-goldfish-host-state-regression.test.mjs",
       "disposition": "required"
@@ -1230,6 +1257,23 @@
       "name": "physical-scratch-boundary-tests",
       "path": "plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs",
       "disposition": "required"
+    },
+    {
+      "name": "pin-denial-names-a-diagnosis-it-refuses-tests",
+      "path": "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "pin-devplan-lane-admits-the-producer-materialize-step-tests",
+      "path": "plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
+      "path": "plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
       "name": "pipeline-start-v3-tests",
@@ -1682,6 +1726,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "session-authority-repair-tests",
+      "path": "plugins/pipeline-core/scripts/session-authority-repair.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "shared-pool-bounds-tests",
       "path": "plugins/pipeline-core/lib/shared-pool-bounds.test.mjs",
       "disposition": "required"
@@ -1699,6 +1748,11 @@
     {
       "name": "signed-quality-package-single-link-tests",
       "path": "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "signed-spec-descriptor-tests",
+      "path": "plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs",
       "disposition": "required"
     },
     {
