@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "725f8b7f26e79800bb76f3ea1573574c7b3edf5042b38276d8f9025774a16bd8"
+    "transitionHead": "a5bc8f5aa10cd5860e6b8aa7128818fe3937102a6200478b22280c7c09722af0"
   },
   "counts": {
-    "open": 273,
+    "open": 269,
     "in_progress": 0,
-    "closed": 664,
+    "closed": 673,
     "rejected": 3,
     "deferred": 11
   },
@@ -178,6 +178,26 @@
       "closureRepository": "self",
       "closureCommit": "85921a119f69a785dd2916b1986ae39cad200cba",
       "closureEvidence": "backlog/evidence/2026-09-11-dispatch-record-critic-projection-closure.md"
+    },
+    {
+      "id": "pipeline.a-dispatch-without-a-model-parameter-inherits-the-session-model",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "PO decision D84 (2026-10-21): the dispatch model comes from the pipeline.user.yaml routing, is enforced, and ships in 0.7.0",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
+      "id": "pipeline.a-divergent-adr-body-is-invisible-to-the-parity-comparison-while-unadopted",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "PO decision D81 (2026-10-21, K3 c): file an item, no 0.7.0 change",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.a-doc-edit-silently-obligates-its-vendored-copy",
@@ -388,6 +408,16 @@
       "owner": "pipeline",
       "created": "2026-10-20",
       "source": "PO report scratch/pipeline-feedback-03.md, finding PF-34; the same refusal on this repository (CCA-REVIEW-UNIT-REQUIRED, Critic of e6fec04a0, 2026-10-19)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
+      "id": "pipeline.a-same-candidate-critic-rerun-after-a-failed-review-can-no-longer-be-compiled",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "repair of lib/critic-review-lineage.test.mjs (2026-10-21): the test fixtures were stale, and the repair exposed a product-side inconsistency",
       "deferred": false,
       "sprint": "none"
     },
@@ -1947,14 +1977,18 @@
     },
     {
       "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-10-08",
       "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
       "deferred": false,
       "due": "2026-10-31",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "35455319327d44d5519671a13f0956583dd99a21",
+      "closureEvidence": "backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md"
     },
     {
       "id": "pipeline.chat-gate-non-ascii-name-windows",
@@ -3039,13 +3073,17 @@
     },
     {
       "id": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-06",
       "source": "Observed live during the Alfred night run, 2026-10-06 (two Opus Critic dispatches, GPGL-5/6 delta and FANOUT bundle remainder).",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "35455319327d44d5519671a13f0956583dd99a21",
+      "closureEvidence": "backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md"
     },
     {
       "id": "pipeline.critic-scratch-notes-write-is-refused-again",
@@ -3310,13 +3348,17 @@
     },
     {
       "id": "pipeline.design-course-phase-telemetry-is-not-recorded",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-19",
       "source": "PO decision D25 (2026-10-18): the telemetry clause of greenfield-design-course-cost-and-proportionality leaves the 0.7.0 acceptance",
       "deferred": false,
-      "sprint": "none"
+      "sprint": "none",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "35455319327d44d5519671a13f0956583dd99a21",
+      "closureEvidence": "backlog/items/2026-10-16-design-course-telemetry-is-deferred.md"
     },
     {
       "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
@@ -4339,13 +4381,17 @@
     },
     {
       "id": "pipeline.full-verify-on-windows-takes-hours",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-17",
       "source": "Sprint Alfred Claude continuation 2026-10-17, stopped candidate Full Verify on native Windows; PO decision 2026-10-17 (after the 0.7.0 local candidate).",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "35455319327d44d5519671a13f0956583dd99a21",
+      "closureEvidence": "backlog/items/2026-10-20-verify-test-economy-rebuild.md"
     },
     {
       "id": "pipeline.gate-should-not-demand-a-human-name",
@@ -5578,13 +5624,17 @@
     },
     {
       "id": "pipeline.handover-doc-committed-without-governance-classification",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-03",
       "source": "Bootstrap F6 finding, Claude Code session on Windows, 2026-10-03: `check-observation-governance.mjs` reported `OG-DOC-UNCLASSIFIED docs/0.7-recovery-2026-10-03.md` at HEAD a0d83ce78.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "35455319327d44d5519671a13f0956583dd99a21",
+      "closureEvidence": "backlog/items/2026-10-16-verify-does-not-run-the-observation-governance-checker.md"
     },
     {
       "id": "pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge",
@@ -6476,13 +6526,17 @@
     },
     {
       "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Installed 0.7 recovery guard refused a single read of the host-declared openai-docs SKILL.md with GUARD-READ-SCOPE-OUTSIDE-ROOT while ordinary Implementation admission was valid.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "35455319327d44d5519671a13f0956583dd99a21",
+      "closureEvidence": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md"
     },
     {
       "id": "pipeline.live-plugin-root-undefended-in-the-shell-lane",
@@ -8541,6 +8595,16 @@
       "closureEvidence": "docs/claude-local-plugin-development.md"
     },
     {
+      "id": "pipeline.project-uninstall-refuses-a-tracked-relative-antigravity-registry-entry",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-22",
+      "source": "D79 installer path fix (2026-10-21): the installer now writes a repo-relative path into the tracked .agents/plugins.json; the uninstall observer predates that shape",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.projection-drift-fault-after-design-implementation-transition-forces-restart",
       "status": "closed",
       "type": "defect",
@@ -8748,13 +8812,17 @@
     },
     {
       "id": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-06",
       "source": "GPGL-7 dispatch report (residual gap after the PowerShell literal-backslash reading), 2026-10-06.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "35455319327d44d5519671a13f0956583dd99a21",
+      "closureEvidence": "backlog/items/2026-10-06-push-classifier-deny-list-does-not-converge.md"
     },
     {
       "id": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
@@ -8768,13 +8836,17 @@
     },
     {
       "id": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-06",
       "source": "GPGL-8 dispatch report (residual gaps after the expansion and typographic-quote fail-closed checks), 2026-10-06.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "35455319327d44d5519671a13f0956583dd99a21",
+      "closureEvidence": "backlog/items/2026-10-06-push-classifier-deny-list-does-not-converge.md"
     },
     {
       "id": "pipeline.push-flow-needs-one-remote-readback-transaction",
@@ -10747,6 +10819,16 @@
       "closureEvidence": "backlog/evidence/2026-09-18-ai-hardening-and-doc-obligations-closure.md"
     },
     {
+      "id": "pipeline.the-architecture-adoption-gate-is-unconditional-for-projects-without-design-approval",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-21",
+      "source": "PO decision D81 (2026-10-21, K3 a): the adoption gate becomes conditional in 0.7.x",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.the-architecture-map-is-not-enforced",
       "status": "open",
       "type": "defect",
@@ -11848,14 +11930,18 @@
     },
     {
       "id": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-07",
       "source": "Critic Q12 delta 1, finding F-E (specs/sprint-alfred-epic/evidence/critic-2026-10-07/q12-delta1.md)",
       "deferred": false,
       "due": "2026-10-20",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-22",
+      "closureRepository": "self",
+      "closureCommit": "35455319327d44d5519671a13f0956583dd99a21",
+      "closureEvidence": "backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md"
     },
     {
       "id": "pipeline.warn-security-gate-hard-blocks-every-push",
