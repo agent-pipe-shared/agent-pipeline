@@ -47,6 +47,11 @@ export function verifyTerminalReaderCourse({root,candidateCommit,featureId,recor
     if(changes.status!==0||changeCommits.length!==1||changeCommits[0]!==commits[0])fail(label+' immutable report changed');
     ancestor(reviewedCommit,commits[0]);ancestor(commits[0],upper);
     if(commits[0]===reviewedCommit||!api.readBlob(root,commits[0],path,1024*1024).equals(bytes))fail(label+' immutable report changed');
+    return text;
+  };
+  // A report-bound adjudication quotes one literal line of each immutable report; it never infers meaning from it.
+  const quote=(value,text,label)=>{
+    if(typeof value!=='string'||value.length<16||value.length>300||/[\r\n]/.test(value)||value!==value.trim()||!text.includes(value))fail('adjudication '+label+' quote not found in its immutable report');
   };
   const v2=record.schema===TERMINAL_READER_SCHEMA_V2;
   closed(record,['schema','courseId','rounds','correctionBatches','ownerDecision','final','policyTransition',...(v2?['escalation']:[])],'record');
@@ -88,23 +93,34 @@ export function verifyTerminalReaderCourse({root,candidateCommit,featureId,recor
     if(changed.status!==0)fail('correction history unavailable');
     const changeCommits=changed.stdout.trim()?changed.stdout.trim().split('\n'):[];
     if(changeCommits.length>32||!api.sameJson([...new Set(changeCommits)].sort(),[...batch.commits].sort()))fail('unlisted correction or input change');
+    const texts={};
     for(const [field,phase] of [['phaseOne','phase-one'],['phaseTwo','phase-two']]){
-      const path=prefix+phase+'/'+round.id+'.md';expectedPaths.add(path);report(round[field],path,field,round.reviewed.commit,upper);
+      const path=prefix+phase+'/'+round.id+'.md';expectedPaths.add(path);texts[field]=report(round[field],path,field,round.reviewed.commit,upper);
     }
     const path=prefix+'disposition/'+round.id+'.json';expectedPaths.add(path);
     const disposition=jsonRef(round.disposition,path,256*1024,'disposition');
     closed(disposition,['schema','round','status','findings'],'disposition');
     if(disposition.schema!=='pipeline.doc-reader-terminal-disposition.v1'||disposition.round!==round.id
       ||disposition.status!=='resolved'||!Array.isArray(disposition.findings)||disposition.findings.length<1||disposition.findings.length>256)fail('disposition or early closure');
-    const ids=new Set();
+    const ids=new Set(),quotes=new Set();
     for(const finding of disposition.findings){
-      closed(finding,['id','class','status','resolutionCommit'],'finding');
+      const adjudicated=finding?.status==='adjudicated';
+      closed(finding,['id','class','status','resolutionCommit',...(adjudicated?['adjudication']:[])],'finding');
       if(!findingId.test(finding.id??'')||ids.has(finding.id)||!['cut','fileline','reordering'].includes(finding.class))fail('finding identity');ids.add(finding.id);
       if(finding.status==='resolved'){
         if(!batch.commits.includes(finding.resolutionCommit))fail('finding resolution outside its correction batch');
       }else if(finding.status==='accepted'){
         const key=round.id+'/'+finding.id;
         if(finding.resolutionCommit!==null||!owner.acceptedFindingIds.includes(key))fail('unaccepted finding');accepted.add(key);
+      }else if(adjudicated){
+        // The phase-two Reader's own expressed decline of a phase-one finding: bound to that round's immutable
+        // phase-two report. Not a correction, not an owner acceptance; nothing here can judge the Reader's reasoning.
+        if(finding.resolutionCommit!==null)fail('adjudicated finding names a resolution');
+        const a=finding.adjudication;closed(a,['report','phaseOneQuote','phaseTwoQuote'],'adjudication');
+        closed(a.report,['path','sha256'],'adjudication report');
+        if(a.report.path!==round.phaseTwo.path||a.report.sha256!==round.phaseTwo.sha256)fail('adjudication outside its own phase-two report');
+        quote(a.phaseOneQuote,texts.phaseOne,'phase-one');quote(a.phaseTwoQuote,texts.phaseTwo,'phase-two');
+        if(a.phaseOneQuote===a.phaseTwoQuote||quotes.has(a.phaseOneQuote))fail('adjudication quote reused');quotes.add(a.phaseOneQuote);
       }else fail('unresolved finding');
     }
   }

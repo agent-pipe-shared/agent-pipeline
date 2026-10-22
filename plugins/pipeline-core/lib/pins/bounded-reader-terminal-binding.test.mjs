@@ -312,3 +312,86 @@ test("actual-course shape: a 15-document first-round scope expands to 16 without
   fx.refresh(); const forged = fx.check();
   assert.equal(forged.status, "failed"); assert.match(joined(forged), /snapshot digest mismatch/);
 });
+
+// Report-bound phase-two adjudication (ALF-K33). A phase-two Reader may expressly decline a phase-one finding; the
+// closed form records that as `adjudicated`, bound to the round's OWN immutable phase-two report by path, digest and a
+// literal quote from each report. It is neither a correction nor an owner acceptance, and it infers neither.
+const adjudicated = (fx, index, over = {}) => {
+  const ref = fx.record.rounds[index].phaseTwo;
+  return { id: "F2", class: "reordering", status: "adjudicated", resolutionCommit: null,
+    adjudication: { report: { path: ref.path, sha256: ref.sha256 }, phaseOneQuote: "# Synthetic phase-one", phaseTwoQuote: "# Synthetic phase-two", ...over } };
+};
+
+test("a phase-two no-change adjudication closes a finding without a resolution commit or owner acceptance (RED: unchanged checker has no such status)", (t) => {
+  const fx = shared(t);
+  const [ok] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0)); }));
+  assert.equal(ok.status, "passed", joined(ok));
+  assert.deepEqual(JSON.parse(fx.read(fx.ownerPath)).acceptedFindingIds, []); // nothing was accepted on anyone's behalf
+  const [onlyAdjudicated] = fx.trial(() => fx.editDisposition(3, (d) => { d.findings = [adjudicated(fx, 3)]; }));
+  assert.equal(onlyAdjudicated.status, "passed", joined(onlyAdjudicated)); // the round's correction batch still exists and is checked
+  const [ownerKey] = fx.trial(() => {
+    fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0)); });
+    fx.editJson(fx.ownerPath, (o) => { o.acceptedFindingIds = ["round-1/F2"]; });
+    fx.editRecord((r) => { r.ownerDecision.sha256 = hash(fx.read(fx.ownerPath)); });
+  });
+  assert.equal(ownerKey.status, "failed", joined(ownerKey)); // an adjudication is not an acceptance and may not be listed as one
+});
+
+test("an adjudication names no resolution and carries exactly its closed report binding (RED: disabled checks pass the forgery)", async (t) => {
+  const fx = shared(t);
+  const noCommit = await mirror("adj-commit", [["if(finding.resolutionCommit!==null)fail('adjudicated finding names a resolution');", "void 0;"]]);
+  const [withCommit, redCommit] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push({ ...adjudicated(fx, 0), resolutionCommit: fx.record.correctionBatches[0].commits[0] }); }), [checkReaderBinding, noCommit]);
+  assert.equal(withCommit.status, "failed", joined(withCommit)); assert.match(joined(withCommit), /adjudicated finding names a resolution/);
+  assert.equal(redCommit.status, "passed");
+  const [missing] = fx.trial(() => fx.editDisposition(0, (d) => { const f = adjudicated(fx, 0); delete f.adjudication; d.findings.push(f); }));
+  assert.equal(missing.status, "failed", joined(missing));
+  const [extraOnResolved] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings[0].adjudication = adjudicated(fx, 0).adjudication; }));
+  assert.equal(extraOnResolved.status, "failed", joined(extraOnResolved)); // `adjudication` exists only on an adjudicated finding
+  const [extraKey] = fx.trial(() => fx.editDisposition(0, (d) => { const f = adjudicated(fx, 0); f.adjudication.ownerApproved = true; d.findings.push(f); }));
+  assert.equal(extraKey.status, "failed", joined(extraKey));
+  const [extraReportKey] = fx.trial(() => fx.editDisposition(0, (d) => { const f = adjudicated(fx, 0); f.adjudication.report.line = 1; d.findings.push(f); }));
+  assert.equal(extraReportKey.status, "failed", joined(extraReportKey));
+});
+
+test("an adjudication must cite the round's own phase-two report (RED: disabled binding passes a foreign or phase-one citation)", async (t) => {
+  const fx = shared(t);
+  const unbound = await mirror("adj-report", [["if(a.report.path!==round.phaseTwo.path||a.report.sha256!==round.phaseTwo.sha256)fail('adjudication outside its own phase-two report');", "void 0;"]]);
+  const foreign = fx.record.rounds[1].phaseTwo, own = fx.record.rounds[0];
+  const [otherRound, redOther] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { report: { path: foreign.path, sha256: foreign.sha256 } })); }), [checkReaderBinding, unbound]);
+  assert.equal(otherRound.status, "failed", joined(otherRound)); assert.match(joined(otherRound), /outside its own phase-two report/);
+  assert.equal(redOther.status, "passed");
+  const [phaseOne] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { report: { path: own.phaseOne.path, sha256: own.phaseOne.sha256 } })); }));
+  assert.equal(phaseOne.status, "failed", joined(phaseOne));
+  const [staleDigest] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { report: { path: own.phaseTwo.path, sha256: "e".repeat(64) } })); }));
+  assert.equal(staleDigest.status, "failed", joined(staleDigest));
+});
+
+test("an adjudication quotes both immutable reports literally, once (RED: disabled quote checks pass an invented or reused quote)", async (t) => {
+  const fx = shared(t);
+  const unquoted = await mirror("adj-quote", [["||!text.includes(value)", ""]]);
+  const [invented, redInvented] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { phaseTwoQuote: "The reader never wrote this sentence." })); }), [checkReaderBinding, unquoted]);
+  assert.equal(invented.status, "failed", joined(invented)); assert.match(joined(invented), /quote not found in its immutable report/);
+  assert.equal(redInvented.status, "passed");
+  const [inventedOne] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { phaseOneQuote: "The reader never wrote this either." })); }));
+  assert.equal(inventedOne.status, "failed", joined(inventedOne));
+  for (const bad of ["too short", "x".repeat(301), "# Synthetic phase-one\nFinding: change fixture paragraph.", " # Synthetic phase-one", 7, null]) {
+    const [rejected] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { phaseOneQuote: bad })); }));
+    assert.equal(rejected.status, "failed", `bad quote ${JSON.stringify(bad)}: ${joined(rejected)}`);
+  }
+  const unreused = await mirror("adj-reuse", [["||quotes.has(a.phaseOneQuote)", ""]]);
+  const [reused, redReused] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0), { ...adjudicated(fx, 0), id: "F3" }); }), [checkReaderBinding, unreused]);
+  assert.equal(reused.status, "failed", joined(reused)); assert.match(joined(reused), /adjudication quote reused/);
+  assert.equal(redReused.status, "passed");
+  const [same] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { phaseTwoQuote: "# Synthetic phase-one" })); }));
+  assert.equal(same.status, "failed", joined(same)); // one sentence cannot stand for both reports; it would not be in the phase-two report either
+});
+
+test("unresolved, partial and unknown dispositions stay non-passing beside a valid adjudication (RED: disabled status gate passes them)", async (t) => {
+  const fx = shared(t);
+  const open = await mirror("adj-open", [["else fail('unresolved finding');", "else void 0;"]]);
+  for (const status of ["open", "partial", "no-change", "adjudication-pending", "adjudicated "]) {
+    const [result, red] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0), { id: "F3", class: "cut", status, resolutionCommit: null }); }), [checkReaderBinding, open]);
+    assert.equal(result.status, "failed", `${status}: ${joined(result)}`); assert.match(joined(result), /unresolved finding|field set/);
+    if (status === "open") assert.equal(red.status, "passed");
+  }
+});
