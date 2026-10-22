@@ -23,13 +23,8 @@ import { verifyModelFamilyAuthority } from "./model-family-authority.mjs";
 import { MODEL_FAMILY_HOST_STORE_LIMITS } from "./model-family-host-store.mjs";
 
 const cases = [];
-// D66(a): `test(name, { todo: "<typed reason naming the backlog item>" }, run)` registers a TYPED PENDING case (completion mode
-// "todo"): the body still runs unchanged and its failure is reported as todo, never as a pass; the reason is source-visible.
-function test(name, optionsOrRun, maybeRun) {
-  const options = typeof optionsOrRun === "function" ? {} : optionsOrRun;
-  const run = typeof optionsOrRun === "function" ? optionsOrRun : maybeRun;
-  if (options.todo !== undefined && !/^typed-pending: .*backlog item pipeline\.[a-z0-9-]+/.test(options.todo)) throw new Error(`pending case without a typed backlog binding: ${name}`);
-  const id = `MFHS${String(cases.length + 1).padStart(3, "0")}`;
+function test(name, optionsOrRun, maybeRun) { // D66(a): test(name, { todo: "typed-pending: ... backlog item pipeline.<id>" }, run) = typed pending case (mode todo), body unchanged
+  const [options, run] = typeof optionsOrRun === "function" ? [{}, optionsOrRun] : [optionsOrRun, maybeRun], id = `MFHS${String(cases.length + 1).padStart(3, "0")}`; if (options.todo !== undefined && !/^typed-pending: .*backlog item pipeline\.[a-z0-9-]+/.test(options.todo)) throw new Error(`pending case without a typed backlog binding: ${name}`);
   cases.push({ id, name, ...(options.todo === undefined ? {} : { mode: "todo" }), run: async (...args) => {
     try { return await run(...args); }
     catch (error) { process.stderr.write(`${id} ${name}: ${error?.stack ?? error}\n`); throw error; }
