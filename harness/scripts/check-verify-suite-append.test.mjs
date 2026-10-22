@@ -187,6 +187,35 @@ test("the same repair is refused when the integration trailer, the entry digest,
   });
 });
 
+// D103: later rows may be inserted anywhere, also while a recorded restoration is in force.
+test("a mid-file insertion commit is admitted by the relaxed contract; a change next to it is not", () => fixture((f) => {
+  f.writeConfig([f.tp13]);
+  f.writeRegistry(["a", "b"]);
+  f.commit("introduce protected registry");
+  f.writeRegistry(["a", "x", "b"]);
+  f.commit("insert in the middle");
+  f.writeRegistry(["w", "a", "x", "b", "c"]);
+  f.commit("insert in front and append");
+  assert.deepEqual(checkVerifySuiteAppend({ rootDir: f.root }),
+    { ok: true, code: "VSA-HISTORY-APPEND-ONLY", checked: 3 });
+  f.writeRegistry(["w", "a", "b", "x", "c", "d"]);
+  f.commit("reorder prior rows while appending");
+  assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED");
+}));
+
+test("the recorded restoration still holds after later rows were inserted mid-file", () => {
+  const restoredWithInsertions = registry([...prior.slice(0, 50), { name: "mid-a", file: "mid-a.test.mjs" },
+    ...prior.slice(50), ...additions.slice(0, 5), { name: "mid-b", file: "mid-b.test.mjs" }, ...additions.slice(5),
+    { name: "tail", file: "tail.test.mjs" }]);
+  const result = evaluate({ candidateBytes: restoredWithInsertions });
+  assert.equal(result.code, "VSA-RECOVERY-VERIFIED");
+  assert.equal(result.futureAppendCount, 3);
+  const lostRow = registry([...prior.slice(0, 50), ...prior.slice(51), ...additions, { name: "tail", file: "tail.test.mjs" }]);
+  assert.equal(evaluate({ candidateBytes: lostRow }).code, "VSA-RECOVERY-CANDIDATE-MISMATCH");
+  const duplicated = registry([...prior, ...additions, { name: "tail", file: additions[0].file }]);
+  assert.equal(evaluate({ candidateBytes: duplicated }).code, "VSA-RECOVERY-DUPLICATE-IDENTITY");
+});
+
 test("full history traversal refuses a rewrite when recovery is missing or invalid", () => {
   const invalidRecovery = JSON.stringify({
     schema: "pipeline.verify-suite-history-recovery.v1",

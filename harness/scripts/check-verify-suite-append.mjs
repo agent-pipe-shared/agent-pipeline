@@ -128,13 +128,22 @@ export function evaluateSignedHistoryRestoration({
 
   const restoredBytes = registryBytes([...parent.suites, ...additions]);
   const restored = parseRegistry(restoredBytes);
-  if (!restored || candidate.suites.slice(0, restored.suites.length)
-    .some((row, index) => canonical(row) !== canonical(restored.suites[index]))) {
+  if (!restored || candidate.suites.length < restored.suites.length) {
     return fail("VSA-RECOVERY-CANDIDATE-MISMATCH");
   }
-  if (candidate.suites.length > restored.suites.length) {
+  if (candidate.suites.length === restored.suites.length) {
+    if (candidate.suites.some((row, index) => canonical(row) !== canonical(restored.suites[index]))) {
+      return fail("VSA-RECOVERY-CANDIDATE-MISMATCH");
+    }
+  } else {
+    // D103: later registrations may be inserted at any position, so the restored
+    // registry must survive as an ordered, unchanged subsequence of the candidate
+    // (the relaxed append policy), not as its literal prefix.
     const suffix = evaluateVerifySuiteAppend({ beforeBytes: restoredBytes, afterBytes: candidateBytes });
-    if (!suffix.ok) return fail("VSA-RECOVERY-SUFFIX-NOT-APPEND");
+    if (!suffix.ok) {
+      return fail(suffix.code === "VSA-PRIOR-ENTRY-CHANGED"
+        ? "VSA-RECOVERY-CANDIDATE-MISMATCH" : "VSA-RECOVERY-SUFFIX-NOT-APPEND");
+    }
   }
   return {
     ok: true,
@@ -237,11 +246,14 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
       const before = show(commit + "^", REGISTRY);
       const after = show(commit, REGISTRY);
       const result = evaluateVerifySuiteAppend({ beforeBytes: before, afterBytes: after });
-      if (!result.ok) {
-        if (recovery?.ok && commit === recovery.entry.integrationCommit
-          && before === recovery.parentBytes && after === recovery.defectBytes) {
-          integrationWitnessSeen = true;
-        } else if (recovery?.ok && integrationWitnessSeen
+      // D103: the integration commit itself may now satisfy the relaxed contract (rows
+      // were inserted, not changed); the witness must be seen either way so that the
+      // one defect-to-restoration transition after it stays recognised.
+      if (recovery?.ok && commit === recovery.entry.integrationCommit
+        && before === recovery.parentBytes && after === recovery.defectBytes) {
+        integrationWitnessSeen = true;
+      } else if (!result.ok) {
+        if (recovery?.ok && integrationWitnessSeen
           && before === recovery.defectBytes && after === recovery.restoredBytes) {
           // This is the one exact defect-to-restoration transition. Any other
           // historical failure remains subject to the original prefix policy.
