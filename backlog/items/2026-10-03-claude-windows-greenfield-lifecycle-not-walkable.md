@@ -106,14 +106,3 @@ Remaining Claude/Windows-specific frictions:
   carries no `Slice:` line), so a slice-keyed record would either collide with the Goldfish it reviews or need a new key and store with no
   governed effect. The Critic is already measured by the template-bound preflight and contamination checks. This answers the open route-policy
   question of the K28 measurement above as a disposition, not as a defect.
-
-### Blocker analysis 2026-10-22
-
-Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
-
-- **HOST-SESSION-NEEDED** — Live interactive Claude/Windows run reaching implementation and push within the two-approval happy path
-  Skipped native case in the pin; needs a live interactive Claude Desktop/CLI session on Windows with the PO giving the two approvals (implementation and push).
-- **NOT-BLOCKED** — V-10 typed gaps (due 2026-10-31): Critic and unrelated-role dispatches not route-recorded, dynamic Workflow script, Codex/Antigravity registration of guard-dispatch
-  Dispositioned in the item's 2026-10-22 extension (ALF-K35, PO decisions): dynamic Workflow prompt becomes the typed advisory GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED, Critic and non-Goldfish roles are out of scope of V-10 (no slice key), and Codex/Antigravity registration is a source-scan case; the stale header text just needs updating.
-- **HOST-SESSION-NEEDED** — The PO's CAS/missing failure is still not located; reproduce on the new candidate and record the code
-  K28 probes found no 'missing' code for continuity-cas on this head and no report text is available; it needs the PO's Windows report or a live Windows Claude run on the new candidate to capture the literal code. Most plausibly V-1 (continuity-cas refusal), already admitted.

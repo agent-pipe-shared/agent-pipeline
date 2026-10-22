@@ -204,10 +204,3 @@ for each of those points, every readiness state it ranges over (the controlling 
 Edit and mkdir; the four near-miss classes and the outside-root class; both shell lanes; the four redirect captures) runs in
 at least one state. What the sample does not claim: each tool shape in each state. Points 4 to 6 and the predicate checks
 are exhaustive over their own listed inputs. This is a statement about the pin's coverage only; it does not close the item.
-
-### Blocker analysis 2026-10-22
-
-Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
-
-- **HOST-SESSION-NEEDED** — The live readback that a blocked session saves a report without a PO override (and apply_patch lane on Codex) needs an installed-host run
-  Needs an installed plugin in a real Claude session blocked by a lifecycle state (Write of a scratch report admitted without override) and a real Codex session for the apply_patch lane; fixtures already cover the guard, the live host tool path is what is unobserved.

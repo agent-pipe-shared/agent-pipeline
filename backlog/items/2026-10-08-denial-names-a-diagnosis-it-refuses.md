@@ -54,10 +54,3 @@ Not covered: denials whose command is not introduced by a "Run"/"then run"/"use 
 and the PO-run commands that human-guard-override denials print (those are attended-operator steps by design). The second
 half of the Proposal (an approved feature whose approval cannot be re-verified degrades to advisory) is a product
 decision and was not touched.
-
-### Blocker analysis 2026-10-22
-
-Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
-
-- **NOT-BLOCKED** — Triage the item and decide the scope of PO decision BI (degrade an unverifiable approval to advisory)
-  The scope of BI is decided and built: item extension 2026-10-22 records PO decision D117 (only DWP-PACKAGE-PHYSICAL qualifies; GUARD-DEVPLAN-APPROVAL-UNVERIFIED advisory; hooks/guard-devplan-approval-unverified.test.mjs). Only the empty Triage block is left, which an agent can fill.
