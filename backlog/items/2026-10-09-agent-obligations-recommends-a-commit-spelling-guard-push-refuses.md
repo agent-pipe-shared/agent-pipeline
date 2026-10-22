@@ -43,7 +43,11 @@ Pin the agreement with a test that runs the recommended spelling through the gua
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** fixed in source and pinned; verified live 2026-10-22 (closes after the 0.7.0 candidate host checklist).
+- **Rationale:** the generated obligations document (section 1) recommends the `-F <msgfile>` spelling and names
+  `-m` with `--trailer` as refused. Three contract cases in `harness/scripts/generate-agent-obligations.test.mjs`
+  (added by `afe6b7f61`, `80c5a9922`, `a34415842`) drive the recommended spelling through guard-push, guard-git and
+  guard-lifecycle-ready and keep a negative control per guard. Counted result on 2026-10-22: 13 cases, 13 pass,
+  0 fail, 0 skipped, 0 todo (`node --test harness/scripts/generate-agent-obligations.test.mjs`, run alone).
+- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+- **Date:** 2026-10-22.
