@@ -1,0 +1,666 @@
+{
+  "schema": "pipeline.doc-reader-round-working-disposition.v0",
+  "note": "Working record outside the evidence root; the closed terminal disposition is derived from it at the end of the course.",
+  "round": "20261023a",
+  "reviewedCommit": "5a276eb30456f0c8d2e31cde7be774b6c75b859f",
+  "correctionBatch": 1,
+  "findings": [
+    {
+      "id": "1",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6"
+      ]
+    },
+    {
+      "id": "2",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6",
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "3",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6"
+      ]
+    },
+    {
+      "id": "4",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6",
+        "868df133f",
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "5",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6"
+      ]
+    },
+    {
+      "id": "6",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6",
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "7",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6"
+      ]
+    },
+    {
+      "id": "8",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6"
+      ]
+    },
+    {
+      "id": "9",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "82b4f520b"
+      ]
+    },
+    {
+      "id": "10",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "82b4f520b"
+      ]
+    },
+    {
+      "id": "11",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "82b4f520b"
+      ]
+    },
+    {
+      "id": "12",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6",
+        "82b4f520b",
+        "cdf70f466",
+        "868df133f"
+      ]
+    },
+    {
+      "id": "13",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "cdf70f466"
+      ]
+    },
+    {
+      "id": "14",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6",
+        "cdf70f466"
+      ]
+    },
+    {
+      "id": "15",
+      "class": "reordering",
+      "status": "owner-needed",
+      "commits": [],
+      "note": "docs/enforcement.md is generated and byte-pinned; order changes only via the generator or owner acceptance"
+    },
+    {
+      "id": "16",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "17",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "18",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "19",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "20",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "21",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "22",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "23",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "d1b700a9a",
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "24",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "868df133f",
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "25",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6",
+        "f9dd29c3f",
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "26",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "4c4e39622"
+      ]
+    },
+    {
+      "id": "27",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "4c4e39622"
+      ]
+    },
+    {
+      "id": "28",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "4c4e39622"
+      ]
+    },
+    {
+      "id": "29",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "4c4e39622"
+      ]
+    },
+    {
+      "id": "30",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "868df133f"
+      ]
+    },
+    {
+      "id": "31",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "868df133f"
+      ]
+    },
+    {
+      "id": "32",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "868df133f"
+      ]
+    },
+    {
+      "id": "33",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "868df133f"
+      ]
+    },
+    {
+      "id": "34",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "868df133f",
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "35",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "868df133f"
+      ]
+    },
+    {
+      "id": "36",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "868df133f"
+      ]
+    },
+    {
+      "id": "37",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "868df133f",
+        "bd003ab5f"
+      ]
+    },
+    {
+      "id": "38",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "39",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "40",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "41",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "42",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "43",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "82b4f520b",
+        "868df133f",
+        "d1b700a9a"
+      ],
+      "note": "conflict with 57 remains for the owner"
+    },
+    {
+      "id": "44",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "bd003ab5f"
+      ]
+    },
+    {
+      "id": "45",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "bd003ab5f"
+      ]
+    },
+    {
+      "id": "46",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "bd003ab5f",
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "47",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "f9dd29c3f"
+      ]
+    },
+    {
+      "id": "48",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "f9dd29c3f"
+      ]
+    },
+    {
+      "id": "49",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "f9dd29c3f"
+      ]
+    },
+    {
+      "id": "50",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "483971b71"
+      ]
+    },
+    {
+      "id": "51",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "a951827e5"
+      ]
+    },
+    {
+      "id": "52",
+      "class": "cut",
+      "status": "owner-needed",
+      "commits": [
+        "9f4573d7b"
+      ],
+      "note": "banner corrected; moving the file changes the fixed 16-path set"
+    },
+    {
+      "id": "53",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "9f4573d7b"
+      ]
+    },
+    {
+      "id": "54",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "9f4573d7b"
+      ]
+    },
+    {
+      "id": "55",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "c823ecafd"
+      ],
+      "note": "judged: GEMINI.md keeps what the runner needs; pointer-only entry file remains an owner choice"
+    },
+    {
+      "id": "56",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "c823ecafd"
+      ]
+    },
+    {
+      "id": "57",
+      "class": "fileline",
+      "status": "owner-needed",
+      "commits": [],
+      "note": "governance input classifies usage.md/overview.md/migration.md as compatibility-redirect while the documents treat them as canonical"
+    },
+    {
+      "id": "58",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "868df133f",
+        "3fa08cb1b"
+      ],
+      "note": "usage.md lines 24-29 may still read 'not a routine onboarding input'; recheck in round 2"
+    },
+    {
+      "id": "59",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "3fa08cb1b",
+        "4c4e39622"
+      ]
+    },
+    {
+      "id": "60",
+      "class": "fileline",
+      "status": "owner-needed",
+      "commits": [
+        "3fa08cb1b",
+        "4c4e39622"
+      ],
+      "note": "code disagrees on the Advisor-consent default; both docs now say the same hedged thing"
+    },
+    {
+      "id": "61",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "cdf70f466"
+      ]
+    },
+    {
+      "id": "62",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "cdf70f466"
+      ]
+    },
+    {
+      "id": "63",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "f9dd29c3f",
+        "483971b71"
+      ]
+    },
+    {
+      "id": "64",
+      "class": "fileline",
+      "status": "owner-needed",
+      "commits": [
+        "e8a8decc6"
+      ],
+      "note": "At a glance bullet qualified as forthcoming; the unbacked inventory anchor capability-architecture-adoption-and-fitness remains"
+    },
+    {
+      "id": "65",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "66",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "d1b700a9a"
+      ]
+    },
+    {
+      "id": "67",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "e8a8decc6",
+        "cdf70f466",
+        "868df133f",
+        "bd003ab5f"
+      ]
+    },
+    {
+      "id": "68",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "cdf70f466",
+        "3fa08cb1b",
+        "4c4e39622"
+      ],
+      "note": "reconcile <repo> use once more in round 2"
+    },
+    {
+      "id": "69",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "868df133f"
+      ]
+    },
+    {
+      "id": "70",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "868df133f",
+        "3fa08cb1b",
+        "4c4e39622"
+      ],
+      "note": "partial: cross-file copies kept once in their own documents"
+    },
+    {
+      "id": "71",
+      "class": "cut",
+      "status": "no-change-proposed",
+      "commits": [],
+      "note": "low weight; disclaimer deliberate at each audit-facing entry"
+    },
+    {
+      "id": "72",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "cdf70f466"
+      ]
+    },
+    {
+      "id": "73",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "3fa08cb1b"
+      ]
+    },
+    {
+      "id": "74",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "9f4573d7b"
+      ]
+    },
+    {
+      "id": "75",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "9f4573d7b"
+      ]
+    },
+    {
+      "id": "76",
+      "class": "cut",
+      "status": "owner-needed",
+      "commits": [
+        "d1b700a9a"
+      ],
+      "note": "duplicate DE link removed; unnumbered h2 holds two pinned anchors; GEMINI.md h1-to-h3 jump not recorded as touched"
+    },
+    {
+      "id": "77",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "bd003ab5f"
+      ]
+    },
+    {
+      "id": "78",
+      "class": "fileline",
+      "status": "owner-needed",
+      "commits": [],
+      "note": "inventory criticReview is required-before-publication and all targets pending; needs owner acceptance, not a text edit"
+    }
+  ]
+}
