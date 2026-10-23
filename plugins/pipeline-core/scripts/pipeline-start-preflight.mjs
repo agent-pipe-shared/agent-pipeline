@@ -2242,6 +2242,22 @@ export async function observeAgyStartHintField({
 }
 
 /**
+ * MP-04 readback (PO decision 2026-10-23, batch 7 row 8): the Elephant bootstrap must confirm that
+ * the global subagent-model override variable is unset, and reading one non-secret variable through
+ * `printenv`, an `echo` expansion or `/proc/self/environ` is refused by the guard union. This is the
+ * sanctioned route: PRESENCE of exactly one named variable, read by `Object.hasOwn` -- never the
+ * value, never a prefix of it, never an enumeration of the environment. Any present value, the
+ * empty string included, reads `set`, the same rule as `bootstrap-env-check.mjs`. Carried beside
+ * the typed envelope like `nodeSandbox`, so the pinned key set and payload budget of
+ * `observePipelineStartPreflight` are untouched.
+ */
+export const SUBAGENT_MODEL_ENV_NAME = "CLAUDE_CODE_SUBAGENT_MODEL";
+
+export function observeSubagentModelEnv({ env = process.env } = {}) {
+  return { status: Object.hasOwn(env, SUBAGENT_MODEL_ENV_NAME) ? "set" : "unset" };
+}
+
+/**
  * Synchronous, exactly as before the readiness report existed: it returns the exit code and,
  * called with no options, writes the same one compact line. `environmentReadiness` is an
  * optional seam the async process entry (`runEntry`, below) fills; an exported function must
@@ -2261,6 +2277,7 @@ export function main(options = {}) {
     ...(environmentReadiness === undefined ? {} : { environmentReadiness }),
     ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
     ...(options?.nodeSandbox === undefined ? {} : { nodeSandbox: options.nodeSandbox }),
+    ...(options?.subagentModelEnv === undefined ? {} : { subagentModelEnv: options.subagentModelEnv }),
   };
   process.stdout.write(`${JSON.stringify(envelope)}\n`);
   if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
@@ -2306,6 +2323,8 @@ async function runEntry(argv = process.argv.slice(2)) {
     environmentReadiness,
     agyStartHint,
     nodeSandbox: observeNodeSandboxProbe(),
+    // MP-04 is the Elephant's bootstrap duty (policies/model-policy.md): an absent or `elephant` role only.
+    ...(role === undefined || role === "elephant" ? { subagentModelEnv: observeSubagentModelEnv() } : {}),
     ...(role === undefined ? {} : { role }),
     ...(modelRoleBootstrap === undefined ? {} : { modelRoleBootstrap }),
   });
