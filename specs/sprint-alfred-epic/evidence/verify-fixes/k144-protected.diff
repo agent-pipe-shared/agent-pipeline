@@ -1,0 +1,74 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+index d31f93298..c4bf07475 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+@@ -58,7 +58,15 @@ register("D84 block a Claude dispatch that names a model no configured duty rout
+   assert.ok(stderr.includes("DISPATCH-MODEL-UNROUTED"), `stderr missing "DISPATCH-MODEL-UNROUTED" -- ${stderr.trim().slice(0, 200)}`);
+ });
+ 
+-assert.equal(cases.length, 3, "the D84 dispatch-model hook corpus must register three cases");
++register("D84 leave an Antigravity native invoke_subagent dispatch without a model finding: that tool carries no tool-layer model", () => {
++  // The Antigravity adapter hands the hook a `Task` whose input keeps the capitalised `Subagents` array and no `model`;
++  // the model of each entry rides in its prompt text. Requiring `model` there refused every native Antigravity dispatch (K144).
++  const subagents = [{ TypeName: "customer-researcher", Role: "Customer Researcher", Prompt: "Inspect the customer fixture." }];
++  const { stderr } = run({ tool_name: "Task", tool_input: { subagent_type: "customer-researcher", prompt: "Inspect the customer fixture.", Subagents: subagents } });
++  assert.ok(!stderr.includes("DISPATCH-MODEL"), `unexpected model finding on an Antigravity native dispatch -- ${stderr.trim().slice(0, 200)}`);
++});
++
++assert.equal(cases.length, 4, "the D84 dispatch-model hook corpus must register four cases");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+ const completionCases = cases.map((entry, index) => ({ ...entry, id: `GDM${String(index + 1).padStart(2, "0")}` }));
+ registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+index ab345df5d..968105458 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+@@ -177,9 +177,29 @@ check("GD15k block a marked Codex worker when its native type differs from the b
+ check("GD15l block a marked Codex worker binding with an unknown field", {
+   tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt({ unexpected: true }) },
+ }, BLOCK, { stderrIncludes: ["NGHR-BRIEFING-SHAPE"], projectDir: repoRoot });
+-check("GD15m check a marked worker packet against the functional Goldfish briefing", {
+-  tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt() },
+-}, BLOCK, { stderrIncludes: ["DISPATCH-INCOMPLETE-BRIEFING"], projectDir: repoRoot });
++// GD15m runs in its own governed fixture with no active feature, not in `repoRoot`: the live repository's State
++// carries an approved feature, and the guard then demands that feature's untracked, gitignored slice-queue.json
++// (SQ-DELIVERY-COURSE-ABSENT) before it reaches the briefing check, so the case was green only in the one checkout
++// that owns that file and red in every fresh clone (K144).
++manualCheck("GD15m check a marked worker packet against the functional Goldfish briefing", () => {
++  const fixture = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-native-incomplete-"));
++  try {
++    execFileSync("git", ["init", "-q"], { cwd: fixture });
++    execFileSync("git", ["config", "user.name", "Pipeline Fixture"], { cwd: fixture });
++    execFileSync("git", ["config", "user.email", "pipeline-fixture@example.invalid"], { cwd: fixture });
++    recordConsentGiven({ rootDir: fixture });
++    assert.equal(observeGovernanceScope({ rootDir: fixture }).requiresEnforcement, true,
++      "native fixture must be admitted through canonical governance enrollment");
++    mkdirSync(join(fixture, ".claude"), { recursive: true });
++    writeFileSync(join(fixture, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
++    writeFileSync(join(fixture, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0" })}\n`);
++    execFileSync("git", ["add", "--", ".agent-pipeline/onboarding-consent.json", ".claude/pipeline.yaml", ".claude/pipeline-state.json"], { cwd: fixture });
++    execFileSync("git", ["commit", "-q", "-m", "fixture candidate"], { cwd: fixture });
++    const { code, stderr } = run({ tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt() } }, fixture);
++    assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 200)}`);
++    assert.ok(stderr.includes("DISPATCH-INCOMPLETE-BRIEFING"), `stderr missing "DISPATCH-INCOMPLETE-BRIEFING" -- ${stderr.trim().slice(0, 200)}`);
++  } finally { rmSync(fixture, { recursive: true, force: true }); }
++});
+ 
+ assert.equal(cases.length, 4, "the native-worker dispatch regression corpus must register four cases");
+ 
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index ef13911d1..8a86b3032 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -731,9 +731,9 @@ if (isDirectInvocation(import.meta.url)) {
+   const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? toolInput.agent_type ?? (codexDispatch ? "default" : "");
+   const prompt = toolInput.prompt ?? toolInput.message ?? "";
+ 
+-  // D84: the model of a Claude subagent dispatch comes from the configured routing, never from inheritance.
++  // D84: the model of a Claude subagent dispatch comes from the configured routing, never from inheritance. The Antigravity adapter relabels its native invoke_subagent as a `Task` keeping the capitalised `Subagents` array; that tool has no tool-layer `model` (each entry's model rides in its prompt), so the runner is "antigravity", which evaluateDispatchModel leaves without an opinion (K144).
+   if (["Task", "Agent"].includes(input?.tool_name)) {
+-    const modelCheck = evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model });
++    const modelCheck = evaluateDispatchModel({ runner: Array.isArray(toolInput.Subagents) ? "antigravity" : "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model });
+     const modelWarnings = dispatchModelWarningText(modelCheck);
+     if (modelWarnings !== "") process.stderr.write(modelWarnings);
+     if (!modelCheck.ok) {

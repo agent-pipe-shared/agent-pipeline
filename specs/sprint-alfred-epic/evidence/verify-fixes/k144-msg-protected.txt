@@ -1,0 +1,30 @@
+fix(guard-dispatch): leave an Antigravity native dispatch without a model finding (D84)
+
+The D84 model rule (3534b0ab8) is evaluated for every Task/Agent call with
+runner "claude". The Antigravity adapter relabels its native invoke_subagent
+call as a Task and keeps the capitalised Subagents array, so every native
+Antigravity dispatch reached the rule. That tool has no tool-layer model
+parameter (each entry's model rides in its prompt text), so every dispatch was
+refused with DISPATCH-MODEL-MISSING and could not be repaired: antigravity-
+native-dispatch-pretool-tests were 0/8, and the unrelated host-defined array of
+ANDP01 was blocked too. The hook now names the runner "antigravity" when the
+input carries the Subagents array; evaluateDispatchModel already gives a runner
+without a tool-layer model no opinion, as 7fcbce5ea documents.
+
+- hooks/guard-dispatch.mjs: pick the runner from the input shape (net 0 lines).
+- hooks/guard-dispatch-model.test.mjs: GDM04 pins the Antigravity shape (RED on
+  the unchanged hook with DISPATCH-MODEL-MISSING, GREEN after).
+- hooks/guard-dispatch-native-worker.test.mjs: GD15m ran in repoRoot, whose
+  State carries an approved feature, so the guard demanded that feature's
+  untracked, gitignored slice-queue.json (SQ-DELIVERY-COURSE-ABSENT) before the
+  briefing check; green only in the checkout that owns the file, red in every
+  clone. It now runs in its own governed fixture without an active feature and
+  asserts the same refusal (DISPATCH-INCOMPLETE-BRIEFING). QG-04: same assertion,
+  hermetic fixture; no logic reverted.
+
+Measured alone, private HOME: guard-dispatch-model 3/3 -> 4/4;
+antigravity-native-dispatch-pretool 0/8 -> 8/8; guard-dispatch-native-worker
+3/4 -> 4/4; dispatch-model-enforcement 9/9 unchanged.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

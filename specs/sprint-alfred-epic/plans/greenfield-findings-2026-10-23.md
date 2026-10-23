@@ -25,6 +25,14 @@ Class A, not applied: `codex-isolated-critic-protected-preimage-tests`, six pinn
 - Open from the hand-back: `codex-critic-host-tests` CCH136/CCH137 were red in the same batch; not examined on the base (see K145 section). `architecture-boundary-check` reports `unowned-path` findings including the accepted row 45 for `scripts/full-verify.mjs`; total not counted.
 - Files: `specs/sprint-alfred-epic/evidence/verify-fixes/k143-*`.
 
+## K144 results (guard and dispatch red steps; steps 1 to 3 complete in clone, step 4 partial; independent Critic read, operator commit of protected parts and PO acceptance pending)
+
+- V4 is a real product defect (G5, blocks the Antigravity Greenfield): `hooks/guard-dispatch.mjs` runs the D84 model rule with runner "claude" on every Task/Agent call; the Antigravity adapter relabels native `invoke_subagent` as "Task" and keeps its `Subagents` array, which has no tool-layer `model`, so every native Antigravity dispatch gets `DISPATCH-MODEL-MISSING` with no repair. `antigravity-pretool-guard.test.mjs` had `model: "sonnet"` in its args and hid it. Fix (protected, net 0 lines): pick runner "antigravity" when the input has a `Subagents` array; new pin GDM04 (RED on the unchanged hook). The Antigravity Greenfield stays blocked until the operator applies `k144-protected.diff` and a re-stamp is installed.
+- `guard-dispatch-native-worker-tests` GD15m: depended on the untracked gitignored `slice-queue.json` of the repo root's approved feature (`SQ-DELIVERY-COURSE-ABSENT`, green only in the checkout owning the file); now runs in its own governed fixture (protected test file, in the protected diff). 3/4 to 4/4.
+- `agy-session-dispatch-tests`: finalize ran outside `f.runtime.run` (stale fixture); fixed and committed (`c8256e280`, 6/7 to 7/7).
+- `codex-pretool-guard-tests`: 28 of 37 were red (classification said about 13). Ready-fixture used the "feature" profile; now "mini" (committed, `c8256e280`, boundary bound 1407 to 1413). Still 16 of 37 red: tests 8, 10, 11, 22 to 25, 27 to 32, 35, 37 use a tmp dir with only `.claude/`, adapter exits 0 with empty stdout (root probably no longer governance-enrolled; test 30 needs the opposite); test 16 expects `Step: prepare-authorization`, denial prints `Step: plan`. Next dispatch.
+- Not run: `check-consumer-safe-paths.test.mjs`. Files: `evidence/verify-fixes/k144-*`.
+
 ## G1 fix questions (for the batch, not decided)
 
 - What does the family check protect on Claude (a dispatch must not silently run another family than the agent definition declares, MP-29)? A Codex dispatch has no Claude alias, so the check needs a runner-aware reading, not a removal.

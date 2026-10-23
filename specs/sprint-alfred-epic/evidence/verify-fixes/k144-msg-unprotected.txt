@@ -1,0 +1,19 @@
+test(pipeline-core): repair the agy finalize and Codex ready-fixture cases the Full Verify found red
+
+Two stale fixtures, no product change (apply together with K144-ratchet.diff,
+which raises the codex-pretool-guard.test.mjs line bound from 1407 to 1413):
+
+- agy-session-dispatch.test.mjs: the delivering finalize publishes its private
+  receipt under a source-owned requester (AGY-HOST-STORE-REQUESTER-UNAVAILABLE
+  without one) but ran outside f.runtime.run; it now runs inside the
+  controlled-unit-method carrier like every other positive route. 6/7 -> 7/7.
+- codex-pretool-guard.test.mjs: the HGO ready-fixture selected the "feature"
+  profile, whose draft is bound unapproved (finalPackageProfile, 1bd1d7bf6) and
+  never reaches the design stop or the chat acknowledgement it expects. It now
+  selects "mini" and authors the PRD/spec package like the Antigravity
+  ready-fixture; the SessionStart descriptor assertion is restated to the
+  shipped ` --runner codex` argument (QG-04, equal strength). 28/37 red -> 16/37
+  red; the rest is a separate cause (see the K144 notes).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
