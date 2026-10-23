@@ -4,6 +4,18 @@ import {parseStrictJson} from '../../plugins/pipeline-core/lib/governance-event.
 export const TERMINAL_READER_SCHEMA='pipeline.doc-reader-terminal-record.v1';
 export const TERMINAL_READER_SCHEMA_V2='pipeline.doc-reader-terminal-record.v2';
 export const parseTerminalReaderRecord=bytes=>JSON.parse(JSON.stringify(parseStrictJson(bytes)));
+// Closed, digest-bound list of the HISTORICAL Reader course of one feature (PO decision 2026-10-23, batch 13, "Older-course
+// reports"). Its four rounds were reviewed and published before the current course began; their phase-one/phase-two reports
+// sit in the same evidence directories, bytes unchanged. A v2 course for that feature recognises exactly these eight
+// reports (blob digest at the candidate, one committed publication, never rewritten) and skips them in the round-set rule.
+// It is a list of reports, not a round budget: any other round (a fourth of the current course, a renamed or deleted
+// current-course report, any historical report with other bytes) is still refused by the unchanged rule below.
+export const HISTORICAL_READER_COURSE=Object.freeze({featureId:'sprint-alfred-epic',rounds:Object.freeze([
+  Object.freeze({id:'round-20260923a',phaseOne:'fee972f3bf1c384ae216e96a146548902610d94f27aa0a76b099a7fea64bb013',phaseTwo:'b129784ced7e4d153f5708f7aab3337e9474137f02656a0925b34c46a6495528'}),
+  Object.freeze({id:'round-20260924a',phaseOne:'3a2020fae76533aa4377387a2637f72bdba4118a927fc175e142e5089d373066',phaseTwo:'56f94c47e68d92bb350e3da71c55074068da91ddc494d3fe6b81e5205d73ff69'}),
+  Object.freeze({id:'round-20260927a',phaseOne:'c41b8254758c0b656d64a43881412da3a50bddc86429b892a94b455d8c8a4bec',phaseTwo:'329f37a656732a160bf38fc570810ef4c4420bb37371b905865e296d1bfcc39d'}),
+  Object.freeze({id:'round-20260927b',phaseOne:'e3a04c1c123f17bec1ba2bdf28b7992f2015e3a82f06feffa24578932090998e',phaseTwo:'683251e9c6fcbe55955bc029f2014bf4274e2d64167b304ad289365aa5f45b10'}),
+])});
 const sha=/^[a-f0-9]{64}$/,oid=/^[a-f0-9]{40}$/,id=/^[a-z0-9][a-z0-9-]{0,62}$/;
 const findingId=/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const exact=(value,keys)=>value!==null&&typeof value==='object'&&!Array.isArray(value)
@@ -147,6 +159,19 @@ export function verifyTerminalReaderCourse({root,candidateCommit,featureId,recor
       ancestor(record.correctionBatches[1].commits.at(-1),commits[0]);
       ancestor(commits[0],record.rounds[2].reviewed.commit);
       if(!api.readBlob(root,record.rounds[2].reviewed.commit,escalation.source.path,65536).equals(bytes))fail('third-round escalation prelaunch digest');
+    }
+  }
+  // The typed historical-course list (v2 only): the older course's reports are part of the expected round set, but only
+  // as exactly the listed, digest-bound, once-published reports.
+  if(v2&&featureId===HISTORICAL_READER_COURSE.featureId){
+    for(const old of HISTORICAL_READER_COURSE.rounds){
+      for(const [phase,digest] of [['phase-one',old.phaseOne],['phase-two',old.phaseTwo]]){
+        const path=prefix+phase+'/'+old.id+'.md';
+        blobRef({path,sha256:digest},path,1024*1024,'historical-course report');
+        const changes=api.git(root,['log','--full-history','--no-renames','--format=%H',candidateCommit,'--',path],'utf8');
+        if(changes.status!==0||changes.stdout.trim().split('\n').filter(Boolean).length!==1)fail('historical-course report immutable history');
+        expectedPaths.add(path);
+      }
     }
   }
   // Include added-then-deleted reports: changing round IDs cannot erase a fifth committed round.
