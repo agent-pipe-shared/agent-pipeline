@@ -30,5 +30,17 @@
       "signed": false,
       "reason": "Historical, unsigned exception recorded by the Elephant (PO decision D107): the first commit added a second registry row repeating the name and file of an existing row, the second commit removed that row again. Narrow and not extendable: it is bound to these two commits and their registry bytes, so a third commit of the same shape stays refused."
     }
+  ],
+  "rewrites": [
+    {
+      "schema": "pipeline.verify-suite-case-list-extension-entry.v1",
+      "commit": "91f728f85534e768a19fea62c587a35d10855cf4",
+      "parent": "557035fd83dc4c891b42b090bdb3aa03c4fc0ae2",
+      "preimageSha256": "55c3684c8b06387d888222bf131884dcecd4e18787c25a18879658154a0ddbee",
+      "postimageSha256": "1ee65943c65aea28b2b0f76328ba74b2c733579536287ecefba257cdd3efb763",
+      "owner": "Elephant",
+      "signed": false,
+      "reason": "Historical, unsigned exception recorded by the Elephant (Full Verify finding V3): this one commit extended the caseCompletion case-ID lists of four existing registry rows in place and inserted one row. Narrow and not extendable: it is bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that every prior row is otherwise unchanged."
+    }
   ]
 }

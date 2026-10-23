@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { canonical } from "../../plugins/pipeline-core/lib/po-approval-proof.mjs";
-import { checkVerifySuiteAppend, evaluateDuplicateRepair, evaluateSignedHistoryRestoration, integrationTrailerWitness } from "./check-verify-suite-append.mjs";
+import { checkVerifySuiteAppend, evaluateCaseListExtension, evaluateDuplicateRepair, evaluateSignedHistoryRestoration, integrationTrailerWitness } from "./check-verify-suite-append.mjs";
 import { evaluateVerifySuiteAppend } from "../../plugins/pipeline-core/lib/verify-suite-append-policy.mjs";
 
 function fixture(run) {
@@ -327,6 +327,27 @@ test("evaluateDuplicateRepair derives the shape from the bytes: no duplicate add
   assert.equal(evaluateDuplicateRepair(input({ removeAfterBytes: registryText(keptDup) })).ok, false);
   const changedPrior = [row("a"), { ...row("b"), invariantPinned: "weakened" }, row("c"), row("d")];
   assert.equal(evaluateDuplicateRepair(input({ removeAfterBytes: registryText(changedPrior) })).ok, false);
+});
+
+test("evaluateCaseListExtension admits only an in-place case-list extension bound to its exact bytes (K143 V3)", () => {
+  const row = (name, ids, extra = {}) => ({ name, file: `${name}.test.mjs`, caseCompletion: { caseIds: ids, maxBytes: 65536 }, ...extra });
+  const text = (suites) => JSON.stringify({ schema: "pipeline.verify-suites.v1", suites }, null, 2) + "\n";
+  const sha = (value) => createHash("sha256").update(value).digest("hex");
+  const before = text([row("a", ["A1", "A2"]), row("b", ["B1"])]);
+  const after = text([row("a", ["A1", "A2", "A3"]), row("c", ["C1"]), row("b", ["B1"])]);
+  const entry = (b, a) => ({ schema: "pipeline.verify-suite-case-list-extension-entry.v1", commit: "b".repeat(40), parent: "a".repeat(40), preimageSha256: sha(b), postimageSha256: sha(a), owner: "Elephant", signed: false, reason: "Historical, unsigned exception recorded by the Elephant for a test." });
+  const run = (e, b, a, over = {}) => evaluateCaseListExtension({ entry: e, commit: "b".repeat(40), parent: "a".repeat(40), beforeBytes: b, afterBytes: a, ...over });
+  assert.equal(run(entry(before, after), before, after).ok, true);
+  assert.equal(run(entry(before, after), before, after, { commit: "c".repeat(40) }).code, "VSA-REWRITE-AUTHORIZATION");
+  const reordered = text([row("a", ["A2", "A1", "A3"]), row("b", ["B1"])]);
+  assert.equal(run(entry(before, reordered), before, reordered).ok, false, "a reordered case list is not an extension");
+  const shrunk = text([row("a", ["A1"]), row("b", ["B1"])]);
+  assert.equal(run(entry(before, shrunk), before, shrunk).ok, false);
+  const otherChange = text([row("a", ["A1", "A2", "A3"], { invariantPinned: "x" }), row("b", ["B1"])]);
+  assert.equal(run(entry(before, otherChange), before, otherChange).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED");
+  const insertOnly = text([row("a", ["A1", "A2"]), row("c", ["C1"]), row("b", ["B1"])]);
+  assert.equal(run(entry(before, insertOnly), before, insertOnly).code, "VSA-REWRITE-NO-EXTENSION");
+  assert.equal(run({ ...entry(before, after), signed: true }, before, after).code, "VSA-REWRITE-SHAPE");
 });
 
 test("full history traversal refuses a rewrite when recovery is missing or invalid", () => {

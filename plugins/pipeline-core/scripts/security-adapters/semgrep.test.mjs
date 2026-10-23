@@ -13,6 +13,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import path from "node:path";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { name, CAPABILITY_CONTRACT_V2, run } from "./semgrep.mjs";
 
 // ---------------------------------------------------------------------------
@@ -337,4 +339,44 @@ test("CAPABILITY_CONTRACT_V2.timeoutContract matches run()'s real default and me
 
 test("CAPABILITY_CONTRACT_V2.evidenceFields matches the real findings.map(...) object shape (same shape as gitleaks)", () => {
   assert.deepEqual(CAPABILITY_CONTRACT_V2.evidenceFields, ["tool", "severity", "rule", "path", "line", "msg"]);
+});
+
+// ---------------------------------------------------------------------------
+// SEM-B -- the scan's stdout buffer is explicit and bounded (K143-FV-TOOLING, Full Verify V2).
+//
+// Cause: run() called spawnSync without `maxBuffer`, so node's 1 MiB default applied; a real
+// Semgrep --json report of this repository is about 2.3 MB, so the child was killed with
+// ENOBUFS and security-scan exited 2. The bound is 64 MiB: about 28x the observed report, still
+// a hard ceiling (a runaway scanner is cut off, never unbounded memory).
+// ---------------------------------------------------------------------------
+test("SEM-B (a): run() passes an explicit, bounded maxBuffer to the spawn boundary (at least 16 MiB, at most 256 MiB)", async () => {
+  let seen;
+  await run({
+    rootDir: SCAN_ROOT,
+    config: { binaryPath: "semgrep-fixture-binary" },
+    timeoutMs: 5000,
+    spawnFn: (_command, _args, options) => {
+      seen = options;
+      return { status: 0, stdout: JSON.stringify({ results: [] }), stderr: "" };
+    },
+  });
+  assert.equal(typeof seen?.maxBuffer, "number", "spawn options carry no numeric maxBuffer (node's 1 MiB default applies)");
+  assert.ok(Number.isFinite(seen.maxBuffer), "maxBuffer must be finite, not Infinity");
+  assert.ok(seen.maxBuffer >= 16 * 1024 * 1024, `maxBuffer ${seen.maxBuffer} is below 16 MiB; a 2.3 MB report needs real headroom`);
+  assert.ok(seen.maxBuffer <= 256 * 1024 * 1024, `maxBuffer ${seen.maxBuffer} exceeds the 256 MiB ceiling`);
+});
+
+test("SEM-B (b): a real child writing a 3 MB JSON report through the default spawn is parsed, not ENOBUFS", { skip: process.platform === "win32" ? "shebang fixture" : false }, async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "sem-b-"));
+  try {
+    const binary = path.join(dir, "fake-semgrep");
+    const report = JSON.stringify({ results: [], errors: [], padding: "x".repeat(3 * 1024 * 1024) });
+    writeFileSync(binary, `#!/usr/bin/env node\nprocess.stdout.write(${JSON.stringify(report)});\n`);
+    chmodSync(binary, 0o755);
+    const result = await run({ rootDir: dir, config: { binaryPath: binary }, timeoutMs: 30000 });
+    assert.equal(result.status, "PASS", `expected PASS, got ${result.status}: ${result.reason ?? ""}`);
+    assert.deepEqual(result.findings, []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

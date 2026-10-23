@@ -153,6 +153,11 @@ function cleanupScratch(path) {
   try { rmSync(path, { recursive: true, force: true }); } catch { /* best-effort bounded scratch cleanup */ }
 }
 
+// Explicit stdout/stderr ceiling for the scan child. Node's spawnSync default is 1 MiB and a real
+// `--json` report of this repository is about 2.3 MB, so the default killed the child (ENOBUFS)
+// and security-scan exited 2. 64 MiB is about 28x the observed report and still a hard bound.
+const SCAN_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
+
 async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutMs = 60000, env = process.env }) {
   const resolved = config.binaryPath ? { installed: true, path: config.binaryPath } : resolveBinary(env);
   if (!resolved.installed) {
@@ -190,7 +195,7 @@ async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutM
 
   let res;
   try {
-    res = spawnFn(resolved.path, args, { cwd: rootDir, encoding: "utf8", env: scanEnv, timeout: timeoutMs, shell: false });
+    res = spawnFn(resolved.path, args, { cwd: rootDir, encoding: "utf8", env: scanEnv, timeout: timeoutMs, shell: false, maxBuffer: SCAN_MAX_BUFFER_BYTES });
   } catch (err) {
     cleanupScratch(scratch);
     return spawnFailure(err);

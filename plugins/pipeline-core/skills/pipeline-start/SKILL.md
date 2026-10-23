@@ -114,8 +114,7 @@ recommendation.
    that is not yet ready, that action names the guided driver,
    `onboarding-init.mjs --root <root> [--runner <runner>] [--step-cap <n>]`
    (`scripts/onboarding-init.mjs`) -- it walks the whole onboarding chain
-   step by step and re-anchors after each apply, replacing what used to be a
-   manual turn-by-turn `inspect`/apply loop. For an already-ready project the
+   and re-anchors after each apply. For an already-ready project the
    returned action is the read-only
    `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap`.
    Accept only ready `pipeline.project-onboarding.v4` native-local or
@@ -156,9 +155,7 @@ recommendation.
    `powershell`/`cmd` arrays are each a line already bounded under
    `COPY_COMMAND_MAX_COLUMNS` — relay it VERBATIM, line for line, from that
    same tool result. Never hand-reconstruct the command from memory of a
-   prior turn, even for the identical restart action seen before: a
-   correctly relayed rendering on one occasion does not carry over to the
-   next if the command is retyped instead of re-read.
+   prior turn, even for an identical earlier restart action: re-read it.
 4. **Confirmation:** after all checks print exactly this line, five concrete
    fields, no placeholder (additions, role variants → typed references):
 
@@ -216,8 +213,7 @@ recommendation.
    failed or skipped read must be surfaced honestly, never silently skipped
    or claimed as done when it was not; this is a MUST-DO consumption step, not
    a new readiness precondition, so it never blocks or gates the session.
-   The card is never a gate and capture failure must be surfaced honestly rather
-   than claimed as persisted context.
+   Capture failure must be surfaced honestly, never claimed as persisted context.
    Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
    their shapes differ: `intent` is one string; the other three are **arrays** of
    short strings, at most 4, 4 and 3 entries. Every entry is a distilled
@@ -383,9 +379,8 @@ lifecycle recovery action. Never bypass a real gate or turn an automated
 evidence failure into an invented PO approval.
 
 When one of those does require asking, a confirmation with only one real
-option (proceed or don't, with nothing else meaningfully on offer) is plain
-text plus waiting for the reply — never `AskUserQuestion`, whose own
-validator rejects a single-option call outright.
+option (proceed or don't) is plain text plus waiting for the reply — never
+`AskUserQuestion`, whose validator rejects a single-option call.
 
 ## Compact
 

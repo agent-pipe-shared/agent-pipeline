@@ -35,6 +35,22 @@ git(work, "config", "user.name", "t");
 git(work, "config", "user.email", "t@example.invalid");
 test.after(() => rmSync(sandbox, { recursive: true, force: true }));
 
+test("full-verify.mjs pure parts: short TMPDIR bound, red steps from the run record, summary, private git config (K143)", async () => {
+  const fv = await import("./full-verify.mjs");
+  assert.equal(fv.tmpDirIsShortEnough("/home/u/.fv/fv/t"), true);
+  assert.equal(fv.tmpDirIsShortEnough("/home/u/pipeline-test-tmp/a-very-long-label-name/tmp"), false);
+  assert.equal(fv.tmpDirIsShortEnough(""), false);
+  const record = { steps: [{ name: "a", exitCode: 0 }, { name: "b", exitCode: 1 }, { name: "c", exitCode: 2 }] };
+  assert.deepEqual(fv.redStepNames(record), ["b", "c"]);
+  assert.deepEqual(fv.redStepNames(null), []);
+  const lines = fv.summarize({ exitCode: 1, seconds: 7, outputPath: "scratch/fv-output.txt", record });
+  assert.equal(lines[0], "verify exit 1 after 7 s; output in scratch/fv-output.txt");
+  assert.equal(lines[1], "steps 3, red 2");
+  assert.deepEqual(lines.slice(2), ["  red: b", "  red: c"]);
+  assert.match(fv.summarize({ exitCode: 0, seconds: 1, outputPath: "o", record: null })[1], /unreadable or absent/);
+  assert.match(fv.privateGitConfig({ name: "N", email: "e@x" }), /defaultBranch = main/);
+});
+
 test("a clean source runs its exact HEAD and prints the commit", () => {
   initSrc(1);
   const r = run();
