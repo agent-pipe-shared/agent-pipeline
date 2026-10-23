@@ -740,3 +740,17 @@ inventory were counted in `evidence/pin-counted-results-2026-10-23.md`. D60 (a):
 `WORK-STATUS.md` and recorded evidence by prefix instead of fixing their links; the Elephant states that
 this satisfies D60 (a), the checker passes and the links point into `scratch/` by design. A new evidence
 directory under `specs/` that links into `scratch/` needs a new prefix.
+
+### K9 closure (2026-10-23, closed with a named rest)
+
+One counted serial pass over the cluster (`evidence/pin-counted-results-2026-10-23-d.md`, K77): 61 test files,
+58 green, 3 red, no timeout; `nova-verify-journal` has no suite of that name (the verify-journal suites, the
+nearest, are green 95/95). The named rests of K1h are green standalone: onboarding-continuity 306/306
+(OBC129 passes at file level), pipeline-state-rebind-mutable 5/5, verify-journal 95/95,
+po-human-approval-openssl-path 11/11; the security-scan suites and the gitleaks near-miss are green. Two of
+the three reds were stale fixtures after checkpoint `d02409a8a` (the consent admission and the live-host
+session case run against a bound real checkout now) and are repaired in `f4a89baaa` (K78): agy-session-authority
+6/6, goldfish-antigravity-live-host 6/6. Named rest: `scripts/local-worker-supervisor.test.mjs` (1/10) fails
+against a deliberate fail-closed in the kernel file (`withWorkerAuthority`); the choice between a D66 (a)
+extension and implementing the journal phase is PO list row 30. The Windows and WSL pins that skip on native
+Windows ran green on Linux without exercising those cases (D133).

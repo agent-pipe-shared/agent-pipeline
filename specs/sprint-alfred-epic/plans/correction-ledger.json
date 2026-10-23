@@ -78,8 +78,8 @@
     {
       "id": "K9",
       "title": "remaining single suites",
-      "status": "open",
-      "next": "split by area"
+      "status": "closed",
+      "next": "-"
     },
     {
       "id": "K11",
