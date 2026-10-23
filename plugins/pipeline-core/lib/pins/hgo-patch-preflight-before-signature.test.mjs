@@ -30,6 +30,7 @@ import {
 } from "../human-guard-override.mjs";
 import * as hgo from "../human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../po-approval-proof.mjs";
+import { extractShellWriteTargets } from "../protected-test-paths.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = resolve(here, "..", "..");
@@ -397,5 +398,31 @@ test(`AC-201 converter: converted diffs apply with real git and produce the exac
     assert.equal(result.status, 0, `${item.name}: ${result.stderr}`);
     for (const [name, text] of Object.entries(item.expect)) assert.equal(readFileSync(join(root, name), "utf8"), text, item.name);
     for (const name of item.absent ?? []) assert.equal(existsSync(join(root, name)), false, item.name);
+  }
+});
+
+// ---------------------------------------------------------------------------------------------
+// Optional residual of AC-201 (item "Native grammar observation", request 69cf992e...): the optional
+// whole-patch read-only command `git apply --check --reverse` was classified as mutating with unbound
+// patch targets. "Applicability preflight must recognize validation-only flags without admitting an
+// actual mutation." Inert strings only: the shell-write-target classifier runs, no git subprocess does.
+// ---------------------------------------------------------------------------------------------
+const applyTargets = (command) => extractShellWriteTargets({ command, root: PROJECT_ROOT, platform: "linux" });
+
+test("AC-201 residual: `git apply --check <patch>` (validation only) names no write target and is admitted", () => {
+  assert.deepEqual(applyTargets("git apply --check scratch/p.patch"), []);
+});
+
+test("AC-201 residual: `git apply --check --reverse <patch>` is a read-only check and is admitted in either flag order",
+  { todo: "RED: the classifier faults with 'mutating git apply has unbound patch targets' for a --check form that also carries --reverse; fix site is the git apply grammar in protected-test-paths.mjs / guard grammar (protected), not changed here" },
+  () => {
+    for (const command of ["git apply --check --reverse scratch/p.patch", "git apply --reverse --check scratch/p.patch"]) {
+      assert.deepEqual(applyTargets(command), [], command);
+    }
+  });
+
+test("AC-201 residual: plain `git apply <patch>` (and --reverse without --check) stays mutating, never admitted as a check", () => {
+  for (const command of ["git apply scratch/p.patch", "git apply --reverse scratch/p.patch"]) {
+    assert.throws(() => applyTargets(command), /mutating git apply/u, command);
   }
 });

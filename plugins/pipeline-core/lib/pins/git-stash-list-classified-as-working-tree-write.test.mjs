@@ -192,3 +192,47 @@ test('PF-16 end to end: a draft-phase sed -i on an implementation file is refuse
     assert.equal(hit.lane, 'write-command', command);
   }
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Optional residuals recorded by 3bbdb7c12 (item "Reconciled 2026-10-23"): (1) an `&&` chain is outside the closed
+// grammar; (2) `perl -i.bak` / `ruby -i.bak` in-place edits. Cases marked `todo` are documented REDs: they assert the
+// contract the item states and fail on the current product (todo cases never fail the run; the reason names the fix site).
+// ---------------------------------------------------------------------------------------------------------------
+const readerChains = ['git stash list && git stash list', 'git stash list && git stash show', 'git stash show && git stash list'];
+const mutatingChains = ['git stash list && git stash pop', 'git stash pop && git stash list', 'git stash list && git stash drop',
+  'git stash list && git stash list && git stash push'];
+for (const command of readerChains) {
+  test('AC-181 residual: the read-only chain `' + command + '` is read-only, names no write target and is admitted in draft', () => {
+    assertReadOnlyStash(command, real);
+    assert.equal(devPlanShellRefusalHit(command, fixture, deps), null, command);
+  });
+}
+for (const command of mutatingChains) {
+  test('AC-181 residual: the chain `' + command + '` with one mutating stash verb is never read-only', () => {
+    assert.equal(real.readOnly(command), false, 'must not be read-only: ' + command);
+  });
+}
+test('AC-181 residual: a chain with one mutating stash verb stays in the git-working-tree-write lane and is refused in draft',
+  { todo: 'RED: an `&&` chain is outside the closed grammar, so no git-working-tree-write target is extracted and the draft lane admits it (null); the fix site is the raw-token fallback of extractShellWriteTargets in lib/protected-test-paths.mjs, not changed here' },
+  () => {
+    for (const command of mutatingChains) {
+      assert.ok(targetsOf(command).some(t => t.lane === 'git-working-tree-write'), 'must name the write lane: ' + command);
+      assert.equal(devPlanShellRefusalHit(command, fixture, deps)?.verdict, 'block', command);
+    }
+  });
+
+// perl/ruby in-place edit (-i[SUFFIX]) is the same family as `sed -i`: the real file operand must be a write candidate.
+for (const interpreter of ['perl', 'ruby']) {
+  test('AC-181 residual: `' + interpreter + ' -i -pe` (no suffix) already names the real file operand', () => {
+    assert.ok(writeCommandCandidates(`${interpreter} -i -pe 's/a/b/' ${F}`).includes(F));
+  });
+  test('AC-181 residual: `' + interpreter + ' -i.bak -pe` is refused in the draft phase on an implementation file', () => {
+    const hit = devPlanShellRefusalHit(`${interpreter} -i.bak -pe 's/a/b/' src/app.js`, fixture, deps);
+    assert.equal(hit?.verdict, 'block');
+  });
+  test('AC-181 residual: `' + interpreter + ' -i.bak -pe` names the real file operand as a write-command candidate, like `sed -i.bak`',
+    { todo: 'RED: the glued-suffix in-place spelling is not recognised in the parsed lane (extractShellWriteTargets returns no target); the fix site is the in-place option handling in lib/protected-test-paths.mjs, not changed here' },
+    () => {
+      assert.ok(writeCommandCandidates(`${interpreter} -i.bak -pe 's/a/b/' ${F}`).includes(F));
+    });
+}
