@@ -1,0 +1,45 @@
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 4be0e1bbf..0ca69a92e 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -166,6 +166,17 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+   // the test-path shell lane covers PowerShell too.
+   const sessionRoots = toolName === "Bash" ? sessionReadScopeRoots(input, dependencies) : [];
+   const shellLifts = [];
++  // One onboarding observation per guard call. The memoizing wrapper is built BEFORE the shell lanes so the
++  // dev-plan shell lane (observedOnboardingCommandMatch) and the later gate share a single inspection instead
++  // of each reading the project separately. Every consumer asks with the same options (rootDir, intent
++  // "session", runner), so the memo returns the observation each would have read for itself.
++  const inspect = dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3;
++  let inspected = false, observed, inspectionError;
++  const consistent = {...dependencies, inspectProjectOnboardingV3Fn(options) {
++    if (!inspected) { inspected = true; try { observed = inspect(options); } catch (error) { inspectionError = error; } }
++    if (inspectionError) throw inspectionError;
++    return observed;
++  }};
+   if (toolName === "PowerShell"
+     && exactClaudeTaskOutputPowerShellRead((input.tool_input.command ?? input.tool_input.CommandLine), root, input, dependencies)) {
+     return verdict(0);
+@@ -198,7 +209,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       && sanctionedPowerShellNodeCall(shellCommand, root);
+     const devPlanOutcome = sanctionedPowerShellLifecycleCall
+       ? null
+-      : devPlanShellRefusalHit(shellCommand, root, dependencies, toolName, sessionRoots);
++      : devPlanShellRefusalHit(shellCommand, root, consistent, toolName, sessionRoots);
+     // D117 / BI: an approval whose verification input is unavailable is an advisory, never a refusal. It rides the
+     // same notice channel as the rebase-admission notice (exit 0 + stderr text carried onto the final verdict).
+     if (devPlanOutcome?.advisory === true) shellLifts.push(verdict(0, `${devPlanOutcome.notice}\n`));
+@@ -503,13 +514,6 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       lifts.push(route.admitted);
+     }
+   }
+-  const inspect = dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3;
+-  let inspected = false, observed, inspectionError;
+-  const consistent = {...dependencies, inspectProjectOnboardingV3Fn(options) {
+-    if (!inspected) { inspected = true; try { observed = inspect(options); } catch (error) { inspectionError = error; } }
+-    if (inspectionError) throw inspectionError;
+-    return observed;
+-  }};
+   const result = evaluateAfterGrammarAdmission(input, root, toolName, consistent);
+   return withLifts(lifts, withLifecycleReturnedActionTelemetry(result, input, root, toolName, consistent));
+ }
