@@ -480,8 +480,10 @@ At the first prompt choose **Approved Plugin Directory** (the default). Choose
 copy; if that development copy is unavailable, the installer refuses the
 selection instead of silently switching sources. Then choose
 **Workspace-Local** when the installer asks where to bind
-the plugin. The installer registers that exact physical plugin directory in
-the consumer project's `.agents/plugins.json`; keep the clone at the same path
+the plugin, or **Global** as described under *Choosing where to bind* below.
+Workspace-Local registers the plugin directory in the consumer project's
+`.agents/plugins.json` as a path relative to the project and refuses a plugin
+directory that lies outside the project; keep the clone at the same path
 while it is registered. Do not hand-edit Agy registry or plugin files. The
 installer may offer a runner-local autonomous tool policy, but that option
 grants no plan, release, remote, or human authority.
@@ -527,10 +529,67 @@ with `--refresh`; on its own it is refused with a repair. After the refresh,
 list` and `plugins.json` are not proof of what is loaded, and neither is the
 installer's readback, which is a physical diagnostic only.
 
+**Choosing where to bind.** The interactive installer asks up to two
+questions. Everything below is read from `install-agy.mjs` and the topology
+code it calls; nothing here is a claim about what Agy itself does.
+
+1. *Plugin source:* `1` Approved Plugin Directory (the default), `2` Local
+   Marketplace (refused unless the development marketplace directory exists),
+   or `3` Central agy snapshot (global, per-user).
+2. *Where to install* (asked only for source `1` or `2`):
+   - `1` **Workspace-Local.** Writes `<project-root>/.agents/plugins.json`: one
+     Pipeline entry, the plugin directory as a path relative to the project,
+     and no absolute Pipeline entry. The plugin directory must lie inside the
+     project. A directory outside it, such as the clone location in the
+     procedure above, is refused with `ATR-WORKSPACE-SOURCE-OUTSIDE` and the
+     repair "use the global option". A stale Agy-managed copy or stale global
+     hook wiring also makes this choice refuse (`ATR-GLOBAL-SCOPE`); those
+     changes are made only by the global choice. The optional autonomous tool policy goes to
+     `<project-root>/.agents/settings.json`.
+   - `2` **Global topology refresh.** User-wide, not tied to one project. It
+     generates a runner view of the approved source in a per-user Pipeline
+     directory and, when Agy has no managed copy or a stale one, runs
+     `agy plugin validate` and `agy plugin install` on that view. Afterwards
+     the global registry (`$HOME/.gemini/config/plugins.json`) holds exactly
+     one Pipeline entry, naming the generated view. Pipeline-owned hook
+     commands in already existing global and workspace `hooks.json` and
+     `external-hooks.json` files are rewritten to the view (foreign entries
+     stay byte-identical; absent files are not created). Any absolute
+     Pipeline entry in the project's tracked `.agents/plugins.json` is removed;
+     a relative entry stays. The optional autonomous tool policy goes to
+     `$HOME/.gemini/antigravity-cli/settings.json`.
+
+   Source `3` skips the second question and is global: it publishes the
+   per-user central snapshot, retires the Pipeline entries it owns in the
+   project's `.agents/plugins.json`, and refreshes Agy's global copy from the
+   snapshot. It does not offer the autonomous tool policy.
+
+Both choices need the `agy` command on the installer's `PATH` at version
+1.2.12 or later; the installer refuses before changing anything otherwise
+(`ATR-CLI` when `agy` is not found, `ATR-CLI-CAPABILITY` for an older or
+unrecognised version). The workspace choice is also refused with
+`ATR-OTHER-SCOPE-CONFLICT` while the global registry holds a Pipeline entry for
+a different root, which is the case after a global install. The installer has
+no mode for going from global back to workspace, and the code does not show
+a repair for it (unverified).
+
+*Refreshing or switching.* To pick up a newer release, rerun the installer
+from the new approved directory with the same choice, or use `--refresh`
+(global, described above). To move a project from workspace to global, run
+the installer again and choose global. After any of these, fully restart Agy
+and read the session lock.
+
+*Not verified from the code:* which workspaces Agy loads a global registration
+for, how Agy treats `.agents/plugins.json` in a project that never ran the
+installer, and whether the installer's `--refresh` can be used by a consumer
+(its help calls it a developer entry).
+
 **Inert outside opted-in repositories.** A global install acts only in
 repositories that opted in. Outside them the hooks are inert: no blocking, no
 injected instructions, no writes. The one exception is the destructive-git
-protection, which stays active everywhere.
+protection, which stays active everywhere. A repository that has not yet
+decided may still show the optional onboarding hint; it creates no
+obligation, and a decline silences it.
 
 **Node.js on the host's PATH.** The pipeline hooks need the Agy host to resolve
 `node`; a desktop or service launcher may have a different PATH from an
