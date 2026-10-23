@@ -149,6 +149,29 @@ function followLifecycleAction(root, result, name) {
   return lifecycleCommand(root, ...result.nextAction.argv.slice(1));
 }
 
+// A greenfield staging PRD must carry one complete pipeline-architecture-design
+// block before the single PO acknowledgement is offered (the onboarding
+// ARCHITECTURE-DESIGN-PACKAGE-REQUIRED stop, collectPrdAcknowledgementAction).
+// This minimal closed package serves adapter routing only, not design semantics.
+function agyArchitectureDesignBlock() {
+  const module = { id: "application", responsibility: "Local application", nonResponsibilities: ["Network"],
+    ownedPaths: ["src/**", "tests/**"], publicContracts: ["docs/contract.md"],
+    allowedDependencies: [], authorityEffects: [], verificationEntryPoints: ["tests/application.test.mjs"], adrReferences: [] };
+  const design = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+    disposition: { decision: "approved-scoped", scope: ["src/", "tests/", "docs/contract.md", "architecture/", "specs/"], rationale: "Explicit design scope" },
+    modules: [module], implementationSurface: ["src/application.mjs"],
+    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "local", revision: 1,
+      allowedBoundaryCrossings: [], antiFragmentationPolicy: { rejectTrivialFacades: true } } };
+  return "\n```pipeline-architecture-design\n" + JSON.stringify(design) + "\n```\n";
+}
+
+// MP-29 / D84: the nested guard-dispatch refuses a Task-shaped dispatch that carries no tool-layer `model`
+// (DISPATCH-MODEL-MISSING). The Antigravity adapter spreads the invoke_subagent `args` into the dispatch
+// tool input, so a top-level `model` argument is the tool-layer model; "sonnet" is the configured
+// duty.implement selector, as in the neighbouring guard-dispatch.test.mjs fixtures. The cases that
+// assert a later or different verdict must not be cut short by the missing-model refusal.
+const AGY_TOOL_LAYER_MODEL = "sonnet";
+
 function readyLifecycleFixture(mode = "chat") {
   const root = mkdtempSync(join(tmpdir(), "agy-ready-hgo-"));
   const home = join(root, "fixture-home");
@@ -214,7 +237,7 @@ function readyLifecycleFixture(mode = "chat") {
   const prdFile = join(root, generated.targets.prd.path);
   const language = readFileSync(prdFile, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
   writeFileSync(join(root, generated.targets.spec.path), "# Completed AGY fixture specification\n\n## Acceptance criteria\n- AC-01: WHEN the AGY adapter fixture is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n\n## Architecture\nThe intake checkpoint owns package paths; the marker writer binds the final specification digest.\n");
-  writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n`);
+  writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n${agyArchitectureDesignBlock()}`);
   const markerPlan = invoke("intake-spec-marker-plan", "--root", root, "--runner", "antigravity");
   invoke("intake-spec-marker-apply", "--root", root, "--plan-sha256", markerPlan.planSha256, "--activate", "--runner", "antigravity");
   // Mini staging still requires the canonical chat acknowledgement before
@@ -725,6 +748,12 @@ check("Antigravity pretool guard blocks invoke_subagent missing mandatory templa
 
 check("Antigravity native implementation dispatch is refused even when candidate-bound", () => {
   const root = nativeFixture();
+  // A productive Goldfish dispatch is refused SQ-AUTHORITY-UNAVAILABLE (resolveGovernedItemQueue, the shipped
+  // productive-course default) in a governed project that carries no project authority files, before the
+  // adapter's own native-implementation refusal is reached. Same enrolled-but-not-item-governed shape as the
+  // shared fixture of guard-dispatch.test.mjs: the two authority files, no active feature, no slice queue.
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
   const nativeSubagents = [{
     TypeName: "goldfish-implementor",
     Role: "Goldfish Implementor",
@@ -739,7 +768,7 @@ check("Antigravity native implementation dispatch is refused even when candidate
     ].join("\n"),
   }];
   prepareNative(root, nativeSubagents);
-  const res = decision(run({ tool_use_id: "agy-native-implementation-refused", toolCall: { name: "invoke_subagent", args: { Subagents: nativeSubagents } } }, root));
+  const res = decision(run({ tool_use_id: "agy-native-implementation-refused", toolCall: { name: "invoke_subagent", args: { model: AGY_TOOL_LAYER_MODEL, Subagents: nativeSubagents } } }, root));
   assert.equal(res.decision, "deny");
   assert.match(res.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/);
   rmSync(root, { recursive: true, force: true });
@@ -1025,6 +1054,7 @@ check("Antigravity pretool guard admits the actual rendered Critic envelope", ()
     toolCall: {
       name: "invoke_subagent",
       args: {
+        model: AGY_TOOL_LAYER_MODEL,
         Subagents: nativeSubagents,
       },
     },
@@ -1073,6 +1103,7 @@ check("Antigravity pretool guard does not treat a paths-only critic dispatch as 
     toolCall: {
       name: "invoke_subagent",
       args: {
+        model: AGY_TOOL_LAYER_MODEL,
         Subagents: nativeSubagents,
       },
     },
@@ -1091,6 +1122,7 @@ check("Antigravity pretool guard allows a Critic dispatch naming the canonical t
     toolCall: {
       name: "invoke_subagent",
       args: {
+        model: AGY_TOOL_LAYER_MODEL,
         Subagents: nativeSubagents,
       },
     },
@@ -1210,6 +1242,7 @@ check("Antigravity pretool guard allows a multi-subagent envelope when the criti
     toolCall: {
       name: "invoke_subagent",
       args: {
+        model: AGY_TOOL_LAYER_MODEL,
         Subagents: nativeSubagents,
       },
     },
@@ -1434,6 +1467,9 @@ check("Antigravity pretool guard allows a plain bash script invocation, not inli
 });
 
 check("Antigravity scratch script inspection blocks Git indirection and keeps safe scripts usable", () => {
+  // The fixture root lives under the working directory's own scratch/ (untracked, gitignored), which a fresh
+  // clone or CI checkout does not have; create it so the case does not depend on a pre-existing directory.
+  mkdirSync(join(process.cwd(), "scratch"), { recursive: true });
   const root = mkdtempSync(join(process.cwd(), "scratch/agy-report-hotfixes-20261003-script-check-"));
   const scratch = join(root, "scratch");
   mkdirSync(scratch, { recursive: true });
