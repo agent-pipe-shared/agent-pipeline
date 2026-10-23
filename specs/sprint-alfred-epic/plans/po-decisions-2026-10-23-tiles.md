@@ -22,4 +22,8 @@ protected patches still go through the bundled sitting.
 | 4 | 32 | `VSA-PRIOR-ENTRY-CHANGED` (`b7c660282`) | Accept as intended | Entered as a decision: the changes to prior verify-suites entries in the signed quality-package import were operator-approved; the Critic batch reads them |
 | 4 | 34 | D124 meaning | Typed baseline-only carry as built | Rejected at release Verify, admitted as a typed carry at implementation entry; no protected source change; the pin header is restated to this decision (K96, unprotected) |
 | 4 | 34 | D129 provenance-debt scope | Confirm 368 commits (exact stage-0 trailer, admission commit `8e7dce0f4` or ancestor, every changed path under `specs/`) | The note and the AC4 pin stay as committed |
+| 5 | 33 | Deferrals: forensics (AC-175), greenfield-comparisons (AC-190), lifecycle-read-scope (AC-209) | Confirm all three as deferred past 0.7.0 (D63 a / D21) | The matrix rows are carried as deferred; the built forensics parts stay documented |
+| 5 | 33 | `agy-el01` three fail-open conditions | 0.7.1, as D86 says | Named residual risks; the Critic batch does the D86 security read |
+| 5 | 33 | Quick route (`verify.quick`) | After 0.7.0 per ADR-0088 / D69 | The generator keeps reporting "quick route: missing" typed; item stays open with that reason |
+| 5 | 33 | Elephant context before/after | Live sessions only; measured in the Greenfield test | Item stays at its stage without a before/after number until then |
 | 1 | 19 | K6 / C28 Critic preimage re-pin | Re-pin at the end, right before the stamp, after the Critic batch | Test stays red until then; the re-pin patch is regenerated from the digests at that moment (never applied earlier) |
