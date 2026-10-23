@@ -11,15 +11,16 @@ inspect later.
   stakes warrant it, a PRD or spec with EARS-style acceptance criteria linked
   to tests and review.
 - **Preserve architecture across sessions:** assess the impact of a change,
-  record significant choices in ADRs, and use an OKF-based, machine-readable
-  map and architecture-fitness checks where the project has adopted them.
+  record significant choices in ADRs and, in the forthcoming `0.7.0`
+  line, use an OKF-based, machine-readable map and architecture-fitness checks
+  where the project has adopted them.
 - **Keep agent work bounded:** split implementation into fresh-context tasks
   with explicit scope, handovers, and role/model effort matched to the work.
 - **Verify the actual candidate:** apply configured project policies and
   Git/write guardrails, then run tests and security checks against the exact
-  candidate. Depending on the project's setup, these cover secrets,
-  dependency vulnerabilities, licenses, and static analysis; optional SBOM
-  and provenance checks make supply-chain inputs inspectable.
+  candidate. Depending on the project's setup, these cover secret detection,
+  dependency vulnerability scanning, static analysis, and license checks;
+  optional SBOM and provenance checks make supply-chain inputs inspectable.
 - **Separate review from authority:** obtain independent Critic findings,
   while people retain plan acceptance, go/no-go, and approval of consequential
   external actions.
@@ -33,6 +34,10 @@ inspect later.
 > normal consumer adoption flow, continue with [PIPELINE_FLOW](PIPELINE_FLOW.md)
 > for the lifecycle, and then use [Usage](docs/usage.md). The links below are
 > optional reference.
+>
+> **Documentation line `0.7.0`:** until it is released, keep the approved
+> GitHub-distributed version you already use; a maintainer's local candidate is
+> not an installation source. Release status: [overview](docs/overview.md).
 
 ## The problem
 
@@ -51,9 +56,9 @@ Four deliberately separated roles carry the model:
 
 - **Product Owner (you)** — the human gate. Sets direction, reviews outcomes, holds
   final sign-off.
-- **Elephant** — the long-lived orchestrator session. Turns your intent into a spec,
-  breaks it into small tasks, dispatches them, and prepares a go/no-go
-  recommendation for the Product Owner.
+- **Elephant** — the role name of the Coordinator: the long-lived main session that
+  dispatches work. Turns your intent into a spec, breaks it into small tasks,
+  dispatches them, and prepares a go/no-go recommendation for the Product Owner.
 - **Goldfish** — a fresh-context implementor subagent. Owns one complete, independently
   checkable acceptance criterion or backlog outcome: analysis, test cases, code,
   targeted checks and fixes stay in the same context. Reports actual evidence.
@@ -63,26 +68,20 @@ Four deliberately separated roles carry the model:
 Around those roles:
 
 - **Review before expensive final qualification** — targeted, candidate-bound
-  checks and Security evidence prepare an independent Critic review. Findings
-  are corrected by one fresh Correction Goldfish for the coherent batch, with
-  one full review and at most three delta reviews; review stops on PASS. Full Verify then
-  qualifies the reviewed candidate. A later Verify rerun alone does not
-  invalidate a content-bound Critic review.
-- **Specs with checkable acceptance criteria** — every task has a Definition of
-  Done something or someone can actually check, not a "done"-on-a-feeling.
+  checks and Security evidence prepare an independent Critic review; Full Verify
+  then qualifies the reviewed candidate. The review-budget rule is in
+  [Usage](docs/usage.md#deliver-work-after-readiness).
 - **Git and write-path guardrails** — configured integrations can refuse unsafe
   commands, protected-path writes, force-pushes, history rewrites, and skipped
-  hooks. The exact live controls depend on the installed runner and project
-  configuration; see [enforcement](docs/enforcement.md).
+  hooks. What actually applies depends on the installed runner and project
+  configuration; [enforcement](docs/enforcement.md) lists the hook registrations
+  of the plugin source and what a registration does and does not establish.
 - **A model/token policy** — role-tiered model routing (design / implement /
   mechanic / review / optional advisor) configured to your own subscription.
   It supports task-appropriate routing; it does not estimate your cost.
 - **Evidence discipline** — "done" means a machine-written log or output, the exact
   command, and its exit code — never a model-formulated claim that something
   "should work."
-- **Explicit human authority** — plan, acceptance, and remote-action decisions
-  remain with the human where the project calibration and action require them;
-  evidence never creates that authority.
 
 > **What you can inspect:** a candidate-bound Verify receipt, security-scan
 > status, review and approval records where the project requires them, and a
@@ -94,29 +93,11 @@ Around those roles:
 > documents what is and is not measured. It is not an onboarding estimate,
 > runner comparison, or promise for your project.
 
-## The front door: optional design pre-stage
-
-Before the pipeline itself there's deliberately no mandatory step, just a
-front door: idea → optional design brainstorming with any chat AI (guide +
-standard prompt + lean export template under
-[`docs/design/README.md`](docs/design/README.md)) → requirements export →
-feeds the pipeline. If a requirement looks large at triage (multiple
-modules/projects affected, new architecture, several plausible options, a
-larger security/data surface), the Elephant flags it **non-blocking** and
-links the guide — you can always skip the design pre-stage and go straight to
-work. An external design export never gets a free pass: the Elephant
-challenges it and re-derives it through the normal path (interview → spec →
-readiness) instead of adopting it as an already-approved design. For large
-topics, the Elephant also proposes a cut into several self-contained backlog
-items and waits for confirmation or correction — the existing per-item PRD
-review stays the only check point, nothing new is added. Details:
-[`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
-
 ## How it works
 
 ```mermaid
 flowchart LR
-    PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(orchestrator)"]
+    PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(Coordinator)"]
     Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
     Goldfish -->|"evidence"| Gates["Targeted checks<br/>(tests, security, lint)"]
     Gates -.->|"fail"| Goldfish
@@ -127,23 +108,38 @@ flowchart LR
     Elephant -->|"go/no-go recommendation"| PO
 ```
 
-> **Documentation line: `0.7.0`.** Until this line is released, consumer
-> repositories should continue to use the approved GitHub-distributed version
-> they already have; a maintainer's local candidate is neither an installation
-> source nor evidence that its release gates passed. The detailed release
-> status is kept in the [release-scope overview](docs/overview.md).
-
 <a id="capability-architecture-adoption-and-fitness"></a>
 <!-- capability:architecture-adoption-and-fitness -->
 
-The next distributed architecture capability adds decision assessment, a module
-inventory, machine-readable maps, and baseline/fitness checks. In an existing
-repository, start with the read-only adoption status and proposal described in
+The architecture capability of the forthcoming `0.7.0` line is described, with
+its adoption route for an existing repository, in
 [Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
-Only then does the repository owner choose an explicitly bounded adoption
-decision. A valid deferred decision remains valid until its stated review or
-expiry date, explicit supersession, or a changed decision — an ordinary commit
-does not turn it into a partial lifecycle state.
+
+**The front door: optional design pre-stage.** There is deliberately no
+mandatory step before the pipeline: idea → optional design brainstorming with
+any chat AI → requirements export → feeds the pipeline. You can always skip it;
+the guide, prompt and export template are under
+[`docs/design/README.md`](docs/design/README.md), and an external design export
+is re-derived through the normal path, never adopted as already approved. Details:
+[`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
+
+## Three dials, not one size fits all
+
+The method uses calibrated strictness: teams can match the written contract
+and implementation effort to the delivery's actual stakes. Three configuration
+choices shape that work:
+
+- **Rigor per task** — issue-only / delta-spec / spec-anchored, which are Rigor
+  0 / 1 / 2 in [Pipeline Flow](PIPELINE_FLOW.md#2-decide-the-amount-of-design-and-review)
+- **Governance mode per rule set** — advisory / enforcing / off
+- **Work profile per topic** — epic / feature / mini (model and effort per
+  phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
+  bootstrap and consultation is on demand)
+
+**Risk is assessed separately.** Security, architecture, guardrail, irreversible,
+costly or externally visible impact can require stronger independent review
+and human approval even for a short change or a `mini` profile. See
+[Pipeline Flow](PIPELINE_FLOW.md#2-decide-the-amount-of-design-and-review).
 
 ## Bring your own architecture rules & guardrails
 
@@ -155,37 +151,30 @@ their evaluation route. Start from the templates under
 rules into project-owned paths, and configure those paths through the
 `governance` block in the project's manifest.
 
-Once configured, enforcement differs by class: applicable guidelines feed into
-the plan and become the Critic's review benchmark — an unnamed deviation is the
-finding, not the deviation itself. Evaluated machine-checkable policies can
-fail their applicable gate; human-checkable items become explicit obligations
-in the applicable review. A pattern played all the way through — from house
-rule to enforced rule — lives in the
-[worked example](governance/examples/worked-example.md).
-
-## Three dials, not one size fits all
-
-The method uses calibrated strictness: teams can match the written contract
-and implementation effort to the delivery's actual stakes. Three configuration
-choices shape that work:
-
-- **Rigor per task** — issue-only / delta-spec / spec-anchored
-- **Governance mode per rule set** — advisory / enforcing / off
-- **Work profile per topic** — epic / feature / mini (model and effort per
-  phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
-  bootstrap and consultation is on demand)
-
-**Risk is assessed separately.** Security, architecture, guardrail, irreversible,
-costly or externally visible impact can require stronger independent review
-and human approval even for a short change or a `mini` profile. See
-[Pipeline Flow](PIPELINE_FLOW.md#2-decide-the-amount-of-design-and-review).
+How each class takes effect, and how to wire it in, is in
+[Setup, step 4](SETUP.md#4-optional-manifest-governance-and-ritual-extensions);
+a pattern played all the way through — from house rule to enforced rule —
+lives in the [worked example](governance/examples/worked-example.md).
 
 ## Learn more
 
 Follow the canonical [documentation map](docs/README.md): it keeps adoption,
 enforcement, evidence, security, cost, and maintainer references in one order.
 For the normative contract, read [`docs/operating-model.md`](docs/operating-model.md).
-- [`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional Permission; see [`docs/licensing.md`](docs/licensing.md).
+
+### Maintainer and runtime reference
+
+Source maintainers can find checkout commands and the V3 authority sequence in
+[Maintain a shared pipeline source](SETUP.md). Supported runner integrations
+can enforce configured guards, while the methodology remains portable; see
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for current boundaries
+and setup requirements.
+
+## License and price
+
+[`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available
+Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional
+Permission; see [`docs/licensing.md`](docs/licensing.md).
 
 > **Price today: 0 EUR.** That covers personal use and internal business use,
 > including inside a commercial company. Monetizing Agent-Pipeline itself
@@ -195,14 +184,6 @@ For the normative contract, read [`docs/operating-model.md`](docs/operating-mode
 > version may introduce a fee for use by companies; copies already received
 > keep the license they came with. This notice does not amend the current
 > license. See [Licensing](docs/licensing.md).
-
-### Maintainer and runtime reference
-
-Source maintainers can find checkout commands and the V3 authority sequence in
-[Maintain a shared pipeline source](SETUP.md). Supported runner integrations
-can enforce configured guards, while the methodology remains portable; see
-[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for current boundaries
-and setup requirements.
 
 ## Acknowledgments
 
