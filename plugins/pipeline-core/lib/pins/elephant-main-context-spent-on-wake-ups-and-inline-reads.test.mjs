@@ -98,6 +98,39 @@ test("delegationCost: a single-action dispatch is measured as costlier than the 
   assert.ok(delegationCost.costRatio > 1);
 });
 
+/** Cause keys the role section names: its bullet heads and every `causes.<key>` reference. */
+function roleCauseKeys(sectionText) {
+  const heads = sectionText.split("\n").map((line) => /^- \*\*`([A-Za-z]+)`/u.exec(line)?.[1]).filter(Boolean);
+  const refs = [...sectionText.matchAll(/`causes\.([A-Za-z]+)[.`]/gu)].map((m) => m[1]);
+  return { heads, refs: [...new Set(refs)] };
+}
+
+/** Drift report between the measure's CAUSES and one role section; an empty list means parity. */
+function causeKeyDrift(sectionText) {
+  const { heads, refs } = roleCauseKeys(sectionText);
+  const drift = [];
+  for (const key of CAUSES) if (!heads.includes(key)) drift.push(`role text has no bullet for measured cause ${key}`);
+  for (const key of heads) if (!CAUSES.includes(key)) drift.push(`role text names ${key}, which the measure does not report`);
+  for (const key of refs) if (!CAUSES.includes(key)) drift.push(`role text checks causes.${key}, which the measure does not report`);
+  if (JSON.stringify(heads) !== JSON.stringify(CAUSES) && drift.length === 0) drift.push("role text lists the causes in a different order than the measure");
+  return drift;
+}
+
+test("key parity: the causes the role text lists and the causes the measure reports cannot drift apart", () => {
+  for (const [copy, text] of Object.entries(ROLE_COPIES)) {
+    assert.deepEqual(causeKeyDrift(sectionOf(text)), [], `${copy} role copy and measure disagree on the cause keys`);
+    assert.deepEqual(roleCauseKeys(sectionOf(text)).heads, CAUSES, copy);
+  }
+  // Negative controls: the same check must fail for each way the two sides can diverge.
+  const section = sectionOf(ROLE_COPIES.root);
+  const bulletOf = (key) => measureOf(ROLE_COPIES.root, key);
+  assert.notEqual(bulletOf("guardRefusals"), "", "control precondition");
+  assert.ok(causeKeyDrift(section.replace(`${bulletOf("guardRefusals")}\n`, "")).length > 0, "a measured cause with no role bullet");
+  assert.ok(causeKeyDrift(section.replaceAll("wakeUpLoops", "wakeUpStorms")).length > 0, "a role cause the measure does not report");
+  assert.ok(causeKeyDrift(`${section}\n- **\`invented\`** — a cause only the role text names. Check: \`causes.invented.share\`.`).length > 0, "an extra role bullet");
+  assert.ok(causeKeyDrift(section.replace("`causes.delegationCost.costRatio`", "`causes.delegationCosts.costRatio`")).length > 0, "a check key that is not a measured cause");
+});
+
 test("the role section is the same in both copies and states the PO target", () => {
   assert.notEqual(sectionOf(ROLE_COPIES.root), "");
   assert.equal(sectionOf(ROLE_COPIES.root), sectionOf(ROLE_COPIES.plugin));

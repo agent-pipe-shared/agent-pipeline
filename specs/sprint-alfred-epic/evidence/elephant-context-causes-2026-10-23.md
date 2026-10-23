@@ -1,0 +1,57 @@
+# Elephant main-context causes against their enforcement (2026-10-23)
+
+Item: `backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md`
+(AC-168). Status of this note: evidence table, written by dispatch K89-TWO-SMALL-PACKAGES; independent
+Critic read and PO acceptance pending. It is read-only evidence: no item, spec or PRD file is changed.
+
+## What exists
+
+- The measure: `plugins/pipeline-core/scripts/elephant-context-measure.mjs` (b8a020ec3). `CAUSES`
+  (line 23) lists the five cause keys; `classifyTranscript` reports them under `causes.<key>`
+  (lines 181-187); `--compare <before.jsonl> <after.jsonl>` (`compareMeasurements`, line 213, usage
+  line 235) reports a per-cause before/after and calls a cause `improved` only when its share AND its
+  absolute bytes both fall. The metric is a utf8-byte upper bound, not model tokens; Claude
+  transcripts only.
+- The guidance: `roles/elephant.md` section "Main-context economy", lines 124-132 (the plugin copy is
+  byte-identical, pinned). One bullet per cause with its `Check:` key. The section states itself
+  (line 126) that a hook-level refusal for any cause is "a separate guard change".
+- The pins: `plugins/pipeline-core/lib/pins/elephant-main-context-spent-on-wake-ups-and-inline-reads.test.mjs`
+  (one case per cause, one delegation case, one section case, and from this package one key-parity
+  case) and the measure's own test `plugins/pipeline-core/scripts/elephant-context-measure.test.mjs`
+  (cases at lines 85 and 104 attribute and compare all five causes).
+
+## Table, one row per measured cause
+
+| Cause (`causes.<key>`) | Measure (script / role text) | Enforcement layer today | Pin case that proves it | Gap (not enforced; this is the held protected part) |
+|---|---|---|---|---|
+| `wakeUpLoops` | `--compare` and plain run, keys `.share`, `.longestRun`; role bullet line 128 | Role text only. Adjacent, not a limit: `hooks/stop-suggest.mjs` stays silent when its suggestion fingerprint is unchanged (header lines 33-43), which avoids byte-identical repeats | Lib pin case `wakeUpLoops: role measure with a telemetry check in both copies, and its own share falls`; script test line 85 (longest run 3) | No hook limits or refuses a reply to a stop-hook, goal or task-notification wake-up; the wake-ups are host-generated and the rule "one line or none" is guidance |
+| `delegationCost` | keys `.costRatio`, `.costlierThanInline`; role bullet line 129 (with *One-turn recon* line 118 and *Read-only dispatch enforcement* line 119) | Role text only | Lib pin cases `delegationCost: role measure ...` and `delegationCost: a single-action dispatch is measured as costlier than the inline read` | No hook compares a dispatch's briefing and report cost with the inline actions it replaces; the ratio is observed after the fact |
+| `exploreOrPlanRefused` | key `.events` (0 or 1 per session is the target); role bullet line 130 | Role text only. `hooks/guard-dispatch.mjs` holds no Explore/Plan rule (no match for "Explore", "Plan" dispatch policy or recon in that file) | Lib pin case `exploreOrPlanRefused: role measure ...`; script test line 85 (one refusal attributed to this cause, not to `guardRefusals`) | Nothing compares a retried dispatch with the refused one, so an unchanged retry is not refused; recording the refusal as a backlog finding is manual |
+| `guardRefusals` | keys `.events`, `.retriedAdmittedEvents` (false-positive CANDIDATES, not verdicts), `.share`; role bullet line 131 | Role text plus typed refusal text: guard refusals print the admitted grammar and a `pipeline.guard-retry-actions.v1` block, and `templates/prompts/agent-obligations.md` sections 1 and 1b state the admitted spellings. This lowers retries; it does not limit them | Lib pin case `guardRefusals: role measure ...`; script test line 153 (F5b: the cause counts refusals and names the retried subset) | No hook refuses a repeated re-submission of spelling variants after a refusal; a false refusal cannot be told from a true one in the transcript |
+| `handWrittenBriefings` | keys `.events` (upper bound on freehand prompts), `.share`; role bullet line 132; the script treats a prompt as template-shaped when it carries the six Goldfish headings or the three Critic template headings | Role text plus a hook-level WARNING: `hooks/guard-dispatch.mjs` lines 812-817 call `generatedBriefingAdmission` (`lib/dispatch-briefing-build.mjs` lines 175-184, codes `DBG-GENERATED-BRIEFING-REQUIRED`, `DBG-GENERATED-DIGEST-MISMATCH`) for governed Goldfish item briefings; warn state, refusal planned for 0.7.1 (comment at line 813, PO 2026-10-21; ff028b6ca) | Lib pin case `handWrittenBriefings: role measure ...`; script test line 135 (F5a: a filled Critic briefing is template-shaped, a freehand one is not); `scripts/dispatch-briefing.test.mjs` line 660 (the admission refuses an edited or hand-assembled item briefing) | The hook only warns; it covers governed Goldfish item briefings only, not Critic prompts or ungoverned dispatches; the measure counts anything not template-shaped, so it is an upper bound |
+
+Across all five rows the enforcement layer is guidance plus a telemetry check, as the role section itself
+states. The only hook-level control is the cause-5 warning; the other four hook-level refusals are the
+held protected part (hook files under `plugins/pipeline-core/hooks/` are protected source).
+
+## Key parity (new in this package)
+
+Before this package the pin tied the role copies to each other and to the measure per cause, but nothing
+failed if a cause key existed on one side only: a new `CAUSES` entry with no role bullet, a role bullet
+for a cause the script does not report, or a `Check:` key that names no measured cause. The new lib-pin
+case `key parity: the causes the role text lists and the causes the measure reports cannot drift apart`
+compares the bullet keys and every `causes.<key>` reference of both role copies with `CAUSES` (set and
+order) and carries four negative controls (dropped bullet, renamed cause, extra bullet, misspelled check
+key) that must each report drift.
+
+## Before/after: not claimed
+
+The item's second acceptance clause asks for a before/after measurement per cause. This note claims no
+number. The pins use synthetic transcript pairs and say so ("No transcript here is a real session"). A
+counted before/after needs the sanctioned transcript export (admitted by 0824e528e,
+`lib/guard/sanctioned-args-scripts.mjs` lines 151-181) run on one session from before and one from after
+the measure commit b8a020ec3 on the same host, followed by `--compare`. No repository evidence holds such a
+run. The item's blocker analysis of 2026-10-22 calls only real live sessions on the installed host the
+target and a replay "not the target", so whether an own-host export pair counts is a PO decision. The
+Elephant decision E4 (`specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md`) treats
+reaching the 10 % target as a host observation, not a gate.
