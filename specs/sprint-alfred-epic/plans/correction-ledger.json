@@ -42,20 +42,20 @@
     {
       "id": "K3",
       "title": "architecture decisions (AC-19)",
-      "status": "open",
-      "next": "owner AC-119 (D68)"
+      "status": "closed",
+      "next": "-"
     },
     {
       "id": "K4",
       "title": "human approval and signed integration",
-      "status": "open",
-      "next": "check item admission"
+      "status": "closed",
+      "next": "-"
     },
     {
       "id": "K5",
       "title": "documentation and text contracts",
-      "status": "open",
-      "next": "docs by Elephant; checker change under the D68 exception"
+      "status": "closed",
+      "next": "-"
     },
     {
       "id": "K6",
@@ -72,8 +72,8 @@
     {
       "id": "K8",
       "title": "guard hook suites that crash or time out",
-      "status": "open",
-      "next": "diagnose and prepare drop-ins (protected sources)"
+      "status": "in-progress",
+      "next": "three suites stay red in the 2026-10-23 counted run (pin-counted-results-2026-10-23-c.md): lifecycle-denial-loop-guard case RC04C001, guard-apply-patch (whole file dies at line 472 after two failing cases), antigravity-pretool-guard (dies at line 406 after 'rejects invalid JSON'); diagnose each by cause, protected sources become drop-ins"
     },
     {
       "id": "K9",

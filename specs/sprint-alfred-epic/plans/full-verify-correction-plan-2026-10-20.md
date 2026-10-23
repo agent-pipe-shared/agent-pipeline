@@ -709,3 +709,34 @@ Status: **partly closed.** Implementation complete; the Critic batch and PO acce
 - **Dispatch records (Elephant decision):** this sprint keeps the orchestrator commit trailers
   (`Dispatch:` plus `Commit-Act: orchestrator`) as the record for host-committed Goldfish and does
   not write `dispatch-record-write.mjs` records; the gap is named for the Critic batch.
+
+### K3 closure (2026-10-23, closed with a named rest)
+
+All six suites of the cluster are green in a fresh serial counted run on `905fb7568`
+(`evidence/pin-counted-results-2026-10-23-c.md`, K68): architecture-effective-decisions 13/13,
+architecture-baseline 21/21, architecture-decision-continuity 4/4, architecture-entry-required-source 2/2,
+rigor-floor 18/18, guard-push-architecture GPA001 1/1. The repairs were test restatements with the product
+kept (`7cc87d860`, `e11b26971`, `7ea5ad228`, `6c5f5f934`, `da961b61c`); the AC-119 owner fix is `a6641cce4`.
+Named rest, not agent work: the explicit "established with ratchet" state in the AC-9 adoption diagnosis (D66)
+is signed once with AC-9 at the operator sitting. The symptom "inputDigest instability" showed no flake in
+the counted run.
+
+### K4 closure (2026-10-23, closed)
+
+All suites of the cluster are green in the same counted run: guard-human-override 28/28,
+human-guard-override-capability-scan 3/3, commit-msg-hook-signed-integration 9/9,
+guard-git-signed-integration 5/5, model-family-approval-request 10/10, critical-action-approval-request 7,
+threat-model-approval-request 39 checks, guard-gate-strength-ledger 2/2, guard-gate-strength 41 passed
+0 failed, pipeline-state push-anchor 10/10. The item admission was done on 2026-10-20 (line 79 above). No
+ceremony is pending for K4.
+
+### K5 closure (2026-10-23, closed)
+
+All named suites and checks are green in the same counted run: check-doc-contracts 76/76 (was 73/76),
+pipeline-start-v3 8/8 (PSV04 is a case in it), check-language-canon 4/4, check-phase3-sdlc-coherence
+31 ok / 0 not ok, no-autoupdate-key 15/15, check-spec-retention 6, push-release-flow-docs-contract 11/11,
+check-license-contract 19 and the license check PASS (1989 sources). hook-governance-scope and the capability
+inventory were counted in `evidence/pin-counted-results-2026-10-23.md`. D60 (a): the checker exempts
+`WORK-STATUS.md` and recorded evidence by prefix instead of fixing their links; the Elephant states that
+this satisfies D60 (a), the checker passes and the links point into `scratch/` by design. A new evidence
+directory under `specs/` that links into `scratch/` needs a new prefix.
