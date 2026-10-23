@@ -8,7 +8,7 @@ import { placeholder, renderHumanCopySafeCommand } from "../copy-safe-command.mj
 import { consumeHumanGuardOverride, humanGuardRouteUnavailableReason, recordHumanGuardDenial } from "../human-guard-override.mjs";
 import { readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
 import { AUTHORITY_RESTORE_SCRIPT, CONTROLLING_NON_READY_STATUSES, INTAKE_LIFECYCLE_STATUSES, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, PLUGIN_ROOT } from "./constants.mjs";
-import { GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, GRAMMAR_DENIAL_REMEDY_SHORT, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY } from "./grammar-denials.mjs";
+import { GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, GRAMMAR_DENIAL_REMEDY_SHORT, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_CREDENTIAL_TARGET_REMEDY, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY } from "./grammar-denials.mjs";
 import { verdict } from "./verdict.mjs";
 
 export function blocked(
@@ -25,8 +25,11 @@ export function blocked(
   // the objection), so it is checked first and supplies its own true guidance/remedy.
   const readScope = code === READ_SCOPE_DENIAL_CODE;
   const readUnsupported = code === READ_COMMAND_UNSUPPORTED_CODE;
+  // K96: a credential read target prints its own guidance and repair, never the grammar remedy (the grammar is not the objection).
+  const readCredential = code === READ_CREDENTIAL_TARGET_CODE;
   const grammarReason = readScope ? READ_SCOPE_DENIAL_GUIDANCE
-    : readUnsupported ? READ_COMMAND_UNSUPPORTED_GUIDANCE : GRAMMAR_DENIAL_GUIDANCE[code];
+    : readCredential ? READ_CREDENTIAL_TARGET_GUIDANCE
+      : readUnsupported ? READ_COMMAND_UNSUPPORTED_GUIDANCE : GRAMMAR_DENIAL_GUIDANCE[code];
   if (grammarReason) {
     const retryEnvelope = {
       schema: "pipeline.guard-retry-actions.v1",
@@ -41,7 +44,9 @@ export function blocked(
     // GUARD-REDIRECT-UNAPPROVED) trim on repeat.
     const remedyLines = readScope
       ? READ_SCOPE_DENIAL_REMEDY
-      : readUnsupported
+      : readCredential
+        ? READ_CREDENTIAL_TARGET_REMEDY
+        : readUnsupported
         ? [READ_COMMAND_UNSUPPORTED_NOTE, ...GRAMMAR_DENIAL_REMEDY]
         : (firstOccurrenceThisSession ? GRAMMAR_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY_SHORT);
     return verdict(

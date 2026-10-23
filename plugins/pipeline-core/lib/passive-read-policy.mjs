@@ -156,6 +156,65 @@ export function isHostCredentialLocation(identity, { homePrefixes = [], recursiv
   return info !== null && hostException(info, now) === null && hostCredentialRefusal(info, recursive, directoryListing);
 }
 
+/**
+ * K96 (PO decision 2026-10-23, rows 6/16, M7 and M5): is this exact read operand a CREDENTIAL target? The classification is the one
+ * isAllowedPassiveReadTarget() applies (same PASSIVE_READ_CREDENTIAL_ROOTS, same secret-basename rule, same named exceptions, both the
+ * lexical and the physical identity), narrowed to the question "is the path itself the cause of a refusal". It answers false for every
+ * other reason a read can be refused (a glob character, a system pseudo root that holds no credential, a missing path, an alias, a
+ * directory that merely contains a credential): those keep their own codes. It never admits anything; the callers use it only to pick the
+ * denial label and text, so a false negative degrades to the previous label and a false positive only renames a refusal that stands anyway.
+ */
+export function isCredentialReadTarget(raw, {
+  rootDir, homeDir = homedir(), credentialRoots = [], recursive = false, directoryListing = false,
+  realpath = realpathSync.native ?? realpathSync,
+  repoKeyDirectory = resolveRepoScopedDirectory,
+  machinePlaneRead = readMachinePlane,
+  now = Date.now(),
+} = {}) {
+  if (typeof raw !== "string" || !raw || raw.includes("\0")
+    || typeof rootDir !== "string" || !rootDir
+    || typeof homeDir !== "string" || !homeDir
+    || !Array.isArray(credentialRoots)) return false;
+  const candidate = rawCandidate(raw, rootDir, homeDir);
+  if (candidate === null) return false;
+  const lexical = resolve(candidate);
+  let physical = lexical;
+  try { physical = realpath(candidate); }
+  catch (error) { if (error?.code !== "ENOENT") return false; }
+  const protectedRoots = PASSIVE_READ_CREDENTIAL_ROOTS.homeRelativePaths.slice(0, 12)
+    .map((path) => resolve(homeDir, path)).concat(credentialRoots.map((path) => resolve(path)));
+  if (process.platform === "win32") {
+    for (const variable of ["APPDATA", "LOCALAPPDATA"]) {
+      const value = process.env[variable];
+      if (typeof value === "string" && isAbsolute(value)) protectedRoots.push(resolve(value));
+    }
+  }
+  try {
+    const machine = machinePlaneRead();
+    if (machine?.status === "valid" && typeof machine.plane?.poKeyDirectory === "string") protectedRoots.push(resolve(machine.plane.poKeyDirectory));
+  } catch { /* the key directory is one more root; its absence leaves the shared lists in force */ }
+  try {
+    const repoKey = repoKeyDirectory(rootDir);
+    if (repoKey?.status === "valid" && typeof repoKey.directory === "string") protectedRoots.push(resolve(repoKey.directory));
+  } catch { /* same: one more root, not a precondition */ }
+  const homePrefixes = [resolve(homeDir)];
+  try { homePrefixes.push(realpath(homeDir)); } catch { /* an unresolvable home keeps its lexical prefix */ }
+  for (const identity of [lexical, physical]) {
+    const hostShape = classifyHostPath(identity, homePrefixes);
+    const exception = hostException(hostShape, now);
+    if (exception?.overridesBasename !== true && SECRET_BASENAME.test(basename(identity))) return true;
+    if (hostShape !== null && exception === null && hostCredentialRefusal(hostShape, recursive, directoryListing)) return true;
+    if (process.platform !== "win32" && PASSIVE_READ_CREDENTIAL_ROOTS.posixAbsolutePaths.some((root) => within(root, identity))) return true;
+    for (const protectedRoot of protectedRoots) {
+      let physicalRoot = protectedRoot;
+      try { physicalRoot = realpath(protectedRoot); }
+      catch { /* a root that cannot be resolved still protects its lexical spelling */ }
+      if (exception === null && (within(protectedRoot, identity) || within(physicalRoot, identity))) return true;
+    }
+  }
+  return false;
+}
+
 // PO decision D96 (2026-10-22, with the 2026-09-10 correction in docs/adr/draft-read-scope-containment-boundary.md):
 // a passive read outside the repository is not by itself a denial reason. Every absolute host path qualifies here;
 // the credential roots, system pseudo roots and secret basenames are screened for BOTH identities by the caller

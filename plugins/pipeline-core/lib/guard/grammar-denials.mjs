@@ -53,6 +53,39 @@ export const READ_COMMAND_UNSUPPORTED_GUIDANCE = "The read-only command is not s
 
 export const READ_COMMAND_UNSUPPORTED_NOTE = "This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.";
 
+// K96 (PO decision 2026-10-23, rows 6/16, M7 and M5): a read whose TARGET is a protected credential location has its own typed code. Before
+// it, an in-root credential read (`cat vault/id_rsa`) was labelled GUARD-READ-COMMAND-UNSUPPORTED and told the agent that the refusal "is about
+// flags or spelling, not a path" -- false, the path is the whole cause. The code names the path as the cause and states a repair that can
+// be run: the human puts the content into a non-credential file, or releases the exact read by a signed one-time override where the planner
+// offers a route. Family: GUARD-READ-*, next to GUARD-READ-SCOPE-OUTSIDE-ROOT, GUARD-READ-COMMAND-UNSUPPORTED and GUARD-READ-TARGET.
+export const READ_CREDENTIAL_TARGET_CODE = "GUARD-READ-CREDENTIAL-TARGET";
+
+export const READ_CREDENTIAL_TARGET_GUIDANCE = "The read target is a protected credential location (a private key, token, credentials or secret-named file).";
+
+const READ_CREDENTIAL_TARGET_CAUSE = "This refusal is about the path: no change to the command, its options or its wording can lift it.";
+const READ_CREDENTIAL_TARGET_COPY_REPAIR = "Repair: ask the human to put the content you need into a non-credential file inside the project (for example under docs/ or scratch/), then read that copy.";
+
+/** Shell lane: the repair lines of the typed refusal. The exact override route (or the statement that none is offered) follows them. */
+export const READ_CREDENTIAL_TARGET_REMEDY = [
+  READ_CREDENTIAL_TARGET_CAUSE,
+  READ_CREDENTIAL_TARGET_COPY_REPAIR,
+  "Alternatively the human can release this one exact read with a signed one-time override; the route is printed below when the override planner offers one for this path, and when it reports that none is offered, the copy above is the repair.",
+];
+
+/** Native read tools (no shell command, no override route for a native tool call): the same cause and the same runnable repair. */
+export const READ_CREDENTIAL_TARGET_REMEDY_NATIVE = [
+  READ_CREDENTIAL_TARGET_CAUSE,
+  READ_CREDENTIAL_TARGET_COPY_REPAIR,
+  "A signed override is a shell-command route only; a native read tool has none, so the copy above is the repair for this tool.",
+];
+
+/** The agent-visible text of the typed refusal for a native read tool (the shell lane renders through blocked()). */
+export function nativeReadCredentialTargetDenialText() {
+  return "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+    + `${READ_CREDENTIAL_TARGET_CODE}: ${READ_CREDENTIAL_TARGET_GUIDANCE}\n`
+    + READ_CREDENTIAL_TARGET_REMEDY_NATIVE.map((line) => `${line}\n`).join("");
+}
+
 // NVA-I-GRAMMAR (PO, 2026-08-28, backlog: 2026-08-27-shell-grammar-reads-quoted-content-as-
 // shell-syntax.md): "wichtig ist, dass der guard das erlaubte grammar immer auch sagt" -- the
 // refusal must state the COMPLETE admitted grammar with bounds and exact spellings, not just

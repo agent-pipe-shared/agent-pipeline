@@ -13,10 +13,10 @@ import { writeTargetPath } from "../tool-write-target.mjs";
 import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { observeGovernanceScope } from "../governance-scope.mjs";
 import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
-import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
 import { firstUnadmittedFlag } from "../read-command-diagnosis.mjs";
 import { isProjectWritePath } from "./path-containment.mjs";
-import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
 import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
 import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
 import { blocked, boundAuthorityDocumentPath, humanOverrideRoute, protectedAuthorityDocumentWriteOnly, protectedStateWriterOnly } from "./denial-route.mjs";
@@ -389,19 +389,32 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     // ALFRED-QP4: label selection ONLY (both refuse, nothing is admitted here). The scope code requires a target that really resolves outside
     // the project root; every other rejected single read-family command is an unsupported command.
     let outsideRoot = false;
+    let credentialTarget = false;
     try {
       const rejected = parseGuardCommand(
         win32QuotedDrivePathCommand(input.tool_input.command ?? input.tool_input.CommandLine), root,
         { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM },
       );
       outsideRoot = isOutsideRootSingleCommandRead(rejected, root) || qp4OperandResolvesOutsideRoot(rejected, root);
-    } catch { outsideRoot = false; }
-    // Name the one flag the grammar objects to when a single flag is the whole reason (null otherwise; nothing is granted).
-    let flag = null;
-    if (!outsideRoot) {
-      try { flag = firstUnadmittedFlag(input.tool_input.command ?? input.tool_input.CommandLine, root); } catch { flag = null; }
+      // K96 (PO decision 2026-10-23, rows 6/16, M7): an in-root read whose target is a credential location is refused for the PATH, so it
+      // gets its own typed code (checked only when the target is inside the root: an outside-root credential read keeps the scope code, QP4-1).
+      credentialTarget = !outsideRoot && qp4OperandIsCredentialTarget(rejected, root);
+    } catch { outsideRoot = false; credentialTarget = false; }
+    if (credentialTarget) {
+      // Same override route as the other human-liftable read refusals: a consumed one-time capability lifts exactly this command; otherwise
+      // the guidance is the plan command, or the planner's own statement that no route is offered for this path.
+      const reason = `${READ_CREDENTIAL_TARGET_CODE}: ${READ_CREDENTIAL_TARGET_GUIDANCE}`;
+      const route = humanOverrideRoute(READ_CREDENTIAL_TARGET_CODE, reason, "command", root, toolName, input.tool_input, dependencies);
+      if (!route.admitted) return withLifts(lifts, blocked(READ_CREDENTIAL_TARGET_CODE, null, [], route.overrideGuidance));
+      lifts.push(route.admitted);
+    } else {
+      // Name the one flag the grammar objects to when a single flag is the whole reason (null otherwise; nothing is granted).
+      let flag = null;
+      if (!outsideRoot) {
+        try { flag = firstUnadmittedFlag(input.tool_input.command ?? input.tool_input.CommandLine, root); } catch { flag = null; }
+      }
+      return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", flag === null ? null : `the flag "${flag}"`));
     }
-    return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", flag === null ? null : `the flag "${flag}"`));
   }
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return withLifts(lifts, verdict(0));

@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { lstatSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { isAllowedPassiveReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
+import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
 // Expose the policy-owned binding; shell decisions continue through the same policy function.
 export { PASSIVE_READ_CREDENTIAL_ROOTS };
 import { isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
@@ -1022,6 +1022,22 @@ export function qp4OperandResolvesOutsideRoot(parsed, root) {
     if (typeof token !== "string" || token.includes("\0")) return false;
     const candidate = rawReadCandidatePath(token, root);
     return candidate !== null && !pathInside(rootResolved, resolve(candidate));
+  });
+}
+
+/**
+ * K96 (PO decision 2026-10-23, rows 6/16, M7): does one of the read targets of this single rejected read-family command name a
+ * CREDENTIAL location (passive-read-policy's isCredentialReadTarget, the one classification the passive-read lane uses)? Label selection
+ * only, like qp4OperandResolvesOutsideRoot() above: both refuse, nothing is admitted here. The operands are the same ones that function
+ * inspects (the rg/grep pattern and option values are not targets), so a credential-looking PATTERN never changes the label.
+ */
+export function qp4OperandIsCredentialTarget(parsed, root) {
+  if (!parsed || parsed.parseStatus !== "accepted" || parsed.segments.length !== 1) return false;
+  const executable = basename(String(parsed.segments[0].executable ?? "")).toLowerCase();
+  const operands = executable === "rg" || executable === "grep" ? qp4ReadTargetOperands(executable, parsed.segments[0].argv) : parsed.segments[0].argv;
+  return operands.some((token) => {
+    if (typeof token !== "string" || token.includes("\0") || token.startsWith("-")) return false;
+    try { return isCredentialReadTarget(token, { rootDir: root }); } catch { return false; }
   });
 }
 
