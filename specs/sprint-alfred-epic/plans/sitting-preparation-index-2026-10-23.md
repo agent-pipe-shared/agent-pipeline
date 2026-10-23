@@ -8,8 +8,8 @@ Single entry point for a session that has to find what was prepared for the oper
 |---|---|
 | Apply the sitting (operator) | `specs/sprint-alfred-epic/evidence/sitting/README.md`, then `runbook.md` in the same folder |
 | What every rehearsal found | `specs/sprint-alfred-epic/evidence/sitting/notes/k133-results.md` and `k133-runbook-corrections.md` (rehearsal 3, merged into the runbook), `rehearsal-notes.md` (rehearsal 2) |
-| PO decisions of the day | `specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md` (batches 1 to 12) |
-| Open PO topics | `specs/sprint-alfred-epic/plans/po-list-afk-2026-10-22.md` (rows 1 to 48; presented only on request) |
+| PO decisions of the day | `specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md` (batches 1 to 13) |
+| Open PO topics | `specs/sprint-alfred-epic/plans/po-list-afk-2026-10-22.md` (rows 1 to 54; presented only on request) |
 | Index and work packages | `specs/sprint-alfred-epic/plans/index-75-plan-2026-10-23.md` |
 | Older ceremony table | `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md` (superseded by the runbook for ordering) |
 | Held patches (older form) | `specs/sprint-alfred-epic/evidence/held-patches/` |
@@ -23,16 +23,17 @@ Packages inside the steps (task id, notes): K92 GS-1 signature route, K93/K104 f
 ## 3. Reader course (documentation, 2+1 protocol)
 
 - Rounds: `20261023a` and `20261023b`; reports in `specs/sprint-alfred-epic/evidence/reader-review/phase-one/` and `phase-two/`.
-- Working dispositions (not the closed schema): `specs/sprint-alfred-epic/plans/reader-round-20261023a-working-disposition.json` and `reader-round-20261023b-working-disposition.json`. Correction batches 1 and 2 are on `feat/sprint-alfred`. No third round (PO decision, batch 12).
-- Still to do after the sitting: the terminal v2 record, per-round terminal dispositions and the owner decision (`by: APS`, supplied by the PO as a standing value for this repository). Drafts are prepared by task K137 under `scratch/agent-out/K137-draft/` on the machine that ran it (see section 5).
-- Open Reader items: 8 (global route documented by K129/K131, Antigravity run verifies the scope), 41 (governance class, sitting step 41), 64 (inventory capability, sitting step 40).
+- Working dispositions (not the closed schema): `specs/sprint-alfred-epic/plans/reader-round-20261023a-working-disposition.json` and `reader-round-20261023b-working-disposition.json`. Correction batches 1 and 2 are on `feat/sprint-alfred`. PO decision batch 13 (supersedes the batch-12 "no third round"): a third full round runs after the sitting on the final state.
+- Order after the sitting (batch 13, PO list row 52): (1) protected checker diff limiting the v2 check to the current course, older rounds listed as a typed historical course, with pin (to be built); (2) commit the escalation justification (`afterRound: 2`, reason, digest-bound source) before either reader launches; (3) third complete two-stage round on the final state; (4) final correction batch; (5) terminal v2 record, per-round terminal dispositions and owner decision (`by: APS`, standing value for this repository). Drafts by task K137 under `scratch/agent-out/K137-draft/` on the machine that ran it (see section 5); they need adapting to the third round.
+- Owner acceptances already decided: findings 15, 71, 76, 78, 34, 11/50/52, 49 (accepted gap) and b/48 (the pointer already stands at the first Critic-bound occurrence).
+- Open Reader items: 8 (global route documented by K129/K131, Antigravity run verifies the scope), 60 (divergent `setup.mjs` wording, Critic batch), 41 (governance class, sitting step 41), 57/64 (inventory capability, sitting step 40); these close against the freshly read state of round three.
 
 ## 4. After the sitting (agent work, in order)
 
 1. `node scripts/post-sitting-checks.mjs` (task K134, if imported; otherwise the check list in the sitting README) and record the counts.
 2. Restate the four stale `sites` counts of `harness/scripts/check-verify-case-completion.test.mjs` and the registration fixture (QG-04, PO decision batch 12, row 39).
 3. Serial count pass: `scripts/sitting-count-pass.mjs --list specs/sprint-alfred-epic/plans/count-pass-suites.json`; then the delivery remeasure with `scripts/delivery-remeasure-inputs.mjs` and the reader prompt that carries the batch-10 rulings.
-4. Reader terminal record (section 3).
+4. Reader course closure: checker diff, third round, terminal record (section 3, PO list row 52).
 5. Only on the PO's call: dev build stamp and install (`scripts/stamp-candidate.mjs`), Full Verify, Critic batch, C28 re-pin, push. Memory rule: no stamp, install, push, Full Verify or Critic batch without an explicit PO call.
 6. Native host runs by the PO (Windows, Antigravity S1 to S6, Greenfield on all three runners).
 
@@ -46,8 +47,8 @@ Rows marked IMPORTED are in the repository. For the others the results are NOT y
 | K135 | IMPORTED: release notes draft `specs/sprint-alfred-epic/plans/release-notes-0.7.0-draft.md` (draft, not published, not PO-accepted) | notes in `scratch/agent-out/K135-notes.md` |
 | K136 | IMPORTED: checklists for the native host runs `specs/sprint-alfred-epic/plans/host-run-checklists-2026-10-23.md` (eight gaps marked "command not found", PO list row 50) | notes in `scratch/agent-out/K136-notes.md` |
 | K139 | MP-04 readback (`CLAUDE_CODE_SUBAGENT_MODEL` set/unset, never the value) in the Elephant preflight; PO decision batch 7 row 8, never built before; becomes runbook step 48 if its diff verifies on the post-sitting state | `scratch/clones/k139`, `scratch/agent-out/K139-notes.md` |
-| K137 | Reader closure drafts (dispositions, owner decision, record skeleton, runbook) | `scratch/agent-out/K137-draft/`, `scratch/agent-out/K137-notes.md`; nothing committed by design |
-| K138 | Critic batch plan `specs/sprint-alfred-epic/plans/critic-batch-plan-2026-10-23.md` (fields only, nothing dispatched) | `scratch/clones/k138`, `scratch/agent-out/K138-notes.md` |
+| K137 | Reader closure drafts (dispositions, owner decision, record skeleton, runbook); found two structural blockers (older-course reports in the shared phase directories; Reader inputs change after the last reviewed state), resolved by batch 13 | `scratch/agent-out/K137-draft/`, `scratch/agent-out/K137-notes.md`; nothing committed by design |
+| K138 | IMPORTED: Critic batch plan `specs/sprint-alfred-epic/plans/critic-batch-plan-2026-10-23.md` (groups G1-G7, G9, G10; fields only, SHAs and model id open, nothing dispatched; PO list row 53) | notes in `scratch/agent-out/K138-notes.md` |
 
 Import rule: these files do not touch the runbook's targets, so they may be imported before or after the sitting; do not import anything that edits a file named in `specs/sprint-alfred-epic/evidence/sitting/runbook.md` before the sitting is done.
 
