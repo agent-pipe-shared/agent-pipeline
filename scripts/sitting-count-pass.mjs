@@ -64,7 +64,12 @@ export function parseCounts(out) {
   if (counts.tests === null) {
     const slash = /(\d+)\/(\d+) cases passed/.exec(out);
     const word = /(\d+) passed, (\d+) failed/.exec(out);
-    if (slash) counts = { tests: Number(slash[2]), pass: Number(slash[1]), fail: Number(slash[2]) - Number(slash[1]), skipped: 0, todo: 0, custom: true };
+    const shards = /project-onboarding-v3: (\d+) cases across .*?, (\d+) shards failed/.exec(out);
+    if (shards) {
+      const declared = Number(shards[1]);
+      const failedShards = Number(shards[2]);
+      counts = { tests: declared, pass: failedShards === 0 ? declared : (out.match(/^PASS /gm) ?? []).length, fail: failedShards, skipped: 0, todo: 0, custom: true };
+    } else if (slash) counts = { tests: Number(slash[2]), pass: Number(slash[1]), fail: Number(slash[2]) - Number(slash[1]), skipped: 0, todo: 0, custom: true };
     else if (word) counts = { tests: Number(word[1]) + Number(word[2]), pass: Number(word[1]), fail: Number(word[2]), skipped: 0, todo: 0, custom: true };
   }
   return counts;

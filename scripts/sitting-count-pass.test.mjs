@@ -152,6 +152,8 @@ describe("sitting-count-pass", () => {
     assert.equal(parseCounts("161/161 cases passed").tests, 161);
     assert.equal(parseCounts("24 passed, 0 failed").pass, 24);
     assert.equal(parseCounts("nothing").tests, null);
+    const ctl = parseCounts("PASS  a\nproject-onboarding-v3: 216 cases across 3 sequential chunks of 4 shards, 0 shards failed\n");
+    assert.deepEqual([ctl.tests, ctl.pass, ctl.fail, ctl.custom], [216, 216, 0, true]);
     const scrub = makeScrubber({ root: "/work/some/tree", home: "/home/alice", user: "alice" });
     assert.equal(scrub("at /work/some/tree/x.mjs and /home/alice/y and /home/bob/z"), "at <path>/x.mjs and <path>/y and <path>/z");
   });
