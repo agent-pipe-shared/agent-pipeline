@@ -87,3 +87,9 @@ Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history
   - Residuals recorded by `3bbdb7c12`, still open: an `&&` chain after a writer is outside the closed grammar and still
     reports every word as a conservative candidate; `perl -i.bak` and `ruby -i.bak` are not detected in the parsed lane.
 - The Blocker analysis DEFERRED bullet is unchanged and still true as to the decision.
+
+## Triage 2026-10-23 (PO decision)
+
+The deferral past 0.7.0 of 2026-10-16 is lifted: the fix is built and the item counts for 0.7.0. The three optional residual cases (an `&&` chain after a writer, `perl -i.bak`, `ruby -i.bak`) are covered by ceremony C23 (the pin counts 88 of 88 once it lands).
+
+Source: PO decision tiles of 2026-10-23, batch 11 (`specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md`).

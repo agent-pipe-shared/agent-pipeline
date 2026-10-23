@@ -138,3 +138,9 @@ Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history
 - The Triage block above had empty fields; they were filled from D25, D62, D63 and D110 (text not rewritten).
 - Still open and not agent work: the live parallel Critic plus Goldfish run on an installed host and PO acceptance; AGY
   isolated-worktree preparation is outside 0.7.0 (D63). The status stays `open`.
+
+## Triage 2026-10-23 (PO decision)
+
+The Antigravity isolated-worktree preparation stays outside this item's acceptance (D63, deferred past 0.7.0); it is a 0.7.x follow-up. For 0.7.0 the item is accepted on Claude and Codex. Open acceptance run: a live parallel Critic plus Goldfish run on an installed host, then reading the session-authority registry (owner native-host).
+
+Source: PO decision tiles of 2026-10-23, batch 11 (`specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md`).
