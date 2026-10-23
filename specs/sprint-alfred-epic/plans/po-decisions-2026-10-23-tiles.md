@@ -38,4 +38,8 @@ protected patches still go through the bundled sitting.
 | 6 | 11 | CLAUDE.md lines | Take both lines; the wording is delivered at the sitting | The agent may not edit `CLAUDE.md`; wording goes into the sitting notes |
 | 6 | 14 | German README box | The Reader course handles it | Finding for the 2+1 Reader course (D140) |
 | 6 | 20 | C18 | Apply at the sitting, before C26 | Design-generator pin 13/13 after |
+| 7 | 7 | Dirty `project/pipeline-state.json` after a push | The refusals (CPO-FOREIGN-CHANGES, GIT-03) name the working form | Message-only change; no new write right (K100, protected scripts as a held diff where needed) |
+| 7 | 8 | MP-04 readback | Sanctioned set/unset readback of `CLAUDE_CODE_SUBAGENT_MODEL` in the Elephant preflight | Plugin script change, no value is printed (K100) |
+| 7 | 10 | Stale hooks at start | The installer refreshes the hook snapshots as part of its apply | Installer change (K100) |
+| 7 | 1, 2 | Refusal texts: chat-mode `approve-push` with a catalogue (D74), `TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE` | Improve both now | (1) a concrete runnable repair, (2) the missing home directory in the message; held as a new ceremony (K100) |
 | 1 | 19 | K6 / C28 Critic preimage re-pin | Re-pin at the end, right before the stamp, after the Critic batch | Test stays red until then; the re-pin patch is regenerated from the digests at that moment (never applied earlier) |
