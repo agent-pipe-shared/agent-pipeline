@@ -36,12 +36,13 @@
   in blocks (144). 8 [PO call] final stamp, push signature, release decision. Nothing here is accepted before step 7.
 
 **AFK window (2026-10-23, written during the window; wins over the session cut where they differ):**
-- Agents imported on `feat/sprint-alfred` (implementation complete; Critic read and PO acceptance pending): K53 scripts, 40 backlog
-  items reconciled, D75 S2, D76 S3/S4/S6, D140 doc fixes, K74 pins, K78 fixtures; counted runs `evidence/pin-counted-results-2026-10-23*.md`.
-- Held for the bundled PO sitting: ceremonies C15 to C28 in `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`, patches in
-  `specs/sprint-alfred-epic/evidence/held-patches/`. No row yet: the D78 dispatch-hook default.
-- PO list (only on request): `specs/sprint-alfred-epic/plans/po-list-afk-2026-10-22.md`, rows 1 to 34 (19 Critic digest re-pin, 23/24
-  K2 reds, 27 K1D case C, 28 to 34 K8/K9/remeasure).
+- Agents imported on `feat/sprint-alfred` (implementation complete; Critic read and PO acceptance pending): K53 to K132 batches (scripts,
+  backlog sweep, D75/D76, D140 docs, pins, Reader corrections, ledger); counted runs `evidence/pin-counted-results-2026-10-23*.md`.
+- Held for the PO sitting (about 15:00 on 2026-10-23): ordered runbook `specs/sprint-alfred-epic/evidence/sitting/runbook.md` (steps
+  01 to 47; step 35, the Critic preimage re-pin, waits until just before the stamp); patches also in `evidence/held-patches/`.
+- PO list: `plans/po-list-afk-2026-10-22.md`, rows 1 to 44; tile decisions up to batch 12 in `plans/po-decisions-2026-10-23-tiles.md`.
+  Reader course: rounds 20261023a and b done, correction batches 1 and 2 imported, no third round; the terminal v2 record
+  (owner `by: APS`) is written after the sitting.
 - Ledger after fresh counted runs: K3, K4, K5, K9, K11, K12 closed (named rests in the plan file); K8 repairs held; K1D, K2, K6, K7, K13
   open on ceremonies or PO decisions. Matrix remeasured 2026-10-23 (`evidence/delivery-remeasure-2026-10-23/`): 3/56/115 at 25/50/75, index 66.09% (was 63.65%); repeat after the PO tests. Not started: stamp, push, Full Verify, Critic batch, Reader course.
 
