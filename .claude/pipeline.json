@@ -26,5 +26,6 @@
     "po": {
       "displayLabel": "Human"
     }
-  }
+  },
+  "pipelineUpdateChannel": "alpha"
 }
