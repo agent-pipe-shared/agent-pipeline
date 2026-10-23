@@ -97,7 +97,7 @@
       "id": "K13",
       "title": "D61 content scope: the 2026-10-20 content clauses still open (scope pass), as parallel item packages",
       "status": "in-progress",
-      "next": "waves A and B and D78 part 1 delivered; AC-197 groups A to C verified by reading, AC-181 and AC-201 residuals pinned (K74, C23 carries the fix); open and held behind ceremonies: D78 dispatch-hook default (protected, no ceremony row yet), AC-152 (C18), AC-140/245 (after C19), AC-203/224 pins (after K1D), AC-115/206 (protected)"
+      "next": "waves A and B and D78 part 1 delivered; PO tiles batch 9 decided the plan items (AC-249 additive build K101; AC-187, AC-127 V-10, AC-148 BI dispositioned, no build); AC-197 D to I and AC-147 need no decision (guard-lifecycle-ready 392/389/0 fail at HEAD; AC-147 deferred 2026-10-16); AC-181 and AC-201 residuals pinned (K74, C23 carries the fix); held behind ceremonies: AC-152 (C18), AC-140/245 (after C19), AC-203/224 pins (after K1D), AC-115/206 (protected)"
     }
   ]
 }
