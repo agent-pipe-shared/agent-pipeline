@@ -152,7 +152,250 @@ changed. Do not hand-edit Codex marketplace or cache files. Update channels
 (`alpha`, `beta`, `stable`) are described under
 [Update channels](#update-channels).
 
-#### Antigravity (Agy): workspace-local binding
+#### Antigravity (Agy)
+
+Antigravity binds through the
+[workspace-local procedure](#antigravity-agy-workspace-local-binding),
+which follows step 5 so that Claude Code and Codex readers reach step 1
+without scrolling past it. Follow that procedure, then continue at step 1.
+
+#### Missing prerequisite guidance in a consumer project
+
+The installed plugin's read-only toolchain preflight reports each configured
+tool, observed version, blocked claim and a copyable platform command. From
+the governed project root, run:
+
+```sh
+node "<plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
+```
+
+`<plugin-root>` is the installed Pipeline plugin directory (see the
+[command convention](docs/README.md)). Review any offered installer command under your host/package-management
+policy, then repeat the preflight. npm is never substituted for non-npm
+scanners; bounded Semgrep settings avoid treating ordinary home-directory
+writes as a missing installation.
+
+### 1. After consent, let `pipeline-start` classify the consumer root
+
+Do not copy `setup.mjs` into a consumer project or start a blank directory by
+manually creating Git/V3 runtime files. After completing the binding and full
+host restart in step 0, invoke `/pipeline-core:pipeline-start` as the first
+project action in the new session. Its plugin-owned preflight runs before Git
+or V3 authority checks and has these outcomes:
+
+- A fresh empty root, including Codex's `fresh-host-managed` root, stops as
+  `F0: onboarding-required`, with no bootstrap
+  confirmation. The agent runs the plugin-local read-only `inspect` and `plan`
+  operations and reports their public targets/digests.
+- Only an explicit user request to create or initialize the project authorizes
+  the exact digest-bound plugin-local `project-onboarding-v3.mjs
+  apply-portable-seed --plan-sha256 … --activate` action returned by the
+  reviewed plan. There is no unbound `apply` compatibility alias.
+  For a normal root that transaction initializes Git and the complete V3
+  source/runtime seed. For `fresh-host-managed`, it creates only the portable
+  authority and `.claude/**`, retaining Codex-owned `.git`/`.codex` controls
+  (and `.agents` when present) unchanged. Neither form creates a commit or remote, nor installs
+  dependencies or application scaffolding. Rerun `pipeline-start` afterwards;
+  its normal V3 readback remains required before a confirmation line.
+- An existing project with no Pipeline authority stops as `F0A:
+  adoption-required`. Its reviewed plan adds only absent Pipeline-owned targets
+  and preserves project files plus valid Git metadata; it is neither a legacy
+  migration nor permission to overwrite an existing `.claude`, `.codex`, or
+  `.agents` path.
+- A V0/V1/V2 authority uses the official migration inspect → plan → explicit
+  apply workflow ([consumer procedure](docs/v3-consumer-onboarding.md#legacy-consumer-with-no-projections)),
+  never the fresh initializer. A partial, invalid, unsafe, or
+  malformed root fails closed with no overwrite. A root consisting solely of
+  host-owned, non-writable `.git`/`.codex` controls (and `.agents` when
+  present) is the supported `fresh-host-managed` variant; never delete,
+  overwrite, chmod, ignore, or silently bypass those paths.
+
+This step only classifies and, when you explicitly approve a seed, creates the
+portable starting state. It does **not** finish onboarding. After this
+classification, Codex users continue at the [Fresh Codex lifecycle V4
+section](docs/v3-consumer-onboarding.md#fresh-codex-lifecycle-v4). Claude and
+Antigravity users follow their installed Driver's returned runtime/restart,
+intake, and binding action rather than repeating runner installation. Stop at
+each requested confirmation. Treat the project as ready only when a fresh
+`pipeline-start` readback explicitly says so.
+
+The Codex `SessionStart` registration provides an onboarding hint. The
+mandatory `pipeline-start` invocation remains proactive for the user's first
+request; the hint does not perform automatic hidden initialization.
+
+### 2. Complete project calibration after onboarding
+
+For a fresh root, the official initializer already creates the minimal
+V3-owned bootstrap calibration and runtime projection. Do not pre-create,
+copy over, or hand-edit those generated targets. After the initializer and its
+readback, propose project-specific calibration choices to the repository owner
+and apply them through the normal reviewed workflow.
+
+For an existing project, follow the reviewed, additive adoption plan. Use
+the installed plugin's `templates/pipeline.json.example` and
+`templates/CLAUDE.project.md` as references. Create only absent targets; merge the needed
+calibration and guidance into existing files while preserving project settings
+and instructions. Never copy a template over an existing `CLAUDE.md` or
+calibration file.
+
+(A runner-neutral project — one without a `.claude/` directory — targets
+`project/pipeline.json` instead; the calibration is read at its resolved
+authority tier, `project/pipeline.json` else `.claude/pipeline.json`.)
+
+`pipeline.json` names the project, its **one** `verify` command, worktree and
+branch model, autonomy, stakes, constraints, handover, and rollback procedure.
+Make `verify` the one deterministic command every actor and CI job means by
+“green” (for example, format → lint → typecheck → tests → build). Keep
+`CLAUDE.md` short: it is the stable project map, not a session log. The handover
+file is the single source for current state.
+
+Put hard project denies and permission boundaries in committed
+`.claude/settings.json` and, where used, `.claude/guard-config.json` — not in
+`pipeline.json`. Start conservatively: read and plan first, then grant only the
+autonomy your team is prepared to supervise.
+
+<a id="c-bring-an-existing-repository-under-the-pipeline"></a>
+
+#### Existing repository checklist
+
+The same Driver path applies to an existing repository. Adopt one control at a
+time on a normal change branch:
+
+1. Identify the existing test/build commands, branch policy, sensitive paths,
+   and current documentation location.
+2. Bind the supported runner integration and add calibration plus project
+   guidance through the additive adoption plan, preserving existing settings
+   and instructions.
+3. Create or consolidate the one `verify` command and run it successfully
+   before treating it as the delivery gate.
+4. Name one handover file in calibration and move current state there instead
+   of maintaining competing status copies.
+5. Add project-specific denies, risk zones, and constraints. Enable governance
+   policies only after their paths and checks are real.
+6. Pilot the workflow read-mostly with a small spec, deterministic checks, and
+   independent review. Expand autonomy only when its evidence and operating
+   cost are understood.
+
+Migration changes the project's process, so review it like any architectural
+change. Do not paste a pipeline source's `pipeline.user.yaml` into an
+application repository or make a legacy authority look current by copying
+generated runtime files.
+
+### 3. Declare the Git lifecycle before delivery
+
+An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
+the project calibration (see the authority-tier note in step 2): onboarding creates a repository but no initial commit,
+remote, or credential binding. Make the initial commit before normal work.
+When the project is intentionally connected to a shared remote, change the
+committed calibration to `repositoryMode: "remote-tracked"`; the session
+freshness check then requires an upstream and blocks writes when it is stale or
+unknown. `local-only` permits local work only; it never authorizes a push,
+publication, or release claim.
+
+For the exact Codex `fresh-host-managed` layout, the seed instead records
+`repositoryMode: "host-managed"` and deliberately creates neither Git metadata
+nor an initial commit. Codex owns `.git` and `.codex`; retain those controls,
+configure a project-specific verification command, and do not make a
+push/publication/release claim from this mode until the project has its own
+delivery-ready repository lifecycle.
+
+### 4. Optional manifest, governance, and ritual extensions
+
+<!-- capability:starter-templates -->
+<a id="capability-starter-templates"></a>
+
+Starter templates are optional examples for a consuming project to copy and
+adapt deliberately. Copying a template does not install a plugin, activate a
+guard or create approval authority; choose one configuration owner before
+adopting it.
+Review every copied path and command against the consuming repository before
+running it. Keep project-specific identities, destinations and verification
+commands explicit rather than inheriting the examples as production defaults.
+
+<!-- capability:generated-agent-obligations -->
+<a id="capability-generated-agent-obligations"></a>
+
+Use [`templates/pipeline.yaml.example`](templates/pipeline.yaml.example) only
+when your project directly authors the optional declarative manifest. It can
+declare gates, profiles, governance paths, and an optional release tail. Do
+not maintain a directly authored manifest alongside a compiler-managed V3
+projection; choose the ownership model documented in the template.
+
+For team or company rules, copy the generic examples under
+[`governance/examples/`](governance/examples/README.md) into project-owned
+paths and point the manifest at them:
+
+- **Guidelines** are advisory design and style principles. A deviation may be
+  valid, but it must be named and justified.
+- **Policies** are binding controls. Machine-checkable policies can fail a
+  gate; human-checkable policies become an explicit review obligation.
+
+The calibration template also shows `ritualExtensions`. They add project-owned
+steps such as a changelog sync to named lifecycle points without forking the
+core plugin. Keep each extension deterministic, versioned, and safe to run in
+the stated lifecycle phase; a failed extension stops that ritual and must be
+fixed or deliberately removed.
+
+### 5. Enter routine working sessions
+
+After the Driver completes an authorized seed or adoption action, invoke
+`pipeline-start` again as directed. In each later working session, open the
+project root with the runner integration bound in step 0, then invoke:
+
+```text
+/pipeline-core:pipeline-start
+```
+
+The bootstrap is the auditable session entry. It checks the installed ruleset,
+the project calibration, current handover, and verify availability before work
+begins. For a material feature, it also follows the V3 profile and advisory
+rules before writable work. A reminder hook is not a substitute for the
+bootstrap itself.
+
+If the bootstrap reports `hook-refresh-required`, see
+[Troubleshooting](#troubleshooting).
+
+### Human-approval key (one-time setup)
+
+**When the key is required.** The human-approval key is needed whenever the
+project's approval mode is `signature`, which is the default (the
+[approval-strength selector](docs/usage.md#choose-the-human-approval-strength-deliberately)
+explains the choice). The Driver asks for the mode in its initial round
+(`signature` or `chat`); choosing `signature` makes it surface the separate
+trust-anchor step. Under `signature`, a human decision gate (for example PRD
+approval, which [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) makes mandatory for
+rigor 1 or 2 and for high risk, or a push) needs a detached proof, so create
+the key once before the first such gate. Under `chat` no key is needed, but
+the approval is only an unattested chat attribution. No other onboarding input
+(project and author details, project/intake answers, a plan decision) involves
+a key, and routine implementation, tests, and Critic review remain agent work
+after the approved plan. To create the portable external Ed25519 key:
+
+Run the following commands from the governed project root, first defining
+`REPO` as that exact root:
+
+```sh
+REPO="$PWD"
+```
+
+```sh
+node "<plugin-root>/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
+```
+
+The directory stays outside the repository. OpenSSL asks for the passphrase
+locally; the agent never receives the key or passphrase. The agent prepares
+and refreshes public candidate-bound requests. The regular human action is:
+
+```sh
+node "<plugin-root>/scripts/po-human-approval.mjs" approve-all --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
+```
+
+Passkey/WebAuthn, IAM/hardware-key adapters, and remote provisional codes are
+future adapter work, not current CLI features. A code pasted into the same agent
+chat is visible to that agent and cannot replace final local proof for an
+irreversible action. See [PO approval](docs/po-human-approval.md).
+
+### Antigravity (Agy): workspace-local binding
 
 Bind the plugin in the consumer workspace, then fully restart Agy before the
 common step 1 below. The pinned `v0.7.0` example applies only after that tag is
@@ -291,247 +534,11 @@ Then open a new workspace session in the project root and invoke
 `/pipeline-core:pipeline-start` as the first Pipeline action. Do not use an
 unattended permission-bypass mode as an installation or recovery shortcut.
 
-### 1. After consent, let `pipeline-start` classify the consumer root
-
-Do not copy `setup.mjs` into a consumer project or start a blank directory by
-manually creating Git/V3 runtime files. After completing the binding and full
-host restart in step 0, invoke `/pipeline-core:pipeline-start` as the first
-project action in the new session. Its plugin-owned preflight runs before Git
-or V3 authority checks and has these outcomes:
-
-- A fresh empty root, including Codex's `fresh-host-managed` root, stops as
-  `F0: onboarding-required`, with no bootstrap
-  confirmation. The agent runs the plugin-local read-only `inspect` and `plan`
-  operations and reports their public targets/digests.
-- Only an explicit user request to create or initialize the project authorizes
-  the exact digest-bound plugin-local `project-onboarding-v3.mjs
-  apply-portable-seed --plan-sha256 … --activate` action returned by the
-  reviewed plan. There is no unbound `apply` compatibility alias.
-  For a normal root that transaction initializes Git and the complete V3
-  source/runtime seed. For `fresh-host-managed`, it creates only the portable
-  authority and `.claude/**`, retaining Codex-owned `.git`/`.codex` controls
-  (and `.agents` when present) unchanged. Neither form creates a commit or remote, nor installs
-  dependencies or application scaffolding. Rerun `pipeline-start` afterwards;
-  its normal V3 readback remains required before a confirmation line.
-- An existing project with no Pipeline authority stops as `F0A:
-  adoption-required`. Its reviewed plan adds only absent Pipeline-owned targets
-  and preserves project files plus valid Git metadata; it is neither a legacy
-  migration nor permission to overwrite an existing `.claude`, `.codex`, or
-  `.agents` path.
-- A V0/V1/V2 authority uses the official migration inspect → plan → explicit
-  apply workflow ([consumer procedure](docs/v3-consumer-onboarding.md#legacy-consumer-with-no-projections)),
-  never the fresh initializer. A partial, invalid, unsafe, or
-  malformed root fails closed with no overwrite. A root consisting solely of
-  host-owned, non-writable `.git`/`.codex` controls (and `.agents` when
-  present) is the supported `fresh-host-managed` variant; never delete,
-  overwrite, chmod, ignore, or silently bypass those paths.
-
-This step only classifies and, when you explicitly approve a seed, creates the
-portable starting state. It does **not** finish onboarding. After this
-classification, Codex users continue at the [Fresh Codex lifecycle V4
-section](docs/v3-consumer-onboarding.md#fresh-codex-lifecycle-v4). Claude and
-Antigravity users follow their installed Driver's returned runtime/restart,
-intake, and binding action rather than repeating runner installation. Stop at
-each requested confirmation. Treat the project as ready only when a fresh
-`pipeline-start` readback explicitly says so.
-
-The Codex `SessionStart` registration provides an onboarding hint. The
-mandatory `pipeline-start` invocation remains proactive for the user's first
-request; the hint does not perform automatic hidden initialization.
-
-### 2. Complete project calibration after onboarding
-
-For a fresh root, the official initializer already creates the minimal
-V3-owned bootstrap calibration and runtime projection. Do not pre-create,
-copy over, or hand-edit those generated targets. After the initializer and its
-readback, propose project-specific calibration choices to the repository owner
-and apply them through the normal reviewed workflow.
-
-For an existing project, follow the reviewed, additive adoption plan. Use
-the installed plugin's `templates/pipeline.json.example` and
-`templates/CLAUDE.project.md` as references. Create only absent targets; merge the needed
-calibration and guidance into existing files while preserving project settings
-and instructions. Never copy a template over an existing `CLAUDE.md` or
-calibration file.
-
-(A runner-neutral project — one without a `.claude/` directory — targets
-`project/pipeline.json` instead; the calibration is read at its resolved
-authority tier, `project/pipeline.json` else `.claude/pipeline.json`.)
-
-`pipeline.json` names the project, its **one** `verify` command, worktree and
-branch model, autonomy, stakes, constraints, handover, and rollback procedure.
-Make `verify` the one deterministic command every actor and CI job means by
-“green” (for example, format → lint → typecheck → tests → build). Keep
-`CLAUDE.md` short: it is the stable project map, not a session log. The handover
-file is the single source for current state.
-
-Put hard project denies and permission boundaries in committed
-`.claude/settings.json` and, where used, `.claude/guard-config.json` — not in
-`pipeline.json`. Start conservatively: read and plan first, then grant only the
-autonomy your team is prepared to supervise.
-
-### 3. Declare the Git lifecycle before delivery
-
-An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
-the project calibration (see the authority-tier note in step 2): onboarding creates a repository but no initial commit,
-remote, or credential binding. Make the initial commit before normal work.
-When the project is intentionally connected to a shared remote, change the
-committed calibration to `repositoryMode: "remote-tracked"`; the session
-freshness check then requires an upstream and blocks writes when it is stale or
-unknown. `local-only` permits local work only; it never authorizes a push,
-publication, or release claim.
-
-For the exact Codex `fresh-host-managed` layout, the seed instead records
-`repositoryMode: "host-managed"` and deliberately creates neither Git metadata
-nor an initial commit. Codex owns `.git` and `.codex`; retain those controls,
-configure a project-specific verification command, and do not make a
-push/publication/release claim from this mode until the project has its own
-delivery-ready repository lifecycle.
-
-### 4. Optional manifest, governance, and ritual extensions
-
-<!-- capability:starter-templates -->
-<a id="capability-starter-templates"></a>
-
-Starter templates are optional examples for a consuming project to copy and
-adapt deliberately. Copying a template does not install a plugin, activate a
-guard or create approval authority; choose one configuration owner before
-adopting it.
-Review every copied path and command against the consuming repository before
-running it. Keep project-specific identities, destinations and verification
-commands explicit rather than inheriting the examples as production defaults.
-
-<!-- capability:generated-agent-obligations -->
-<a id="capability-generated-agent-obligations"></a>
-
-Use [`templates/pipeline.yaml.example`](templates/pipeline.yaml.example) only
-when your project directly authors the optional declarative manifest. It can
-declare gates, profiles, governance paths, and an optional release tail. Do
-not maintain a directly authored manifest alongside a compiler-managed V3
-projection; choose the ownership model documented in the template.
-
-For team or company rules, copy the generic examples under
-[`governance/examples/`](governance/examples/README.md) into project-owned
-paths and point the manifest at them:
-
-- **Guidelines** are advisory design and style principles. A deviation may be
-  valid, but it must be named and justified.
-- **Policies** are binding controls. Machine-checkable policies can fail a
-  gate; human-checkable policies become an explicit review obligation.
-
-The calibration template also shows `ritualExtensions`. They add project-owned
-steps such as a changelog sync to named lifecycle points without forking the
-core plugin. Keep each extension deterministic, versioned, and safe to run in
-the stated lifecycle phase; a failed extension stops that ritual and must be
-fixed or deliberately removed.
-
-### 5. Enter routine working sessions
-
-After the Driver completes an authorized seed or adoption action, invoke
-`pipeline-start` again as directed. In each later working session, open the
-project root with the runner integration bound in step 0, then invoke:
-
-```text
-/pipeline-core:pipeline-start
-```
-
-The bootstrap is the auditable session entry. It checks the installed ruleset,
-the project calibration, current handover, and verify availability before work
-begins. For a material feature, it also follows the V3 profile and advisory
-rules before writable work. A reminder hook is not a substitute for the
-bootstrap itself.
-
-If the bootstrap reports `hook-refresh-required`, see
-[Troubleshooting](#troubleshooting).
-
-<a id="c-bring-an-existing-repository-under-the-pipeline"></a>
-
-### Existing repository checklist
-
-The same Driver path applies to an existing repository. Adopt one control at a
-time on a normal change branch:
-
-1. Identify the existing test/build commands, branch policy, sensitive paths,
-   and current documentation location.
-2. Bind the supported runner integration and add calibration plus project
-   guidance through the additive adoption plan, preserving existing settings
-   and instructions.
-3. Create or consolidate the one `verify` command and run it successfully
-   before treating it as the delivery gate.
-4. Name one handover file in calibration and move current state there instead
-   of maintaining competing status copies.
-5. Add project-specific denies, risk zones, and constraints. Enable governance
-   policies only after their paths and checks are real.
-6. Pilot the workflow read-mostly with a small spec, deterministic checks, and
-   independent review. Expand autonomy only when its evidence and operating
-   cost are understood.
-
-Migration changes the project's process, so review it like any architectural
-change. Do not paste a pipeline source's `pipeline.user.yaml` into an
-application repository or make a legacy authority look current by copying
-generated runtime files.
-
-### Missing prerequisite guidance in a consumer project
-
-The installed plugin's read-only toolchain preflight reports each configured
-tool, observed version, blocked claim and a copyable platform command. From
-the governed project root, run:
-
-```sh
-node "<plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
-```
-
-`<plugin-root>` is the installed Pipeline plugin directory (see the
-[command convention](docs/README.md)). Review any offered installer command under your host/package-management
-policy, then repeat the preflight. npm is never substituted for non-npm
-scanners; bounded Semgrep settings avoid treating ordinary home-directory
-writes as a missing installation.
-
 ### Optional advanced setup
 
 The slim private overlay and update channels below are not part of routine
 onboarding; use them only when the project's declared operating model requires
-them. The human-approval key is required or not depending on the approval mode.
-
-#### Human-approval key (one-time setup)
-
-**When the key is required.** The human-approval key is needed whenever the
-project's approval mode is `signature`, which is the default (the
-[approval-strength selector](docs/usage.md#choose-the-human-approval-strength-deliberately)
-explains the choice). The Driver asks for the mode in its initial round
-(`signature` or `chat`); choosing `signature` makes it surface the separate
-trust-anchor step. Under `signature`, a human decision gate (for example PRD
-approval, which [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) makes mandatory for
-rigor 1 or 2 and for high risk, or a push) needs a detached proof, so create
-the key once before the first such gate. Under `chat` no key is needed, but
-the approval is only an unattested chat attribution. No other onboarding input
-(project and author details, project/intake answers, a plan decision) involves
-a key, and routine implementation, tests, and Critic review remain agent work
-after the approved plan. To create the portable external Ed25519 key:
-
-Run the following commands from the governed project root, first defining
-`REPO` as that exact root:
-
-```sh
-REPO="$PWD"
-```
-
-```sh
-node "<plugin-root>/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
-```
-
-The directory stays outside the repository. OpenSSL asks for the passphrase
-locally; the agent never receives the key or passphrase. The agent prepares
-and refreshes public candidate-bound requests. The regular human action is:
-
-```sh
-node "<plugin-root>/scripts/po-human-approval.mjs" approve-all --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
-```
-
-Passkey/WebAuthn, IAM/hardware-key adapters, and remote provisional codes are
-future adapter work, not current CLI features. A code pasted into the same agent
-chat is visible to that agent and cannot replace final local proof for an
-irreversible action. See [PO approval](docs/po-human-approval.md).
+them.
 
 #### Activate a slim private overlay
 
