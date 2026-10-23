@@ -86,26 +86,20 @@
           "docs/governance-replay.md",
           "docs/licensing.md",
           "docs/macos-support.md",
+          "docs/migration.md",
           "docs/observation-intake.md",
           "docs/onboarding-recovery.md",
           "docs/operating-model.md",
           "docs/organization-policy-packs.md",
+          "docs/overview.md",
           "docs/parallel-work.md",
           "docs/runner-support.md",
           "docs/runtime-boundary.md",
           "docs/security-controls.md",
+          "docs/usage.md",
           "docs/v3-consumer-onboarding.md",
           "docs/whats-new-0.5.0.md",
           "docs/whats-new-0.6.0.md"
-        ]
-      },
-      {
-        "audience": "public-user",
-        "lifecycle": "compatibility-redirect",
-        "paths": [
-          "docs/migration.md",
-          "docs/overview.md",
-          "docs/usage.md"
         ]
       },
       {
@@ -142,6 +136,7 @@
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
           "docs/nova-execution-plane-threat-model.md",
+          "docs/operating-tools.md",
           "docs/pending-verify-registrations.md",
           "docs/phoenix-governance-threat-model.md",
           "docs/po-approval-proof-contract.md",
@@ -282,6 +277,11 @@
           "docs/adr/0081-boundary-aware-impacted-verify.md",
           "docs/adr/0082-bounded-continuity-self-repair.md",
           "docs/adr/0084-ci-failure-reporter-public-log-boundary.md",
+          "docs/adr/0086-canonical-dab-windows-course-and-separate-legacy-api-checks.json",
+          "docs/adr/0086-canonical-dab-windows-course-and-separate-legacy-api-checks.md",
+          "docs/adr/0087-owning-verification-authenticated-controller-test-channel.json",
+          "docs/adr/0087-owning-verification-authenticated-controller-test-channel.md",
+          "docs/adr/0088-test-economy.md",
           "docs/adr/README.md"
         ]
       },
@@ -313,8 +313,10 @@
           "docs/adr/draft-alfred-a1-e3-evidence-promotion.json",
           "docs/adr/draft-alfred-a1-e3-evidence-promotion.md",
           "docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md",
+          "docs/adr/draft-claude-hook-session-owner.md",
           "docs/adr/draft-content-bound-review-before-full-verify.json",
           "docs/adr/draft-content-bound-review-before-full-verify.md",
+          "docs/adr/draft-criterion-bound-regression-pins.md",
           "docs/adr/draft-critic-report-durable-write-location.md",
           "docs/adr/draft-design-advisory-admission-storage.json",
           "docs/adr/draft-design-advisory-admission-storage.md",
@@ -322,8 +324,11 @@
           "docs/adr/draft-design-stage-architecture-materialization.md",
           "docs/adr/draft-functional-model-roles-at-session-bootstrap.json",
           "docs/adr/draft-functional-model-roles-at-session-bootstrap.md",
+          "docs/adr/draft-item-owned-egm-retained-quality-gates.json",
+          "docs/adr/draft-item-owned-egm-retained-quality-gates.md",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.json",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.md",
+          "docs/adr/draft-po-acceptance-points.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
           "docs/adr/draft-repair-availability.json",
           "docs/adr/draft-repair-availability.md",
