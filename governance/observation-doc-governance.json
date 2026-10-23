@@ -86,26 +86,20 @@
           "docs/governance-replay.md",
           "docs/licensing.md",
           "docs/macos-support.md",
+          "docs/migration.md",
           "docs/observation-intake.md",
           "docs/onboarding-recovery.md",
           "docs/operating-model.md",
           "docs/organization-policy-packs.md",
+          "docs/overview.md",
           "docs/parallel-work.md",
           "docs/runner-support.md",
           "docs/runtime-boundary.md",
           "docs/security-controls.md",
+          "docs/usage.md",
           "docs/v3-consumer-onboarding.md",
           "docs/whats-new-0.5.0.md",
           "docs/whats-new-0.6.0.md"
-        ]
-      },
-      {
-        "audience": "public-user",
-        "lifecycle": "compatibility-redirect",
-        "paths": [
-          "docs/migration.md",
-          "docs/overview.md",
-          "docs/usage.md"
         ]
       },
       {
