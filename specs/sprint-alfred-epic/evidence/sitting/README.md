@@ -27,7 +27,7 @@ Two lines in `CLAUDE.md` (an agent may not edit it). PO decision of 2026-10-23, 
 1. Re-run the suite registration, case-completion, inventory, governance, mirror and backlog-state checks and record the counts.
 2. Restate the four stale `sites` counts of `check-verify-case-completion.test` (QG-04, PO decision batch 12) and the registration fixture list.
 3. Serial count pass: `node scripts/sitting-count-pass.mjs --list specs/sprint-alfred-epic/plans/count-pass-suites.json --out <evidence.md>`, then the delivery remeasure with the reader prompt that carries the batch-10 rulings.
-4. Reader course: write the terminal v2 record from the two rounds and the two correction batches; the owner decision uses `by: APS` and accepts the findings listed in `plans/po-decisions-2026-10-23-tiles.md` (batch 12, row 43); the inventory and governance commits of this sitting enter the final correction batch.
+4. Reader course (PO decision batch 13, PO list row 52): first the protected checker diff limiting the v2 check to the current course (to be built, operator commit with pin), then the committed escalation justification, a third complete two-stage round on the final state, the final correction batch and the terminal v2 record. The owner decision uses `by: APS` and accepts the findings listed in `plans/po-decisions-2026-10-23-tiles.md` (batches 12 and 13); the inventory and governance commits of this sitting are read in round three.
 5. Only on the PO's call: dev build stamp and install, Full Verify, Critic batch, the C28 re-pin, push.
 
 ## Host runs that stay open (not part of this sitting)
