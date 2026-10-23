@@ -41,6 +41,9 @@
 //         source-scan case "V-10 runner registration": hooks/codex-hooks.json registers guard-dispatch.mjs on the spawn_agent
 //         matcher, and hooks/antigravity-pretool-guard.mjs runs it for every Task/Agent entry, once per Subagents array element.
 //         That case reads the shipped files; it does not prove a live Codex or Antigravity host fires the hook.)
+//         PO ruling 2026-10-23 (tile batch 9, AC-127 V-10): the dispositions above suffice for 0.7.0; nothing further is
+//         built. The typed gaps stay typed (the Critic and unrelated-role route, the dynamically built Workflow script)
+//         and are named for the Critic batch, which reads them; there is no separate owner or due date.
 //         V-10 role-dispatch-preflight records the direct transport only; the other transports are recorded by the guard,
 //         because a Workflow digest is taken over the script literal the guard extracts, not over packet.prompt: by design
 //         The caller set below is pinned by a source scan; when a caller is added or removed this header must be
