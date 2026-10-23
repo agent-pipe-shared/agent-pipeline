@@ -16,7 +16,7 @@ export function runConsumerVerifyCheck(check, commandId = null) {
     const artifact = resolveAuthorityArtifactPath("calibration", { rootDir: root });
     if (!["ready", "missing"].includes(artifact.authorityStatus)) throw new Error(`project authority is ${artifact.authorityStatus}`);
     const projectIdentity = readProjectCalibrationIdentity({ rootDir: root });
-    if (projectIdentity.status !== "resolved") throw new Error(`project calibration identity: ${projectIdentity.code}`);
+    if (projectIdentity.status !== "resolved") throw new Error(`project calibration identity: ${projectIdentity.code}${projectIdentity.message === undefined ? "" : ` - ${projectIdentity.message}`}`);
     const calibrationBytes = readFileSync(artifact.path);
     if (projectIdentity.source.path !== artifact.relPath || projectIdentity.source.sha256 !== createHash("sha256").update(calibrationBytes).digest("hex")) throw new Error("project calibration identity: PCI-SOURCE-DRIFT");
     const calibration = JSON.parse(calibrationBytes.toString("utf8"));

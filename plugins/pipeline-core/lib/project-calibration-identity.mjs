@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: SUL-1.0
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -86,6 +87,74 @@ function unavailable(reason, code, rootSha256 = null, source = null) {
     project: null, rootSha256,
     configuredValue: Object.freeze({ status: "unavailable", reason }), source, code });
 }
+/** R1: an aliased identity is not bound to the project; the refusal says why and how to repair it. */
+function aliasRefused(stored, current, source) {
+  const refusal = unavailable("alias-refused", "PCI-ALIAS-REFUSED", current.rootSha256, source);
+  return Object.freeze({ ...refusal,
+    message: `the calibration stores project "${stored}" but the root-derived project name is "${current.project}"; `
+      + `an aliased identity is refused. Repair: regenerate the project identity or set "project" to the root name "${current.project}".` });
+}
+
+// Source-checkout exemption (PO decision 2026-10-23, batch 12, row 42). The Agent-Pipeline source
+// checkout stores the alias "agent-pipeline" and lives in differently named directories on the PO's
+// machines, so R1's alias refusal would refuse this repository itself. The exemption is decided by the
+// facts the reader-review skill uses, observed from the Git index of the selected root: a tracked regular
+// .claude/pipeline.json whose project is "agent-pipeline" AND a tracked regular .claude-plugin/marketplace.json
+// whose name and owner.name are "agent-pipeline" with exactly one plugin "pipeline-core" at
+// ./plugins/pipeline-core. It never reads the directory name and no calibration field can select it.
+const SOURCE_PROJECT = "agent-pipeline";
+const SOURCE_CALIBRATION_PATH = ".claude/pipeline.json";
+const SOURCE_MARKETPLACE_PATH = ".claude-plugin/marketplace.json";
+const SOURCE_PLUGIN_NAME = "pipeline-core";
+const SOURCE_PLUGIN_SOURCE = "./plugins/pipeline-core";
+const MAX_IDENTITY_FILE_BYTES = 64 * 1024;
+function gitOutput(root, args, deps) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const result = (deps.spawnSync ?? spawnSync)("git", args, { cwd: root, env, encoding: "utf8", shell: false, timeout: 5000 });
+  return result.error === undefined && result.status === 0 ? String(result.stdout) : null;
+}
+function readTrackedJson(root, relative, io) {
+  const target = join(root, ...relative.split("/"));
+  const info = io.lstatSync(target);
+  if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_IDENTITY_FILE_BYTES) return null;
+  const value = JSON.parse(io.readFileSync(target, "utf8"));
+  return object(value) ? value : null;
+}
+function isAgentPipelineSourceCheckout(current, io, deps) {
+  try {
+    const top = gitOutput(current.root, ["rev-parse", "--show-toplevel"], deps);
+    if (top === null) return false;
+    const toplevel = typeof io.realpathSync.native === "function"
+      ? io.realpathSync.native(top.trim()) : io.realpathSync(top.trim());
+    if (toplevel !== current.root) return false;
+    const listing = gitOutput(current.root,
+      ["ls-files", "--stage", "-z", "--", SOURCE_CALIBRATION_PATH, SOURCE_MARKETPLACE_PATH], deps);
+    if (listing === null) return false;
+    const modes = new Map();
+    for (const entry of listing.split("\0").filter(Boolean)) {
+      const match = /^(\d{6}) [0-9a-f]{40,64} 0\t(.+)$/u.exec(entry);
+      if (match === null || modes.has(match[2])) return false;
+      modes.set(match[2], match[1]);
+    }
+    for (const path of [SOURCE_CALIBRATION_PATH, SOURCE_MARKETPLACE_PATH]) {
+      if (!["100644", "100755"].includes(modes.get(path))) return false;
+    }
+    const calibration = readTrackedJson(current.root, SOURCE_CALIBRATION_PATH, io);
+    const marketplace = readTrackedJson(current.root, SOURCE_MARKETPLACE_PATH, io);
+    if (calibration === null || marketplace === null || calibration.project !== SOURCE_PROJECT) return false;
+    const plugins = marketplace.plugins;
+    return marketplace.name === SOURCE_PROJECT && object(marketplace.owner) && marketplace.owner.name === SOURCE_PROJECT
+      && Array.isArray(plugins) && plugins.length === 1 && object(plugins[0])
+      && plugins[0].name === SOURCE_PLUGIN_NAME && plugins[0].source === SOURCE_PLUGIN_SOURCE;
+  } catch { return false; }
+}
+/** R1 outcome for a stored name that is not the root-derived name: refuse, except for the source checkout. */
+function aliasOutcome(project, current, source, io, deps) {
+  if (project === SOURCE_PROJECT && isAgentPipelineSourceCheckout(current, io, deps)) {
+    return Object.freeze({ ...resolved(current, project, "configured-alias", source), identityMode: "source-checkout" });
+  }
+  return aliasRefused(project, current, source);
+}
 function resolved(current, project, kind, source, placeholder = false) {
   return Object.freeze({ schema: SCHEMA, status: "resolved", kind, project,
     rootSha256: current.rootSha256,
@@ -150,11 +219,16 @@ export function readProjectCalibrationIdentity({ rootDir = process.cwd(), deps =
     if (metadata.kind === "root-derived" && project !== current.project) {
       return unavailable("name-mismatch", "PCI-NAME-MISMATCH", current.rootSha256, source);
     }
+    if (project !== current.project) return aliasOutcome(project, current, source, io, deps);
     return resolved(current, project, metadata.kind, source);
   }
   // The historical seed is unavailable as a configured identity. Its factual
   // physical-root replacement is a different observed source, even if the
   // real directory itself is legitimately called "new-project".
   if (project === "new-project") return resolved(current, current.project, "root-derived", source, true);
-  return resolved(current, project, "configured-alias", source);
+  // R1 (AC-232, PO decision 2026-10-23 "S4 follows R1"): an aliased identity is
+  // refused. A stored name equal to the physical root name is no alias.
+  // The source checkout alone is exempt (typed identityMode "source-checkout"; PO decision 2026-10-23, row 42).
+  if (project !== current.project) return aliasOutcome(project, current, source, io, deps);
+  return resolved(current, project, "root-derived", source);
 }

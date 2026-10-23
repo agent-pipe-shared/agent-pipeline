@@ -22,7 +22,7 @@ function commandEntry(value, label) {
 export function readConsumerVerifyConfiguration(rootDir) {
   const artifact = resolveAuthorityArtifactPath("calibration", { rootDir });
   const projectIdentity = readProjectCalibrationIdentity({ rootDir });
-  if (projectIdentity.status !== "resolved") throw new Error(`VEP-PROJECT-IDENTITY: ${projectIdentity.code}`);
+  if (projectIdentity.status !== "resolved") throw new Error(`VEP-PROJECT-IDENTITY: ${projectIdentity.code}${projectIdentity.message === undefined ? "" : ` - ${projectIdentity.message}`}`);
   if (!artifact.exists) throw new Error("VEP-NO-CALIBRATION: no project calibration found.");
   const calibrationBytes = readFileSync(artifact.path);
   if (projectIdentity.source.path !== artifact.relPath || projectIdentity.source.sha256 !== createHash("sha256").update(calibrationBytes).digest("hex")) throw new Error("VEP-PROJECT-IDENTITY: PCI-SOURCE-DRIFT");
