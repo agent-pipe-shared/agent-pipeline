@@ -120,6 +120,11 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // first two no longer import node:test, so they count as top-level-assertions (same assertion sites); the Windows pin keeps
   // only the root before/after hooks from node:test and no longer registers a test( call, so it is no longer classified
   // vulnerable and leaves this list. No identity is removed from the pinned sets and no other row changes.
+  // Added 2026-10-23 (QG-04, own hunk; K102-DESIGN-TRAILER-PIN-REGISTRATION): pin-installed-design-trailer-example-is-rejected-by-git-guard-tests
+  // is a Verify registration that was never given a completion-registry row; the conservative classifier reports it
+  // `node-test-single` (a regex literal containing a backtick hides its node:test calls from the mask), so it is registered
+  // `legacy-process-only` and counted here (+1 classified, registry 357). It is also excluded from the R5 set below (registered after R5).
+  // No existing row, assertion or digest is removed or weakened.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",33],
@@ -177,6 +182,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["phoenix-authority-revision-installed-package-tests","plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs","top-level-assertions",10],
     ["pin-denial-names-a-diagnosis-it-refuses-tests","plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs","top-level-assertions",43],
     ["pin-devplan-lane-admits-the-producer-materialize-step-tests","plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs","top-level-assertions",9],
+    ["pin-installed-design-trailer-example-is-rejected-by-git-guard-tests","plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs","node-test-single",60],
     ["plan-reopen-current-action-tests","harness/scripts/plan-reopen-current-action.test.mjs","top-level-assertions",27],
     ["project-onboarding-foreign-residue-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs","top-level-assertions",13],
     ["project-onboarding-foreign-residue-unit-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs","top-level-assertions",15],
@@ -214,7 +220,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length);
   assert.equal(classified.length, result.vulnerableCount,
     "all classified Verify registrations must have a completion-registry row");
-  assert.equal(result.registryCount, 356);
+  assert.equal(result.registryCount, 357);
   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
@@ -261,6 +267,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "phoenix-authority-revision-installed-package-tests",
     "pin-denial-names-a-diagnosis-it-refuses-tests",
     "pin-devplan-lane-admits-the-producer-materialize-step-tests",
+    "pin-installed-design-trailer-example-is-rejected-by-git-guard-tests",
     "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
     "plan-reopen-current-action-tests",
     "project-onboarding-foreign-residue-tests",
