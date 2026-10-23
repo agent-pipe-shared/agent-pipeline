@@ -329,6 +329,43 @@ test("AP11 the git-show lane fails closed: other sinks, no sink, hidden/dash/tra
   assert.equal(verdict(bash("git show HEAD:docs/state.md"), path).exitCode, 0);
 }));
 
+// K97 (PO tile decision, row 15 of 2026-10-23, "Widen the grammar"): AP11 above keeps every one of its entries. The lane additionally
+// admits ONE optional `--format=` / `--format=<plain fmt>` and ONE optional trailing `--` after (or before) the single object operand,
+// then the same head-only sink. The extra tokens named by AP11 (`extra`, `--stat`) and every other shape stay refused.
+test("AP16 the git-show lane admits one optional --format=<plain> and one trailing --; everything else AP11 refuses stays refused (K97)", () => withLaneFixture((path) => {
+  for (const command of [
+    "git show HEAD:docs/state.md --format= -- | head -n 5",
+    "git show HEAD:docs/state.md --format= | head -5",
+    "git show HEAD:docs/state.md -- | head -5",
+    "git show HEAD:docs/state.md --format=%H -- | head -500",
+    "git show --format= HEAD:docs/state.md | head -5",
+    "git --no-pager show abc1234:docs/state.md --format= -- | head -n 5",
+  ]) {
+    const r = verdict(bash(command), path);
+    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
+    assert.equal(gitShowLane(command, path), true, `lane: ${command}`);
+  }
+  for (const command of [
+    "git show HEAD:docs/state.md --format= -- | head -n 501",
+    "git show HEAD:docs/state.md --format= -- | sort",
+    "git show HEAD:docs/state.md --format= -- | head -n 5 | cat",
+    "git show HEAD:docs/state.md --format=$(id) -- | head -n 5",
+    "git show HEAD:docs/state.md --format= --format=%H | head -n 5",
+    "git show HEAD:docs/state.md -- --format= | head -n 5",
+    "git show HEAD:docs/state.md -- -- | head -n 5",
+    "git show HEAD:docs/state.md --stat | head -n 5",
+    "git show HEAD:docs/state.md --format= -- extra | head -n 5",
+    "git show HEAD:docs/.hidden.md --format= -- | head -n 5",
+    "git show HEAD:vault/id_rsa --format= -- | head -n 5",
+    "git show HEAD:../state.md --format= -- | head -n 5",
+    "git show main:docs/state.md --format= -- | head -n 5",
+  ]) {
+    assert.equal(gitShowLane(command, path), false, `lane: ${command}`);
+    const r = verdict(bash(command), path);
+    assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
+  }
+}));
+
 test("AP12 stat -c|--format with one of the two fixed formats on contained, unaliased files and directories is admitted (lane isFormattedStatReadArgs, K3)", () => withLaneFixture((path) => {
   for (const words of [
     ["-c", STAT_FORMAT, "docs/state.md"],

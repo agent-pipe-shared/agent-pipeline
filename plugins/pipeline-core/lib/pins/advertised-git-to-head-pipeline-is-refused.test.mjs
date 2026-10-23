@@ -301,6 +301,91 @@ test("P5 control: the other refused addendum rg flags and an escaping -C target 
   }
 });
 
+// ------------------------------------------------------------------ K97 (PO decision row 15 of the 2026-10-23 tile decisions: "Widen the grammar")
+// The bounded object read `git show <rev>:<path>` is admitted with an optional `--format=` / `--format=<plain fmt>` and an optional
+// trailing `--` before the ONE `| head -n N` / `| head -N` (N in 1..500) sink; the shape the PF-17 real project reported as refused.
+// Nothing else widens: another pipe or sink, a redirect, an expansion, a second option, an unbounded count, a path the credential
+// or root screen refuses and every other show option stay refused.
+for (const command of [
+  "git show HEAD:docs/state.md --format= -- | head -n 5",
+  "git show HEAD:docs/state.md --format= -- | head -5",
+  "git show HEAD:docs/state.md --format= | head -n 5",
+  "git show HEAD:docs/state.md -- | head -n 5",
+  "git show HEAD:docs/state.md --format=%H | head -n 5",
+  "git show HEAD:docs/state.md --format=%H -- | head -500",
+  "git show HEAD:docs/state.md --format=format:%an,%ad -- | head -n 1",
+  "git show --format= HEAD:docs/state.md | head -n 5",
+  "git show --format= HEAD:docs/state.md -- | head -n 5",
+  "git --no-pager show HEAD:docs/state.md --format= -- | head -n 5",
+  "git show abc1234:docs/state.md --format= -- | head -n 5",
+  "git show HEAD:docs/state.md --format= -- | head -n 5 2>/dev/null",
+]) {
+  test(`K97 admitted: ${command}`, () => { assert.equal(guard(command), true); });
+}
+
+test("K97 admitted with -C (D114 repository target, same operand screen)", () => {
+  assert.equal(inRepo("git -C . show HEAD:docs/state.md --format= -- | head -n 3"), true);
+  assert.equal(inRepo("git -C other show HEAD:docs/state.md --format=%H | head -3"), true);
+});
+
+for (const command of [
+  // the sink and the bound
+  "git show HEAD:docs/state.md --format= -- | grep y",
+  "git show HEAD:docs/state.md | grep y",
+  "git show HEAD:docs/state.md --format= -- | head -n 1000",
+  "git show HEAD:docs/state.md | head -n 1000",
+  "git show HEAD:docs/state.md --format= -- | head -n 0",
+  "git show HEAD:docs/state.md --format= -- | head",
+  "git show HEAD:docs/state.md --format= -- | head -n 5 | cat",
+  "git show HEAD:docs/state.md --format= -- | head -n 5 | head -n 2",
+  "git show HEAD:docs/state.md --format= -- | cat",
+  "git show HEAD:docs/state.md --format= -- | sort",
+  "git show HEAD:docs/state.md --format= -- | rg apply",
+  // redirects, expansions, composition
+  "git show HEAD:docs/state.md --format= -- > f",
+  "git show HEAD:docs/state.md > f",
+  "git show HEAD:docs/state.md --format= -- | head -n 5 > f",
+  "git show $(id) | head -n 5",
+  "git show HEAD:docs/state.md --format=$(id) -- | head -n 5",
+  "git show HEAD:docs/state.md '--format=`id`' -- | head -n 5",
+  "git show HEAD:docs/state.md --format=x;y -- | head -n 5",
+  "git show HEAD:docs/state.md; rm y",
+  "git show HEAD:docs/state.md --format= -- ; rm y",
+  "git show HEAD:docs/state.md --format= -- || head -n 5",
+  // the format token is one plain token, once; `--` is last and once
+  "git show HEAD:docs/state.md '--format=%H %s' -- | head -n 5",
+  "git show HEAD:docs/state.md --format | head -n 5",
+  "git show HEAD:docs/state.md --format= --format=%H | head -n 5",
+  "git show HEAD:docs/state.md -- --format= | head -n 5",
+  "git show HEAD:docs/state.md --format= -- -- | head -n 5",
+  "git show HEAD:docs/state.md -- -- | head -n 5",
+  // every other show option, the output/execution options and other subcommands
+  "git show HEAD:docs/state.md --stat | head -n 5",
+  "git show HEAD:docs/state.md --pretty=format:%H | head -n 5",
+  "git show HEAD:docs/state.md --output=f --format= -- | head -n 5",
+  "git show HEAD:docs/state.md --textconv --format= -- | head -n 5",
+  "git show HEAD:docs/state.md extra --format= -- | head -n 5",
+  "git log HEAD:docs/state.md --format= -- | head -n 5",
+  // path and revision screens are unchanged
+  "git show HEAD:.env --format= -- | head -n 5",
+  "git show HEAD:../outside.txt --format= -- | head -n 5",
+  "git show HEAD:/etc/hostname --format= -- | head -n 5",
+  "git show main:docs/state.md --format= -- | head -n 5",
+  "git show HEAD~1:docs/state.md --format= -- | head -n 5",
+  "git log | head",
+]) {
+  test(`K97 stays refused: ${command}`, () => { assert.equal(guard(command), false); });
+}
+
+test("K97 stays refused with -C: escaping target, credential path, extra pipe", () => {
+  for (const command of [
+    "git -C .. show HEAD:docs/state.md --format= -- | head -n 3",
+    "git -C . show HEAD:.env --format= -- | head -n 3",
+    "git -C . show HEAD:docs/state.md --format= -- | head -n 3 | cat",
+    "git -C . show HEAD:docs/state.md --format= -- | head -n 501",
+  ]) assert.equal(inRepo(command), false, command);
+});
+
 // ------------------------------------------------------------------ P4 (RED against a mirror)
 function mirrorWithoutGitPipeline(name) {
   let source = readFileSync(join(guardDir, "shell-grammar.mjs"), "utf8");
