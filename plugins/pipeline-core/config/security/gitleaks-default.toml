@@ -22,6 +22,16 @@
 [extend]
 useDefault = true
 
+# K98 (PO decision 2026-10-23, row 13): the scan source excludes `scratch/clones` (throwaway working
+# clones, never part of a candidate commit), so the security gate does not depend on how many
+# clones the machine holds. Path form as above: gitleaks reports the absolute path. Known limit: a
+# scan whose own root lies below `scratch/clones/` is skipped in full; scan a clone from its parent.
+[allowlist]
+description = "scratch/clones working clones are not part of the scanned source"
+paths = [
+  '''.*/scratch/clones/.*''',
+]
+
 [[rules]]
 id = "sentry-access-token"
 
