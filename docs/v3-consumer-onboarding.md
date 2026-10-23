@@ -1,7 +1,7 @@
 # V3 consumer onboarding and Codex lifecycle V4
 
-This guide covers runner installation, fresh Codex lifecycle V4 onboarding,
-and preview-first migration of a consumer project with a valid legacy
+This guide covers fresh Codex lifecycle V4 onboarding and preview-first
+migration of a consumer project with a valid legacy
 (`pipeline.user.v0`/`pipeline.user.v1`/V2) `pipeline.user.yaml` and no generated
 `.claude/**` or `.codex/**` projections. Migration uses the Public Core
 authority; do not hand-author runtime files, an authority lock, or a
@@ -27,7 +27,14 @@ this guide does not repeat them. After binding and the restart, invoke
 `/pipeline-core:pipeline-start` as the first Pipeline action: its preflight
 supplies the exact onboarding action for the observed project state. Do not
 repeat the Codex lifecycle V4 steps below for Antigravity; follow the installed
-Agy Driver's returned classification action.
+Agy [Driver](README.md#terms-used-across-these-documents)'s returned
+classification action.
+
+For Claude Code the plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`; Claude
+resolves the quoted plugin-root command on Windows, and lifecycle commands
+remain Node argv rather than shell-specific scripts. Update as in SETUP step 0.
+Accept the update only after a new `pipeline-start` identity line names
+the expected version and root.
 
 ## Fresh Codex lifecycle V4
 
@@ -40,8 +47,10 @@ classification and progression. Read the result as
 
 The installed integration exposes a session-entry hint where the runner host
 supports it; the three runner integrations do not have identical host hooks.
-In a folder without Pipeline governance, the first assistant response must briefly explain
-that Agent Pipeline provides a structured, verifiable delivery workflow and ask
+The next two paragraphs describe the agent's behavior; the human only answers
+the consent question. In a folder without Pipeline governance, the first assistant
+response must briefly explain
+that Agent-Pipeline provides a structured, verifiable delivery workflow and ask
 whether the user wants to install it. It must then stop. Before an affirmative
 answer it does not invoke `pipeline-start`, inspect onboarding, initialize Git,
 or write project files. In an already governed project, `pipeline-start`
@@ -55,7 +64,6 @@ cache version heuristically.
 | Runner | Linux and macOS | Windows | Update/readback requirement |
 | --- | --- | --- | --- |
 | Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | Install, update, and restart as in [SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host). Accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
-| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Update as in [SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host). Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
 
 The lifecycle planner returns an executable plus an argv array. Agents must
 render that exact action for the current shell when an operator has to execute
@@ -86,7 +94,7 @@ over existing project files.
 | `intake-required` | Follow the returned consent/capture action to record the project brief and required local identity fields. | The private intake checkpoint contains consent and the captured material input; it is not yet a generated specification. |
 | `intake-design-questions-required` | Answer the one bundled question round, correct wrong answers before generation when needed, then run the returned read-only generation plan and its digest-bound apply. | The complete input is durable and staging generation is bound to its digest. |
 | `bootstrap-binding-required` | Review the generated PRD/Spec, add the requested acknowledgement, then run the returned bind plan/apply. | The generated package becomes the initial project authority only after its own validation and binding readback. |
-| `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan (see the [kickoff apply contract](#kickoff-apply-contract), at the end of this guide). | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
+| `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan (see the [kickoff apply contract](#kickoff-apply-contract) under *Recovery and exceptional migrations*). | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
 | `host-repository-init-required` | For a Codex host-managed root with valid continuity, follow the exact host-repository-init plan and confirmed action described below. It can follow either the fresh binding path or the earlier kickoff route; it is not a second kickoff. | The host initializes local Git without a commit. A fresh readback is still required, and dispatch remains blocked until the first commit. |
 | `continuity-damaged` | Run the exact read-only `plan-repair`. A supported bounded repair requires a separate digest-bound confirmation; an unsupported result stops with no next action. | Only the recognized active-turn resume mismatch or an established PO-bound pre-continuity state is repairable. Kickoff history is never rewritten. |
 | `ready` | No onboarding mutation. Continue through the intent-appropriate bootstrap/session/dispatch gate. | Repository capability, current source/runtime/readback, continuity, and every capability required by that intent passed together. |
@@ -154,6 +162,8 @@ do not change `VERSION` or plugin manifests and do not commit, push, tag,
 publish, merge, close an Issue, or create a release. Those actions remain
 separate, explicitly accepted gates after same-candidate verification and the
 operator's live onboarding acceptance.
+
+### Advisor export consent
 
 Advisor and Critic export consent is not an onboarding precondition; see
 [private review export](usage.md#private-review-export). Whether the Advisor may
