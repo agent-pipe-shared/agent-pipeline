@@ -15,10 +15,15 @@
  * 2b (built as a consumer function, NOT wired end to end): admitRoleFallbackEvidence in
  * design-course-session.mjs accepts a "returned" runCanonicalRoleFallback result as the role's evidence
  * with an honest assurance label and refuses implementor self-review. runDesignCourseV2 itself is
- * behaviorally retired (ADR-0085, DESIGN-COURSE-RETIRED), so no live course path calls it; the
- * end-to-end course clause stays HELD ("the course accepts that result as the role's evidence")
- * until the Elephant decides how a retired course is re-targeted. This pin proves the admission
- * function only, never that a course consumes it.
+ * behaviorally retired (ADR-0085, DESIGN-COURSE-RETIRED), so no live course path calls it. The
+ * end-to-end clause ("the course accepts that result as the role's evidence") named a course that
+ * no longer exists. QG-04 restatement (bounded, PO decision D125 of 2026-10-22): the acceptance is
+ * restated against the single-review route, where fallback evidence goes to the present-plan
+ * --review-receipt route; the retired-course wording is not a held assertion any more. This pin still
+ * proves the admission function only. It does NOT yet prove that the review-receipt route consumes a
+ * returned fallback result: the receipt producer records only a requested route and an observed
+ * identity, and nothing hands it the typed fallback record (K111: product wiring missing, so no case
+ * is added here; the open entry stays open on the item).
  * 5 (P1-1 bullet 3, standalone, NOT wired into a caller): lib/dispatch-recovery-state.mjs keeps one atomic recovery
  *   state per task identity (dispatchId + role + candidate) with a bounded attempt history; see the point-5 cases.
  * 6 (P1-1 bullet 2, briefing-side consumer of the declared route, no new guard): the agent-obligations document and the Goldfish
