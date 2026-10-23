@@ -16,6 +16,15 @@ Class B: `verify-evidence-producer-tests` (private HOME lacks `init.defaultBranc
 Class D race: `prepareAddressRoot` (`session-power.mjs:369`) fails with `fixed address namespace changed` under concurrent processes sharing one HOME (seen in `native-goldfish-host-state-tests` and the finalizer suite); a real race, only visible with concurrency.
 Class A, not applied: `codex-isolated-critic-protected-preimage-tests`, six pinned Critic-file hashes changed since the 2026-10-05 re-pin; belongs to the C28 re-pin step.
 
+## K143 results (series V tooling fixes; implementation complete, independent Critic read, operator commit of the protected part and PO acceptance pending)
+
+- V1: `SKILL.md` trimmed 24,673 to 24,373 bytes, no rule, command, status name or pointer removed; both budget suites green. Needs a re-stamp, nothing else regenerates.
+- V2: `semgrep.mjs` gets an explicit 64 MiB `maxBuffer` (SEM-B pins, one RED first). `security-scan` then exits 0, verdict CLEAN; the 42 findings of the Full Verify classification did not reproduce (0 results, 13 PartialParsing, 2711 files in three checkouts). Confirm in the next Full Verify.
+- V3: cause is `91f728f85` extending four `caseCompletion.caseIds` lists in place. Fix = a third recovery kind `rewrites` in `harness/verify-suite-history-recovery.json` plus `evaluateCaseListExtension` in the protected `check-verify-suite-append.mjs`. The unprotected part is committed (`60ff09ed2`), including the new witness test, which stays red until the protected diff `evidence/verify-fixes/k143-protected.diff` is applied by the operator. Future sittings should grow case-ID lists through the augmentations file.
+- V4 wrapper: `scripts/full-verify.mjs` replaces `scratch/fv-run.mjs` (private HOME with git identity and `init.defaultBranch=main`, short TMPDIR, real node binary). Not run end to end.
+- Open from the hand-back: `codex-critic-host-tests` CCH136/CCH137 were red in the same batch; not examined on the base (see K145 section). `architecture-boundary-check` reports `unowned-path` findings including the accepted row 45 for `scripts/full-verify.mjs`; total not counted.
+- Files: `specs/sprint-alfred-epic/evidence/verify-fixes/k143-*`.
+
 ## G1 fix questions (for the batch, not decided)
 
 - What does the family check protect on Claude (a dispatch must not silently run another family than the agent definition declares, MP-29)? A Codex dispatch has no Claude alias, so the check needs a runner-aware reading, not a removal.

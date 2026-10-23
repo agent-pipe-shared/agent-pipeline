@@ -1,0 +1,6 @@
+fix(verify): accept the recorded in-place case-list extension of 91f728f85 in the append-history check
+
+Adds a third narrow, historical, unsigned exception kind (rewrites) to check-verify-suite-append: bound to one commit, its parent and their registry digests, with the witness re-derived from bytes (every prior row unchanged except a strict caseCompletion.caseIds extension). The recorded b7 restoration is proven against the registry state just before that commit. Requires the committed rewrites entry in harness/verify-suite-history-recovery.json (unprotected diff).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

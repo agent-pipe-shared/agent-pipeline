@@ -1,0 +1,142 @@
+diff --git a/harness/scripts/check-verify-suite-append.mjs b/harness/scripts/check-verify-suite-append.mjs
+index 7204e371c..3395eeceb 100644
+--- a/harness/scripts/check-verify-suite-append.mjs
++++ b/harness/scripts/check-verify-suite-append.mjs
+@@ -92,13 +92,87 @@ function exactDuplicateRepairShape(entry) {
+     && /historical/iu.test(entry.reason) && entry.reason.length >= 40;
+ }
+ 
++// K143 (Full Verify V3): the third narrow, historical, unsigned exception kind. Commit 91f728f85
++// extended the caseCompletion.caseIds lists of existing rows in place (a row rewrite, not an
++// insertion) next to one inserted row. The entry names that one commit, its parent and both
++// registry digests; the witness derives the rest from bytes: every prior row survives in order,
++// byte-identical except that its caseCompletion.caseIds strictly extend (same order, same maxBytes).
++const REWRITE_ENTRY_SCHEMA = "pipeline.verify-suite-case-list-extension-entry.v1";
++const REWRITE_ENTRY_KEYS = ["commit", "owner", "parent", "postimageSha256", "preimageSha256", "reason", "schema", "signed"]
++  .sort().join("\0");
++
++function exactRewriteShape(entry) {
++  return entry !== null && typeof entry === "object" && !Array.isArray(entry)
++    && Object.keys(entry).sort().join("\0") === REWRITE_ENTRY_KEYS
++    && entry.schema === REWRITE_ENTRY_SCHEMA
++    && fullOid(entry.commit) && fullOid(entry.parent) && entry.commit !== entry.parent
++    && SHA256.test(entry.preimageSha256 ?? "") && SHA256.test(entry.postimageSha256 ?? "")
++    && entry.owner === "Elephant" && entry.signed === false
++    && typeof entry.reason === "string" && /unsigned/u.test(entry.reason)
++    && /historical/iu.test(entry.reason) && entry.reason.length >= 40;
++}
++
++function extendsCaseList(before, after) {
++  const prior = before?.caseCompletion?.caseIds;
++  const next = after?.caseCompletion?.caseIds;
++  if (!Array.isArray(prior) || !Array.isArray(next) || next.length <= prior.length
++    || !(after.caseCompletion.maxBytes >= before.caseCompletion.maxBytes)) return false;
++  let at = 0;
++  for (const id of prior) {
++    while (at < next.length && next[at] !== id) at += 1;
++    if (at === next.length) return false;
++    at += 1;
++  }
++  const { caseIds: _a, maxBytes: _b, ...beforeRest } = before.caseCompletion;
++  const { caseIds: _c, maxBytes: _d, ...afterRest } = after.caseCompletion;
++  return canonical(beforeRest) === canonical(afterRest);
++}
++
++/** Pure witness: digests match the entry and `after` is `before` with in-place case-list extensions and insertions only. */
++export function evaluateCaseListExtension({ entry, commit, parent, beforeBytes, afterBytes } = {}) {
++  if (!exactRewriteShape(entry)) return fail("VSA-REWRITE-SHAPE");
++  if (commit !== entry.commit || parent !== entry.parent
++    || sha256Hex(beforeBytes) !== entry.preimageSha256 || sha256Hex(afterBytes) !== entry.postimageSha256) {
++    return fail("VSA-REWRITE-AUTHORIZATION");
++  }
++  const before = parseRegistry(beforeBytes);
++  const after = parseRegistry(afterBytes);
++  if (!before || !after || after.suites.length < before.suites.length) return fail("VSA-REWRITE-SHAPE");
++  let at = 0;
++  let extended = 0;
++  for (const prior of before.suites) {
++    const key = canonical(prior);
++    while (at < after.suites.length) {
++      const row = after.suites[at];
++      if (canonical(row) === key) break;
++      if (row?.name === prior.name && row?.file === prior.file && extendsCaseList(prior, row)
++        && canonical({ ...row, caseCompletion: prior.caseCompletion }) === key) { extended += 1; break; }
++      at += 1;
++    }
++    if (at === after.suites.length) return fail("VSA-REWRITE-PRIOR-ENTRY-CHANGED");
++    at += 1;
++  }
++  if (extended === 0) return fail("VSA-REWRITE-NO-EXTENSION");
++  const names = new Set();
++  const files = new Set();
++  for (const row of after.suites) {
++    if (!validIdentity(row) || names.has(row.name) || files.has(row.file)) return fail("VSA-REWRITE-ENTRY");
++    names.add(row.name);
++    files.add(row.file);
++  }
++  return { ok: true, code: "VSA-REWRITE-VERIFIED", extendedRows: extended };
++}
++
+ function exactRecoveryShape(value) {
+   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+   const keys = Object.keys(value).sort().join("\0");
+-  if (keys !== "entries\0schema" && keys !== "duplicateRepairs\0entries\0schema") return false;
++  if (!["entries\0schema", "duplicateRepairs\0entries\0schema", "entries\0rewrites\0schema",
++    "duplicateRepairs\0entries\0rewrites\0schema"].includes(keys)) return false;
+   if (Object.hasOwn(value, "duplicateRepairs")
+     && !(Array.isArray(value.duplicateRepairs) && value.duplicateRepairs.length === 1
+       && exactDuplicateRepairShape(value.duplicateRepairs[0]))) return false;
++  if (Object.hasOwn(value, "rewrites")
++    && !(Array.isArray(value.rewrites) && value.rewrites.length === 1 && exactRewriteShape(value.rewrites[0]))) return false;
+   return value.schema === RECOVERY_SCHEMA && Array.isArray(value.entries)
+     && value.entries.length === 1 && exactEntryShape(value.entries[0]);
+ }
+@@ -242,6 +316,26 @@ export function evaluateDuplicateRepair({
+   return { ok: true, code: "VSA-DUPREPAIR-VERIFIED" };
+ }
+ 
++function readRewrite(root, read) {
++  try {
++    const value = parseStrictJson(read(resolve(root, RECOVERY), "utf8"));
++    return exactRecoveryShape(value) && Object.hasOwn(value, "rewrites") ? value.rewrites[0] : null;
++  } catch { return null; }
++}
++
++function bindRewrite({ root, run, read, entry }) {
++  if (!entry) return null;
++  try {
++    if (run(["show", "HEAD:" + RECOVERY]) !== read(resolve(root, RECOVERY), "utf8")) return null;
++    const line = run(["rev-list", "--parents", "-n", "1", entry.commit]).trim().split(/\s+/u);
++    if (line.length !== 2 || line[0] !== entry.commit || line[1] !== entry.parent) return null;
++    const beforeBytes = run(["show", entry.parent + ":" + REGISTRY]);
++    const afterBytes = run(["show", entry.commit + ":" + REGISTRY]);
++    const result = evaluateCaseListExtension({ entry, commit: entry.commit, parent: entry.parent, beforeBytes, afterBytes });
++    return result.ok ? { entry, beforeBytes } : null;
++  } catch { return null; }
++}
++
+ function bindDuplicateRepair({ root, run, read, entry }) {
+   if (!entry) return null;
+   try {
+@@ -320,7 +414,10 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
+     if (!OID.test(head)) return fail("VSA-HEAD");
+     const worktree = read(resolve(root, REGISTRY), "utf8");
+     const entry = readRecovery(root, read);
+-    const recovery = bindRecovery({ root, run, read, candidateBytes: worktree, entry });
++    const rewrite = bindRewrite({ root, run, read, entry: readRewrite(root, read) });
++    // The b7 restoration is proven against the registry state just before the recorded in-place
++    // case-list extension when one is recorded; every commit after it is checked by the walk below.
++    const recovery = bindRecovery({ root, run, read, candidateBytes: rewrite ? rewrite.beforeBytes : worktree, entry });
+     const configCommits = run(["log", "--first-parent", "--reverse", "--format=%H", "--", CONFIG])
+       .trim().split("\n").filter(Boolean);
+     let introduction = null;
+@@ -361,6 +458,9 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
+           && before === recovery.defectBytes && after === recovery.restoredBytes) {
+           // This is the one exact defect-to-restoration transition. Any other
+           // historical failure remains subject to the original prefix policy.
++        } else if (rewrite && commit === rewrite.entry.commit
++          && sha256Hex(before) === rewrite.entry.preimageSha256 && sha256Hex(after) === rewrite.entry.postimageSha256) {
++          // The one recorded in-place case-list extension (bound to this commit and its bytes).
+         } else if (dup && !dupAddSeen && commit === dup.entry.addCommit
+           && sha256Hex(before) === dup.entry.addPreimageSha256 && sha256Hex(after) === dup.entry.addPostimageSha256) {
+           dupAddSeen = true;

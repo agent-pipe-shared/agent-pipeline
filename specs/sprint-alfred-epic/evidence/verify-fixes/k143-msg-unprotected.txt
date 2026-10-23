@@ -1,0 +1,6 @@
+fix(pipeline-core): K143 Full Verify tooling fixes (skill budget, semgrep buffer, verify wrapper, case-list witness test)
+
+Trim pipeline-start SKILL.md to 24373 bytes; give the semgrep adapter an explicit 64 MiB maxBuffer with SEM-B pins; record the historical 91f728f85 case-list extension in harness/verify-suite-history-recovery.json; add scripts/full-verify.mjs and list it in docs/operating-tools.md; pin the new witness in check-verify-suite-append.test.mjs.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
