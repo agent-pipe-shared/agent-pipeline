@@ -4,24 +4,21 @@ The reader path is the Newcomer box of the top-level [README](../README.md).
 Use the rest of this map as reference; [`overview.md`](overview.md) is a short
 companion, not a competing front door.
 
-**Terms:** *PO* means Product Owner, the human who decides. The *Coordinator*
-is the main session that dispatches work (the README calls this role the
-Elephant).
-
 **Command convention:** In user-repository examples, `<plugin-root>` is the
 installed directory of the approved GitHub-distributed `pipeline-core` plugin;
 `<absolute-plugin-root>` is the same directory written as an absolute path.
 `<project-root>` and `<repo>` are the root of the governed repository.
+`<feature-id>` is the identifier of one feature under `specs/`.
 Run commands from the governed repository unless the example says otherwise.
-`<plugin-root>` never means a maintainer checkout.
+`<plugin-root>` never means a maintainer checkout. Terms such as PO, Driver and
+Feature Package are defined in
+[Terms used across these documents](#terms-used-across-these-documents).
 
 **Audience rule:** This map, Setup, Usage, the flow, enforcement, evidence,
 security, cost, onboarding, and operation pages describe what an application
 repository does with the installed plugin. Source-maintainer procedures are
 explicitly labelled and isolated in the maintainer sections, local-development
 guides, release records, architecture decision records, and state archives.
-Those durable records retain their original repository/commit context as
-evidence; they are not copy-and-run instructions for a consumer project.
 
 ## Adoption
 
@@ -33,8 +30,8 @@ evidence; they are not copy-and-run instructions for a consumer project.
 - [`usage.md#assess-architecture-adoption-in-an-existing-project`](usage.md#assess-architecture-adoption-in-an-existing-project)
   — read-only status and proposal before an existing project adopts the
   architecture controls.
-- [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
-  integration boundaries.
+- [`overview.md`](overview.md) — the `0.7.0` release status and the Phoenix and
+  Nova product strands.
 - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
   preview-first migration and the Codex lifecycle V4.
 - [`migration.md`](migration.md) — pointer to the current onboarding and V3
@@ -91,8 +88,6 @@ evidence; they are not copy-and-run instructions for a consumer project.
 
 - [`operating-model.md`](operating-model.md) — normative roles, lifecycle,
   review, evidence, and human authority.
-- [`overview.md`](overview.md) — the `0.7.0` release status and the Phoenix and
-  Nova product strands.
 - [`design-decisions.md`](design-decisions.md) — the "why" behind the method.
 - [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — what was new in the `0.6.0`
   release: product scope, release boundary, and non-claims at that time.
@@ -108,6 +103,8 @@ evidence; they are not copy-and-run instructions for a consumer project.
 
 ## Operations and reference
 
+- [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
+  integration boundaries.
 - [`observation-intake.md`](observation-intake.md) — public observation intake,
   privacy routing, triage, and backlog-link governance.
 - [`github-issue-operations.md`](github-issue-operations.md) — project-scoped
@@ -117,8 +114,7 @@ evidence; they are not copy-and-run instructions for a consumer project.
 
 ## Maintainer reference
 
-These documents are classified as maintainer material in the repository's
-documentation governance.
+Classified as maintainer material.
 
 - [`po-human-approval.md`](po-human-approval.md) — the one-time external-key
   setup and the bounded human signing commands; agent-side preparation remains
@@ -132,3 +128,27 @@ documentation governance.
 - [`nova-execution-plane-threat-model.md`](nova-execution-plane-threat-model.md)
   — execution-plane scope, evidence, and intentionally excluded claims.
 - [`adr/`](adr/) — durable decisions and rationale.
+
+## Terms used across these documents
+
+- **Agent-Pipeline** — the product name; always spelled with the hyphen.
+- **PO** — Product Owner, the human who decides.
+- **Coordinator / Elephant** — the same role: the long-lived main session that
+  dispatches work. Prose uses Coordinator; the README and the flow also use its
+  role name, Elephant.
+- **Driver** — the onboarding driver of the public Pipeline-start path: it
+  inspects the directory and returns the next structured action.
+- **Trust anchor** — the one-time human-approval key setup that a project on
+  the default `signature` approval mode needs before its first signature-path
+  gate; see [Setup](../SETUP.md#human-approval-key-one-time-setup).
+- **Feature Package** — the validated artifacts of one governed feature, kept
+  under `specs/<feature-id>/` with a lifecycle manifest; an Audit Bundle is a
+  copy of one.
+- **Greenfield** — a new project that starts from an empty directory.
+- **OKF** — the format of the machine-readable architecture map of the
+  forthcoming `0.7.0` line.
+- **EARS** — the sentence-template style for acceptance criteria that a spec
+  uses so each criterion can be linked to a test.
+- **Candidate** — two meanings: the *release candidate* is a version that is
+  not yet released (`0.7.0` today); the *candidate commit* is the commit under
+  verification, to which receipts and reviews are bound.
