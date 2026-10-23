@@ -253,7 +253,7 @@ function createReadyLifecycleFixture(mode = "chat") {
     "the test fixture explicitly grants local intake consent through the returned action");
   const captured = collect(runtimeInspection, {
     "<PO_INTAKE_LANGUAGE>": "en",
-    "<PO_INTAKE_PROFILE>": "feature",
+    "<PO_INTAKE_PROFILE>": "mini", // not "feature": epic/feature binds its draft unapproved (finalPackageProfile, 1bd1d7bf6) and skips the design stop and chat acknowledgement below (K144)
   }, "HGO test fixture material.\n");
   assert.equal(captured.status, "applied", JSON.stringify(captured));
   runtimeInspection = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
@@ -329,7 +329,12 @@ function createReadyLifecycleFixture(mode = "chat") {
     },
   };
   const prdPath = join(root, designStop.nextAction.prdPath);
-  writeFileSync(prdPath, `${readFileSync(prdPath, "utf8")}\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture, null, 2)}\n\`\`\`\n`);
+  // K144: the acknowledgement refuses a generated draft (BOOTSTRAP-ACK-PLACEHOLDER-CONTENT), so author the package and bind the spec digest via the marker route, as the Antigravity ready-fixture does.
+  const language = readFileSync(prdPath, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
+  writeFileSync(join(root, generated.targets.spec.path), "# Completed HGO fixture specification\n\n## Acceptance criteria\n- AC-01: WHEN the HGO fixture is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n\n## Architecture\nThe intake checkpoint owns package paths; the marker writer binds the final specification digest.\n");
+  writeFileSync(prdPath, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed HGO fixture design\n\n## Goal\nExercise lifecycle-guard coverage for the Codex adapter.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture, null, 2)}\n\`\`\`\n`);
+  const markerPlan = lifecycleCommand(root, "intake-spec-marker-plan", "--root", root, "--runner", "codex");
+  lifecycleCommand(root, "intake-spec-marker-apply", "--root", root, "--plan-sha256", markerPlan.planSha256, "--activate", "--runner", "codex");
   // Even this chat-mode fixture must use the dedicated acknowledgement
   // writer.  A generated draft is never permitted to skip directly to bind.
   followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-acknowledge-chat-apply");
@@ -508,7 +513,8 @@ check("descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing f
   const sessionStart = descriptor.hooks.SessionStart;
   assert.equal(sessionStart.length, 1);
   assert.equal(sessionStart[0].matcher, "startup|resume|clear|compact");
-  assert.equal(sessionStart[0].hooks[0].command, "node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"");
+  // K144, QG-04 restatement at equal strength: the SessionStart hint ships `--runner codex` (read by codex-session-start-hint.mjs).
+  assert.equal(sessionStart[0].hooks[0].command, "node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\" --runner codex");
   assert.equal(sessionStart[0].hooks[0].commandWindows, sessionStart[0].hooks[0].command);
   assert.equal(sessionStart[0].hooks[0].timeout, 3);
   const entries = descriptor.hooks.PreToolUse;

@@ -266,7 +266,10 @@ test("actual Agy S2 S4 S5 native callers launch each signed successor once and r
         assert.equal((await finalizeAgyFamilyHostObservedReturn({ sealed: { ...sealed, ...drift }, launched: pending })).code, "AGY-FAMILY-FINALIZE-WITNESS-DRIFT");
         assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.root, encoding: "utf8" }).trim(), f.candidate.commit, "drift refuses before commit");
       }
-      const delivered = await finalizeAgyFamilyHostObservedReturn({ sealed, launched: pending }); assert.equal(delivered.status, "authored-commit-recorded", JSON.stringify(delivered));
+      // The private receipt is published under a source-owned requester (withSourceOwnedAgyHostObservedPublication,
+      // AGY-HOST-STORE-REQUESTER-UNAVAILABLE without one), so the delivering finalize runs inside the controlled-unit-method
+      // carrier like every other positive route of this suite (K144; the drift refusals above fail before publication).
+      const delivered = await f.runtime.run(() => finalizeAgyFamilyHostObservedReturn({ sealed, launched: pending })); assert.equal(delivered.status, "authored-commit-recorded", JSON.stringify(delivered));
       assert.equal(readFileSync(hookMarker, "utf8"), "invoked", "ordinary Git hook executes without bypass");
       const git = (...args) => execFileSync("git", args, { cwd: f.root, encoding: "utf8" }).trim();
       assert.equal(git("rev-parse", "HEAD^"), f.candidate.commit); assert.equal(git("rev-parse", "HEAD"), delivered.record.commit);
