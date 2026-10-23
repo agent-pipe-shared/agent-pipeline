@@ -36,7 +36,7 @@
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -62,7 +62,8 @@ import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
 import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
-import { readDispatchRecordLiveness } from "../lib/dispatch-record-liveness.mjs";
+// D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
+import { readRunningDispatches } from "../lib/dispatch-record-liveness.mjs";
 import { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } from "../lib/slice-queue.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
 import * as sessionAuthorityRegistry from "../lib/session-authority-registry.mjs";
@@ -165,42 +166,7 @@ function defaultQueueRow(root, sliceId) {
   } catch { return null; }
 }
 
-const BRIEFING_SCAN_LIMIT = 500;
-const BRIEFING_READ_LIMIT = 1048576;
-
-/** The allowed paths of every generated briefing directly under scratch/, by dispatch id (read-only, bounded, never throws). */
-function briefedWriteScopes(root) {
-  const scopes = new Map();
-  let names = [];
-  try { names = readdirSync(resolve(root, "scratch")).filter((name) => name.endsWith(".md")).sort().slice(0, BRIEFING_SCAN_LIMIT); } catch { return scopes; }
-  for (const name of names) {
-    const bytes = readRepoFile(root, `scratch/${name}`);
-    if (!bytes || bytes.byteLength > BRIEFING_READ_LIMIT || !bytes.includes(BLOCK_OPEN.slice(0, BLOCK_OPEN.lastIndexOf(":v") + 2))) continue;
-    try {
-      const parsed = parseNativeGoldfishBriefing(bytes.toString("utf8"));
-      if (parsed.ok && !scopes.has(parsed.binding.dispatchId)) scopes.set(parsed.binding.dispatchId, [...parsed.binding.allowedPaths]);
-    } catch { /* a file that is not a briefing is not a source of scopes */ }
-  }
-  return scopes;
-}
-
-/**
- * D76: the dispatches that may still be writing in this checkout, each with its write scope when it can be read.
- * A dispatch is running while its record (evidence/dispatch-record-<id>.json) is open and its owner is not provably
- * gone (the existing liveness readback: alive, or unjudgeable, which is the usual Claude case). Its scope is the
- * governed queue row's write scope, else the allowed paths of its generated briefing under scratch/; `writeScope`
- * is null when neither exists. A checkout whose records cannot be read has no running dispatch to judge.
- */
-function defaultRunningDispatches(root) {
-  let records;
-  try { records = readDispatchRecordLiveness(root).records.filter((entry) => entry.verdict !== "gone"); } catch { return []; }
-  if (records.length === 0) return [];
-  const briefed = briefedWriteScopes(root);
-  return records.map((entry) => ({
-    dispatchId: entry.taskId, verdict: entry.verdict, record: entry.record,
-    writeScope: defaultQueueRow(root, entry.taskId)?.writeScope ?? briefed.get(entry.taskId) ?? null,
-  }));
-}
+const defaultRunningDispatches = (root) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing });
 
 /** K12: the session-authority registry lock as a reader sees it (never taken), or null when it cannot be observed. */
 function defaultRegistryLock(root) {
