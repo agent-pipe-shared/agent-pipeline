@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 //
-// session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root> [--no-goldfish-running | --no-pipeline-running | --no-other-session-running] [--from <session>] [--reason "<why>"] [--timeout <seconds>]
+// session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait|take-over> --root <root> [--no-goldfish-running | --no-pipeline-running | --no-other-session-running] [--from <session>] [--reason "<why>"] [--class <budget|wrong-premise|review-defect|integrated-elsewhere|superseded>] [--timeout <seconds>]
 //
 // D52 (2), PF-55: the general repair every SDC-AUTHORITY-* refusal names. None of the verbs needs a bound
 // session, so each runs from the agent's shell and from the PO's terminal alike.
@@ -28,7 +28,8 @@
 //               is gone, so a loop waits instead of retrying blind.
 //   take-over   Q13 (a), D57: frees every item operation the named session --from started and did not settle, so
 //               this session can dispatch those slices again. Whether that session still lives cannot be observed,
-//               so this rests on the caller's word (--no-other-session-running) and --reason. Each such slice is
+//               so this rests on the caller's word (--no-other-session-running), --reason and --class (D75: why
+//               the slices end, one class for all of them; the same vocabulary as slice-queue.mjs cancel). Each such slice is
 //               cancelled through the ordinary started cancel (its reservation stops blocking, nothing of it is
 //               delivered), and the decision is retained under session-authority-abandoned like move-aside. It
 //               rewrites no other session's binding and does not transfer the continuity cleanup slot, which
@@ -45,11 +46,15 @@ import { createSessionAuthorityParticipantPorts } from "../lib/session-authority
 import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
 import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
 import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
+import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass } from "../lib/slice-queue.mjs";
 
 const SCHEMA = "pipeline.session-authority-repair.v1";
 const SELF = fileURLToPath(import.meta.url);
 const SLICE_QUEUE = fileURLToPath(new URL("./slice-queue.mjs", import.meta.url));
 const IN_FLIGHT = new Set(["armed", "running"]);
+// D75: the class every cancel names, and one teaching line per class, read from the queue library's vocabulary.
+const CLASS_ARGUMENT = `--class <${CANCEL_CLASSES.join("|")}>`;
+const CLASS_TEACHING = `Pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")}`;
 
 const sorted = (value) => Array.isArray(value) ? value.map(sorted)
   : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, sorted(value[key])])) : value;
@@ -63,7 +68,7 @@ export function sessionAuthorityRepairCommand(root, verb = "inspect") {
 
 // Each verb's own assertion flag and value flags (FB3-PF-55: release-lock, wait).
 const ASSERTION = { "move-aside": "no-goldfish-running", "release-lock": "no-pipeline-running", "take-over": "no-other-session-running" };
-const VALUES = { inspect: ["root"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"], "take-over": ["root", "from", "reason"] };
+const VALUES = { inspect: ["root"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"], "take-over": ["root", "from", "reason", "class"] };
 const validReason = (reason) => typeof reason === "string" && reason.trim() !== "" && reason.length <= 500 && !/[\u0000-\u001f\u007f]/u.test(reason);
 const validSession = (session) => typeof session === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(session);
 
@@ -85,7 +90,9 @@ function parse(argv) {
   if (verb === "release-lock" && (flags["no-pipeline-running"] !== true || !validReason(flags.reason)))
     return { error: "release-lock needs --no-pipeline-running (you assert that no Pipeline process runs for this repository) and --reason \"<one line>\"" };
   if (verb === "take-over" && (flags["no-other-session-running"] !== true || !validSession(flags.from) || !validReason(flags.reason)))
-    return { error: "take-over needs --from <session id>, --no-other-session-running (you assert that the named session and its Goldfish no longer run) and --reason \"<one line>\"" };
+    return { error: `take-over needs --from <session id>, --no-other-session-running (you assert that the named session and its Goldfish no longer run), --reason "<one line>" and ${CLASS_ARGUMENT}` };
+  // D75: every cancel names why the slice ends; take-over cancels each slice it frees, so it carries one class for all of them.
+  if (verb === "take-over") { const verdict = checkCancelClass(flags.class); if (!verdict.ok) return { error: `take-over needs ${CLASS_ARGUMENT}: ${verdict.reason}. ${verdict.repair}` }; }
   if (verb === "wait") {
     const timeout = flags.timeout === undefined ? 60 : Number(flags.timeout);
     if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600) return { error: "--timeout needs whole seconds from 1 to 600" };
@@ -192,12 +199,12 @@ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
   const held = lockStep(root, lock);
   if (held) next.push(held);
   const open = reservations.filter((row) => row.sliceId && row.settled === null);
-  const cancelCommand = (sliceId) => `node ${SLICE_QUEUE} cancel ${sliceId} --started --reason "<why>"`;
-  for (const row of open) next.push({ why: `slice ${row.sliceId} still holds its item reservation; if it delivered, commit its work with the trailer "Dispatch: ${row.sliceId} (goldfish)"; if its Goldfish no longer runs, cancel it`, command: cancelCommand(row.sliceId) });
+  const cancelCommand = (sliceId) => `node ${SLICE_QUEUE} cancel ${sliceId} --started --reason "<why>" ${CLASS_ARGUMENT}`;
+  for (const row of open) next.push({ why: `slice ${row.sliceId} still holds its item reservation; if it delivered, commit its work with the trailer "Dispatch: ${row.sliceId} (goldfish)"; if its Goldfish no longer runs, cancel it. ${CLASS_TEACHING}`, command: cancelCommand(row.sliceId) });
   // Q13 (a): every slice of a session other than this one is freed at once with take-over.
   const here = scratchSessionId(scratch?.env ?? {});
   for (const from of [...new Set(open.map((row) => row.sessionId).filter((id) => validSession(id) && id !== here))].sort())
-    next.push({ why: `session ${from} started ${open.filter((row) => row.sessionId === from).map((row) => row.sliceId).join(", ")}; if that session and its Goldfish no longer run, free them all for this session`, command: `${sessionAuthorityRepairCommand(root, "take-over")} --from ${from} --no-other-session-running --reason "<why>"` });
+    next.push({ why: `session ${from} started ${open.filter((row) => row.sessionId === from).map((row) => row.sliceId).join(", ")}; if that session and its Goldfish no longer run, free them all for this session. ${CLASS_TEACHING}`, command: `${sessionAuthorityRepairCommand(root, "take-over")} --from ${from} --no-other-session-running --reason "<why>" ${CLASS_ARGUMENT}` });
   const drifted = registry.producers.filter((row) => row.status === "drifted");
   const broken = registry.producers.filter((row) => ["unreadable", "reconcile-refused", "missing"].includes(row.status));
   // A catalogue another plugin version wrote is migrated on the next boundary entry (PF-52), which heal performs.
@@ -239,18 +246,18 @@ function lockRefusal(error, root) {
 }
 
 /** Q13 (a): cancels, on the caller's word, every unsettled item slice the named session started, and retains the decision. */
-function takeOver(repository, root, from, reason) {
+function takeOver(repository, root, from, reason, cancelClass) {
   const owned = reservationReport(repository, root).filter((row) => row.sessionId === from && row.sliceId && row.settled === null);
   const slices = [...new Set(owned.map((row) => row.sliceId))].sort();
   if (!slices.length) return { status: "nothing-to-take-over", from, reason: `no unsettled item operation of session ${from} is recorded` };
   const cancelled = [], refused = [];
   for (const sliceId of slices) {
-    const result = cancelUnstartedGovernedItemSlice({ root, sliceId, reason: `take-over from session ${from}: ${reason}`, started: true });
-    (result.status === "cancelled" ? cancelled : refused).push({ sliceId, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
+    const result = cancelUnstartedGovernedItemSlice({ root, sliceId, reason: `take-over from session ${from}: ${reason}`, started: true, cancelClass });
+    (result.status === "cancelled" ? cancelled : refused).push({ sliceId, code: result.code, ...(result.reason ? { reason: result.reason } : {}), ...(result.status === "cancelled" ? { cancelClass: result.cancelClass } : {}) });
   }
   const dir = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", `${new Date().toISOString().replace(/[^0-9]/gu, "")}-${randomBytes(4).toString("hex")}-take-over`);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
-  writeFileSync(join(dir, "take-over.json"), `${JSON.stringify({ schema: "pipeline.session-authority-take-over.v1", from, reason, at: new Date().toISOString(), assertion: "no-other-session-running", cancelled, refused }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+  writeFileSync(join(dir, "take-over.json"), `${JSON.stringify({ schema: "pipeline.session-authority-take-over.v1", from, reason, cancelClass, at: new Date().toISOString(), assertion: "no-other-session-running", cancelled, refused }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
   return { status: refused.length ? "refused" : "taken-over", ...(refused.length ? { code: "SAR-TAKE-OVER-INCOMPLETE" } : {}), from, cancelled, refused,
     note: "the cancelled slices no longer hold their item reservations; queue new slices for those items from this session" };
 }
@@ -283,7 +290,7 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
   if (parsed.verb === "take-over") {
     const before = new Set(markers(repository));
     let taken;
-    try { taken = takeOver(repository, root, parsed.flags.from, parsed.flags.reason.trim()); }
+    try { taken = takeOver(repository, root, parsed.flags.from, parsed.flags.reason.trim(), parsed.flags.class); }
     catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: short(error) }, 2); }
     return emit({ ...taken, retained: markers(repository).filter((name) => !before.has(name)), ...inspect(repository, root, { scratch }) }, taken.status === "refused" ? 2 : 0);
   }

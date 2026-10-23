@@ -10,6 +10,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_STALE_AFTER_MINUTES as LEDGER_STALE_MINUTES } from "./fanout-ledger.mjs";
 import {
+  CANCEL_CLASSES,
+  UNCLASSIFIED_CANCEL,
+  checkCancelClass,
   DEFAULT_MAX_ATTEMPTS,
   DEFAULT_STALE_AFTER_MINUTES,
   loadSliceQueue,
@@ -691,7 +694,64 @@ check("v2 unbound legacy migration is readable and held; forged readiness and cr
   const folded=queue([slice('ITEM-A',['src/Thing.mjs'],{delivery:delivery('AC-1')}),slice('ITEM-B',['src/thing.mjs'],{delivery:delivery('AC-2')})]);folded.schema='pipeline.slice-queue.v2';
   assert.equal(validateSliceQueue(folded,WIN).ok,false);assert.equal(validateSliceQueue(folded,MAC).ok,false);
 });
-assert.equal(cases.length, 37,"the complete slice-queue corpus must be registered before execution begins");
+check("D75 cancel class: the five classes are accepted on a cancelled slice, a legacy cancelled row is reported unclassified, a live row carries none", () => {
+  assert.deepEqual([...CANCEL_CLASSES], ["budget", "wrong-premise", "review-defect", "integrated-elsewhere", "superseded"]);
+  assert.equal(UNCLASSIFIED_CANCEL, "unclassified");
+  for (const cancelClass of CANCEL_CLASSES) {
+    const result = validateSliceQueue(queue([slice("A", ["lib/a.mjs"], { state: "cancelled", holdReason: "dropped", cancelClass })]), LINUX);
+    assert.equal(result.ok, true, `${cancelClass}: ${JSON.stringify(result.errors)}`);
+    assert.equal(result.queue.slices[0].cancelClass, cancelClass);
+  }
+  const mixed = validateSliceQueue(queue([
+    slice("LEGACY", ["lib/a.mjs"], { state: "cancelled", holdReason: "dropped before D75" }),
+    slice("LIVE", ["lib/b.mjs"]),
+  ]), LINUX);
+  assert.equal(mixed.ok, true, JSON.stringify(mixed.errors));
+  assert.equal(mixed.queue.slices[0].cancelClass, "unclassified", "a cancelled row without a class is never silently treated as classified");
+  assert.equal(mixed.queue.slices[1].cancelClass, null);
+});
+
+check("D75 cancel class: an unknown, non-string or misplaced class is refused SQ-CANCEL-CLASS and the message names the five classes; a missing class is refused by checkCancelClass", () => {
+  const refused = (extra) => validateSliceQueue(queue([slice("A", ["lib/a.mjs"], extra)]), LINUX);
+  for (const [label, extra] of [
+    ["unknown class", { state: "cancelled", holdReason: "dropped", cancelClass: "whatever" }],
+    ["empty class", { state: "cancelled", holdReason: "dropped", cancelClass: "" }],
+    ["non-string class", { state: "cancelled", holdReason: "dropped", cancelClass: 3 }],
+    ["the reserved word unclassified", { state: "cancelled", holdReason: "dropped", cancelClass: "unclassified" }],
+    ["class on a ready slice", { cancelClass: "budget" }],
+    ["class on a held slice", { state: "hold-po", holdReason: "PO", cancelClass: "budget" }],
+  ]) {
+    const result = refused(extra);
+    assert.equal(result.ok, false, label);
+    const found = result.errors.find((error) => error.code === "SQ-CANCEL-CLASS");
+    assert.ok(found, `${label}: ${JSON.stringify(result.errors)}`);
+    assert.ok(!result.errors.some((error) => error.code === "SQ-SCHEMA" && /unknown key/u.test(error.message)), `${label}: cancelClass is a known key`);
+    for (const cancelClass of CANCEL_CLASSES) assert.ok(found.message.includes(cancelClass), `${label}: message names ${cancelClass}`);
+  }
+  assert.deepEqual(checkCancelClass("budget"), { ok: true, cancelClass: "budget" });
+  for (const bad of [undefined, null, "", "nope", 7, "unclassified"]) {
+    const result = checkCancelClass(bad);
+    assert.equal(result.ok, false, String(bad));
+    assert.equal(result.code, "SQ-CANCEL-CLASS");
+    for (const cancelClass of CANCEL_CLASSES) assert.ok(result.reason.includes(cancelClass) && result.repair.includes(cancelClass), `${String(bad)}: reason and repair name ${cancelClass}`);
+  }
+});
+
+check("D75 cancel class: readyAndLive reports the class of a cancelled slice, `unclassified` for a legacy row", () => {
+  const raw = queue([
+    slice("A", ["lib/a.mjs"], { state: "cancelled", holdReason: "wrong base", cancelClass: "wrong-premise" }),
+    slice("B", ["lib/b.mjs"], { state: "cancelled", holdReason: "dropped before D75" }),
+    slice("C", ["lib/c.mjs"]),
+  ]);
+  const result = readyAndLive({ queue: raw, now: NOW }, LINUX);
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(find(result, "A").cancelClass, "wrong-premise");
+  assert.equal(find(result, "B").cancelClass, "unclassified");
+  assert.equal(find(result, "C").cancelClass, undefined, "only a cancelled slice carries a class");
+  assert.equal(result.counts.cancelled, 2);
+});
+
+assert.equal(cases.length, 40,"the complete slice-queue corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

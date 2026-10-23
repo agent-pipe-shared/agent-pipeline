@@ -273,6 +273,18 @@ test("a dispatch id that names a governed queue row must match its write scope, 
   assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { queueRow: () => ({ ...wider, state: "deferred", delivery: { status: "unbound-legacy" } }) })).ok, true, "a legacy row is rebound by the course writer");
 });
 
+test("a scope drift names the cancel with its class argument and teaches each class (D75 S5)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { CANCEL_CLASS_HELP, CANCEL_CLASSES } = await import("../lib/slice-queue.mjs");
+  const fx = makeFixture();
+  const first = runDispatchBriefing(argvOf(fx), depsOf(fx));
+  const row = { id: "ALF-T1", state: "ready", writeScope: [...first.binding.allowedPaths, "plugins/x/extra.mjs"], delivery: { itemId: first.binding.itemDelivery.itemId } };
+  const drift = runDispatchBriefing(argvOf(fx), depsOf(fx, { queueRow: () => row }));
+  assert.equal(drift.code, "DBG-QUEUE-ROW-DRIFT");
+  assert.match(drift.message, /slice-queue\.mjs cancel ALF-T1 --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>/u, drift.message);
+  for (const name of CANCEL_CLASSES) assert.ok(drift.message.includes(`${name} = ${CANCEL_CLASS_HELP[name]}`), `${name} is taught: ${drift.message}`);
+});
+
 const REFUSALS = [
   ["a missing acceptance row names the slug", { "--item": "absent-slug" }, [], {}, "DBG-AC-ROW-MISSING", "absent-slug"],
   ["an unknown agent type", { "--agent-type": "goldfish-wizard" }, [], {}, "DBG-AGENT-TYPE-UNKNOWN", "goldfish-wizard"],

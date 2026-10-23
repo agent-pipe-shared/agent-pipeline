@@ -7,10 +7,10 @@ import { existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync
 import { createHash } from "node:crypto";
 import { devNull, hostname } from "node:os";
 import { observeLinuxProcess } from "../lib/native-platform-process-observer.mjs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { runSessionAuthorityRepair } from "./session-authority-repair.mjs";
-import { cancelUnstartedGovernedItemSlice, checkpointNativeGoldfishItemDelivery, prepareGovernedItemQueue, prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
+import { cancelUnstartedGovernedItemSlice, checkpointNativeGoldfishItemDelivery, prepareGovernedItemQueue, prepareNativeGoldfishHostState, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
 import { run as runState } from "./pipeline-state.mjs";
 import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
@@ -21,6 +21,7 @@ import { initializeSessionAuthorityRegistry } from "../lib/session-authority-reg
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent } from "../lib/test-item-approved-course-fixture.mjs";
+import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
 
 function fixture(run) {
   const parent = nativeContractFixtureParent();
@@ -52,6 +53,12 @@ function course(root) {
     return runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input }));
   };
   return { original, repository, runtime, dispatch };
+}
+// The stored row of a slice in the governed item queue (D75: a cancelled row carries its cancelClass).
+function governedRow(root, sliceId) {
+  const governed = resolveGovernedItemQueue({ root });
+  assert.equal(governed.status, "required", JSON.stringify(governed));
+  return JSON.parse(readFileSync(resolve(root, governed.path), "utf8")).slices.find((row) => row.id === sliceId);
 }
 function repair(...argv) {
   let text = "";
@@ -108,7 +115,11 @@ const cases = [
     assert.deepEqual(found.reservations.filter((row) => row.settled === null).map((row) => row.sliceId), ["ITEM-AC-1"]);
     assert.ok(found.next.some((row) => /slice-queue\.mjs cancel ITEM-AC-1 --started --reason/u.test(row.command)), JSON.stringify(found.next));
     assert.ok(found.next.some((row) => / move-aside --root .* --no-goldfish-running --reason/u.test(row.command)), JSON.stringify(found.next));
-    assert.equal(cancelUnstartedGovernedItemSlice({ root, sliceId: "ITEM-AC-1", reason: "its Goldfish stopped", started: true }).status, "cancelled");
+    // D75: the named cancel carries the class argument and teaches every class from the step's own text.
+    const cancelStep = found.next.find((row) => /slice-queue\.mjs cancel ITEM-AC-1 --started --reason/u.test(row.command));
+    assert.match(cancelStep.command, /--reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>$/u, cancelStep.command);
+    for (const name of CANCEL_CLASSES) assert.ok(cancelStep.why.includes(`${name} = ${CANCEL_CLASS_HELP[name]}`), `${name} is taught: ${cancelStep.why}`);
+    assert.equal(cancelUnstartedGovernedItemSlice({ root, sliceId: "ITEM-AC-1", reason: "its Goldfish stopped", started: true, cancelClass: "budget" }).status, "cancelled");
     const moved = repair("move-aside", "--root", root, "--no-goldfish-running", "--reason", "the native namespace changed under a stopped slice");
     assert.equal(moved.code, 0, JSON.stringify(moved.result)); assert.equal(moved.result.status, "moved-aside");
     const aside = moved.result.retained.find((name) => name.endsWith("-repair-move-aside"));
@@ -299,17 +310,52 @@ const cases = [
     assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
     const named = repair("inspect", "--root", root).result.next.find((row) => / take-over --root /u.test(row.command));
     assert.match(named?.command ?? "", / take-over --root \S+ --from native-session-one --no-other-session-running --reason /u, JSON.stringify(named));
+    // D75: the named take-over carries the class argument and teaches every class.
+    assert.match(named.command, /--reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>$/u, named.command);
+    for (const name of CANCEL_CLASSES) assert.ok(named.why.includes(`${name} = ${CANCEL_CLASS_HELP[name]}`), `${name} is taught: ${named.why}`);
+    // Without a valid class the take-over is refused before it cancels anything, naming every class.
+    for (const extra of [[], ["--class", "bogus"], ["--class", "unclassified"]]) {
+      const noClass = repair("take-over", "--root", root, "--from", "native-session-one", "--no-other-session-running", "--reason", "the old session ended", ...extra);
+      assert.equal(noClass.result.code, "SAR-ARGS", JSON.stringify(extra));
+      for (const name of CANCEL_CLASSES) assert.ok(noClass.result.reason.includes(name) && noClass.result.reason.includes(CANCEL_CLASS_HELP[name]), `${name} is taught in the refusal: ${noClass.result.reason}`);
+    }
+    assert.deepEqual(repair("inspect", "--root", root).result.reservations.filter((row) => row.settled === null).map((row) => row.sliceId), ["ITEM-AC-1"], "a refused take-over cancels nothing");
     for (const argv of [["take-over", "--root", root, "--from", "native-session-one", "--reason", "x"], ["take-over", "--root", root, "--no-other-session-running", "--reason", "x"],
       ["take-over", "--root", root, "--from", "../x", "--no-other-session-running", "--reason", "x"]]) assert.equal(repair(...argv).result.code, "SAR-ARGS", JSON.stringify(argv));
-    assert.equal(repair("take-over", "--root", root, "--from", "another-session", "--no-other-session-running", "--reason", "x").result.status, "nothing-to-take-over");
-    const taken = repair("take-over", "--root", root, "--from", "native-session-one", "--no-other-session-running", "--reason", "the old session ended");
+    assert.equal(repair("take-over", "--root", root, "--from", "another-session", "--no-other-session-running", "--reason", "x", "--class", "superseded").result.status, "nothing-to-take-over");
+    const taken = repair("take-over", "--root", root, "--from", "native-session-one", "--no-other-session-running", "--reason", "the old session ended", "--class", "budget");
     assert.equal(taken.code, 0, JSON.stringify(taken.result)); assert.equal(taken.result.status, "taken-over");
     assert.deepEqual(taken.result.cancelled.map((row) => row.sliceId), ["ITEM-AC-1"]);
+    assert.deepEqual(taken.result.cancelled.map((row) => row.cancelClass), ["budget"], "the class reaches the cancelled row's result");
+    assert.equal(governedRow(root, "ITEM-AC-1").cancelClass, "budget", "and into the governed queue row");
     const record = taken.result.retained.find((name) => name.endsWith("-take-over"));
     const kept = JSON.parse(readFileSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", record, "take-over.json"), "utf8"));
-    assert.equal(kept.from, "native-session-one"); assert.equal(kept.reason, "the old session ended");
+    assert.equal(kept.from, "native-session-one"); assert.equal(kept.reason, "the old session ended"); assert.equal(kept.cancelClass, "budget", "the retained decision names the class");
     assert.equal(taken.result.next.some((row) => / take-over /u.test(row.command)), false, "nothing of that session is left to free");
     assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1B", "native-tool-two").ok, false, "the cancelled slice is not re-dispatched under its old row");
+  }) },
+  { id: "SAR11", name: "the queue CLI's cancel on a governed item queue needs --class, refuses before any write and stores the class on the row (D75 S5)", run: () => fixture(({ root }) => {
+    const { original, runtime } = course(root);
+    const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-0", itemId: "AC-1", criterionLocator: original.criterionLocator, checks: [{ id: "criterion-one", path: "src/change.test.mjs", dependencies: ["src/change.mjs", "src/change.test.mjs"] }] };
+    assert.equal(runtime.run(() => prepareGovernedItemQueue({ root, itemDelivery, candidate: original.candidate, writeScope: ["src/change.mjs"] })).status, "required");
+    const before = readFileSync(resolve(root, resolveGovernedItemQueue({ root }).path));
+    const cwd = process.cwd();
+    process.chdir(root);
+    try {
+      leaveClaudeHookSessionOwner();
+      assert.equal(enterSessionOwnerFromEnvironment({ CLAUDE_CODE_SESSION_ID: "abcdef12-0000-4000-8000-000000000002" }, root), true);
+      for (const extra of [[], ["--class", "bogus"]]) {
+        const refused = runCli(["cancel", "ITEM-AC-0", "--reason", "not needed", ...extra]);
+        assert.equal(refused.exit, 2, JSON.stringify(refused.output)); assert.equal(refused.output.code, "SQ-CANCEL-CLASS");
+        for (const name of CANCEL_CLASSES) assert.ok(refused.output.repair.includes(name) && refused.output.repair.includes(CANCEL_CLASS_HELP[name]), `${name} is taught: ${refused.output.repair}`);
+      }
+      assert.ok(readFileSync(resolve(root, resolveGovernedItemQueue({ root }).path)).equals(before), "a refused cancel writes nothing");
+      const cancelled = runCli(["cancel", "ITEM-AC-0", "--reason", "not needed", "--class", "superseded"]);
+      assert.equal(cancelled.exit, 0, JSON.stringify(cancelled.output));
+      assert.equal(cancelled.output.cancelClass, "superseded");
+    } finally { leaveClaudeHookSessionOwner(); process.chdir(cwd); }
+    assert.equal(governedRow(root, "ITEM-AC-0").cancelClass, "superseded");
+    assert.equal(governedRow(root, "ITEM-AC-0").state, "cancelled");
   }) },
 ];
 

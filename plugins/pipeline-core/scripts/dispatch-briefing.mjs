@@ -63,7 +63,7 @@ import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/prote
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { readDispatchRecordLiveness } from "../lib/dispatch-record-liveness.mjs";
-import { scopesOverlap } from "../lib/slice-queue.mjs";
+import { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } from "../lib/slice-queue.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
 import * as sessionAuthorityRegistry from "../lib/session-authority-registry.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
@@ -518,7 +518,7 @@ export function generateDispatchBinding(options, deps = {}) {
     const scope = [...(row.writeScope ?? [])].sort();
     if (JSON.stringify(scope) !== JSON.stringify(allowedPaths)) {
       const checks = scope.filter((path) => /\.test\.(?:mjs|cjs|js)$/u.test(path));
-      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" first when it still holds a successor)`);
+      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
     }
   }
 

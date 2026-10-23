@@ -20,7 +20,7 @@ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-ho
 import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority } from "./native-goldfish-host-state.mjs";
 import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
 import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
-import { readyAndLive, SLICE_QUEUE_MAX_BYTES } from "./slice-queue.mjs";
+import { readyAndLive, SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "./slice-queue.mjs";
 import { runCli, writeQueueAtomic } from "../scripts/slice-queue.mjs";
 import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
 import { createAgyAuthorityJournalOwner } from "./agy-host-observed-store.mjs";
@@ -786,7 +786,7 @@ const cases = [
     const held=prepare('ITEM-AC-2');
     assert.equal(held.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(held));assert.match(held.reason,/held on ITEM-AC-1 .*the queue was not written$/u);assert.match(held.repair,/slice-queue\.mjs cancel <slice id>/u);
     assert.equal(readFileSync(queuePath,'utf8'),before,'a held dependency leaves the queue untouched');
-    const cancel=(sliceId,reason='never started')=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId,reason}));
+    const cancel=(sliceId,reason='never started')=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId,reason,cancelClass:'superseded'}));
     assert.equal(cancel('ITEM-AC-1','').code,'SQ-ITEM-CANCEL-INPUT');assert.equal(cancel('NOPE').code,'SQ-NOT-FOUND');
     const cancelled=cancel('ITEM-AC-1');assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));assert.deepEqual(cancelled.released,[]);
     assert.equal(cancel('ITEM-AC-1').code,'SQ-ITEM-CANCEL-ALREADY');
@@ -998,7 +998,7 @@ const cases = [
     git('checkout','-q','--','.gitignore');
     // A never-started slice is cancelled from an unbound shell (D51 (3)).
     assert.equal(runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-0'),candidate:original.candidate,writeScope:['src/change.mjs']})).status,'required');
-    const unbound=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-0',reason:'not needed'});
+    const unbound=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-0',reason:'not needed',cancelClass:'superseded'});
     assert.equal(unbound.status,'cancelled',JSON.stringify(unbound));
     assert.equal(dispatch('ITEM-AC-1','DELIVER-AC-1','native-tool-one',original.candidate).ok,true);
     // The Goldfish delivered and the orchestrator committed it by hand: the commit evidence releases the item (D40, D51 (2)).
@@ -1006,11 +1006,11 @@ const cases = [
     const candidate={commit:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}')};
     const second=dispatch('ITEM-AC-2','DELIVER-AC-2','native-tool-two',candidate);
     assert.equal(second.ok,true,JSON.stringify(second));
-    assert.equal(runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-1',reason:'delivered'})).code,'SQ-ITEM-CANCEL-INTEGRATED');
+    assert.equal(runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-1',reason:'delivered',cancelClass:'integrated-elsewhere'})).code,'SQ-ITEM-CANCEL-INTEGRATED');
     // A started slice whose Goldfish no longer runs is cancelled from an unbound shell on the caller's word.
-    const started=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped'});
-    assert.equal(started.code,'SQ-ITEM-CANCEL-STARTED',JSON.stringify(started));assert.match(started.repair,/slice-queue\.mjs cancel ITEM-AC-2 --started --reason/u);
-    const cancelled=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped',started:true});
+    const started=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped',cancelClass:'budget'});
+    assert.equal(started.code,'SQ-ITEM-CANCEL-STARTED',JSON.stringify(started));assert.match(started.repair,/slice-queue\.mjs cancel ITEM-AC-2 --started --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>/u);
+    const cancelled=cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-2',reason:'its Goldfish stopped',started:true,cancelClass:'budget'});
     assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));assert.equal(cancelled.started,true);assert.equal(row('ITEM-AC-2').state,'cancelled');
     const third=dispatch('ITEM-AC-3','DELIVER-AC-3','native-tool-three',candidate);
     assert.equal(third.ok,true,JSON.stringify(third));assert.deepEqual(row('ITEM-AC-3').dependsOn,['ITEM-AC-1']);
@@ -1028,7 +1028,7 @@ const cases = [
     const basis={association:{state:'unbound',target:null},candidate:repository.candidate,operationNonce:'a'.repeat(64),itemDelivery:{itemId:'AC-1',sliceId:'ITEM-AC-1',queuePath:'specs/unit/slice-queue.json',queueSha256:'b'.repeat(64),writeScope:['src/change.mjs']}};
     const entry={schema:'pipeline.agy-authority-lifetime.v2',producerId:'agy-family-dispatch',repositorySha256:nativeManagedDigest({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir}),operationId:'a'.repeat(32),basis,bindingSha256:nativeManagedDigest(basis),phase:'armed',terminal:null,terminalEvidence:null,sourcePaths:[]};
     writeFileSync(join(journal,`op.${entry.operationId}.1.json`),JSON.stringify(entry),{mode:0o600});
-    const cancel=(sliceId,started=false)=>cancelUnstartedGovernedItemSlice({root,sliceId,reason:'its AGY run stopped',started});
+    const cancel=(sliceId,started=false)=>cancelUnstartedGovernedItemSlice({root,sliceId,reason:'its AGY run stopped',started,cancelClass:'budget'});
     const absent=cancel('ITEM-AC-1');
     assert.equal(absent.code,'SQ-ITEM-CANCEL-STARTED',JSON.stringify(absent));assert.match(absent.reason,/unreleased AGY reservation/u);assert.match(absent.repair,/slice-queue\.mjs cancel ITEM-AC-1 --started/u);
     assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized');
@@ -1038,6 +1038,36 @@ const cases = [
     assert.equal(forced.status,'cancelled',JSON.stringify(forced));assert.equal(forced.started,true);
     // A slice no reservation names is still cancelled without --started.
     assert.equal(prepare('ITEM-AC-2').status,'required');assert.equal(cancel('ITEM-AC-2').status,'cancelled');
+  })},
+
+  { id: "NGHS39", name: "a cancel needs a reason class: a missing or unknown class is refused SQ-CANCEL-CLASS with a repair and leaves the queue untouched, a valid class is stored in row.cancelClass, a legacy row reads as unclassified, the repairs teach --class (D75)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+    const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
+    assert.equal(prepare('ITEM-AC-1').status,'required');
+    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
+    const classes=['budget','wrong-premise','review-defect','integrated-elsewhere','superseded'];
+    const held=prepare('ITEM-AC-2');
+    assert.equal(held.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(held));
+    assert.match(held.repair,/slice-queue\.mjs cancel <slice id> --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>/u);
+    const cancel=cancelClass=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId:'ITEM-AC-1',reason:'wrong base',...(cancelClass===undefined?{}:{cancelClass})}));
+    for(const bad of [undefined,'','whatever','unclassified',7,null]){
+      const refused=cancel(bad);
+      assert.equal(refused.status,'refused',`${String(bad)}: ${JSON.stringify(refused)}`);assert.equal(refused.code,'SQ-CANCEL-CLASS',String(bad));
+      for(const name of classes){assert.ok(refused.reason.includes(name),`reason names ${name}`);assert.ok(refused.repair.includes(name),`repair names ${name}`);}
+      assert.equal(readFileSync(queuePath,'utf8'),before,'a refused class leaves the queue untouched');
+    }
+    const cancelled=cancel('wrong-premise');
+    assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));
+    const stored=JSON.parse(readFileSync(queuePath,'utf8'));
+    assert.equal(stored.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass,'wrong-premise');
+    assert.equal(validateSliceQueue(stored).queue.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass,'wrong-premise');
+    // A row cancelled before D75 carries no class and is reported unclassified, never as classified.
+    const legacy=structuredClone(stored);delete legacy.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass;
+    const legacyResult=validateSliceQueue(legacy);assert.equal(legacyResult.ok,true,JSON.stringify(legacyResult.errors));
+    assert.equal(legacyResult.queue.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass,'unclassified');
   })},
 
 ];

@@ -7,6 +7,8 @@
  *
  *   slice-queue.mjs <verb> [<id> [<dep>]] --queue <path> [flags]
  *   verbs: validate | next | add | defer | hold | depend | cancel | pause | reap | finish | report
+ *   cancel <id> --reason "<why>" --class <budget|wrong-premise|review-defect|integrated-elsewhere|superseded> [--started]
+ *     (D75: the class is required; `report` counts cancelled slices per class under queue.cancelClasses)
  *
  * `--queue` is explicit outside an approved course. Within a governed approved
  * course it resolves to the active feature directory, matching authenticated admission. Stdout is ONE JSON document;
@@ -41,7 +43,7 @@ import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mj
 import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
 import { sessionAuthorityRepairCommand } from "./session-authority-repair.mjs";
 import { appendEvent, FANOUT_FINISH_HOWS, FanoutLedgerError, liveSlices, readEvents } from "../lib/fanout-ledger.mjs";
-import { COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_SCHEMA, SLICE_TIERS, validateSliceQueue } from "../lib/slice-queue.mjs";
+import { CANCEL_CLASS_HELP, CANCEL_CLASSES, checkCancelClass, COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_SCHEMA, SLICE_TIERS, UNCLASSIFIED_CANCEL, validateSliceQueue } from "../lib/slice-queue.mjs";
 
 export const CLI_SCHEMA = "pipeline.slice-queue-cli.v1";
 export const EXIT = Object.freeze({ OK: 0, USAGE: 2, INVALID: 3, NOT_FOUND: 4, IO: 5 });
@@ -75,7 +77,7 @@ const VERBS = {
   hold: { positional: 1, flags: [...COMMON, ...LEDGER, "po-question", "external-reason"], repeatable: [] },
   depend: { positional: 2, flags: [...COMMON], repeatable: [] },
   // D51 (3): --started cancels a started slice whose Goldfish no longer runs; the caller asserts that.
-  cancel: { positional: 1, flags: [...COMMON, "reason", "started"], repeatable: [], booleans: ["started"] },
+  cancel: { positional: 1, flags: [...COMMON, "reason", "class", "started"], repeatable: [], booleans: ["started"] },
   pause: { positional: 0, flags: [...COMMON, ...LEDGER, "by", "reason", "until"], repeatable: [] },
   reap: { positional: 1, flags: [...COMMON, ...LEDGER, "reason"], repeatable: [] },
   finish: { positional: 1, flags: [...COMMON, ...LEDGER, "how"], repeatable: [] },
@@ -374,26 +376,31 @@ function verbDepend({ positional, flags }) {
 
 // PF-45: a never-started slice is cancelled and every slice waiting on it is released. An item queue goes
 // through the authenticated course writer; a plain queue is edited like the other declarations.
+// D75: --class says why the slice ends (one of CANCEL_CLASSES); a later re-dispatch is decided from it. It is checked
+// before any queue read, so a refused call touches nothing, and the refusal teaches every class from its own text.
 function verbCancel({ positional, flags }) {
   const reason = requireText(flags, "reason", "cancel");
+  const verdict = checkCancelClass(flags.class);
+  if (!verdict.ok) throw new CliError(verdict.code, EXIT.USAGE, `cancel: --class is required. ${verdict.reason}`, { repair: verdict.repair, classes: CANCEL_CLASS_HELP });
   const path = resolve(flags.queue);
   const loaded = loadRaw(path);
   if (loaded.status !== "valid") throw invalidQueue(loaded);
   if (loaded.raw.schema === "pipeline.slice-queue.v2") {
     const governed = resolveGovernedItemQueue({ root: process.cwd() });
     if (governed.status !== "required" || resolve(process.cwd(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
-    const result = cancelUnstartedGovernedItemSlice({ root: process.cwd(), sliceId: positional[0], reason, started: flags.started === true });
+    const result = cancelUnstartedGovernedItemSlice({ root: process.cwd(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
     if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
-    return { sliceId: result.sliceId, state: "cancelled", released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
+    return { sliceId: result.sliceId, state: "cancelled", cancelClass: result.cancelClass, released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
   }
   const raw = structuredClone(loaded.raw);
   const entry = findSlice(raw, positional[0]);
   if (entry.state === "cancelled") throw new CliError("SQ-ITEM-CANCEL-ALREADY", EXIT.INVALID, `slice ${entry.id} is already cancelled`);
   entry.state = "cancelled";
   entry.holdReason = reason;
+  entry.cancelClass = verdict.cancelClass;
   const released = [];
   for (const other of raw.slices) if ((other.dependsOn ?? []).includes(entry.id)) { other.dependsOn = other.dependsOn.filter((id) => id !== entry.id); released.push(other.id); }
-  return commit(path, raw, { sliceId: entry.id, state: "cancelled", released });
+  return commit(path, raw, { sliceId: entry.id, state: "cancelled", cancelClass: verdict.cancelClass, released });
 }
 
 function verbPause({ flags }) {
@@ -472,7 +479,9 @@ function verbReport({ flags }) {
     const read = readEvents(target.commonDir, target.runner, target.sessionId);
     return { skippedLines: read.skipped, ...summariseLedger(read.events, now) };
   });
-  return { queue: { feature: loaded.queue.feature, size: loaded.queue.slices.length, counts: status.counts, ready: status.ready.length }, ledger };
+  // D75: how many slices ended for which reason; a slice cancelled before classes existed is counted `unclassified`.
+  const cancelClasses = Object.fromEntries([...CANCEL_CLASSES, UNCLASSIFIED_CANCEL].map((name) => [name, loaded.queue.slices.filter((entry) => entry.state === "cancelled" && entry.cancelClass === name).length]));
+  return { queue: { feature: loaded.queue.feature, size: loaded.queue.slices.length, counts: status.counts, ready: status.ready.length, cancelClasses }, ledger };
 }
 
 const HANDLERS = { validate: verbValidate, next: verbNext, add: verbAdd, defer: verbDefer, hold: verbHold, depend: verbDepend, cancel: verbCancel, pause: verbPause, reap: verbReap, finish: verbFinish, report: verbReport };

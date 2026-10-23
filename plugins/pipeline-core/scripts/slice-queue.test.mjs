@@ -11,6 +11,7 @@ import { openSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { appendEvent, readEvents } from "../lib/fanout-ledger.mjs";
+import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -187,9 +188,9 @@ check("defer / hold / depend: usage errors exit 2, unknown ids exit 4, a depende
 check("cancel: a cancelled slice stops holding the slices that waited on it (PF-45)", () => {
   const dir = sandbox();
   const path = writeQueue(dir, [slice("A", ["a.mjs"]), slice("B", ["b.mjs"], { dependsOn: ["A"] }), slice("C", ["c.mjs"], { dependsOn: ["A", "B"] })]);
-  assert.equal(cli(dir, ["cancel", "A", "--queue", REL]).status, 2, "cancel needs --reason");
-  assert.equal(cli(dir, ["cancel", "NOPE", "--queue", REL, "--reason", "x"]).status, 4);
-  const cancelled = cli(dir, ["cancel", "A", "--queue", REL, "--reason", "never started"]);
+  assert.equal(cli(dir, ["cancel", "A", "--queue", REL, "--class", "superseded"]).status, 2, "cancel needs --reason");
+  assert.equal(cli(dir, ["cancel", "NOPE", "--queue", REL, "--reason", "x", "--class", "superseded"]).status, 4);
+  const cancelled = cli(dir, ["cancel", "A", "--queue", REL, "--reason", "never started", "--class", "superseded"]);
   assert.equal(cancelled.status, 0, cancelled.stdout + cancelled.stderr);
   assert.deepEqual(cancelled.json.released, ["B", "C"]);
   const byId = Object.fromEntries(JSON.parse(readFileSync(path, "utf8")).slices.map((item) => [item.id, item]));
@@ -198,7 +199,7 @@ check("cancel: a cancelled slice stops holding the slices that waited on it (PF-
   assert.deepEqual(byId.B.dependsOn, []);
   assert.deepEqual(byId.C.dependsOn, ["B"]);
   assert.deepEqual(cli(dir, ["next", "--queue", REL, "--now", NOW]).json.ready, ["B"]);
-  assert.equal(cli(dir, ["cancel", "A", "--queue", REL, "--reason", "again"]).status, 3, "an already cancelled slice is refused");
+  assert.equal(cli(dir, ["cancel", "A", "--queue", REL, "--reason", "again", "--class", "superseded"]).status, 3, "an already cancelled slice is refused");
 });
 
 check("pause: records a hashed pause event, refuses a window over 4 hours and a missing session", () => {
@@ -284,18 +285,63 @@ check("cancel: --started is a flag without a value, given at most once (D51)", (
   const dir = sandbox();
   const path = writeQueue(dir, [slice("A", ["a.mjs"])]);
   const before = readFileSync(path);
-  for (const args of [["cancel", "A", "--queue", REL, "--reason", "x", "--started=yes"], ["cancel", "A", "--queue", REL, "--reason", "x", "--started", "--started"]]) {
+  for (const args of [["cancel", "A", "--queue", REL, "--reason", "x", "--class", "budget", "--started=yes"], ["cancel", "A", "--queue", REL, "--reason", "x", "--class", "budget", "--started", "--started"]]) {
     const result = cli(dir, args);
     assert.equal(result.status, 2, JSON.stringify(args));
     assert.equal(result.json.code, "SQ-USAGE");
     assert.ok(readFileSync(path).equals(before));
   }
-  const cancelled = cli(dir, ["cancel", "A", "--started", "--queue", REL, "--reason", "no longer runs"]);
+  const cancelled = cli(dir, ["cancel", "A", "--started", "--queue", REL, "--reason", "no longer runs", "--class", "budget"]);
   assert.equal(cancelled.status, 0, cancelled.stdout + cancelled.stderr);
   assert.equal(JSON.parse(readFileSync(path, "utf8")).slices[0].state, "cancelled");
 });
 
-assert.equal(cases.length, 16, "the complete CLI corpus must be registered before execution begins");
+// D75 S5: the cancel class. These cases fail on a CLI that accepts a cancel without --class.
+check("cancel: --class is required and refused with the five classes and one teaching line each; the queue stays byte for byte (D75)", () => {
+  const dir = sandbox();
+  const path = writeQueue(dir, [slice("A", ["a.mjs"])]);
+  const before = readFileSync(path);
+  for (const extra of [[], ["--class", "bogus"], ["--class", "unclassified"], ["--class=BUDGET"]]) {
+    const result = cli(dir, ["cancel", "A", "--queue", REL, "--reason", "x", ...extra]);
+    assert.equal(result.status, 2, JSON.stringify(extra));
+    assert.equal(result.json.code, "SQ-CANCEL-CLASS", JSON.stringify(extra));
+    assert.match(result.json.message, /--class is required/u);
+    for (const name of CANCEL_CLASSES) {
+      assert.ok(result.json.message.includes(name) || result.json.repair.includes(name), `${name} is named: ${JSON.stringify(extra)}`);
+      assert.ok(result.json.repair.includes(CANCEL_CLASS_HELP[name]), `the teaching line of ${name} is in the repair`);
+    }
+    assert.deepEqual(result.json.classes, CANCEL_CLASS_HELP, "the refusal carries the vocabulary as data too");
+    assert.ok(readFileSync(path).equals(before), "a refused cancel writes nothing");
+  }
+  assert.equal(cli(dir, ["cancel", "A", "--queue", REL, "--class", "budget"]).json.code, "SQ-USAGE", "a missing --reason is still the usage error");
+});
+
+check("cancel: every class is accepted, stored on the slice and echoed (D75)", () => {
+  const dir = sandbox();
+  const path = writeQueue(dir, CANCEL_CLASSES.map((name) => slice(name, [`${name}.mjs`])));
+  for (const name of CANCEL_CLASSES) {
+    const result = cli(dir, ["cancel", name, "--queue", REL, "--reason", `ends as ${name}`, "--class", name]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(result.json.cancelClass, name);
+  }
+  const stored = JSON.parse(readFileSync(path, "utf8")).slices;
+  assert.deepEqual(stored.map((item) => item.cancelClass), [...CANCEL_CLASSES]);
+  assert.equal(cli(dir, ["validate", "--queue", REL]).status, 0, "the stored queue validates");
+});
+
+check("report: queue.cancelClasses counts cancelled slices per class and counts a legacy cancelled row as unclassified (D75)", () => {
+  const dir = sandbox();
+  writeQueue(dir, [slice("A", ["a.mjs"]), slice("B", ["b.mjs"]), slice("C", ["c.mjs"]), slice("D", ["d.mjs"]),
+    slice("OLD", ["old.mjs"], { state: "cancelled", holdReason: "cancelled before classes existed" })]);
+  const empty = cli(dir, ["report", "--queue", REL, "--now", NOW]);
+  assert.equal(empty.status, 0, empty.stdout + empty.stderr);
+  assert.deepEqual(empty.json.queue.cancelClasses, { budget: 0, "wrong-premise": 0, "review-defect": 0, "integrated-elsewhere": 0, superseded: 0, unclassified: 1 });
+  for (const [id, name] of [["A", "budget"], ["B", "budget"], ["C", "superseded"]]) assert.equal(cli(dir, ["cancel", id, "--queue", REL, "--reason", "x", "--class", name]).status, 0);
+  const counted = cli(dir, ["report", "--queue", REL, "--now", NOW]);
+  assert.deepEqual(counted.json.queue.cancelClasses, { budget: 2, "wrong-premise": 0, "review-defect": 0, "integrated-elsewhere": 0, superseded: 1, unclassified: 1 });
+});
+
+assert.equal(cases.length, 19, "the complete CLI corpus must be registered before execution begins");
 process.on("exit", () => {
   for (const dir of sandboxes) rmSync(dir, { recursive: true, force: true });
 });
