@@ -334,3 +334,75 @@ git apply specs/sprint-alfred-epic/evidence/sitting/k120-nghs-pin-unprotected.di
 git add -- plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs
 git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/39-nghs-node-test-context-pin.txt -- plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs
 ```
+
+## 40 PRO K125 architecture capability in the inventory [after 39]
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k125-inventory-architecture-capability-protected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k125-inventory-architecture-capability-protected.diff
+node harness/scripts/check-product-capability-inventory.mjs
+git add -- docs/product-capability-inventory.json
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/40-architecture-capability-inventory-protected.txt -- docs/product-capability-inventory.json
+```
+
+## 41 UN K125 governance reclassification and its test assertion
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k125-governance-reclass-unprotected.diff
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k125-governance-test-assertion-unprotected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k125-governance-reclass-unprotected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k125-governance-test-assertion-unprotected.diff
+node harness/scripts/check-observation-governance.mjs
+git add -- governance/observation-doc-governance.json harness/scripts/check-observation-governance.test.mjs
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/41-governance-usage-overview-migration-maintained.txt -- governance/observation-doc-governance.json harness/scripts/check-observation-governance.test.mjs
+```
+
+## 42 PRO K127 S4 follows R1 with a typed source-checkout exemption (replaces the K112 hold patches)
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k127-s4-protected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k127-s4-protected.diff
+git add -- plugins/pipeline-core/lib/project-calibration-identity.mjs plugins/pipeline-core/lib/consumer-verify.mjs plugins/pipeline-core/scripts/consumer-verify-check.mjs
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/42-s4-source-checkout-exemption-protected.txt -- plugins/pipeline-core/lib/project-calibration-identity.mjs plugins/pipeline-core/lib/consumer-verify.mjs plugins/pipeline-core/scripts/consumer-verify-check.mjs
+```
+
+## 43 UN K127 pin and evidence producer
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k127-s4-unprotected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k127-s4-unprotected.diff
+git add -- plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs plugins/pipeline-core/scripts/verify-evidence-producer.mjs plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/43-s4-source-checkout-exemption-pin.txt -- plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs plugins/pipeline-core/scripts/verify-evidence-producer.mjs plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+```
+
+## 44 PRO K128 fallback record on the review receipt
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k128-fallback-protected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k128-fallback-protected.diff
+git add -- plugins/pipeline-core/lib/design-review-receipt.mjs plugins/pipeline-core/lib/design-approval-binding.mjs plugins/pipeline-core/lib/design-consistency-check.mjs plugins/pipeline-core/scripts/pipeline-state.mjs
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/44-fallback-receipt-field-protected.txt -- plugins/pipeline-core/lib/design-review-receipt.mjs plugins/pipeline-core/lib/design-approval-binding.mjs plugins/pipeline-core/lib/design-consistency-check.mjs plugins/pipeline-core/scripts/pipeline-state.mjs
+```
+
+## 45 UN K128 producer flag, pin cases and route-1 assertions
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k128-fallback-unprotected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k128-fallback-unprotected.diff
+```
+Add the files named in the diff header (producer script, pin file, route e2e test), then:
+```
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/45-fallback-receipt-field-pin.txt -- <the files of the diff>
+```
+
+## 46 PRO calibration tier sync (.claude/pipeline.json)
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/claude-calibration-channel-sync.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/claude-calibration-channel-sync.diff
+git add -- .claude/pipeline.json
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/46-claude-calibration-channel-sync.txt -- .claude/pipeline.json
+```
+
+## 47 PRO Reader-input mirrors and pins (LAST source-affecting step)
+Any later edit of the inventory or the governance input makes the mirrors stale: run `node scripts/sync-reader-inputs.mjs --check` afterwards.
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k132-mirrors-protected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k132-mirrors-protected.diff
+node scripts/sync-reader-inputs.mjs --check
+git add -- plugins/pipeline-core/reader-inputs plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs harness/scripts/check-consumer-safe-paths.mjs
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/47-reader-input-mirrors-protected.txt -- plugins/pipeline-core/reader-inputs plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs harness/scripts/check-consumer-safe-paths.mjs
+```

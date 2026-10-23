@@ -1,0 +1,9 @@
+feat(design-review): carry the typed fallback record on the review receipt
+
+PO decision 2026-10-23 (row 41): an optional closed fallback record on the
+review receipt, written by the producer, validated by the receipt schema and
+named in the presented plan and the signed binding. The producer flag, the
+pin cases and the route-1 end-to-end assertions are the unprotected part.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

@@ -1,0 +1,20 @@
+fix(calibration): refuse an aliased project identity (PCI-ALIAS-REFUSED) except for the Agent-Pipeline source checkout
+
+R1 / AC-232: an aliased project identity is refused with PCI-ALIAS-REFUSED, and the
+refusal message names the stored name, the root-derived name and the repair
+(PO decision 2026-10-23, "S4 follows R1").
+
+PO decision 2026-10-23 (batch 12, row 42): this repository gets a typed
+source-checkout exemption. It is decided from the Git index of the selected root
+(tracked regular .claude/pipeline.json with project "agent-pipeline" AND tracked
+regular .claude-plugin/marketplace.json with name/owner.name "agent-pipeline" and
+exactly one plugin "pipeline-core" at ./plugins/pipeline-core), never from the
+directory name and never from a calibration field. The stored alias is accepted
+only when it equals "agent-pipeline", and the readback carries
+identityMode: "source-checkout". Every other repository keeps the refusal.
+
+Files: lib/project-calibration-identity.mjs, lib/consumer-verify.mjs,
+scripts/consumer-verify-check.mjs (message passthrough).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

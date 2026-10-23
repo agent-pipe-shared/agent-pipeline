@@ -1,0 +1,22 @@
+test(calibration): restate S4 to follow R1 and pin the source-checkout exemption (QG-04, PO decision 2026-10-23)
+
+S4 is restated under QG-04 with a bounded justification in the pin: PO decision
+2026-10-23 and R1 (AC-232) say an aliased identity is refused, so the two alias
+cases now assert PCI-ALIAS-REFUSED instead of acceptance; the intent (the alias
+question has a defined, tested outcome) is unchanged. Three cases are added for
+a name equal to the root name and for the consumer fail-closed message.
+
+PO decision 2026-10-23 (batch 12, row 42): 12 S4x cases pin the typed
+source-checkout exemption (real identity files under an arbitrary directory name
+resolve with identityMode source-checkout and reach consumer verify; a
+consumer-shaped repository, a repository copying one of the two files, untracked
+or non-repository copies, a deviating marketplace, another alias, root-derived
+metadata and a symlinked marketplace stay refused).
+
+The --commit evidence producer names its temporary worktree like the checkout
+root so a non-exempt project's identity still resolves there; fixtures that
+stored an alias under a differently named root are restated without changing an
+assertion (verify-evidence-producer.test, parallel-work-in-one-checkout pin).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

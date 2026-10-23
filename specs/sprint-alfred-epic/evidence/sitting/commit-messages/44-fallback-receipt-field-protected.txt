@@ -1,0 +1,19 @@
+feat(design-review): carry the typed fallback record on the review receipt into present-plan
+
+A design review receipt may carry one OPTIONAL, closed `fallback` record
+({route: fallback-self-dispatch, reasonCode, requestedRoute, observedIdentity}); names are
+taken from the canonical fallback result and the receipt producer. The receipt schema
+refuses a malformed or extended record and still accepts every receipt without it, byte
+for byte unchanged. The summary surfaces it, the design approval binding carries it on the
+matching reviewReceipts entry (so the PO signs it knowingly), the consistency check admits
+it as the one optional summary key, and present-plan --review-receipt prints a
+"Review route:" line naming the fallback instead of presenting a single-review route as an
+independent review. Closes the held clause of
+backlog item role-route-preflight-with-self-dispatch-fallback under the PO decision of
+2026-10-23, batch 12, row 41.
+
+Protected paths: lib/design-review-receipt.mjs, lib/design-approval-binding.mjs,
+lib/design-consistency-check.mjs (kernel list), scripts/pipeline-state.mjs.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

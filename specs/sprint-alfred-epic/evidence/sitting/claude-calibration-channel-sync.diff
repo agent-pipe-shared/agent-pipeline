@@ -1,0 +1,11 @@
+diff --git a/.claude/pipeline.json b/.claude/pipeline.json
+--- a/.claude/pipeline.json
++++ b/.claude/pipeline.json
+@@ -26,5 +26,6 @@
+     "po": {
+       "displayLabel": "Human"
+     }
+-  }
++  },
++  "pipelineUpdateChannel": "alpha"
+ }

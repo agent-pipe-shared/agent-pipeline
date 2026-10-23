@@ -1,0 +1,8 @@
+docs(governance): classify usage, overview and migration as maintained documents
+
+PO decision 2026-10-23 (Reader findings 57 and 41): the three documents are
+canonical, not compatibility redirects. The governance test assertion follows
+the new classification without weakening any other assertion.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

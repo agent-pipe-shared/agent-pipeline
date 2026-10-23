@@ -1,0 +1,10 @@
+feat(inventory): declare the architecture adoption and fitness capability
+
+PO decision 2026-10-23 (Reader finding 64): the README marker
+capability-architecture-adoption-and-fitness gets a backing capability in the
+inventory, optional, with the real architecture scripts and tests as evidence
+and no runner support claimed; the 18 architecture verify phases move out of
+deterministic-verification because each surface belongs to one capability.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

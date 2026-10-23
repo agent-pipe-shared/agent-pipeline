@@ -1,0 +1,18 @@
+chore(reader): resync the plugin's Reader-input mirrors and pins with the sitting's inventory and governance
+
+Run scripts/sync-reader-inputs.mjs after the last commit that changes a Reader
+source: the capability inventory (runbook steps 03 and 37 plus the architecture
+capability) and the observation governance (docs/usage.md, docs/overview.md and
+docs/migration.md reclassified to maintained). The mirrors under
+plugins/pipeline-core/reader-inputs/ were stale copies of earlier source
+revisions (the inventory mirror equalled no committed revision); they are now
+byte copies, the manifest is rebuilt, and the inputHashes constant plus the
+manifest hash in installedInputs() carry the new digests.
+
+The synced inventory mirror quotes two harness test paths that the
+consumer-safe-path check did not yet allowlist; both get the same exact-quote
+allowlist entry the neighbouring paths already have (stale entries are an error,
+so the entries must ride in this commit).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

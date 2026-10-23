@@ -1,0 +1,8 @@
+chore(calibration): add the alpha update channel to the Claude calibration tier
+
+PO decision 2026-10-23: both calibration tiers of this repository must be
+byte-equal for the source-checkout identity exemption to apply; the project
+tier already declares pipelineUpdateChannel alpha.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
