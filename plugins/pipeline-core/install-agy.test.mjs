@@ -36,7 +36,9 @@ test("Agy release-tag checkout creates a named branch without changing the tag c
   const agyEntry = readFileSync(new URL("../../GEMINI.md", import.meta.url), "utf8");
   const onboarding = readFileSync(new URL("../../docs/v3-consumer-onboarding.md", import.meta.url), "utf8");
   assert.match(setup, /https:\/\/github\.com\/agent-pipe-shared\/agent-pipeline(?:\.git)?/u);
-  assert.match(setup, /Before `v0\.7\.0` is published, use the installation instructions at the\s+already-approved release tag/u);
+  // Restated 2026-10-23 (QG-04, K141-FULL-VERIFY-RED-CLASSIFY): the reader rounds of the sitting reworded this SETUP.md passage; it now
+  // states that an Antigravity release tag such as `v0.7.0` is the only approved route and that none exists before such a tag is published.
+  assert.match(setup, /for Antigravity it is a final release tag of the\s+official repository, such as `v0\.7\.0`\. Before such a tag exists there is no\s+approved Antigravity route/u);
   assert.doesNotMatch(setup, /\[version-independent Agy installation path\]\(GEMINI\.md/u,
     "the pre-release instruction must not loop back to GEMINI.md");
   assert.match(agyEntry, /SETUP\.md#antigravity-agy-workspace-local-binding/u);
@@ -44,7 +46,9 @@ test("Agy release-tag checkout creates a named branch without changing the tag c
   assert.match(setup, /\$pipelineReleaseDir = Join-Path \$env:LOCALAPPDATA/u);
   assert.match(setup, /git -C \$pipelineReleaseDir switch -c pipeline-release-v0\.7\.0/u);
   assert.match(setup, /node \(Join-Path \$pipelineReleaseDir 'plugins\/pipeline-core\/install-agy\.mjs'\)/u);
-  assert.match(onboarding, /\.\.\/SETUP\.md#antigravity-agy-workspace-local-binding/u,
+  // Restated 2026-10-23 (QG-04, K141-FULL-VERIFY-RED-CLASSIFY): the reader rounds folded the runner-specific link into one SETUP step 0 link
+  // that names Claude Code, Codex and Antigravity together; the Agy binding anchor itself is still asserted on GEMINI.md above.
+  assert.match(onboarding, /\.\.\/SETUP\.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host/u,
     "consumer onboarding links to the single maintained GitHub installation procedure");
 });
 

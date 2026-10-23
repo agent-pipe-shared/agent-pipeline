@@ -93,7 +93,8 @@ const verdict = (input, project) => {
   return { exitCode: r.exitCode, text: String(r.stderr ?? "") };
 };
 // Refused AND for the stated reason: a typed read-scope/target refusal code, never a bare exit 2 from some other cause.
-const REFUSAL_CODE = /GUARD-READ-SCOPE-OUTSIDE-ROOT|GUARD-READ-TARGET/u;
+// Restated 2026-10-23 (QG-04, K141-FULL-VERIFY-RED-CLASSIFY): a native read of a credential file carries the typed GUARD-READ-CREDENTIAL-TARGET (31aec2de2).
+const REFUSAL_CODE = /GUARD-READ-SCOPE-OUTSIDE-ROOT|GUARD-READ-TARGET|GUARD-READ-CREDENTIAL-TARGET/u;
 const assertRefused = (input, project, label) => {
   const r = verdict(input, project);
   assert.equal(r.exitCode, 2, `${label}\n${r.text}`);

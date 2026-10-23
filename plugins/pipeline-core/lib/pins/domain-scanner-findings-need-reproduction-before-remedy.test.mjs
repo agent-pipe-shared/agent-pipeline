@@ -126,7 +126,11 @@ test("C: a scan never generates or edits ignore files and cannot take scanner co
 
 test("C: shipped scanner config has no secret-prefix whitelist, stopwords, global or regex allowlist", () => {
   for (const p of [resolveGitleaksConfigPath(), join(repoRoot, "plugins/pipeline-core/config/security/gitleaks-default.toml")]) {
-    const text = readFileSync(p, "utf8");
+    // Restated 2026-10-23 (QG-04, K141-FULL-VERIFY-RED-CLASSIFY; PO decision 2026-10-23 row 13 / K98, commit 0386004d3): the one
+    // sanctioned global allowlist is the exact `scratch/clones` path exclusion below. It is removed byte-for-byte before the checks, so any
+    // other or any widened global allowlist still fails exactly as before.
+    const K98_ALLOWLIST = "[allowlist]\ndescription = \"scratch/clones working clones are not part of the scanned source\"\npaths = [\n  '''.*/scratch/clones/.*''',\n]\n";
+    const text = readFileSync(p, "utf8").replace(K98_ALLOWLIST, "");
     assert.doesNotMatch(text, /^\s*(regexes|stopwords|entropy|tags|commits)\s*=/mu);
     assert.doesNotMatch(text, /^\s*\[(\[?)allowlists?\]/mu);
     assert.deepEqual([...text.matchAll(/^id = "([^"]+)"/gmu)].map((m) => m[1]), ["sentry-access-token", "generic-api-key"]);

@@ -131,6 +131,11 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // given a completion-registry row; the conservative classifier reports each `node-test-single`, so each is registered
   // `legacy-process-only` and counted here (+4 classified, registry 361), and excluded from the R5 set below (registered after R5).
   // No existing row, assertion or digest is removed or weakened.
+  // Restated 2026-10-23 (QG-04, own hunk; K141-FULL-VERIFY-RED-CLASSIFY, PO decision batch 12 "Four stale VCR01 sites counts and the
+  // registration fixture: restate after the sitting"): the sitting added top-level assertions to four converted suites, so the measured
+  // `sites` of git-null-device-sites-tests 14 -> 17, session-authority-repair-tests 123 -> 144, slice-queue-cli-tests 109 -> 125 and
+  // slice-queue-tests 310 -> 330. Only these four numbers change; names, paths, classifications, the identity digests and the counts
+  // 266 / 347 / 361 stay as pinned, and no assertion is weakened.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",33],
@@ -168,7 +173,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["fanout-governor-tests","plugins/pipeline-core/lib/fanout-governor.test.mjs","top-level-assertions",273],
     ["fanout-ledger-tests","plugins/pipeline-core/lib/fanout-ledger.test.mjs","top-level-assertions",62],
     ["git-hook-runtime-snapshot-fast-verify-tests","plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs","top-level-assertions",57],
-    ["git-null-device-sites-tests","plugins/pipeline-core/lib/git-null-device-sites.test.mjs","top-level-assertions",14],
+    ["git-null-device-sites-tests","plugins/pipeline-core/lib/git-null-device-sites.test.mjs","top-level-assertions",17],
     ["git-stash-readonly-tests","plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs","top-level-assertions",7],
     ["gitleaks-repair-ignore-cli-tests","plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs","top-level-assertions",2],
     ["gitleaks-scratch-clones-exclusion-tests","plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs","node-test-single",5],
@@ -202,14 +207,14 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["runtime-handover-writer-tests","plugins/pipeline-core/scripts/runtime-handover-writer.test.mjs","top-level-assertions",14],
     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",123],
+    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",144],
     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],
     ["signed-quality-package-single-link-tests","plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs","top-level-assertions",28],
     ["signed-spec-descriptor-tests","plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs","top-level-assertions",26],
-    ["slice-queue-cli-tests","plugins/pipeline-core/scripts/slice-queue.test.mjs","top-level-assertions",109],
-    ["slice-queue-tests","plugins/pipeline-core/lib/slice-queue.test.mjs","top-level-assertions",310],
+    ["slice-queue-cli-tests","plugins/pipeline-core/scripts/slice-queue.test.mjs","top-level-assertions",125],
+    ["slice-queue-tests","plugins/pipeline-core/lib/slice-queue.test.mjs","top-level-assertions",330],
     ["stop-fanout-tests","plugins/pipeline-core/hooks/stop-fanout.test.mjs","top-level-assertions",89],
     ["verify-case-completion-augmentation-policy-tests","harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs","top-level-assertions",8],
     ["verify-run-record-tests","plugins/pipeline-core/lib/verify-run-record.test.mjs","top-level-assertions",24],

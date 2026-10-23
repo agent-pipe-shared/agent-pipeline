@@ -117,7 +117,9 @@ test("baseline precondition: credential reads under the protected fake home are 
   assert.match(viaTilde.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
   const viaRead = verdict(readTool(join(f.home, ".codex", "auth.json")), f.project);
   assert.equal(viaRead.exitCode, 2, viaRead.text);
-  assert.match(viaRead.text, /GUARD-READ-TARGET/u);
+  // Restated 2026-10-23 (QG-04, K141-FULL-VERIFY-RED-CLASSIFY): a native read of a credential file now carries the typed
+  // GUARD-READ-CREDENTIAL-TARGET code (31aec2de2); GUARD-READ-TARGET stays the code for other targets.
+  assert.match(viaRead.text, /GUARD-READ-CREDENTIAL-TARGET/u);
   // Control: an in-project read is still admitted, so the refusals above are scope decisions, not a dead guard.
   assert.equal(verdict(bash("cat docs/state.md"), f.project).exitCode, 0);
 }));

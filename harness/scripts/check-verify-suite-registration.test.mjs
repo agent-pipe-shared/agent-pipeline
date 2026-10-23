@@ -609,6 +609,7 @@ const FIXTURE_MODULES = Object.freeze([
   "plugins/pipeline-core/lib/nova-candidate-freeze.mjs",
   "plugins/pipeline-core/lib/review-economy.mjs", // via nova-candidate-freeze.mjs
   "plugins/pipeline-core/lib/verify-selection.mjs",
+  "plugins/pipeline-core/lib/session-power-address-repair.mjs", // imported directly by verify.mjs (repairAddressRootQuietly); node: imports only
 ]);
 /** Authority files the two registration validators hash before verify plans anything. */
 const FIXTURE_AUTHORITY = Object.freeze([

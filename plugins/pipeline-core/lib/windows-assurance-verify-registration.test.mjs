@@ -171,6 +171,7 @@ const FIXTURE_MODULES = Object.freeze([
   "plugins/pipeline-core/lib/nova-candidate-freeze.mjs",
   "plugins/pipeline-core/lib/review-economy.mjs", // via nova-candidate-freeze.mjs
   "plugins/pipeline-core/lib/verify-selection.mjs",
+  "plugins/pipeline-core/lib/session-power-address-repair.mjs", // imported directly by verify.mjs (repairAddressRootQuietly); node: imports only
 ]);
 const JOURNAL_STUB_REL_PATH = "plugins/pipeline-core/scripts/verify-journal.mjs";
 const JOURNAL_STUB_SOURCE = 'export function runVerifyJournal() { throw new Error("journal must not run after windows-assurance-registration failure"); }\n';
