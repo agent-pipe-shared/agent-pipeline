@@ -233,6 +233,10 @@ const SCRATCH_ROOT = fileURLToPath(new URL("../../../scratch/", import.meta.url)
 // CLAUDE_BASH_SHELL_DIALECT_PLATFORM), so a fixture that feeds a POSIX command line to
 // parseGuardCommand() directly must say so instead of inheriting process.platform.
 const POSIX_PARSE = { platform: "linux" };
+// A path spliced into a Bash command string is read by the POSIX parse of the Bash tool, which treats a
+// backslash as an escape. On native Windows a join() path carries backslashes, so a fixture that builds a
+// command from one must spell it with forward slashes; on POSIX hosts this is the identity.
+function posixCommandPath(path) { return path.replaceAll("\\", "/"); }
 // A directory link is a junction on native Windows (no privilege needed); a symlink elsewhere.
 function dirLink(target, path) {
   symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
@@ -1346,7 +1350,7 @@ test("NVA-B8-IPA: only the exact fresh preflight attestation writer survives an 
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const pluginRoot = "/opt/agent-pipeline/pipeline-core";
     const argv = [
-      join(pluginRoot, "scripts", "installed-plugin-attestation-host.mjs"),
+      posixCommandPath(join(pluginRoot, "scripts", "installed-plugin-attestation-host.mjs")),
       "write-local-from-codex-registry",
       "--version", "0.6.2+test",
       "--source-plugin-root", "/source/pipeline-core",
@@ -1911,8 +1915,8 @@ test("bounded rg pipeline admits self-inspection reads of the plugin's own insta
   const path = root();
   markGovernedFixture(path);
   const pluginRoot = fileURLToPath(new URL("../", import.meta.url));
-  const hooksDir = join(pluginRoot, "hooks");
-  const grammarFile = join(hooksDir, "guard-command-grammar.mjs");
+  const hooksDir = posixCommandPath(join(pluginRoot, "hooks"));
+  const grammarFile = posixCommandPath(join(pluginRoot, "hooks", "guard-command-grammar.mjs"));
   try {
     for (const [command, genericExpected] of [
       // D96 (QG-04 restatement): the generic expectation for a recursive directory outside the repository was false only
@@ -1932,7 +1936,7 @@ test("bounded rg pipeline admits self-inspection reads of the plugin's own insta
     }
     const foreign = mkdtempSync(join(tmpdir(), "guard-lifecycle-foreign-"));
     try {
-      const command = `rg --files ${foreign} | rg 'x'`;
+      const command = `rg --files ${posixCommandPath(foreign)} | rg 'x'`;
       // D96: an ordinary foreign directory is admitted; the same directory holding a key file keeps its refusal.
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       writeFileSync(join(foreign, "id_rsa"), "synthetic fixture\n");
@@ -2040,7 +2044,7 @@ test("NVA-CATPIPE-1: exactness -- an outside-root read and unsafe composition st
   try {
     writeFileSync(join(path, "notes.txt"), "keep this open line\n");
     writeFileSync(join(outside, "secret.txt"), "outside\n");
-    const outsideRead = `cat ${join(outside, "secret.txt")} | grep open`;
+    const outsideRead = `cat ${posixCommandPath(join(outside, "secret.txt"))} | grep open`;
     assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), true, outsideRead);
     for (const command of [
       "cat notes.txt | grep open | wc -l",
@@ -7346,10 +7350,10 @@ test("host-provided transcript, memory and sibling paths share passive read beha
   writeFileSync(memoryFile, "note\n");
   writeFileSync(sibling, "other\n");
   try {
-    assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir, [transcriptPath]), true);
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${transcriptPath}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${memoryFile} | head -n 5`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${sibling}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
+    assert.equal(isReadOnlyDiagnosticCommand(`cat ${posixCommandPath(transcriptPath)}`, projectDir, [transcriptPath]), true);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${posixCommandPath(transcriptPath)}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${posixCommandPath(memoryFile)} | head -n 5`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${posixCommandPath(sibling)}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(dirname(transcriptPath), { recursive: true, force: true });
@@ -7405,27 +7409,30 @@ test("PASSIVE-READ-ROOT-INTEROP: exact transcript files and memory directories a
     }, deps);
     assert.equal(globMemory.exitCode, 0, "Glob admits bounded inventory in the current memory directory");
     const command = (value) => ({ tool_name: "Bash", tool_input: { command: value }, transcript_path: transcriptPath });
-    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + memoryFile, projectDir, roots), true,
+    // A path spliced into a Bash command string is spelled with forward slashes (POSIX parse of the Bash tool);
+    // the root list and tool-input paths above keep the native spelling.
+    const posixPath = (value) => value.replaceAll("\\\\", "/");
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + posixPath(memoryFile), projectDir, roots), true,
       "single cat admits the same approved memory file");
-    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + memoryFile + " | head -n 5", projectDir, roots), true,
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + posixPath(memoryFile) + " | head -n 5", projectDir, roots), true,
       "cat pipeline admits the same approved memory file");
-    assert.equal(guard.isReadOnlyDiagnosticCommand("rg -n fixture " + transcriptPath, projectDir, roots), true,
+    assert.equal(guard.isReadOnlyDiagnosticCommand("rg -n fixture " + posixPath(transcriptPath), projectDir, roots), true,
       "single recursive-grammar rg admits the exact transcript file");
-    assert.equal(guard.isReadOnlyDiagnosticCommand("rg --files " + memoryDir + " | rg learned", projectDir, roots), true,
+    assert.equal(guard.isReadOnlyDiagnosticCommand("rg --files " + posixPath(memoryDir) + " | rg learned", projectDir, roots), true,
       "rg pipeline admits bounded memory inventory despite the file root");
     // D96 (PO decision 2026-10-22, 2026-09-10 correction in docs/adr/draft-read-scope-containment-boundary.md; QG-04
     // restatement): the two sibling assertions said "refused" only because the sibling lay outside the repository
     // without a session root. An ordinary outside file is read on its own merits now; the exactness of the transcript
     // root itself (it never authorizes a descendant) is pinned by the policy unit test, and a credential-named
     // sibling stays refused on both routes below.
-    assert.equal(guard.evaluateLifecycleReadyGuard(command("cat " + sibling), deps).exitCode, 0,
+    assert.equal(guard.evaluateLifecycleReadyGuard(command("cat " + posixPath(sibling)), deps).exitCode, 0,
       "D96: an ordinary sibling of the transcript is an ordinary outside file");
-    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + sibling, projectDir, roots), true,
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + posixPath(sibling), projectDir, roots), true,
       "D96: single-command policy admits an ordinary outside file");
     const credentialSibling = process.env.PASSIVE_FIXTURE_CREDENTIAL_SIBLING;
-    assert.equal(guard.evaluateLifecycleReadyGuard(command("cat " + credentialSibling), deps).exitCode, 2,
+    assert.equal(guard.evaluateLifecycleReadyGuard(command("cat " + posixPath(credentialSibling)), deps).exitCode, 2,
       "a credential-named sibling stays refused");
-    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + credentialSibling, projectDir, roots), false);
+    assert.equal(guard.isReadOnlyDiagnosticCommand("cat " + posixPath(credentialSibling), projectDir, roots), false);
   `;
   const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
     cwd: projectDir,
@@ -7456,8 +7463,8 @@ test("runner session paths are ordinary host-visible passive read targets", () =
   writeFileSync(prior, "{\"cwd\":\"fixture\"}\n");
   try {
     const deps = { projectDir, ...hgoReadyDeps(), runner: "codex", env: { CODEX_HOME: codexHome } };
-    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior} | head -n 5`), deps).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), { ...deps, runner: "claude" }).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${posixCommandPath(prior)} | head -n 5`), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${posixCommandPath(prior)}`), { ...deps, runner: "claude" }).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(codexHome, { recursive: true, force: true });
@@ -7470,9 +7477,10 @@ test("the dedicated Codex transcript recovery routes stay exact before readiness
   const prior = join(codexHome, "sessions", "2026", "09", "prior-rollout.jsonl");
   mkdirSync(dirname(prior), { recursive: true });
   writeFileSync(prior, "{\"type\":\"session_meta\",\"payload\":{\"cwd\":\"fixture\",\"session_id\":\"prior\"}}\n");
-  const command = `node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner codex --exclude-session current-session`;
-  const list = `node ${TRANSCRIPT_RECOVERY_SCRIPT} list --root ${projectDir} --runner codex --exclude-session current-session`;
-  const read = `node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session --session-id prior-session`;
+  const recoveryScript = posixCommandPath(TRANSCRIPT_RECOVERY_SCRIPT), recoveryRoot = posixCommandPath(projectDir);
+  const command = `node ${recoveryScript} --root ${recoveryRoot} --runner codex --exclude-session current-session`;
+  const list = `node ${recoveryScript} list --root ${recoveryRoot} --runner codex --exclude-session current-session`;
+  const read = `node ${recoveryScript} read --root ${recoveryRoot} --runner codex --exclude-session current-session --session-id prior-session`;
   try {
     const nonReady = { projectDir, runner: "codex", env: { CODEX_HOME: codexHome }, requireProjectOnboardingReadyFn() { deny("intake-required"); } };
     assert.equal(isSanctionedLifecycleCommand(command, projectDir), true);
@@ -7481,12 +7489,12 @@ test("the dedicated Codex transcript recovery routes stay exact before readiness
     assert.equal(evaluateLifecycleReadyGuard(bash(list), nonReady).exitCode, 0);
     assert.equal(isSanctionedLifecycleCommand(read, projectDir), true);
     assert.equal(evaluateLifecycleReadyGuard(bash(read), nonReady).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner codex`), nonReady).exitCode, 2);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} list --root ${projectDir} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session`), nonReady).exitCode, 2);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session --session-id prior-session --extra no`), nonReady).exitCode, 2);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), nonReady).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${recoveryScript} --root ${recoveryRoot} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${recoveryScript} --root ${recoveryRoot} --runner codex`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${recoveryScript} list --root ${recoveryRoot} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${recoveryScript} read --root ${recoveryRoot} --runner codex --exclude-session current-session`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${recoveryScript} read --root ${recoveryRoot} --runner codex --exclude-session current-session --session-id prior-session --extra no`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${posixCommandPath(prior)}`), nonReady).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(codexHome, { recursive: true, force: true });
@@ -7504,8 +7512,8 @@ test("a sibling transcript path follows the same passive read policy", () => {
   writeFileSync(prior, "{\"cwd\":\"prior\"}\n");
   try {
     const deps = { projectDir, ...hgoReadyDeps(), runner: "claude" };
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), deps).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), { ...deps, runner: "codex" }).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + posixCommandPath(prior), current), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + posixCommandPath(prior), current), { ...deps, runner: "codex" }).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(claudeHome, { recursive: true, force: true });
@@ -7557,7 +7565,7 @@ test("passive reads accept host-resolved symlink-plus-dotdot paths", () => {
   writeFileSync(secret, "outside\n");
   const link = join(projectDir, "linked-outside");
   dirLink(targetDir, link);
-  const escaped = link + "/../sibling/secret.txt";
+  const escaped = posixCommandPath(link) + "/../sibling/secret.txt";
   try {
     for (const command of [
       "cat " + escaped,
