@@ -1,0 +1,67 @@
+diff --git a/plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs b/plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs
+index 37f0a6feb..1ffdb3261 100644
+--- a/plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs
++++ b/plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs
+@@ -213,7 +213,6 @@ for (const command of mutatingChains) {
+   });
+ }
+ test('AC-181 residual: a chain with one mutating stash verb stays in the git-working-tree-write lane and is refused in draft',
+-  { todo: 'RED: an `&&` chain is outside the closed grammar, so no git-working-tree-write target is extracted and the draft lane admits it (null); the fix site is the raw-token fallback of extractShellWriteTargets in lib/protected-test-paths.mjs, not changed here' },
+   () => {
+     for (const command of mutatingChains) {
+       assert.ok(targetsOf(command).some(t => t.lane === 'git-working-tree-write'), 'must name the write lane: ' + command);
+@@ -221,6 +220,16 @@ test('AC-181 residual: a chain with one mutating stash verb stays in the git-wor
+     }
+   });
+ 
++test('AC-181 residual: negative controls - a mutating stash verb is a write in any chain operator or position, a reader-only chain is not', () => {
++  for (const command of ['git stash list || git stash pop', 'git stash list; git stash drop', 'git status && git stash push',
++    'git -C . stash list && git stash pop', 'git stash show && git stash clear']) {
++    assert.ok(targetsOf(command).some(t => t.lane === 'git-working-tree-write'), 'must name the write lane: ' + command);
++  }
++  for (const command of readerChains) {
++    assert.deepEqual(targetsOf(command), [], command);
++  }
++});
++
+ // perl/ruby in-place edit (-i[SUFFIX]) is the same family as `sed -i`: the real file operand must be a write candidate.
+ for (const interpreter of ['perl', 'ruby']) {
+   test('AC-181 residual: `' + interpreter + ' -i -pe` (no suffix) already names the real file operand', () => {
+@@ -231,7 +240,6 @@ for (const interpreter of ['perl', 'ruby']) {
+     assert.equal(hit?.verdict, 'block');
+   });
+   test('AC-181 residual: `' + interpreter + ' -i.bak -pe` names the real file operand as a write-command candidate, like `sed -i.bak`',
+-    { todo: 'RED: the glued-suffix in-place spelling is not recognised in the parsed lane (extractShellWriteTargets returns no target); the fix site is the in-place option handling in lib/protected-test-paths.mjs, not changed here' },
+     () => {
+       assert.ok(writeCommandCandidates(`${interpreter} -i.bak -pe 's/a/b/' ${F}`).includes(F));
+     });
+diff --git a/plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs b/plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs
+index b135275a9..de072db20 100644
+--- a/plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs
++++ b/plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs
+@@ -414,13 +414,24 @@ test("AC-201 residual: `git apply --check <patch>` (validation only) names no wr
+ });
+ 
+ test("AC-201 residual: `git apply --check --reverse <patch>` is a read-only check and is admitted in either flag order",
+-  { todo: "RED: the classifier faults with 'mutating git apply has unbound patch targets' for a --check form that also carries --reverse; fix site is the git apply grammar in protected-test-paths.mjs / guard grammar (protected), not changed here" },
+   () => {
+     for (const command of ["git apply --check --reverse scratch/p.patch", "git apply --reverse --check scratch/p.patch"]) {
+       assert.deepEqual(applyTargets(command), [], command);
+     }
+   });
+ 
++test("AC-201 residual: a --reverse check mixed with a real apply, or an ambiguous option beside it, stays mutating", () => {
++  for (const command of [
++    "git apply --check --reverse scratch/p.patch && git apply scratch/p.patch",
++    "git apply --check --reverse scratch/p.patch && git apply --reverse scratch/p.patch",
++    "git apply --reverse --check --reverse scratch/p.patch",
++    "git apply --reverse --whitespace=error --check scratch/p.patch",
++    "git apply --check --reverse --index scratch/p.patch",
++  ]) {
++    assert.throws(() => applyTargets(command), /mutating git apply/u, command);
++  }
++});
++
+ test("AC-201 residual: plain `git apply <patch>` (and --reverse without --check) stays mutating, never admitted as a check", () => {
+   for (const command of ["git apply scratch/p.patch", "git apply --reverse scratch/p.patch"]) {
+     assert.throws(() => applyTargets(command), /mutating git apply/u, command);
