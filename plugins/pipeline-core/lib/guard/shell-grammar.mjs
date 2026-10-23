@@ -9,7 +9,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
 // Expose the policy-owned binding; shell decisions continue through the same policy function.
 export { PASSIVE_READ_CREDENTIAL_ROOTS };
-import { isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+import { gitShowObjectOperand, isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM } from "./constants.mjs";
 import { MAX_AND_CHAIN_SEGMENTS } from "./grammar-denials.mjs";
 import { commandPath, isProjectWritePath, isRealpathedWithinBoundary, pathInside, rawReadCandidatePath } from "./path-containment.mjs";
@@ -424,7 +424,9 @@ function areGitObjectSpecOperandsContained(subcommand, subargs, root) {
     if (GIT_VALUE_FLAGS.has(subargs[i]) && /^[0-9]+$/u.test(subargs[i + 1] ?? "")) { i += 1; continue; }
     operands.push(subargs[i]);
   }
-  return operands.length === 1 && isContainedGitObjectSpec(operands[0], root);
+  // K97: one object operand plus at most one plain `--format=<fmt>` and one trailing `--` (the shape is defined once, in the grammar module).
+  const spec = gitShowObjectOperand(operands);
+  return spec !== null && isContainedGitObjectSpec(spec, root);
 }
 
 function areGitPipelineOperandsContained(subargs, root, extraRoots) {

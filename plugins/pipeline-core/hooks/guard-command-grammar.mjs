@@ -416,8 +416,25 @@ export function isBoundedSingleRg(argv, root, additionalRoots = []) {
 // Pinned by lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs (AP10 admitted shapes, AP11 fail-closed shapes).
 function isContainedGitShowObject(argv, root) {
   const args = argv[0] === "--no-pager" ? argv.slice(1) : argv;
-  if (args.length !== 2 || args[0] !== "show") return false;
-  return isContainedGitObjectSpec(args[1], root);
+  if (args[0] !== "show") return false;
+  const spec = gitShowObjectOperand(args.slice(1));
+  return spec !== null && isContainedGitObjectSpec(spec, root);
+}
+
+// K97 (PO tile decision, row 15 of 2026-10-23, "Widen the grammar"): the operands after `show` are exactly ONE `<rev>:<path>` object
+// operand plus, optionally, ONE `--format=` / `--format=<fmt>` token (before or after the object) and ONE trailing `--`. <fmt> is a
+// plain token of letters, digits and `% . , : _ -` (a pretty-format placeholder string; no space, quote, `$`, backtick, `;` or
+// parenthesis). The format only shapes the output of the object read and names no path or write target. Returns the object operand,
+// or null when the operands are anything else (a second option, a repeated format, a `--` that is not last, an extra operand).
+// Shared with lib/guard/shell-grammar.mjs (areGitObjectSpecOperandsContained) so both lanes read the same shape.
+const GIT_SHOW_FORMAT_TOKEN = /^--format=[A-Za-z0-9%._,:-]*$/u;
+export function gitShowObjectOperand(operands) {
+  if (!Array.isArray(operands)) return null;
+  const rest = operands[operands.length - 1] === "--" ? operands.slice(0, -1) : [...operands];
+  const formats = rest.filter((token) => GIT_SHOW_FORMAT_TOKEN.test(token));
+  if (formats.length > 1) return null;
+  const objects = rest.filter((token) => !GIT_SHOW_FORMAT_TOKEN.test(token));
+  return objects.length === 1 ? objects[0] : null;
 }
 
 // The `<object>` half of the lane above, exported so the generic git-to-head pipeline (lib/guard/shell-grammar.mjs,
