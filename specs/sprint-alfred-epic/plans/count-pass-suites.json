@@ -1,0 +1,1485 @@
+{
+ "schema": "pipeline.count-pass-suites.v1",
+ "note": "Input of scripts/sitting-count-pass.mjs. Order: cheap suites first, heavy ones last, unresolved entries at the end (never run).",
+ "suites": [
+  {
+   "id": "gitleaks",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k98-refusal-texts",
+   "knownSeconds": 1
+  },
+  {
+   "id": "node-v24-on-windows-creates-a-real-nul-file",
+   "items": [
+    "pipeline.node-v24-on-windows-creates-a-real-nul-file"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Recount git-null-device-sites after 109ce619f added GND009 (the counted 8/8 predates it).",
+   "knownSeconds": 1
+  },
+  {
+   "id": "advertised-git-to-head-pipeline-is-refused",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k97-ap11-git-show-pipe"
+  },
+  {
+   "id": "agy-driver-dispatch-and-design-routes-incomplete",
+   "items": [
+    "pipeline.agy-driver-dispatch-and-design-routes-incomplete"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] A counted serial run of the pin after d80719e5f is only stated in the item text, not in committed evidence."
+  },
+  {
+   "id": "agy-el01-write-authorization-gap",
+   "items": [
+    "pipeline.agy-el01-write-authorization-gap"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Three fail-open conditions are reported open and unchanged: unparseable hook input, a spec with no Risk class row, an open dispatch record not bound to the caller."
+  },
+  {
+   "id": "antigravity-native-read-credential-roots",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k105-claude-native-read-credential-code, held-patches/k96-read-credential-target"
+  },
+  {
+   "id": "antigravity-pretool-guard",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k105-claude-native-read-credential-code, held-patches/k73-k8-three-reds, held-patches/k76-k8-followup, held-patches/k91-sitting-rehearsal, held-patches/k92-gs1-signature-route, held-patches/k96-read-credential-target"
+  },
+  {
+   "id": "antigravity-topology-refresh-host",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "approval-bound-design-package-lives-in-an-ignored-directory",
+   "items": [
+    "pipeline.approval-bound-design-package-lives-in-an-ignored-directory"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] One todo case in rebind-approval.test.mjs (inspect of an unverifiable approval lists rebind-approval) still fails on the fixture clone."
+  },
+  {
+   "id": "architecture-design",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/architecture-design.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k73-k8-three-reds"
+  },
+  {
+   "id": "bounded-reader-terminal-binding",
+   "items": [
+    "pipeline.bounded-reader-terminal-binding"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Run the planned 2+1 Reader course on the content-frozen state and write the terminal record with the adjudicated form."
+  },
+  {
+   "id": "brownfield-implementation-entry-demands-a-greenfield-design-block",
+   "items": [
+    "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Confirm that the established-with-ratchet state of D66 is covered by the signed AC-9 adoption or pin it; no committed test names it."
+  },
+  {
+   "id": "budget-checkpoint-fires-below-the-briefed-cap",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k106-recon-duty-ends-at-delivery, held-patches/k95-d75a-recon-gate"
+  },
+  {
+   "id": "check-verify-case-completion",
+   "items": [],
+   "command": [
+    "--test",
+    "harness/scripts/check-verify-case-completion.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "check-verify-case-completion-augmentation-policy",
+   "items": [],
+   "command": [
+    "--test",
+    "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "clone-hook-readiness.refresh",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/clone-hook-readiness.refresh.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k103-hook-refresh-and-approve-push-repair"
+  },
+  {
+   "id": "codex-bootstrap-in-the-typed-next-action",
+   "items": [
+    "pipeline.codex-bootstrap-in-the-typed-next-action"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Run the retargeted refuted-premise pin once, serially, and record the counted result."
+  },
+  {
+   "id": "codex-critic-packet-host",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/codex-critic-packet-host.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "codex-isolated-critic-protected-preimage",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "codex-readiness-private-receipt-omits-output-custody",
+   "items": [
+    "pipeline.codex-readiness-private-receipt-omits-output-custody"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Run the receipt-custody pin serially on the current HEAD and record the counted result including 99d477455's three cases."
+  },
+  {
+   "id": "commit-pipeline-owned",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k98-refusal-texts"
+  },
+  {
+   "id": "critic-course-admission",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/critic-course-admission.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k81-adapter-purity"
+  },
+  {
+   "id": "critic-dispatch-preflight",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k81-adapter-purity"
+  },
+  {
+   "id": "critic-packet-preflight",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k81-adapter-purity"
+  },
+  {
+   "id": "critic-review-lineage",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/critic-review-lineage.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k81-adapter-purity"
+  },
+  {
+   "id": "critic-scratch-notes-write-is-refused-again",
+   "items": [
+    "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+    "pipeline.critic-scratch-notes-write-is-refused-again"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Re-run the Critic notes pin once serially after the e454442ca text change and record the count. // [agent] Re-run the notes pin once serially after e454442ca and record the count."
+  },
+  {
+   "id": "critic-verify-lifecycle",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k81-adapter-purity"
+  },
+  {
+   "id": "declared-system-skill-read-requires-human-override",
+   "items": [
+    "pipeline.declared-system-skill-read-requires-human-override"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Restate the item pin to the D96 premise so its counted result stops resting on native-hold skips."
+  },
+  {
+   "id": "design-bootstrap-verify-state-contradicts-deferred-contract",
+   "items": [
+    "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Restate the A2-literal pin case to D124 (the deferred state is rejected at implementation entry and at release Verify) and count it."
+  },
+  {
+   "id": "design-course-run-v2-refuses-its-own-documented-routes",
+   "items": [
+    "pipeline.design-course-run-v2-refuses-its-own-documented-routes"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Judge the revision path under the restated single-review acceptance (e144dc3c8 walks the prescribed lifecycle with zero overrides) and pin it if it is not already covered."
+  },
+  {
+   "id": "design-course-session",
+   "items": [
+    "pipeline.design-course-run-v2-refuses-its-own-documented-routes"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/design-course-session.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Judge the revision path under the restated single-review acceptance (e144dc3c8 walks the prescribed lifecycle with zero overrides) and pin it if it is not already covered. | named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+   "items": [
+    "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Run the AC-155 fitness-model qualification pin serially on the current HEAD and record the counted result."
+  },
+  {
+   "id": "design-workflow-package",
+   "items": [
+    "pipeline.readiness-input-omits-current-advisor-observation"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/design-workflow-package.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Counted green run of the extended pin and of the two cited design-workflow-package suites on the current HEAD."
+  },
+  {
+   "id": "design-workflow-package-v2",
+   "items": [
+    "pipeline.readiness-input-omits-current-advisor-observation"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Counted green run of the extended pin and of the two cited design-workflow-package suites on the current HEAD."
+  },
+  {
+   "id": "dispatch-authorship-verify",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "dispatch-briefing",
+   "items": [
+    "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/dispatch-briefing.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Build the consumer coverage (quick consumer qualification) with a counted green. | named as counted in held-patches/k104-fanout-guard-enforce, held-patches/k106-recon-duty-ends-at-delivery, held-patches/k95-d75a-recon-gate"
+  },
+  {
+   "id": "dispatch-briefing-route-record",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/dispatch-briefing-route-record.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k106-recon-duty-ends-at-delivery, held-patches/k95-d75a-recon-gate"
+  },
+  {
+   "id": "dispatch-record-liveness",
+   "items": [
+    "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] The 31/31 pin count was measured in an agent clone and predates the liveness second-writer guard 1cbd22393; recount the pin serially on current HEAD. | named as counted in held-patches/k104-fanout-guard-enforce"
+  },
+  {
+   "id": "dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+   "items": [
+    "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs"
+   ],
+   "expect": {
+    "minPass": 31
+   },
+   "heavy": false,
+   "why": "[verify-wsl] The 31/31 pin count was measured in an agent clone and predates the liveness second-writer guard 1cbd22393; recount the pin serially on current HEAD."
+  },
+  {
+   "id": "dispatch-record-ownership-binds-an-attempted-creation",
+   "items": [
+    "pipeline.dispatch-record-ownership-binds-an-attempted-creation"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Recount the AC-164 pin on current HEAD, because the same guard lane changed after the last count."
+  },
+  {
+   "id": "dispatch-recovery",
+   "items": [
+    "pipeline.role-route-preflight-with-self-dispatch-fallback"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/dispatch-recovery.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there."
+  },
+  {
+   "id": "dispatch-recovery-admission",
+   "items": [
+    "pipeline.role-route-preflight-with-self-dispatch-fallback"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there."
+  },
+  {
+   "id": "domain-scanner-findings-need-reproduction-before-remedy",
+   "items": [
+    "pipeline.domain-scanner-findings-need-reproduction-before-remedy"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Restore the missing backlog item file with its acceptance text so the pin can be checked against it. / [verify-wsl] Run the real gitleaks historical reproduction (the pin only uses a fake scanner binary)."
+  },
+  {
+   "id": "elephant-main-context-spent-on-wake-ups-and-inline-reads",
+   "items": [
+    "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/elephant-main-context-spent-on-wake-ups-and-inline-reads.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Build one enforcement measure per measured cause and record before/after numbers."
+  },
+  {
+   "id": "existing-signing-key-reuse-deadlocks-onboarding",
+   "items": [
+    "pipeline.existing-signing-key-reuse-deadlocks-onboarding"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/existing-signing-key-reuse-deadlocks-onboarding.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Recount the pin on current HEAD, because the attended recovery (A6) code changed in 98a53938e after the last count."
+  },
+  {
+   "id": "feature-branch-push-admitted-without-signature-approval",
+   "items": [
+    "pipeline.feature-branch-push-admitted-without-signature-approval"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/feature-branch-push-admitted-without-signature-approval.test.mjs"
+   ],
+   "expect": {
+    "minPass": 16
+   },
+   "heavy": false,
+   "why": "[verify-wsl] Recount the 16-case pin on current HEAD after the approve-push route change ec1c22db2."
+  },
+  {
+   "id": "foreign-worktree-closes-the-implementation-gate",
+   "items": [
+    "pipeline.foreign-worktree-closes-the-implementation-gate"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Count the new WSL /mnt foreign-worktree case on a WSL host with a writable DrvFs mount (b041fb39b states no count)."
+  },
+  {
+   "id": "git-hook-runtime-snapshot",
+   "items": [
+    "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/git-hook-runtime-snapshot.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host."
+  },
+  {
+   "id": "git-null-device-sites",
+   "items": [
+    "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+    "pipeline.node-v24-on-windows-creates-a-real-nul-file"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/git-null-device-sites.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Count git-null-device-sites.test.mjs serially including GND009 (109ce619f states no count). // [agent] Recount git-null-device-sites after 109ce619f added GND009 (the counted 8/8 predates it)."
+  },
+  {
+   "id": "git-stash-list-classified-as-working-tree-write",
+   "items": [
+    "pipeline.git-stash-list-classified-as-working-tree-write"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Recount the 87-case pin serially on current HEAD (277a1756d counts were taken in an agent clone). / [agent] Optional residuals pinned as todo: an && chain after a writer and perl/ruby -i.bak are not handled. | named as counted in held-patches/k75-classifier-chain-inplace-reverse"
+  },
+  {
+   "id": "git-stash-readonly",
+   "items": [
+    "pipeline.git-stash-list-classified-as-working-tree-write"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Recount the 87-case pin serially on current HEAD (277a1756d counts were taken in an agent clone). / [agent] Optional residuals pinned as todo: an && chain after a writer and perl/ruby -i.bak are not handled."
+  },
+  {
+   "id": "gitleaks-scratch-clones-exclusion",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k98-refusal-texts"
+  },
+  {
+   "id": "goldfish-budgets-omit-the-closing-ceremony",
+   "items": [
+    "pipeline.goldfish-budgets-omit-the-closing-ceremony"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/goldfish-budgets-omit-the-closing-ceremony.test.mjs"
+   ],
+   "expect": {
+    "minPass": 7
+   },
+   "heavy": false,
+   "why": "[verify-wsl] Recount the 7-case pin on current HEAD after the goldfish template and role edits."
+  },
+  {
+   "id": "goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+   "items": [
+    "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Build the consumer coverage (quick consumer qualification) with a counted green."
+  },
+  {
+   "id": "greenfield-design-course-cost-and-proportionality",
+   "items": [
+    "pipeline.greenfield-design-course-cost-and-proportionality"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Restate the pin header against the ADR-0085 single-review route and the shortened acceptance."
+  },
+  {
+   "id": "greenfield-machine-output-and-skill-budget",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k106-recon-duty-ends-at-delivery, held-patches/k95-d75a-recon-gate"
+  },
+  {
+   "id": "guard-apply-patch",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k73-k8-three-reds, held-patches/k75-classifier-chain-inplace-reverse, held-patches/k91-sitting-rehearsal"
+  },
+  {
+   "id": "guard-dispatch",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k104-fanout-guard-enforce, held-patches/k76-k8-followup, held-patches/k91-sitting-rehearsal"
+  },
+  {
+   "id": "guard-dispatch-fanout",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k104-fanout-guard-enforce"
+  },
+  {
+   "id": "guard-lifecycle-ready",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k105-claude-native-read-credential-code, held-patches/k55-guard-lifecycle-ready-test-posix-command-paths, held-patches/k76-k8-followup, held-patches/k91-sitting-rehearsal, held-patches/k96-read-credential-target, held-patches/k97-ap11-git-show-pipe"
+  },
+  {
+   "id": "guard-maintenance-window",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k81-adapter-purity"
+  },
+  {
+   "id": "guard-maintenance-window-kernel-closure",
+   "items": [
+    "pipeline.kernel-closure-check-masks-violations-after-the-first"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Re-count the pin after the GMWKC01 fixes so the live-repository case is measured on current HEAD. | named as counted in held-patches/k104-fanout-guard-enforce, held-patches/k81-adapter-purity"
+  },
+  {
+   "id": "guard-override-request-digest-drifts-after-arming",
+   "items": [
+    "pipeline.guard-override-request-digest-drifts-after-arming"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/guard-override-request-digest-drifts-after-arming.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Re-count this pin on a HEAD that includes f76a3eb42."
+  },
+  {
+   "id": "guard-split-contract",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k105-claude-native-read-credential-code"
+  },
+  {
+   "id": "guard-testpath",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/hooks/guard-testpath.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k97-ap11-git-show-pipe"
+  },
+  {
+   "id": "hgo-patch-preflight-before-signature",
+   "items": [
+    "pipeline.hgo-patch-preflight-before-signature"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs"
+   ],
+   "expect": {
+    "minPass": 12
+   },
+   "heavy": false,
+   "why": "[agent] Re-count the pin file now that it carries 13 tests with 1 todo (277a1756d). | named as counted in held-patches/k75-classifier-chain-inplace-reverse"
+  },
+  {
+   "id": "hgo-stale-capability-shadows-current-authorization",
+   "items": [
+    "pipeline.hgo-stale-capability-shadows-current-authorization"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Re-count this pin on a HEAD that includes f76a3eb42."
+  },
+  {
+   "id": "host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+   "items": [
+    "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] The red K1D session-cleanup-binding case (neutral coordinator-close release) is open in the same cluster."
+  },
+  {
+   "id": "human-guard-override",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/human-guard-override.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k92-gs1-signature-route"
+  },
+  {
+   "id": "human-guard-override-disjoint",
+   "items": [
+    "pipeline.disjoint-signed-hgo-actions-invalidate-one-another"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Recount human-guard-override-disjoint(.isolation) suites serially on current HEAD; neither is in the 2026-10-23 counted sets and the suite is sensitive to plugin drift. / [agent] Two documented diagnostic gaps in the isolation suite are todo cases (expired action reads HGO-DRIFT; audit rows against non-matching siblings); optional."
+  },
+  {
+   "id": "human-guard-override-disjoint-isolation",
+   "items": [
+    "pipeline.disjoint-signed-hgo-actions-invalidate-one-another"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/human-guard-override-disjoint-isolation.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Recount human-guard-override-disjoint(.isolation) suites serially on current HEAD; neither is in the 2026-10-23 counted sets and the suite is sensitive to plugin drift. / [agent] Two documented diagnostic gaps in the isolation suite are todo cases (expired action reads HGO-DRIFT; audit rows against non-matching siblings); optional."
+  },
+  {
+   "id": "implementation-without-dispatch-escapes-review-coverage",
+   "items": [
+    "pipeline.implementation-without-dispatch-escapes-review-coverage"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/implementation-without-dispatch-escapes-review-coverage.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Create the public backlog item text with an acceptance section and map the pin cases to it."
+  },
+  {
+   "id": "installed-design-trailer-example-is-rejected-by-git-guard",
+   "items": [
+    "pipeline.installed-design-trailer-example-is-rejected-by-git-guard"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Write the D129 evidence note listing the stage-0-labelled design commits and make bullet 4 an asserting case. | named as counted in held-patches/k91-sitting-rehearsal"
+  },
+  {
+   "id": "interruption-receipts",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/interruption-receipts.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k81-adapter-purity"
+  },
+  {
+   "id": "kernel-closure-check-masks-violations-after-the-first",
+   "items": [
+    "pipeline.kernel-closure-check-masks-violations-after-the-first"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Re-count the pin after the GMWKC01 fixes so the live-repository case is measured on current HEAD."
+  },
+  {
+   "id": "lifecycle-denial-loop-guard",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/hooks/lifecycle-denial-loop-guard.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k73-k8-three-reds"
+  },
+  {
+   "id": "lifecycle-read-scope-blocks-host-declared-system-skill",
+   "items": [
+    "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Declared-skill admission is not implemented; the work and its 7 held cases ride with the canonical open item, deferred past 0.7.0."
+  },
+  {
+   "id": "model-family-approval-with-automatic-version-upgrades",
+   "items": [
+    "pipeline.model-family-approval-with-automatic-version-upgrades"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/model-family-approval-with-automatic-version-upgrades.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Fix or restate the red model-family-host-store cases MFHS023 and MFHS028 (real-process contention)."
+  },
+  {
+   "id": "model-family-host-store",
+   "items": [
+    "pipeline.model-family-approval-with-automatic-version-upgrades"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/model-family-host-store.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Fix or restate the red model-family-host-store cases MFHS023 and MFHS028 (real-process contention)."
+  },
+  {
+   "id": "model-family-runtime-host",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/model-family-runtime-host.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "native-goldfish-host-return",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "nongit-retirement-reader-calls-inaccessible-controller-helper",
+   "items": [
+    "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Run the complete original onboarding controller (184 cases, four shards) and the Source corpus serially on Linux/WSL with a private TMPDIR and reconcile any remaining failures."
+  },
+  {
+   "id": "onboarding-test-runner-reports-async-pass-before-settlement",
+   "items": [
+    "pipeline.onboarding-test-runner-reports-async-pass-before-settlement"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Complete the full onboarding suite (216 cases, eight workers) serially on Linux/WSL with a private TMPDIR and capture consistent PASS and END counts, all child completions and exit 0."
+  },
+  {
+   "id": "opus-critic-only-batched-for-architecture-and-security",
+   "items": [
+    "pipeline.opus-critic-only-batched-for-architecture-and-security"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Recount the pin once on the current HEAD, because the critic template and role copy changed after the 15/15 run."
+  },
+  {
+   "id": "outside-root-read-label-skips-option-value-file-tokens",
+   "items": [
+    "pipeline.outside-root-read-label-skips-option-value-file-tokens"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Recount the pin once after 5b3990a37 changed the passive-read policy that the label function belongs to."
+  },
+  {
+   "id": "passive-read-policy",
+   "items": [
+    "pipeline.declared-system-skill-read-requires-human-override",
+    "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/passive-read-policy.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Restate the item pin to the D96 premise so its counted result stops resting on native-hold skips. // [agent] Recount the restated pin on the current HEAD; 5b3990a37 changed the pin and the implementation without a stated count and says native Windows and macOS branches were not run. | named as counted in held-patches/k105-claude-native-read-credential-code, held-patches/k96-read-credential-target"
+  },
+  {
+   "id": "passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+   "items": [
+    "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Recount the restated pin on the current HEAD; 5b3990a37 changed the pin and the implementation without a stated count and says native Windows and macOS branches were not run."
+  },
+  {
+   "id": "pipeline-state-discard-feature",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/pipeline-state-discard-feature.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k67-discard-feature-finish-orphan-release, held-patches/k80-closed-release-member-step"
+  },
+  {
+   "id": "pipeline-state-push-anchor",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k103-hook-refresh-and-approve-push-repair"
+  },
+  {
+   "id": "plan-submission-must-not-require-separate-po-approval",
+   "items": [
+    "pipeline.plan-submission-must-not-require-separate-po-approval"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Recount the pin once after 37060e4b4 and afee1a33d changed submit-plan and present-plan."
+  },
+  {
+   "id": "powershell-bypasses-onboarding-read-boundary",
+   "items": [
+    "pipeline.powershell-bypasses-onboarding-read-boundary"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Recount the pin after 5b3990a37; its outside-root refusal assertions (Get-ChildItem, Grep and Glob on the outside directory) must still hold or be restated under QG-04."
+  },
+  {
+   "id": "pre-commit-hook-install",
+   "items": [
+    "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host."
+  },
+  {
+   "id": "project-uninstall",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/project-uninstall.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "protected-test-paths",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/protected-test-paths.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k75-classifier-chain-inplace-reverse"
+  },
+  {
+   "id": "read-blocks-and-misleading-denial-texts-across-runners",
+   "items": [
+    "pipeline.read-blocks-and-misleading-denial-texts-across-runners"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Recount the pin once with M5 and M6 strict, after 5b3990a37 and 1874da3ac changed the read policy."
+  },
+  {
+   "id": "read-only-guard-admits-execution-and-output-options",
+   "items": [
+    "pipeline.read-only-guard-admits-execution-and-output-options"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Recount the pin after the grammar extensions of d3bc82194, 29b18d9e0 and 888518eaa. | named as counted in held-patches/k105-claude-native-read-credential-code"
+  },
+  {
+   "id": "readiness-input-omits-current-advisor-observation",
+   "items": [
+    "pipeline.readiness-input-omits-current-advisor-observation"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Counted green run of the extended pin and of the two cited design-workflow-package suites on the current HEAD."
+  },
+  {
+   "id": "rebind-approval",
+   "items": [
+    "pipeline.approval-bound-design-package-lives-in-an-ignored-directory"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/rebind-approval.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] One todo case in rebind-approval.test.mjs (inspect of an unverifiable approval lists rebind-approval) still fails on the fixture clone."
+  },
+  {
+   "id": "retirement-reader-masks-typed-unsafe-layout-inspection",
+   "items": [
+    "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/retirement-reader-masks-typed-unsafe-layout-inspection.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Run the complete original onboarding controller and the preserved unsafe-layout callback serially on Linux/WSL with a raised timeout and a private TMPDIR."
+  },
+  {
+   "id": "review-economy",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/review-economy.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k81-adapter-purity"
+  },
+  {
+   "id": "revised-native-design-cannot-reach-a-new-advisor-course",
+   "items": [
+    "pipeline.revised-native-design-cannot-reach-a-new-advisor-course"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Counted green run of the pin extended by b02abaa78 (baseline 7/7 predates it) and correction of the item text, which still says the route pin is not located."
+  },
+  {
+   "id": "role-route-preflight-with-self-dispatch-fallback",
+   "items": [
+    "pipeline.role-route-preflight-with-self-dispatch-fallback"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there."
+  },
+  {
+   "id": "run-parallel",
+   "items": [],
+   "command": [
+    "--test",
+    "scripts/run-parallel.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k79-c15-c16-registration-dropins, held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "session-cleanup-binding",
+   "items": [
+    "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] The red K1D session-cleanup-binding case (neutral coordinator-close release) is open in the same cluster. | named as counted in held-patches/k67-discard-feature-finish-orphan-release, held-patches/k80-closed-release-member-step"
+  },
+  {
+   "id": "session-cleanup-lost-binding",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k67-discard-feature-finish-orphan-release, held-patches/k80-closed-release-member-step"
+  },
+  {
+   "id": "session-cleanup-recovery",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k67-discard-feature-finish-orphan-release, held-patches/k80-closed-release-member-step"
+  },
+  {
+   "id": "shell-grammar-file-is-a-kernel-path-without-capability-placement",
+   "items": [
+    "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Re-count the AC-255 pin once on the current HEAD, since the kernel-path list changed after the 8 of 8."
+  },
+  {
+   "id": "signature-ceremony-requires-operator-work-and-breaks",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k92-gs1-signature-route"
+  },
+  {
+   "id": "verify-case-completion-augmentation",
+   "items": [],
+   "command": [
+    "--test",
+    "harness/scripts/verify-case-completion-augmentation.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
+  },
+  {
+   "id": "security-scan",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/security-scan.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k98-refusal-texts",
+   "knownSeconds": 7
+  },
+  {
+   "id": "claude-windows-guard-refuses-every-in-repo-read",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "named as counted in held-patches/k97-ap11-git-show-pipe",
+   "knownSeconds": 27
+  },
+  {
+   "id": "claude-windows-greenfield-lifecycle-not-walkable",
+   "items": [
+    "pipeline.claude-windows-greenfield-lifecycle-not-walkable"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs"
+   ],
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Update the stale V-10 header text in the pin (still says open, owner Coordinator).",
+   "knownSeconds": 85
+  },
+  {
+   "id": "onboarding-init",
+   "items": [
+    "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
+   ],
+   "expect": null,
+   "heavy": true,
+   "why": "[verify-wsl] Time the split greenfield cases serially on Linux/WSL against the 368.5 s baseline and replace the measurement-hold skip with a counted result. | named as counted in held-patches/k98-refusal-texts | HEAVY: the unsplit onboarding-init greenfield matrix: 4/4 pass in 368.5 s on 2026-09-29 (item text); the baseline for the timing comparison"
+  },
+  {
+   "id": "onboarding-init-greenfield-matrix-is-serial-and-slow",
+   "items": [
+    "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow"
+   ],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/onboarding-init-greenfield-matrix-is-serial-and-slow.test.mjs"
+   ],
+   "expect": null,
+   "heavy": true,
+   "why": "[verify-wsl] Time the split greenfield cases serially on Linux/WSL against the 368.5 s baseline and replace the measurement-hold skip with a counted result. | HEAVY: greenfield matrix timing (the split cases); compare the wall time with the 368.5 s baseline of the item text"
+  },
+  {
+   "id": "onboarding-continuity",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
+   ],
+   "expect": null,
+   "heavy": true,
+   "why": "named as counted in held-patches/k80-closed-release-member-step | HEAVY: long suite, about 640 s in an earlier counted run",
+   "knownSeconds": 642
+  },
+  {
+   "id": "project-onboarding-v3",
+   "items": [
+    "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+    "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+    "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+    "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection"
+   ],
+   "command": [
+    "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
+   ],
+   "expect": {
+    "minPass": 216
+   },
+   "heavy": true,
+   "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host. // [verify-wsl] Run the complete original onboarding controller (184 cases, four shards) and the Source corpus serially on Linux/WSL with a private TMPDIR and reconcile any remaining failures. // [verify-wsl] Complete the full onboarding suite (216 cases, eight workers) serially on Linux/WSL with a private TMPDIR and capture consistent PASS and END counts, all child completions and exit 0. // [verify-wsl] Run the complete original onboarding controller and the preserved unsafe-layout callback serially on Linux/WSL with a raised timeout and a private TMPDIR. | HEAVY: original onboarding controller: 184 cases in four shards, 216 cases with eight workers; about 15 to 30 minutes; run `node <file>` (not `--test`), own summary line; run alone with a raised cap"
+  },
+  {
+   "id": "forensics-and-audit-evidence-not-reconstructable",
+   "items": [
+    "pipeline.forensics-and-audit-evidence-not-reconstructable"
+   ],
+   "command": null,
+   "unresolved": "the open clause asks to BUILD continuity digest drift, the executable Verify contract and the generated audit index with a pin; no pin or suite exists yet (item text: only the runner transcript export admission is committed)",
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Build continuity digest drift, the executable Verify contract and the generated audit index, with a pin."
+  },
+  {
+   "id": "greenfield-comparisons-need-reproducible-public-evidence",
+   "items": [
+    "pipeline.greenfield-comparisons-need-reproducible-public-evidence"
+   ],
+   "command": null,
+   "unresolved": "the open clause says implementation and pin do not exist and are deferred past 0.7.0; no suite to count",
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Implementation and a pin for reproducible public comparison evidence do not exist; deferred past 0.7.0."
+  },
+  {
+   "id": "git-hook-runtime-snapshot-full-verify",
+   "items": [
+    "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog"
+   ],
+   "command": null,
+   "unresolved": "Full Verify and the candidate-bound closure checks are an operator step on the Linux/WSL host, not a suite file",
+   "expect": null,
+   "heavy": false,
+   "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host."
+  },
+  {
+   "id": "domain-scanner-real-gitleaks-reproduction",
+   "items": [
+    "pipeline.domain-scanner-findings-need-reproduction-before-remedy"
+   ],
+   "command": null,
+   "unresolved": "the real gitleaks historical reproduction is a manual run on a WSL host with the real binary; the pin only uses a fake scanner binary",
+   "expect": null,
+   "heavy": false,
+   "why": "[agent] Restore the missing backlog item file with its acceptance text so the pin can be checked against it. / [verify-wsl] Run the real gitleaks historical reproduction (the pin only uses a fake scanner binary)."
+  }
+ ]
+}
