@@ -1,0 +1,508 @@
+{
+  "schema": "pipeline.doc-reader-round-working-disposition.v0",
+  "note": "Working record outside the evidence root; the closed terminal disposition is derived from it at the end of the course.",
+  "round": "20261023b",
+  "reviewedCommit": "b90c103e332f8d7150f65bd968c1f40e8c3b1901",
+  "correctionBatch": 2,
+  "findings": [
+    {
+      "id": "1",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "5d44f7e2d",
+        "69dea2bd5"
+      ]
+    },
+    {
+      "id": "2",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "69dea2bd5",
+        "fff81b080"
+      ]
+    },
+    {
+      "id": "3",
+      "class": "fileline",
+      "status": "resolved-by-decision",
+      "commits": [
+        "d1c6f6e98",
+        "a56cca4d8"
+      ],
+      "note": "PO 2026-10-23: commands stay inline, links labelled maintainer background"
+    },
+    {
+      "id": "4",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "fff81b080"
+      ]
+    },
+    {
+      "id": "5",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "2d33f667b"
+      ]
+    },
+    {
+      "id": "6",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "bbfd0da0a"
+      ]
+    },
+    {
+      "id": "7",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "bbfd0da0a"
+      ],
+      "note": "Phoenix/Nova cut declined by phase two"
+    },
+    {
+      "id": "8",
+      "class": "fileline",
+      "status": "pending-follow-up",
+      "commits": [],
+      "note": "PO 2026-10-23: document the global route; K129 writes it from installer facts"
+    },
+    {
+      "id": "9",
+      "class": "cut",
+      "status": "accepted-by-decision",
+      "commits": [
+        "ba7097bdc"
+      ],
+      "note": "PO 2026-10-23: GEMINI.md keeps the actionable minimum; Agy defined"
+    },
+    {
+      "id": "10",
+      "class": "cut",
+      "status": "declined-by-phase-two",
+      "commits": [],
+      "note": "phase two DECLINED: the report's own deduplication claim"
+    },
+    {
+      "id": "11",
+      "class": "cut",
+      "status": "accepted-by-decision",
+      "commits": [],
+      "note": "PO 2026-10-23: stays in the set with its banner; language point to the Critic batch"
+    },
+    {
+      "id": "12",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "63e6ab06b"
+      ],
+      "note": "the 41 baseline counts a different set than the 25 items; the report does not say which"
+    },
+    {
+      "id": "13",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "10814f263"
+      ]
+    },
+    {
+      "id": "14",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "10814f263"
+      ]
+    },
+    {
+      "id": "15",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "10814f263"
+      ]
+    },
+    {
+      "id": "16",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "10814f263",
+        "dab9f7cd9",
+        "bbfd0da0a",
+        "fff81b080",
+        "f380cab73",
+        "69dea2bd5"
+      ]
+    },
+    {
+      "id": "17",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "10814f263"
+      ]
+    },
+    {
+      "id": "18",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "69dea2bd5",
+        "2d33f667b",
+        "10814f263",
+        "bbfd0da0a"
+      ]
+    },
+    {
+      "id": "19",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "69dea2bd5"
+      ],
+      "note": "PO 2026-10-23: no Antigravity route before the tag"
+    },
+    {
+      "id": "20",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "5d44f7e2d"
+      ]
+    },
+    {
+      "id": "21",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "69dea2bd5"
+      ]
+    },
+    {
+      "id": "22",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "69dea2bd5",
+        "d85653858"
+      ]
+    },
+    {
+      "id": "23",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "fff81b080",
+        "69dea2bd5"
+      ]
+    },
+    {
+      "id": "24",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "fff81b080"
+      ]
+    },
+    {
+      "id": "25",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "fff81b080"
+      ]
+    },
+    {
+      "id": "26",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "79b61de05"
+      ]
+    },
+    {
+      "id": "27",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "79b61de05"
+      ]
+    },
+    {
+      "id": "28",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "614f4c903"
+      ],
+      "note": "enforcement.md part accepted by the owner (round-1 finding 15)"
+    },
+    {
+      "id": "29",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "f1b7b861c"
+      ]
+    },
+    {
+      "id": "30",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "dab9f7cd9"
+      ]
+    },
+    {
+      "id": "31",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "dab9f7cd9"
+      ]
+    },
+    {
+      "id": "32",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "d85653858"
+      ]
+    },
+    {
+      "id": "33",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "d85653858"
+      ]
+    },
+    {
+      "id": "34",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "2d33f667b"
+      ],
+      "note": "pinned paragraphs accepted unchanged by PO decision"
+    },
+    {
+      "id": "35",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "2d33f667b"
+      ]
+    },
+    {
+      "id": "36",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "2d33f667b"
+      ]
+    },
+    {
+      "id": "37",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "10814f263"
+      ]
+    },
+    {
+      "id": "38",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "614f4c903"
+      ]
+    },
+    {
+      "id": "39",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "f380cab73"
+      ]
+    },
+    {
+      "id": "40",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "ba7097bdc",
+        "69dea2bd5"
+      ]
+    },
+    {
+      "id": "41",
+      "class": "fileline",
+      "status": "pending-follow-up",
+      "commits": [],
+      "note": "PO 2026-10-23: adjust governance classification; K125 prepares the diff for the sitting inventory commit"
+    },
+    {
+      "id": "42",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "5d44f7e2d"
+      ]
+    },
+    {
+      "id": "43",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "69dea2bd5",
+        "d85653858"
+      ]
+    },
+    {
+      "id": "44",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "10814f263",
+        "dab9f7cd9",
+        "fff81b080",
+        "2d33f667b",
+        "f1b7b861c"
+      ]
+    },
+    {
+      "id": "45",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "79b61de05",
+        "f380cab73",
+        "69dea2bd5",
+        "d85653858"
+      ]
+    },
+    {
+      "id": "46",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "10814f263",
+        "bbfd0da0a",
+        "fff81b080"
+      ]
+    },
+    {
+      "id": "47",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "fff81b080"
+      ]
+    },
+    {
+      "id": "48",
+      "class": "reordering",
+      "status": "no-change",
+      "commits": [],
+      "note": "forward pointer already sits at the first Critic-bound mention"
+    },
+    {
+      "id": "49",
+      "class": "fileline",
+      "status": "accepted-gap",
+      "commits": [
+        "f380cab73"
+      ],
+      "note": "PO 2026-10-23 cannot name where an approved policy pack comes from; no claim made; prerequisite stated and linked"
+    },
+    {
+      "id": "50",
+      "class": "cut",
+      "status": "resolved",
+      "commits": [
+        "63e6ab06b"
+      ],
+      "note": "counts explained; German banner and set membership accepted by decision (11)"
+    },
+    {
+      "id": "51",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "614f4c903"
+      ]
+    },
+    {
+      "id": "52",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "10814f263"
+      ]
+    },
+    {
+      "id": "53",
+      "class": "reordering",
+      "status": "resolved",
+      "commits": [
+        "2d33f667b"
+      ]
+    },
+    {
+      "id": "54",
+      "class": "fileline",
+      "status": "resolved",
+      "commits": [
+        "69dea2bd5"
+      ]
+    }
+  ],
+  "carriedRoundOneOwnerItems": [
+    {
+      "round1Id": "15",
+      "status": "accepted-by-decision"
+    },
+    {
+      "round1Id": "52",
+      "status": "accepted-by-decision"
+    },
+    {
+      "round1Id": "57",
+      "status": "pending-follow-up",
+      "note": "same as round-2 finding 41"
+    },
+    {
+      "round1Id": "60",
+      "status": "resolved-by-decision",
+      "commits": [
+        "d1c6f6e98"
+      ]
+    },
+    {
+      "round1Id": "64",
+      "status": "pending-follow-up",
+      "note": "K125 prepares the inventory capability for the sitting inventory commit"
+    },
+    {
+      "round1Id": "71",
+      "status": "accepted-by-decision"
+    },
+    {
+      "round1Id": "76",
+      "status": "accepted-by-decision"
+    },
+    {
+      "round1Id": "78",
+      "status": "accepted-by-decision"
+    }
+  ]
+}
