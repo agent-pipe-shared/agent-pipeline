@@ -38,7 +38,7 @@
 **AFK window (2026-10-23, written during the window; wins over the session cut where they differ):**
 - Agents imported on `feat/sprint-alfred` (implementation complete; Critic read and PO acceptance pending): K53 scripts, 40 backlog
   items reconciled, D75 S2, D76 S3/S4/S6, D140 doc fixes, K74 pins, K78 fixtures; counted runs `evidence/pin-counted-results-2026-10-23*.md`.
-- Held for the bundled PO sitting: ceremonies C15 to C26 in `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`, patches in
+- Held for the bundled PO sitting: ceremonies C15 to C28 in `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`, patches in
   `specs/sprint-alfred-epic/evidence/held-patches/`. No row yet: the D78 dispatch-hook default.
 - PO list (only on request): `specs/sprint-alfred-epic/plans/po-list-afk-2026-10-22.md`, rows 1 to 30 (19 Critic digest re-pin, 23/24
   K2 reds, 27 K1D case C, 28 to 30 K8/K9 findings).
