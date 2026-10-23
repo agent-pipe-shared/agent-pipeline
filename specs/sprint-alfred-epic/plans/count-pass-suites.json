@@ -188,9 +188,11 @@
     "--test",
     "plugins/pipeline-core/scripts/clone-hook-readiness.refresh.test.mjs"
    ],
-   "expect": null,
+   "expect": {
+    "minPass": 4
+   },
    "heavy": false,
-   "why": "named as counted in held-patches/k103-hook-refresh-and-approve-push-repair"
+   "why": "named as counted in held-patches/k103-hook-refresh-and-approve-push-repair | K134: expect 4 set from the counted result in evidence/sitting (k118-notes.md, notes/k133-results.md)."
   },
   {
    "id": "codex-bootstrap-in-the-typed-next-action",
@@ -247,9 +249,11 @@
     "--test",
     "plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs"
    ],
-   "expect": null,
+   "expect": {
+    "minPass": 2
+   },
    "heavy": false,
-   "why": "named as counted in held-patches/k98-refusal-texts"
+   "why": "named as counted in held-patches/k98-refusal-texts | K134: expect 2 set from the counted result in evidence/sitting (k118-notes.md, notes/k133-results.md)."
   },
   {
    "id": "critic-course-admission",
@@ -640,9 +644,11 @@
     "--test",
     "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs"
    ],
-   "expect": null,
+   "expect": {
+    "minPass": 2
+   },
    "heavy": false,
-   "why": "named as counted in held-patches/k98-refusal-texts"
+   "why": "named as counted in held-patches/k98-refusal-texts | K134: expect 2 set from the counted result in evidence/sitting (k118-notes.md, notes/k133-results.md)."
   },
   {
    "id": "goldfish-budgets-omit-the-closing-ceremony",
@@ -725,9 +731,11 @@
     "--test",
     "plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs"
    ],
-   "expect": null,
+   "expect": {
+    "minPass": 34
+   },
    "heavy": false,
-   "why": "named as counted in held-patches/k104-fanout-guard-enforce"
+   "why": "named as counted in held-patches/k104-fanout-guard-enforce | K134: expect 34 set from the counted result on the sitting tree (notes/k133-results.md); 29 of 29 on the pre-sitting tree, so a thin green (RED) there by design."
   },
   {
    "id": "guard-lifecycle-ready",
@@ -1259,9 +1267,11 @@
     "--test",
     "plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs"
    ],
-   "expect": null,
+   "expect": {
+    "minPass": 31
+   },
    "heavy": false,
-   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there."
+   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there. | K134: expect 31 set from the counted result on the sitting tree (decision-round pin); 25 of 25 on the pre-sitting tree, so a thin green (RED) there by design."
   },
   {
    "id": "run-parallel",
@@ -1383,6 +1393,110 @@
    "knownSeconds": 85
   },
   {
+   "id": "governed-check-child-ignores-inherited-node-test-context",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs"
+   ],
+   "expect": {
+    "minPass": 2
+   },
+   "heavy": false,
+   "why": "K134, decision-round pin of K120 (evidence/sitting/k120-notes.md): a governed delivery check verdict ignores an inherited NODE_TEST_CONTEXT; expect 2 of 2. The pin file and the one-line product fix land with the sitting, so this entry is RED (file missing, or 0 pass / 2 fail without the fix) on a tree before the sitting: list only, run it after the sitting."
+  },
+  {
+   "id": "project-calibration-retains-new-project-placeholder",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs"
+   ],
+   "expect": {
+    "minPass": 43
+   },
+   "heavy": false,
+   "why": "K134, project-calibration pin (AC-232, cases S1 to S8, evidence/sitting/notes/k133-results.md): 43 of 43 on the sitting tree; 28 of 28 on the pre-sitting tree, so a thin green (RED) there by design. Count it after the sitting."
+  },
+  {
+   "id": "design-approval-route.e2e",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs"
+   ],
+   "expect": {
+    "minPass": 14
+   },
+   "heavy": false,
+   "why": "K134, decision-round suite: end-to-end design approval route; 14 of 14 measured on the pre-sitting tree (a floor: the sitting tree may hold more)."
+  },
+  {
+   "id": "check-observation-governance",
+   "items": [],
+   "command": [
+    "--test",
+    "harness/scripts/check-observation-governance.test.mjs"
+   ],
+   "expect": {
+    "minPass": 7
+   },
+   "heavy": false,
+   "why": "K134, decision-round suite: the observation governance checker; expect 7 of 7."
+  },
+  {
+   "id": "dispatch-scope-overlap",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/dispatch-scope-overlap.test.mjs"
+   ],
+   "expect": {
+    "minPass": 12
+   },
+   "heavy": false,
+   "why": "K134, one of the seven test files registered by K118 (evidence/sitting/k118-notes.md), 12 of 12 there. The file exists only on the sitting tree: list only, RED (file missing) before it."
+  },
+  {
+   "id": "commit-message-policy-administrative-refusal",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs"
+   ],
+   "expect": {
+    "minPass": 1
+   },
+   "heavy": false,
+   "why": "K134, K118 registration (evidence/sitting/k118-notes.md), 1 of 1 there. The file exists only on the sitting tree: list only, RED (file missing) before it."
+  },
+  {
+   "id": "onboarding-init-machine-plane-reason",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs"
+   ],
+   "expect": {
+    "minPass": 1
+   },
+   "heavy": false,
+   "why": "K134, K118 registration (evidence/sitting/k118-notes.md), 1 of 1 there. The file exists only on the sitting tree: list only, RED (file missing) before it."
+  },
+  {
+   "id": "pipeline-state-approve-push-chat-catalogue-repair",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs"
+   ],
+   "expect": {
+    "minPass": 1
+   },
+   "heavy": false,
+   "why": "K134, K118 registration (evidence/sitting/k118-notes.md), 1 of 1 there. The file exists only on the sitting tree: list only, RED (file missing) before it."
+  },
+  {
    "id": "onboarding-init",
    "items": [
     "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow"
@@ -1436,6 +1550,20 @@
    },
    "heavy": true,
    "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host. // [verify-wsl] Run the complete original onboarding controller (184 cases, four shards) and the Source corpus serially on Linux/WSL with a private TMPDIR and reconcile any remaining failures. // [verify-wsl] Complete the full onboarding suite (216 cases, eight workers) serially on Linux/WSL with a private TMPDIR and capture consistent PASS and END counts, all child completions and exit 0. // [verify-wsl] Run the complete original onboarding controller and the preserved unsafe-layout callback serially on Linux/WSL with a raised timeout and a private TMPDIR. | HEAVY: original onboarding controller: 184 cases in four shards, 216 cases with eight workers; about 15 to 30 minutes; run `node <file>` (not `--test`), own summary line; run alone with a raised cap"
+  },
+  {
+   "id": "native-goldfish-host-state",
+   "items": [],
+   "command": [
+    "--test",
+    "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs"
+   ],
+   "expect": {
+    "minPass": 38
+   },
+   "heavy": true,
+   "timeoutMs": 3600000,
+   "why": "K134, HEAVY: the whole native Goldfish host-state file, about 15 minutes alone, 38 of 38 expected (K120 notes: run the whole file once, alone, NGHS09 included). NGHS09 is RED without the K120 product fix, so the whole file is only green after the sitting. Run alone, last, with a raised cap."
   },
   {
    "id": "forensics-and-audit-evidence-not-reconstructable",
