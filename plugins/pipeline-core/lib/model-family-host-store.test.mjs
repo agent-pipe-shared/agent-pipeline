@@ -916,6 +916,10 @@ test("real competing transition and prepare serialize on the stored generation",
     const successorInputs = { bundle: next.bundle, routeSource: next.routeSource, trustAnchors };
     const authorityInputs = { bundle: f.data.bundle, routeSource: f.data.routeSource, trustAnchors, predecessor: null };
     const transitionPromise = spawnTransitionWriter(f.root, { authorityInputs, successorInputs });
+    // K111 (PO batch 8, typed pending): when the parent's own step throws first, this child promise rejects after the case ended and
+    // surfaced as an unhandled rejection that failed the whole process (exit 1) although the case is a todo. An inert observer marks
+    // the rejection as handled; the `await transitionPromise` below still rethrows it, so no assertion changes.
+    transitionPromise.catch(() => {});
     // QG-04 (E30): the registry lock is O_EXCL with no wait, so the parent's own competing invoke retries a bounded
     // number of times on SDC-LOCK-HELD / registry-lock-held only; anything else, and the last failure, rethrows.
     let prepared;
