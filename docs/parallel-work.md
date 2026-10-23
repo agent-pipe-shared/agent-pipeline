@@ -16,6 +16,19 @@ all of the following are true:
 - The commit surface is safe: use separate worktrees, allow only one slice to
   commit, or sequence commits in a shared checkout.
 
+The dispatch guard enforces the first condition by default. It refuses a
+Goldfish dispatch whose declared write scope overlaps another dispatch in the
+same call or one that may still be writing in the project's working tree (an open dispatch
+record whose owner is not provably gone). The refusal names the overlapping
+paths and the repairs: send the dispatch in a later call, narrow one
+`Write scope:` list, run it in its own worktree (`isolation: "worktree"`; such
+a call is not checked), or finalize the record of an abandoned dispatch.
+Read-only dispatches are not judged, and a scope that cannot be read only
+warns. Setting `PIPELINE_FANOUT_SCOPE_MODE=shadow` for the hook turns the
+refusal into a warning. The briefing generator applies the same check when it
+binds a dispatch and refuses with `DBG-SCOPE-OVERLAP`, naming the running
+dispatch and the repairs.
+
 This can shorten independent review, documentation, or implementation work.
 It also adds coordination and integration work, so small, overlapping, or
 dependent work is often better kept sequential. No cross-runner speed or cost
@@ -29,6 +42,13 @@ keeps those duties and targeted fixes in its own context. The Elephant declares
 file owners before dispatch; an item that collides with an active owner waits.
 Main preserves all deliveries during integration. Original owners end after
 tested delivery and integration, rather than remaining alive for later review.
+
+After a slice was cancelled with the class `wrong-premise`, the briefing
+generator refuses to brief a new dispatch for the same item
+(`DBG-RECON-REQUIRED`) until a recon note is referenced: the `reconNote` field
+of the briefing package, or `--recon-note` on the binding route, naming a
+non-empty file under `scratch/` or `specs/`. The duty ends once a slice of that
+item has been delivered (integrated into the candidate).
 
 Declare a coherent review batch before its items start, then freeze membership
 after integration and before the single full Critic. This batching rule applies
