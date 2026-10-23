@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "85d46b825074a14a99263a9d3a35a3a1901b8b56",
-    "tree": "9af51be113ba028a0180162c71c42c652e0d11c7"
+    "commit": "91f728f85534e768a19fea62c587a35d10855cf4",
+    "tree": "98460ee135a11ab34d729cbad0b5ebf2bb51194d"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -989,6 +989,7 @@
         "verify-phase:harness/scripts/verify.mjs:run-codex-critic-isolation-tests",
         "verify-phase:harness/scripts/verify.mjs:run-codex-critic-probe-split-tests",
         "verify-phase:harness/scripts/verify.mjs:run-codex-isolation-control-decomposition-tests",
+        "verify-phase:harness/scripts/verify.mjs:run-parallel-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-contracts.schema-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-native-continuation-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",
