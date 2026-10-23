@@ -68,7 +68,7 @@
 import { randomBytes, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
@@ -279,9 +279,16 @@ function mkdirPrivate(base, path) {
   }
 }
 
+/**
+ * The temporary named-commit worktree directory carries the NAME OF THE CHECKOUT ROOT: the project
+ * calibration identity is root-derived and an aliased identity is refused (AC-232 / R1, PO decision
+ * 2026-10-23), so a worktree directory named differently from the project would refuse its own commit.
+ */
+function commitWorktreePath(root, container) { return join(container, basename(resolve(root))); }
+
 /** Remove a temporary named-commit worktree. Never throws; reports whether it is really gone. */
 function removeCommitWorktree(root, container) {
-  try { git(root, ["worktree", "remove", "--force", join(container, "checkout")], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* the filesystem removal below still runs */ }
+  try { git(root, ["worktree", "remove", "--force", commitWorktreePath(root, container)], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* the filesystem removal below still runs */ }
   try { rmSync(container, { recursive: true, force: true }); } catch { /* reported through the return value */ }
   try { git(root, ["worktree", "prune"], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* a stale admin record is pruned by the next worktree command */ }
   return !existsSync(container);
@@ -321,9 +328,9 @@ async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
   try {
     mkdirPrivate(common, hooks);
     // An empty hooks directory: a post-checkout hook of the shared repository must not run for this plumbing.
-    try { git(root, ["-c", `core.hooksPath=${hooks}`, "worktree", "add", "--detach", "--quiet", join(container, "checkout"), sha], COMMIT_WORKTREE_TIMEOUT_MS); }
+    try { git(root, ["-c", `core.hooksPath=${hooks}`, "worktree", "add", "--detach", "--quiet", commitWorktreePath(root, container), sha], COMMIT_WORKTREE_TIMEOUT_MS); }
     catch { fail("VEP-COMMIT-WORKTREE", `Could not create the temporary worktree for commit ${sha}.`); }
-    const produced = await produceVerifyEvidence({ ...options, rootDir: join(container, "checkout"), commit: null });
+    const produced = await produceVerifyEvidence({ ...options, rootDir: commitWorktreePath(root, container), commit: null });
     // The run above wrote into the temporary worktree; publish the evidence into the requested path of the checkout.
     writeEvidence(root, target, produced.evidence);
     result = { ...produced, outPath: target };

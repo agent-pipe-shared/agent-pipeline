@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -35,7 +35,9 @@ function git(root, args) { return run("git", ["-C", root, ...args]).trim(); }
 function fixture(verifyCommand) {
   const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "fixture-project", verify: verifyCommand }, null, 2)}\n`);
+  // Fixture restatement (QG-04, bounded; PO decision 2026-10-23 "S4 follows R1", AC-232): an aliased
+  // identity is now refused, so the fixture project is named like its root. No assertion changed.
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root), verify: verifyCommand }, null, 2)}\n`);
   writeFileSync(join(root, "README.md"), "# Fixture\n");
   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
   prepareConsumerVerify({ rootDir: root });
@@ -422,7 +424,7 @@ test("a calibration naming no verify command cannot produce success at any bound
   const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
   try {
     mkdirSync(join(root, ".claude"), { recursive: true });
-    writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "no-verify" }, null, 2)}\n`);
+    writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root) }, null, 2)}\n`);
     writeFileSync(join(root, "README.md"), "# Baseline-only fixture\n");
     prepareConsumerVerify({ rootDir: root });
     git(root, ["init", "-q"]);

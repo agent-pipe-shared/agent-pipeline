@@ -557,7 +557,7 @@ const observe4 = (root) => ({
 test("PARWORK-M4a: the real producer CLI makes Critic evidence for an older commit and leaves a dirty checkout, its worktree list and the session-authority registry untouched", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, PO decision K7)" : false, timeout: 300000 }, () => {
   const root = join(FIXTURE, "m4-root");
   mkdirSync(join(root, ".claude"), { recursive: true });
-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m4", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "m4-root", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
   writeFileSync(join(root, "README.md"), "# Fixture\n");
   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
   prepareConsumerVerify({ rootDir: root });
@@ -612,7 +612,7 @@ function waitFor5(path, label) {
 test("PARWORK-M5a: the real producer CLI and the repair inspect run while another process holds the registry boundary; afterwards no lock, no retired-lock directory remain, the registry reads and the session descriptors are unchanged", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, ALF-K13)" : false, timeout: 300000 }, async () => {
   const root = join(FIXTURE, "m5-root");
   mkdirSync(join(root, ".claude"), { recursive: true });
-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m5", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "m5-root", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
   writeFileSync(join(root, "README.md"), "# Fixture\n");
   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
   prepareConsumerVerify({ rootDir: root });
