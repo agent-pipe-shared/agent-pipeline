@@ -409,7 +409,7 @@ function continuityRequest(authority) {
 }
 
 /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
-async function buildSubmittedFeature(prefix) {
+async function buildSubmittedFeature(prefix, { fallback } = {}) {
   stateModule ??= await import(pathToFileURL(CLI).href);
   const governance = await loadLib("governance-scope.mjs");
   const poGate = await loadLib("po-gate-authority.mjs");
@@ -495,6 +495,7 @@ async function buildSubmittedFeature(prefix) {
     report: sourceFor(REPORT_PATH),
     openFindingIds: [],
     reviewedAt: "2026-10-09T09:00:00.000Z",
+    ...(fallback === undefined ? {} : { fallback }),
   });
   if (!created.ok) throw new Error(`fixture review receipt refused: ${created.code}`);
   writeFileIn(dir, RECEIPT_PATH, Buffer.from(created.bytes).toString("utf8"));
@@ -608,6 +609,21 @@ test("route 1: present-plan --review-receipt accepts finished sources and hands 
   for (const key of ["designWorkflowPackagePath", "designWorkflowPackageSha256"]) {
     assert.equal(key in presentation, false, `presentation carries no ${key}`);
   }
+  // K128 (PO decision 2026-10-23, batch 12, row 41): a native receipt presents no fallback line; a receipt produced on the typed
+  // fallback-self-dispatch route is named in the presented plan and in the PO's signed binding. Added assertions only.
+  assert.equal(/Review route:/u.test(run.present.stdout), false, "a native receipt presents no fallback line");
+  assert.equal("fallback" in run.request.binding.reviewReceipts[0], false, "a native receipt's binding entry carries no fallback");
+  const fallback = { route: "fallback-self-dispatch", reasonCode: "RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER", requestedRoute: "duty.critic_normal", observedIdentity: "unknown" };
+  const fb = await buildSubmittedFeature("route-fallback", { fallback });
+  await bindRouteOwner(fb);
+  const presented = await ownedCli(fb, ["present-plan", "--by", "coordinator", "--review-receipt", fb.receiptPath]);
+  assert.equal(presented.status, 0, `present-plan over a fallback receipt must exit 0; stderr: ${presented.stderr}`);
+  assert.match(presented.stdout, /Review route: \S+ ran on the fallback-self-dispatch route \(RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER; requested duty\.critic_normal, observed unknown\) -- a single-review fallback, not an independent native review\./u);
+  const signLine = presented.stdout.split(/\r?\n/u).find((line) => /sign-intent/u.test(line)) ?? "";
+  const requested = /--request\s+(?:"([^"]+)"|'([^']+)'|(\S+))/u.exec(signLine);
+  const requestPath = requested ? (requested[1] ?? requested[2] ?? requested[3]) : null;
+  assert.ok(requestPath !== null && existsSync(requestPath), "the fallback route hands over the same ready sign command");
+  assert.deepEqual(JSON.parse(readFileSync(requestPath, "utf8")).binding.reviewReceipts[0].fallback, fallback, "the PO's signed binding names the fallback");
 });
 
 test("route 2: one design proof, approve-plan, and the closed v9 accepted-contract record", async (t) => {

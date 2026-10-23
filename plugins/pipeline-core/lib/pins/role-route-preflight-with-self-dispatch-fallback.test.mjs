@@ -19,11 +19,16 @@
  * end-to-end clause ("the course accepts that result as the role's evidence") named a course that
  * no longer exists. QG-04 restatement (bounded, PO decision D125 of 2026-10-22): the acceptance is
  * restated against the single-review route, where fallback evidence goes to the present-plan
- * --review-receipt route; the retired-course wording is not a held assertion any more. This pin still
- * proves the admission function only. It does NOT yet prove that the review-receipt route consumes a
- * returned fallback result: the receipt producer records only a requested route and an observed
- * identity, and nothing hands it the typed fallback record (K111: product wiring missing, so no case
- * is added here; the open entry stays open on the item).
+ * --review-receipt route; the retired-course wording is not a held assertion any more. Points 1 to 6
+ * prove the admission function and its neighbours. The restated clause is now asserted too (K128, PO
+ * decision of 2026-10-23, batch 12, row 41; QG-04: no earlier assertion changed, this only adds cases):
+ * 7 (the typed fallback on the single-review route) the design review receipt carries an OPTIONAL, closed `fallback` record
+ *   ({route: fallback-self-dispatch, reasonCode, requestedRoute, observedIdentity}); the producer writes it when the typed
+ *   fallback occurred, the receipt schema refuses a malformed or extended one (a receipt without it stays valid and unchanged),
+ *   and `present-plan --review-receipt` names it in the presented plan and in the PO's signed binding instead of presenting a
+ *   single-review route as an independent review; see the point-7 cases and the added route-1 assertions in
+ *   scripts/design-approval-route.e2e.test.mjs. What stays outside: the Elephant must still pass the flag
+ *   `--fallback-reason-code` when it produces a receipt after a fallback (a briefing duty, not a guard).
  * 5 (P1-1 bullet 3, standalone, NOT wired into a caller): lib/dispatch-recovery-state.mjs keeps one atomic recovery
  *   state per task identity (dispatchId + role + candidate) with a bounded attempt history; see the point-5 cases.
  * 6 (P1-1 bullet 2, briefing-side consumer of the declared route, no new guard): the agent-obligations document and the Goldfish
@@ -50,6 +55,10 @@ import {
 import { buildDesignCourseProducerAction, executeDesignCourseProducer } from "../../scripts/design-course-session.mjs";
 // Namespace import for the point-2b function: a missing export then fails its own cases (TypeError), not the whole file at link time.
 import * as designCourseSession from "../../scripts/design-course-session.mjs";
+import { createDesignReviewReceipt, parseDesignReviewReceipt, summarizeDesignReviewReceipt } from "../design-review-receipt.mjs";
+import { createDesignApprovalBinding, validateDesignApprovalBinding } from "../design-approval-binding.mjs";
+import { canonical } from "../po-approval-proof.mjs";
+import { createReceiptFromDisk, main as receiptProducerMain } from "../../scripts/design-review-receipt.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const pluginRoot = resolve(repoRoot, "plugins", "pipeline-core");
@@ -508,4 +517,118 @@ test("point 6: the Goldfish task template (canonical and vendored) carries the m
     assert.match(field, /from the first call/, rel);
     assert.match(field, /agent-obligations\.md/, rel);
   }
+});
+
+// --- Point 7 (K128, PO decision of 2026-10-23, batch 12, row 41): the typed fallback record rides on the review receipt ----------
+// The open entry "pin the fallback evidence on the single-review route": an OPTIONAL, CLOSED `fallback` field of the design review
+// receipt. Names come from records that already exist: `route` and `reasonCode` (the canonical fallback result and the recovery
+// state), `requestedRoute` and `observedIdentity` (the receipt producer). Absent stays valid, so every existing receipt is unchanged.
+const FALLBACK = Object.freeze({
+  route: "fallback-self-dispatch", reasonCode: "RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER",
+  requestedRoute: "duty.critic_normal", observedIdentity: "unknown",
+});
+const P7_FEATURE = "feat-k128";
+const p7Sources = () => ({ prd: { path: "specs/f/prd.md", sha256: digest("1") }, spec: { path: "specs/f/spec.md", sha256: digest("2") }, companions: [] });
+const p7Input = (extra = {}) => ({
+  featureId: P7_FEATURE, previous: null, sources: p7Sources(), reviewer: { runner: "claude", model: "unknown" },
+  report: { path: "specs/f/review.md", sha256: digest("3") }, openFindingIds: [], reviewedAt: "2026-10-23T09:00:00.000Z", ...extra,
+});
+const p7Bytes = (object) => new TextEncoder().encode(`${canonical(object)}\n`);
+
+test("point 7a: a receipt that carries the typed fallback is accepted, round-trips and is surfaced by the summary", () => {
+  const created = createDesignReviewReceipt(p7Input({ fallback: { ...FALLBACK } }));
+  assert.equal(created.ok, true, `createDesignReviewReceipt: ${created.code}`);
+  assert.deepEqual(created.receipt.fallback, FALLBACK);
+  const parsed = parseDesignReviewReceipt(created.bytes);
+  assert.equal(parsed.ok, true, `parse: ${parsed.code}`);
+  assert.deepEqual(parsed.receipt.fallback, FALLBACK);
+  const summary = summarizeDesignReviewReceipt({ path: "specs/f/review/r1.json", bytes: created.bytes });
+  assert.equal(summary.ok, true, `summarize: ${summary.code}`);
+  assert.deepEqual(summary.summary.fallback, FALLBACK, "the read-back summary names the fallback");
+});
+
+test("point 7b: a receipt without the field is unchanged (no key, same summary shape, still valid)", () => {
+  const created = createDesignReviewReceipt(p7Input());
+  assert.equal(created.ok, true);
+  assert.equal(Object.hasOwn(created.receipt, "fallback"), false);
+  assert.equal(parseDesignReviewReceipt(created.bytes).ok, true);
+  const summary = summarizeDesignReviewReceipt({ path: "specs/f/review/r1.json", bytes: created.bytes });
+  assert.equal(summary.ok, true);
+  assert.equal(Object.hasOwn(summary.summary, "fallback"), false, "no fallback key appears on a native receipt summary");
+});
+
+test("point 7c: a malformed or extended fallback is refused on creation and on parse; unknown keys stay refused", () => {
+  const malformed = [
+    ["extra key", { ...FALLBACK, extra: "x" }],
+    ["missing observedIdentity", (({ observedIdentity, ...rest }) => rest)(FALLBACK)],
+    ["wrong route", { ...FALLBACK, route: "native" }],
+    ["lower-case reason code", { ...FALLBACK, reasonCode: "rrp-fallback" }],
+    ["space in requested route", { ...FALLBACK, requestedRoute: "duty critic" }],
+    ["empty observed identity", { ...FALLBACK, observedIdentity: "" }],
+    ["not an object", "fallback-self-dispatch"],
+    ["null", null],
+  ];
+  for (const [label, fallback] of malformed) {
+    const created = createDesignReviewReceipt(p7Input({ fallback }));
+    assert.equal(created.ok, false, `creation must refuse: ${label}`);
+    assert.equal(created.code, "DRR-SHAPE", label);
+  }
+  const good = createDesignReviewReceipt(p7Input({ fallback: { ...FALLBACK } }));
+  assert.equal(good.ok, true);
+  for (const [label, fallback] of malformed) {
+    const bytes = p7Bytes({ ...good.receipt, fallback });
+    assert.equal(parseDesignReviewReceipt(bytes).ok, false, `parse must refuse: ${label}`);
+  }
+  assert.equal(parseDesignReviewReceipt(p7Bytes({ ...createDesignReviewReceipt(p7Input()).receipt, unknownKey: 1 })).code, "DRR-SHAPE", "an unknown top-level key is still refused");
+});
+
+test("point 7d: the approval binding that present-plan builds names the fallback of the receipt, and is unchanged without it", () => {
+  const entry = (extra) => ({ path: "specs/f/review/r1.json", bytes: createDesignReviewReceipt(p7Input(extra)).bytes });
+  const withFallback = createDesignApprovalBinding({ featureId: P7_FEATURE, receipts: [entry({ fallback: { ...FALLBACK } })], currentSources: p7Sources() });
+  assert.equal(withFallback.ok, true, `binding: ${withFallback.code} ${withFallback.causes}`);
+  assert.deepEqual(withFallback.binding.reviewReceipts[0].fallback, FALLBACK, "the presented binding names the fallback");
+  assert.equal(validateDesignApprovalBinding(withFallback.binding).ok, true);
+  assert.equal(validateDesignApprovalBinding({ ...withFallback.binding, reviewReceipts: [{ ...withFallback.binding.reviewReceipts[0], fallback: { ...FALLBACK, extra: 1 } }] }).ok, false, "an extended fallback in a binding is refused");
+  assert.equal(validateDesignApprovalBinding({ ...withFallback.binding, reviewReceipts: [{ ...withFallback.binding.reviewReceipts[0], unknownKey: 1 }] }).ok, false, "unknown keys stay refused");
+  const native = createDesignApprovalBinding({ featureId: P7_FEATURE, receipts: [entry({})], currentSources: p7Sources() });
+  assert.equal(native.ok, true, `native binding: ${native.code}`);
+  assert.deepEqual(Object.keys(native.binding.reviewReceipts[0]).sort(), ["path", "round", "sha256"], "a native receipt keeps the exact three-key binding entry");
+});
+
+test("point 7e: the receipt producer writes the fallback when the typed fallback occurred, and refuses it without a requested route", () => {
+  const dir = realpathSync(mkdtempSync(join(scratchParent, "k128-fallback-receipt-")));
+  try {
+    const relative = (name) => `specs/f/${name}`;
+    mkdirSync(join(dir, "specs", "f"), { recursive: true });
+    for (const [name, text] of [["prd.md", "# PRD\n"], ["spec.md", "# Spec\n"], ["review.md", "# Critic report\n\nVerdict: PASS\n"]]) writeFileSync(join(dir, relative(name)), text);
+    const base = { repo: dir, featureId: P7_FEATURE, reportPath: relative("review.md"), prdPath: relative("prd.md"), specPath: relative("spec.md") };
+    const env = { CLAUDECODE: "1" };
+    const made = createReceiptFromDisk({ ...base, outPath: relative("r1.json"), requestedRoute: "duty.critic_normal", fallbackReasonCode: "RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER" }, { env });
+    assert.equal(made.ok, true, `${made.code}: ${made.message}`);
+    assert.deepEqual(made.receipt.fallback, FALLBACK);
+    assert.deepEqual(parseDesignReviewReceipt(readFileSync(join(dir, relative("r1.json")))).receipt.fallback, FALLBACK, "the file on disk carries it");
+    const refused = createReceiptFromDisk({ ...base, outPath: relative("r2.json"), fallbackReasonCode: "RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER" }, { env });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.code, "DRC-USAGE", "a fallback names the route that was requested");
+    const badCode = createReceiptFromDisk({ ...base, outPath: relative("r3.json"), requestedRoute: "duty.critic_normal", fallbackReasonCode: "not a code" }, { env });
+    assert.equal(badCode.ok, false);
+    assert.equal(badCode.code, "DRC-USAGE");
+    const native = createReceiptFromDisk({ ...base, outPath: relative("r4.json") }, { env });
+    assert.equal(native.ok, true);
+    assert.equal(Object.hasOwn(native.receipt, "fallback"), false, "no fallback unless it occurred");
+    let printed = "";
+    const code = receiptProducerMain(["create", "--repo", dir, "--feature", P7_FEATURE, "--report", relative("review.md"), "--prd", relative("prd.md"), "--spec", relative("spec.md"),
+      "--requested-route", "duty.critic_normal", "--observed-identity", "claude-sonnet-5-5", "--fallback-reason-code", "RRP-FALLBACK-ADVISOR-CONSULT", "--out", relative("r5.json")], env,
+    { writeFn: (text) => { printed += text; }, errorFn: () => {} });
+    assert.equal(code, 0, printed);
+    assert.deepEqual(JSON.parse(printed).fallback, { ...FALLBACK, reasonCode: "RRP-FALLBACK-ADVISOR-CONSULT", observedIdentity: "claude-sonnet-5-5" }, "the CLI report names the fallback");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("point 7f: present-plan states the fallback so a single-review route is not presented as an independent review", () => {
+  const source = readFileSync(join(pluginRoot, "scripts", "pipeline-state.mjs"), "utf8");
+  assert.match(source, /Review route: .*fallback-self-dispatch/u, "present-plan prints a line naming the fallback route");
+  assert.match(source, /not an independent/u);
 });

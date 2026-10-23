@@ -39,7 +39,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
 
 const USAGE = "Usage: design-review-receipt.mjs create --repo <repo-root> --feature <feature-id> --report <critic-report> --prd <prd> --spec <spec> "
-  + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] --out <receipt>\n"
+  + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] [--fallback-reason-code <RRP-code>] --out <receipt>\n"
   + "Every path is repo-relative. The review time, runner and all digests are derived, never supplied. The observed identity is "
   + "recorded only when you supply a direct observation of the concrete review dispatch; otherwise it is `unknown`.";
 
@@ -52,7 +52,11 @@ const SINGLE_FLAGS = new Map([
   ["repo", "repo"], ["feature", "featureId"], ["report", "reportPath"], ["prd", "prdPath"],
   ["spec", "specPath"], ["previous", "previousPath"], ["out", "outPath"],
   ["original-report", "originalReportPath"], ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
+  ["fallback-reason-code", "fallbackReasonCode"],
 ]);
+// K128: the one fallback route name, as the canonical fallback result and the recovery state spell it.
+const FALLBACK_ROUTE = "fallback-self-dispatch";
+const FALLBACK_REASON_CODE_PATTERN = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$/u;
 const REPEATED_FLAGS = new Map([["companion", "companionPaths"], ["open-finding", "openFindingIds"]]);
 const REQUIRED = ["repo", "feature", "report", "prd", "spec", "out"];
 // A flag whose name asks for a value the producer derives (time, digest, runner, model) is named as such.
@@ -150,6 +154,15 @@ export function createReceiptFromDisk(input, deps = {}) {
   if (observedIdentity !== null && !(typeof observedIdentity === "string" && OBSERVED_IDENTITY_PATTERN.test(observedIdentity))) {
     return refuse("DRC-USAGE", "the observed identity is not a valid model identity");
   }
+  // K128: a review that ran on the typed fallback-self-dispatch route says so in the receipt. The fallback names the route that
+  // was requested, so a reason code without a requested route is a malformed request, not a receipt with half a record.
+  const fallbackReasonCode = request.fallbackReasonCode ?? null;
+  if (fallbackReasonCode !== null) {
+    if (!(typeof fallbackReasonCode === "string" && FALLBACK_REASON_CODE_PATTERN.test(fallbackReasonCode))) {
+      return refuse("DRC-USAGE", "the fallback reason code must look like RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER");
+    }
+    if (requestedRoute === null) return refuse("DRC-USAGE", "a fallback names the route that was requested: supply --requested-route with --fallback-reason-code");
+  }
 
   const named = [["report", request.reportPath], ["PRD", request.prdPath], ["Spec", request.specPath], ["output", request.outPath]];
   companionPaths.forEach((path) => named.push(["companion", path]));
@@ -216,6 +229,7 @@ export function createReceiptFromDisk(input, deps = {}) {
     openFindingIds,
     reviewedAt: clock.toISOString(),
     specBytes,
+    ...(fallbackReasonCode === null ? {} : { fallback: { route: FALLBACK_ROUTE, reasonCode: fallbackReasonCode, requestedRoute, observedIdentity: model } }),
   });
   if (!created.ok) {
     // AC-155: a PASS is refused while a declared foundational Spec decision has no ADR/register reference and no
@@ -236,6 +250,7 @@ export function createReceiptFromDisk(input, deps = {}) {
   return {
     ok: true, path: request.outPath, sha256: created.sha256, receipt: created.receipt,
     reviewerRole: REVIEWER_ROLE, requestedRoute, observedIdentity: model,
+    ...(created.receipt.fallback === undefined ? {} : { fallback: created.receipt.fallback }),
   };
 }
 
@@ -270,7 +285,7 @@ function parseArgv(argv) {
   }
   const missing = REQUIRED.find((name) => !single.has(name));
   if (missing !== undefined) return refuse("DRC-USAGE", `missing --${missing}\n${USAGE}`);
-  const request = { ...repeated, previousPath: null, originalReportPath: null, requestedRoute: null, observedIdentity: null };
+  const request = { ...repeated, previousPath: null, originalReportPath: null, requestedRoute: null, observedIdentity: null, fallbackReasonCode: null };
   for (const [name, key] of SINGLE_FLAGS) if (single.has(name)) request[key] = single.get(name);
   return { ok: true, request };
 }
@@ -300,6 +315,7 @@ export function main(argv = process.argv.slice(2), env = process.env, deps = {})
       reviewerRole: result.reviewerRole,
       requestedRoute: result.requestedRoute,
       observedIdentity: result.observedIdentity,
+      ...(result.fallback === undefined ? {} : { fallback: result.fallback }),
     })}\n`);
     return 0;
   } catch (error) {
