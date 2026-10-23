@@ -50,6 +50,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { userInfo } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadAndApplyVerifyCaseCompletionAugmentationsToSources } from "./verify-case-completion-augmentation.mjs";
@@ -73,6 +74,7 @@ import {
   writeGovernanceVerificationAction,
 } from "../../plugins/pipeline-core/lib/governance-verification-action.mjs";
 import { runVerifyJournal } from "../../plugins/pipeline-core/scripts/verify-journal.mjs";
+import { repairAddressRootQuietly } from "../../plugins/pipeline-core/lib/session-power-address-repair.mjs";
 import { buildSelfVerifyGovernanceSource, parseVerifyInvocation, renderVerifyCommand, resolveSelfVerifySelection } from "./self-verify-selection.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -273,7 +275,7 @@ const TEST_SUITES = [
   { name: "model-role-host-observations-tests", file: join(libDir, "model-role-host-observations.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 7 }, (_, index) => `MRO${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "model-role-host-identity-tests", file: join(libDir, "model-role-host-identity.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 3 }, (_, index) => `MRI${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "model-role-host-session-tests", file: join(libDir, "model-role-host-session.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 4 }, (_, index) => `MRH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
-  { name: "model-role-host-store-tests", file: join(libDir, "model-role-host-store.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["MRSR01", "MRSR02", "MRSR03", "MRSR04", "MRSR05"], maxBytes: 65_536 } },
+  { name: "model-role-host-store-tests", file: join(libDir, "model-role-host-store.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["MRSR01", "MRSR02", "MRSR03", "MRSR04", "MRSR05", "MRSR06", "MRSR07", "MRSR08"], maxBytes: 65_536 } },
   { name: "model-role-v3-baseline-tests", file: join(libDir, "model-role-v3-baseline.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["MVB01", "MVB02", "MVB03", "MVB04"], maxBytes: 65_536 } },
   { name: "agy-final-return-tests", file: join(libDir, "agy-final-return.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 16 }, (_, index) => `AFR${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "agy-host-commit-admission-tests", file: join(libDir, "agy-host-commit-admission.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 6 }, (_, index) => `AHC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
@@ -290,7 +292,7 @@ const TEST_SUITES = [
   { name: "review-economy-tests", file: join(libDir, "review-economy.test.mjs") },
   { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
   { name: "guard-apply-patch-tests", file: join(hooksDir, "guard-apply-patch.test.mjs") },
-  { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["TPC001", "TPC002", "TPC003", "TPC004", "TPC005", "TPC006", "TPC007", "TPC008", "TPC009", "TPC010", "TPC011", "TPC012", "TPC013", "TPC014", "TPC015", "TPC016", "TPC017", "TPC018"], maxBytes: 65_536 } },
+  { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["TPC001", "TPC002", "TPC003", "TPC004", "TPC005", "TPC006", "TPC007", "TPC008", "TPC009", "TPC010", "TPC011", "TPC012", "TPC013", "TPC014", "TPC015", "TPC016", "TPC017", "TPC018", "TPC019", "TPC020", "TPC021"], maxBytes: 65_536 } },
   { name: "staleness-check-tests", file: join(hooksDir, "staleness-check.test.mjs") },
   { name: "guard-devplan-tests", file: join(hooksDir, "guard-devplan.test.mjs") },
   { name: "guard-lifecycle-ready-tests", file: join(hooksDir, "guard-lifecycle-ready.test.mjs") },
@@ -444,7 +446,7 @@ const TEST_SUITES = [
   // Verify forgot to run -- it is a test that protects nothing, and the gap is invisible
   // precisely because the file exists and passes when run by hand.
   { name: "critical-action-authorization-tests", file: join(libDir, "critical-action-authorization.test.mjs") },
-  { name: "commit-message-policy-tests", file: join(libDir, "commit-message-policy.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CMP001", "CMP002", "CMP003", "CMP004", "CMP005", "CMP006", "CMP007", "CMP008", "CMP009", "CMP010", "CMP011", "CMP012", "CMP013", "CMP014", "CMP015", "CMP016", "CMP017", "CMP018", "CMP019", "CMP020", "CMP021", "CMP022", "CMP023", "CMP024", "CMP025", "CMP026", "CMP027", "CMP028", "CMP029", "CMP030", "CMP031", "CMP032", "CMP033", "CMP034", "CMP035", "CMP036", "CMP037", "CMP038", "CMP039"], maxBytes: 65_536 } },
+  { name: "commit-message-policy-tests", file: join(libDir, "commit-message-policy.test.mjs") , caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CMP001", "CMP002", "CMP003", "CMP004", "CMP005", "CMP006", "CMP007", "CMP008", "CMP009", "CMP010", "CMP011", "CMP012", "CMP013", "CMP014", "CMP015", "CMP016", "CMP017", "CMP018", "CMP019", "CMP020", "CMP021", "CMP022", "CMP023", "CMP024", "CMP025", "CMP026", "CMP027", "CMP028", "CMP029", "CMP030", "CMP031", "CMP032", "CMP033", "CMP034", "CMP035", "CMP036", "CMP037", "CMP038", "CMP039", "CMP040"], maxBytes: 65_536 } },
   { name: "dispatch-budget-core-tests", file: join(libDir, "dispatch-budget-core.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 11 }, (_, index) => `DBC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "dispatch-budget-calibration-tests", file: join(libDir, "dispatch-budget-calibration.test.mjs") },
   { name: "dispatch-policy-tests", file: join(libDir, "dispatch-policy.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 38 }, (_, index) => `DPT${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
@@ -565,7 +567,7 @@ const TEST_SUITES = [
   { name: "observe-critic-preflight-tests", file: join(pluginScriptsDir, "observe-critic-preflight.test.mjs") },
   { name: "requirement-traceability-tests", file: join(libDir, "requirement-traceability.test.mjs") },
   { name: "session-critic-finalizer-tests", file: join(pluginScriptsDir, "session-critic-finalizer.test.mjs") },
-  { name: "windows-private-state-tests", file: join(libDir, "windows-private-state.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["WPS001", "WPS002", "WPS003", "WPS004", "WPS005", "WPS006", "WPS007", "WPS008", "WPS009", "WPS010", "WPS011", "WPS012", "WPS013"], maxBytes: 65_536 } },
+  { name: "windows-private-state-tests", file: join(libDir, "windows-private-state.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["WPS001", "WPS002", "WPS003", "WPS004", "WPS005", "WPS006", "WPS007", "WPS008", "WPS009", "WPS010", "WPS011", "WPS012", "WPS013", "WPS014", "WPS015", "WPS016"], maxBytes: 65_536 } },
   { name: "windows-assurance-verify-registration-tests", file: join(libDir, "windows-assurance-verify-registration.test.mjs") },
   { name: "symlink-capability-tests", file: join(libDir, "symlink-capability.test.mjs") },
   { name: "runner-native-continuation-tests", file: join(libDir, "runner-native-continuation.test.mjs") },
@@ -907,7 +909,7 @@ const TEST_SUITES = [
   { name: "check-state-phase-consistency-tests", file: join(pluginScriptsDir, "check-state-phase-consistency.test.mjs") },
   { name: "check-private-identifiers-tests", file: join(pluginScriptsDir, "check-private-identifiers.test.mjs") },
   { name: "pre-commit-hook-install-tests", file: join(pluginScriptsDir, "pre-commit-hook-install.test.mjs") },
-  { name: "commit-msg-hook-install-tests", file: join(pluginScriptsDir, "commit-msg-hook-install.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CMI001", "CMI002", "CMI003", "CMI004", "CMI005", "CMI006", "CMI007", "CMI008", "CMI009", "CMI010", "CMI011", "CMI012", "CMI013", "CMI014", "CMI015", "CMI016", "CMI017", "CMI018", "CMI019", "CMI020", "CMI021", "CMI022"], maxBytes: 65_536 } },
+  { name: "commit-msg-hook-install-tests", file: join(pluginScriptsDir, "commit-msg-hook-install.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CMI001", "CMI002", "CMI003", "CMI004", "CMI005", "CMI006", "CMI007", "CMI008", "CMI009", "CMI010", "CMI011", "CMI012", "CMI013", "CMI014", "CMI015", "CMI016", "CMI017", "CMI018", "CMI019", "CMI020", "CMI021", "CMI022", "CMI023"], maxBytes: 65_536 } },
   { name: "manual-check-logic-tests", file: join(repoRoot, "harness", "scripts", "manual-check-logic.test.mjs") },
   { name: "pre-commit-hook-install-trust-anchor-bootstrap-tests", file: join(pluginScriptsDir, "pre-commit-hook-install.trust-anchor-bootstrap.test.mjs") },
   { name: "project-onboarding-v3-unborn-head-tests", file: join(pluginScriptsDir, "project-onboarding-v3-unborn-head.test.mjs") },
@@ -1063,6 +1065,7 @@ if (startedCandidate.status === "dirty") {
           process.once("SIGINT", onSigint);
           process.once("SIGTERM", onSigterm);
           try {
+          console.error(`VERIFY-ADDRESS-REPAIR-BEFORE: ${JSON.stringify(repairAddressRootQuietly({ home: userInfo().homedir }))}`);
           verifyRun = await runVerifyJournal({
             gitCommonDir: gitCommonDirectory(),
             runId,
@@ -1080,6 +1083,7 @@ if (startedCandidate.status === "dirty") {
             reuseReceipts: invocation.reuseReceipts,
             signal: verifyCancellation.signal,
           });
+          console.error(`VERIFY-ADDRESS-REPAIR-AFTER: ${JSON.stringify(repairAddressRootQuietly({ home: userInfo().homedir }))}`);
           } finally {
             process.removeListener("SIGINT", onSigint);
             process.removeListener("SIGTERM", onSigterm);
