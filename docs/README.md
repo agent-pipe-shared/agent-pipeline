@@ -1,14 +1,19 @@
 # Documentation map
 
-The canonical reader path is the top-level [README](../README.md),
-[`SETUP.md`](../SETUP.md), [`PIPELINE_FLOW.md`](../PIPELINE_FLOW.md), and then
-[`usage.md`](usage.md). Use the rest of this map as
-reference; `overview.md` is a short companion, not a competing front door.
+The reader path is the Newcomer box of the top-level [README](../README.md).
+Use the rest of this map as reference; [`overview.md`](overview.md) is a short
+companion, not a competing front door.
+
+**Terms:** *PO* means Product Owner, the human who decides. The *Coordinator*
+is the main session that dispatches work (the README calls this role the
+Elephant).
 
 **Command convention:** In user-repository examples, `<plugin-root>` is the
-installed directory of the approved GitHub-distributed `pipeline-core` plugin.
+installed directory of the approved GitHub-distributed `pipeline-core` plugin;
+`<absolute-plugin-root>` is the same directory written as an absolute path.
+`<project-root>` and `<repo>` are the root of the governed repository.
 Run commands from the governed repository unless the example says otherwise.
-It never means a maintainer checkout.
+`<plugin-root>` never means a maintainer checkout.
 
 **Audience rule:** This map, Setup, Usage, the flow, enforcement, evidence,
 security, cost, onboarding, and operation pages describe what an application
@@ -28,52 +33,40 @@ evidence; they are not copy-and-run instructions for a consumer project.
 - [`usage.md#assess-architecture-adoption-in-an-existing-project`](usage.md#assess-architecture-adoption-in-an-existing-project)
   — read-only status and proposal before an existing project adopts the
   architecture controls.
+- [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
+  integration boundaries.
 - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
   preview-first migration and the Codex lifecycle V4.
+- [`migration.md`](migration.md) — pointer to the current onboarding and V3
+  authority upgrade routes in Setup.
 - [`onboarding-recovery.md`](onboarding-recovery.md) — exceptional, explicitly
   returned recovery paths after a typed onboarding or migration failure; not
   a routine first-install checklist.
 - [`runtime-boundary.md`](runtime-boundary.md) and
   [`runner-support.md`](runner-support.md) — what is shared methodology and
   what the installed runner can actually enforce.
+- [`macos-support.md`](macos-support.md) — macOS acceptance status; no native
+  macOS support is claimed.
 
-## Enforcement, evidence, security, and measurement
+## Enforcement, security, and measurement
 
-- [`enforcement.md`](enforcement.md) — configured guard and lifecycle
-  enforcement, including runner limits.
-- [`audit-and-evidence.md`](audit-and-evidence.md) — candidate-bound receipts
-  and offline evidence viewing; artifacts are not compliance
-  certification or authority.
+- [`enforcement.md`](enforcement.md) — the hook registrations declared by the
+  plugin source manifests, per runner event; not an inventory of what an
+  installed release enforces.
 - [`security-controls.md`](security-controls.md) — scanner/control boundaries,
   framework mappings, waivers, and runtime limits.
 - [`cost-and-measurement.md`](cost-and-measurement.md) — what small Greenfield
   trials and Verify receipts actually measure, what remains estimated or
   unavailable, and why they are not a cost forecast.
-- [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
-  integration boundaries.
 
-## Product and governance reference
+## Audit and evidence
 
-- [`overview.md`](overview.md) — the integrated Phoenix foundation and the
-  active Nova product stream.
-- [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — what was new in the `0.6.0`
-  release: product scope, release boundary, and non-claims at that time.
-- [`operating-model.md`](operating-model.md) — normative roles, lifecycle,
-  review, evidence, and human authority.
-- [`codex-onboarding-threat-model.md`](codex-onboarding-threat-model.md) —
-  trust boundaries and residual risks for the Codex lifecycle V4.
-- [`phoenix-governance-threat-model.md`](phoenix-governance-threat-model.md) —
-  governance and external-action threat model.
-- [`nova-execution-plane-threat-model.md`](nova-execution-plane-threat-model.md)
-  — execution-plane scope, evidence, and intentionally excluded claims.
-- [`change-control.md`](change-control.md) — promotion gate that reconciles
-  Pipeline human authority with an authenticated external change receipt.
-- [`organization-policy-packs.md`](organization-policy-packs.md) — governance
-  floors and document-publication rules an organization pack can add on top of
-  the Pipeline's own authority, without creating a second authority system.
-
-## Governance and audit evidence
-
+- [`audit-and-evidence.md`](audit-and-evidence.md) — candidate-bound receipts
+  and offline evidence viewing; artifacts are not compliance
+  certification or authority.
+- [`audit-evidence-overview.md`](audit-evidence-overview.md) — structured index
+  of controls, evidence artifacts, human gates, and exception paths for a
+  technical or compliance reviewer.
 - [`audit-bundles.md`](audit-bundles.md) — create-only, offline-verifiable
   copy of one completed Feature Package's validated artifacts; evidence, not
   a compliance claim.
@@ -94,17 +87,48 @@ evidence; they are not copy-and-run instructions for a consumer project.
   sanitized references binding a Pipeline artifact to an external system
   object, with credentials and coordinates kept out of the reference.
 
+## Product and governance reference
+
+- [`operating-model.md`](operating-model.md) — normative roles, lifecycle,
+  review, evidence, and human authority.
+- [`overview.md`](overview.md) — the `0.7.0` release status and the Phoenix and
+  Nova product strands.
+- [`design-decisions.md`](design-decisions.md) — the "why" behind the method.
+- [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — what was new in the `0.6.0`
+  release: product scope, release boundary, and non-claims at that time.
+- [`whats-new-0.5.0.md`](whats-new-0.5.0.md) — what was new in the `0.5.0`
+  release, for users coming from `0.4.x`.
+- [`licensing.md`](licensing.md) — the Public Core license (SUL-1.0 with the
+  Agent-Pipeline Additional Permission).
+- [`change-control.md`](change-control.md) — promotion gate that reconciles
+  Pipeline human authority with an authenticated external change receipt.
+- [`organization-policy-packs.md`](organization-policy-packs.md) — governance
+  floors and document-publication rules an organization pack can add on top of
+  the Pipeline's own authority, without creating a second authority system.
+
 ## Operations and reference
 
 - [`observation-intake.md`](observation-intake.md) — public observation intake,
   privacy routing, triage, and backlog-link governance.
 - [`github-issue-operations.md`](github-issue-operations.md) — project-scoped
   GitHub login, issue operations, and safety boundaries.
+- [`design/README.md`](design/README.md) — optional design pre-stage.
+- [`deploy/README.md`](deploy/README.md) — optional release/promotion adapter.
+
+## Maintainer reference
+
+These documents are classified as maintainer material in the repository's
+documentation governance.
+
 - [`po-human-approval.md`](po-human-approval.md) — the one-time external-key
   setup and the bounded human signing commands; agent-side preparation remains
   agent work.
 - [`human-authorization-inventory.md`](human-authorization-inventory.md) —
   reference inventory of every Pipeline authority mechanism and its limits.
-- [`design/README.md`](design/README.md) — optional design pre-stage.
-- [`deploy/README.md`](deploy/README.md) — optional release/promotion adapter.
+- [`codex-onboarding-threat-model.md`](codex-onboarding-threat-model.md) —
+  trust boundaries and residual risks for the Codex lifecycle V4.
+- [`phoenix-governance-threat-model.md`](phoenix-governance-threat-model.md) —
+  governance and external-action threat model.
+- [`nova-execution-plane-threat-model.md`](nova-execution-plane-threat-model.md)
+  — execution-plane scope, evidence, and intentionally excluded claims.
 - [`adr/`](adr/) — durable decisions and rationale.
