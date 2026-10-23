@@ -12999,7 +12999,19 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         &&stateOwnedCompanionFailureFrames.has(owningFailureFrame)
         &&(error?.name==="SessionAuthorityError"||error instanceof OnboardingContinuityKickoffError))throw error;
     // D52 (2): the refusal names its reason and the general repair, never only a code.
-    console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}${typeof error?.reason === "string" ? `: ${error.reason.slice(0, 240)}` : ""}); no success is reported. Repair: node ${fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url))} inspect --root ${dir} names the cause and the command that clears it.`);
+    const repairInspect = `node ${fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url))} inspect --root ${dir}`;
+    const reasonText = typeof error?.reason === "string" ? `: ${error.reason.slice(0, 240)}` : "";
+    if (sub === "approve-push" && error?.reason === "state-push-source-requester") {
+      // K103 (PO decision 2026-10-23, tiles batch 7 rows 1 and 2; D74): `inspect` reports a healthy registry for this cause, so the
+      // general sentence below would point at a command that clears nothing. Name the cause and the step that can be run.
+      console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}${reasonText}); no success is reported, no approval was recorded. ` +
+        "Cause: in chat mode (gates.push_approval is \"chat\") with the session-authority catalogue present in this repository, so a push approval must run through the State push producer route, which needs a requester bound by the host runner; a plain shell binds none. " +
+        "Repair: approve through the signature route, which stays commit-bound while a catalogue exists: set gates.push_approval to \"signature\" in pipeline.user.yaml, then run " +
+        "`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>` " +
+        `from ${dir}; the step-by-step flow is docs/push-release-flow.md. To check that the registry itself is healthy: ${repairInspect}`);
+      return 2;
+    }
+    console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}${reasonText}); no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.`);
     return 2;
   } finally {
     if(owningFailureFrame!==null)stateOwnedCompanionFailureFrames.delete(owningFailureFrame);
