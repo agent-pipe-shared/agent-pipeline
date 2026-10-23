@@ -1,0 +1,11 @@
+feat(pipeline-core): admit the runner key in the briefing package
+
+The briefing generator becomes runner-aware (Greenfield finding G1): a
+package may now name `runner` ("claude" default, or "codex") so that
+`dispatch-briefing.mjs build` can render a Codex briefing. The key is added
+to the closed package schema's optional strings; its value is validated by
+the generator (DBG-RUNNER-UNKNOWN names the repair). No other behaviour of
+the builder library changes.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

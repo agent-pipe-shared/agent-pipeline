@@ -1,0 +1,29 @@
+fix(pipeline-core): make the briefing generator's model check runner-aware
+
+Greenfield finding G1: on Codex the implementation dispatch failed at
+dispatch-briefing.mjs, which compared the Codex route model (gpt-6-luna)
+with the Claude alias family of the agent definition (sonnet) and refused
+DBG-MODEL-FAMILY with no repair; --runner was not an admitted flag.
+
+- admit --runner claude|codex (default claude; every Claude behaviour,
+  the Claude skeleton and the preflight call stay byte-identical);
+  an unknown runner is DBG-RUNNER-UNKNOWN naming the repair
+- --runner codex checks the model id against the model the Codex route
+  yields for the role (goldfish-implementor = duty.implement, mechanic =
+  duty.mechanic, deep = duty.deep of the V3 runner-profile registry,
+  read-only), not against the Claude alias; the briefing carries the
+  host's Codex-native v3 shape (nativeAgentType worker) and the route's
+  effort; the preflight is observed as the requested runner
+- an unavailable or unregistered Codex route is DBG-MODEL-ROUTE-UNAVAILABLE
+- both DBG-MODEL-FAMILY refusals now name a repair; the Claude one keeps
+  naming the alias family and points at the tool-layer model parameter
+  (MP-29), the Codex one names the route's model id and the flags
+- build passes the package's runner field to the generator
+
+The new cases extend the registered dispatch-briefing suite (74 tests, was
+66); the build case needs the package-key part of the protected diff. The
+suite now exceeds the line bound, accepted by the ratchet diff of this
+change (maxLines 1086) per the architecture boundary policy.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
