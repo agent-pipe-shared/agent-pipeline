@@ -45,7 +45,8 @@ estimate is currently available.
 
 Parallelism is scheduled across complete, independently verifiable outcomes,
 not across analysis, test authorship and code for the same item. The
-Coordinator declares file owners before dispatch; an item that collides with an
+Coordinator (see the [Terms](README.md#terms-used-across-these-documents))
+declares file owners before dispatch; an item that collides with an
 active owner waits. The per-item steps and their trade-off are in the
 [delivery step table](../PIPELINE_FLOW.md#3-deliver-in-independently-checkable-packages).
 
@@ -59,12 +60,10 @@ The review budget and the rules for retaining evidence are stated once in
 
 ## After a cancelled slice
 
-After a slice was cancelled with the class `wrong-premise`, the briefing
-generator refuses to brief a new dispatch for the same item
-(`DBG-RECON-REQUIRED`) until a recon note is referenced: the `reconNote` field
-of the briefing package, or `--recon-note` on the binding route, naming a
-non-empty file under `scratch/` or `specs/`. The duty ends once a slice of that
-item has been delivered (integrated into the candidate).
+If a slice was cancelled as `wrong-premise`, the briefing generator refuses a
+new dispatch for the same item (`DBG-RECON-REQUIRED`). Repair: write a
+non-empty recon note under `scratch/` or `specs/` and reference it as the
+briefing's `reconNote` (`--recon-note` on the binding route).
 
 ## Runner boundary
 
