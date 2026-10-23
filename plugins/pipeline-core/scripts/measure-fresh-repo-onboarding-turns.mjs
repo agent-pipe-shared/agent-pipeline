@@ -497,7 +497,11 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
     // Any other outcome (error, no-progress, unsupported-next-action, step-cap-exceeded,
     // no-automatic-next-step) is a genuine dead end this harness cannot drive past.
     rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "dead-end" });
-    return { schema: SCHEMA, root: dir, runner, outcome: result.outcome, turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final };
+    // Additive (PO row 23, K94): name the Driver's last executed step and its stderr so a consumer can type the stop it reached.
+    const lastExecuted = executed.at(-1);
+    return { schema: SCHEMA, root: dir, runner, outcome: result.outcome, turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final,
+      lastStep: lastExecuted === undefined ? null : { subcommand: lastExecuted.argv?.[1] ?? null, exitCode: lastExecuted.exitCode ?? null, faultCode: lastExecuted.faultCode ?? null },
+      stopStderr: typeof result.error?.stderr === "string" ? result.error.stderr.slice(0, 500) : null };
   }
 
   return { schema: SCHEMA, root: dir, runner, outcome: "turn-cap-exceeded", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: null };

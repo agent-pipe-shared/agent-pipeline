@@ -10,9 +10,10 @@
  * briefing: cover `parseJsonStdout`'s normal case and the F2 regression case, and
  * `fakeSetupSpawn`'s genpkey/pkey interception (mirroring
  * `po-human-approval.test.mjs`'s own `fakeSetupSpawn` test pattern).  The
- * current suite also executes the full disposable Driver path, so a new
- * onboarding handover shape cannot make the measurement silently stop before
- * the real TOFU push ceremony.
+ * current suite also executes the full disposable Driver path up to the
+ * ADR-0085 single-review design-course boundary and asserts the typed stop it
+ * reaches there, so a new onboarding handover shape cannot silently move that
+ * stop (PO row 23, option (b)); the signed push is measured by the Greenfield test.
  */
 import assert from "node:assert/strict";
 import { createPrivateKey, createPublicKey } from "node:crypto";
@@ -120,21 +121,34 @@ test("fakeSetupSpawn: every other openssl invocation falls through to a real spa
   assert.equal(result.status, 0);
 });
 
-test("full TOFU measurement follows Driver-provided design answers through to a recorded signed push", { timeout: 120_000 }, () => {
+// QG-04 (bounded justification, PO row 23 of the AFK list, decided 2026-10-23 as option (b), D63 decision): the claim of this case changes from
+// "TOFU through a recorded signed push" to "TOFU up to the ADR-0085 single-review design-course boundary, stopping typed". The real Driver cannot reach a
+// recorded signed push without the design course itself (author the staging PRD/Spec, submit-plan, review receipt, present-plan --review-receipt, signed
+// approval), which a disposable in-process measurement cannot supply. The assertions of the old claim (outcome "signed-push-recorded", a successful
+// approve-push step, trustAnchorPinned false, the critical-human-proof-policy schema) are therefore not carried over; the signed push is measured by the
+// Greenfield test instead, and this case asserts the typed stop the walk actually reaches: setup ok, onboarding ends at the Driver's own refusal to
+// acknowledge a generated placeholder PRD/Spec, within the measured six turns, and no later ceremony step ran.
+test("TOFU measurement stops typed at the ADR-0085 single-review design-course boundary; the Greenfield test measures the signed push", { timeout: 120_000 }, () => {
   let stdout = "";
   const status = main([], { write: (chunk) => { stdout += chunk; } });
-  assert.equal(status, 0, stdout);
   const result = JSON.parse(stdout);
-  assert.equal(result.outcome, "signed-push-recorded", stdout);
-  assert.equal(result.steps[0]?.step, "setup");
+  // Typed stop: the measurement is not a signed push, so main() reports status 1 with the onboarding-not-ready outcome.
+  assert.equal(status, 1, stdout);
+  assert.equal(result.outcome, "onboarding-not-ready", stdout);
+  assert.equal(result.steps[0]?.step, "setup", stdout);
   assert.equal(result.steps[0]?.ok, true, stdout);
-  assert.equal(result.steps[1]?.step, "onboarding");
-  assert.equal(result.steps[1]?.outcome, "ready", stdout);
-  assert.ok(result.steps.some((step) => step.step === "approve-push" && step.exitCode === 0), stdout);
-  // The local mirror is accepted only after its authority matches the
-  // repository-private key-directory pointer established by setup. This
-  // measurement ends at approve-push; the separate push-guard boundary owns
-  // any later TOFU policy upgrade.
-  assert.equal(result.trustAnchorPinned, false, stdout);
-  assert.equal(result.policy?.schema, "pipeline.critical-human-proof-policy.v1", stdout);
+  assert.equal(result.steps[1]?.step, "onboarding", stdout);
+  assert.equal(result.steps[1]?.outcome, "error", stdout);
+  // Turn count bound as the existing case measured it (six turns up to the boundary).
+  assert.ok(result.steps[1]?.turns <= 6, stdout);
+  assert.equal(result.onboarding?.turns, result.steps[1]?.turns, stdout);
+  // The walk reached the design course: the architecture design was authored, then the Driver's last step was the plan acknowledgement, which refuses the
+  // generated placeholder PRD/Spec (the ADR-0085 course replaces that acknowledgement with the single review).
+  assert.ok(result.onboarding?.rounds.some((round) => round.resolved === "authored-architecture-design" && round.code === "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE"), stdout);
+  assert.equal(result.onboarding?.lastStep?.subcommand, "bootstrap-acknowledge-plan", stdout);
+  assert.equal(result.onboarding?.lastStep?.exitCode, 2, stdout);
+  assert.match(result.onboarding?.stopStderr ?? "", /BOOTSTRAP-ACK-PLACEHOLDER-CONTENT/, stdout);
+  // No ceremony step after onboarding ran: the signed push is out of this measurement's bound.
+  assert.equal(result.steps.length, 2, stdout);
+  assert.equal(result.steps.some((step) => step.step === "approve-push"), false, stdout);
 });
