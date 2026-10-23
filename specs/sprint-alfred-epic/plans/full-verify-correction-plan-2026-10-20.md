@@ -754,3 +754,24 @@ session case run against a bound real checkout now) and are repaired in `f4a89ba
 against a deliberate fail-closed in the kernel file (`withWorkerAuthority`); the choice between a D66 (a)
 extension and implementing the journal phase is PO list row 30. The Windows and WSL pins that skip on native
 Windows ran green on Linux without exercising those cases (D133).
+
+### K11 closure (2026-10-23, closed with a named rest)
+
+Delivered: S1 grant summary (`d787c9bae`), S3 hook messages and the one-grant-per-continuation rule
+(`bc90c4834`, `686a9ad8e`, D77), the GDBC10 fold-in, S2 briefing wording (GF-02a and the continuation card in
+`roles/goldfish.md` and `templates/prompts/goldfish-task.md`, with pin P5 in
+`budget-checkpoint-fires-below-the-briefed-cap.test.mjs`), the S4 and S5 cancel-class series built and checked
+in a clone. Named rest, all outside agent hands: S4 and S5 touch protected sources and are held as ceremony C19
+(ordered series, `evidence/held-patches/d75-cancel-class/`); S6 (install into the marketplace copy) happens at
+the stamp, so the delivered hook messages are not live before it; D75 (A) "recon before re-dispatch after a
+wrong-premise stop" as a make-briefing rule has no slice (PO list row 22); D75 (C) went to 0.7.x.
+
+### K12 closure (2026-10-23, closed with a named rest)
+
+Delivered: S0 (the ledger admits more than one in-progress cluster), S3 the briefing binding refuses
+`DBG-SCOPE-OVERLAP` against running dispatches and warns `DBG-RUNNING-SCOPE-UNKNOWN` (`38acd203a`, five cases),
+S4 the host-commit parallelism paragraph in `skills/pipeline-start/references/workflow-dispatch.md`
+(`d91c6d005`), S6 the pins for both. Named rest: S2, the guard's own `FANOUT-SCOPE-OVERLAP` check is
+queue-only, shadow by default and its message names a repair but not the overlapping paths; a change is a
+protected sitting item and the choice of the default is PO list row 25. The three design choices taken in S3
+are on the same row.

@@ -36,19 +36,14 @@
   in blocks (144). 8 [PO call] final stamp, push signature, release decision. Nothing here is accepted before step 7.
 
 **AFK window (2026-10-23, written during the window; wins over the session cut where they differ):**
-- Done by agents, imported on `feat/sprint-alfred` (all "implementation complete; independent Critic read and PO acceptance pending"):
-  K53 scripts consolidation (`scripts/`, `docs/operating-tools.md`); 40 backlog items reconciled (append-only "Reconciled 2026-10-23");
-  reader fan-out over the 61 agent-owner items (most already built); D75 S2, D76 S3/S4/S6, K1D E5b; D140 doc fixes; counted runs
-  `evidence/pin-counted-results-2026-10-23.md` and `-b.md` (K57, K66).
-- Held for the bundled PO sitting (protected paths; patches in `specs/sprint-alfred-epic/evidence/held-patches/`, rows C15 to C20 in
-  `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`): C17 guard-lifecycle-ready posix paths, C18 staging banner, C19 D75 S4/S5 series,
-  C20 discard-feature finish call (D73 E). C15/C16 verify.mjs caseIds and suite registrations.
-- PO list (presented only on request): `specs/sprint-alfred-epic/plans/po-list-afk-2026-10-22.md`, rows 1 to 27. Decisions that block
-  nothing but change the candidate: row 19 (re-pin Critic digests), 23/24 (K2 red suites), 27 (K1D case C: a real gap in the private
-  closed-feature release, Option 1 needs the PO's extension of D73 E).
-- Cluster status from closure reads (commit evidence, not fresh runs): K3 and K4 closable; K2 5/7; K5, K8, K9 need counted runs; K6 one
-  open step (row 19); K7 needs C15/C16; K11 S4/S5 held; K12 S2 protected; K13 mostly built. Counted runs for K3/K4/K5/K8 in progress
-  (K68). Not started: stamp, push, release, Full Verify, Critic batch, Reader course, final matrix remeasure (content freeze).
+- Agents imported on `feat/sprint-alfred` (implementation complete; Critic read and PO acceptance pending): K53 scripts, 40 backlog
+  items reconciled, D75 S2, D76 S3/S4/S6, D140 doc fixes, K74 pins, K78 fixtures; counted runs `evidence/pin-counted-results-2026-10-23*.md`.
+- Held for the bundled PO sitting: ceremonies C15 to C24 in `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`, patches in
+  `specs/sprint-alfred-epic/evidence/held-patches/`. No row yet: the D78 dispatch-hook default.
+- PO list (only on request): `specs/sprint-alfred-epic/plans/po-list-afk-2026-10-22.md`, rows 1 to 30 (19 Critic digest re-pin, 23/24
+  K2 reds, 27 K1D case C, 28 to 30 K8/K9 findings).
+- Ledger after fresh counted runs: K3, K4, K5, K9, K11, K12 closed (named rests in the plan file); K8 repairs held; K1D, K2, K6, K7, K13
+  open on ceremonies or PO decisions. Not started: stamp, push, Full Verify, Critic batch, Reader course, final matrix remeasure.
 
 **Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
 Read these three files first, in this order, before any other work:
