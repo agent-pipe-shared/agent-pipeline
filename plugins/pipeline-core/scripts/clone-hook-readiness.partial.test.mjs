@@ -223,22 +223,26 @@ test("RED F1 (g): stale pre-commit + missing commit-msg -> provisioning hop, the
   const provisioned = applyMandatoryHookReadiness(root);
   assert.equal(provisioned.schema, COORDINATOR_EXPECTED.schema);
   assert.equal(provisioned.status, COORDINATOR_EXPECTED.status);
-  assert.equal(readFileSync(markerFile, "utf8"), staleMarker, "hop 1 must not refresh the stale hook (that is hop 2's job)");
+  // K103 RE-POINT (QG-04, bounded justification): this case pinned "hop 1 must not refresh the stale hook (that is
+  // hop 2's job)". PO decision 2026-10-23 (tiles batch 7, row 10) reverses exactly that: the installer's apply refreshes
+  // the stale snapshots itself. The case keeps its precondition and the provisioning-first assertions; the former hop 2
+  // is now part of hop 1 and the explicit refresh helper afterwards must find nothing left to do.
+  assert.notEqual(readFileSync(markerFile, "utf8"), staleMarker, "K103: the apply rebound the stale hook's marker to the current plugin");
+  assert.equal(provisioned.refreshResult?.status, REFRESH_EXPECTED.status);
 
-  // Hop 2: ready, with the stale hook listed for refresh.
+  // Hop 2 (formerly a separate refresh): ready, nothing stale is left for the preflight to report.
   const between = assessMandatoryHookReadiness(checkCloneProvisioning(root));
   assert.equal(between.status, "ready");
-  assert.deepEqual(between.refreshAvailable, ["pre-commit-hook"]);
+  assert.equal(between.refreshAvailable, undefined);
   const refreshed = refreshMandatoryHooks(root);
   assert.equal(refreshed.schema, REFRESH_EXPECTED.schema);
   assert.equal(refreshed.status, REFRESH_EXPECTED.status);
-  assert.deepEqual(refreshed.results.find((entry) => entry.id === "pre-commit-hook"), { id: "pre-commit-hook", status: "refreshed" });
+  assert.deepEqual(refreshed.results.find((entry) => entry.id === "pre-commit-hook"), { id: "pre-commit-hook", status: "current" }, "the explicit helper is a no-op after the apply");
 
   // Hop 3: nothing left to do.
   const done = assessMandatoryHookReadiness(checkCloneProvisioning(root));
   assert.equal(done.status, "ready");
   assert.equal(done.refreshAvailable, undefined);
-  assert.notEqual(readFileSync(markerFile, "utf8"), staleMarker, "the refresh rebound the marker to the current plugin");
 }));
 
 test("GREEN control F1 (h): the stale-marker fixture technique -- stale pre-commit beside a current commit-msg is ready+refreshAvailable and the helper reaches ready", () => withRepository(({ root, gitDir }) => {

@@ -8,6 +8,7 @@ import { assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-cl
 import { applyInstall as applyPreCommit, applyRemoval as removePreCommit } from "./pre-commit-hook-install.mjs";
 import { applyInstall as applyCommitMsg } from "./commit-msg-hook-install.mjs";
 import { applyInstall as applyPrePush } from "./pre-push-hook-install.mjs";
+import { MANDATORY_HOOK_REFRESH_SCHEMA, refreshMandatoryHooks } from "./refresh-mandatory-hooks.mjs";
 
 /** Result statuses by which an installer reports that the hook is now in place. Anything else a second
  * install RETURNS (a `refused-*` result, or no recognisable status) is a failed install, like a throw. */
@@ -131,7 +132,43 @@ function installNonGatingHooks({ root, observed, installPrePush }) {
   return results;
 }
 
+/** K103 (PO decision 2026-10-23, tiles batch 7 row 10): the apply ends by refreshing the mandatory hooks whose recorded
+ * plugin snapshot is stale, through the same routine the typed `hook-refresh-required` action runs
+ * (`refreshMandatoryHooks`), so the next start preflight is not `hook-refresh-required`. Idempotent: when nothing is
+ * stale the routine is not called and the result is returned unchanged. A refresh that fails (a throw, or any result
+ * other than `ready`) is a typed, non-ready `refresh-failed` result that names the repair; the install it follows is kept. */
+function refreshStaleHooks(root, result, dependencies) {
+  const stale = assessMandatoryHookReadiness(checkCloneProvisioning(root)).refreshAvailable;
+  if (!Array.isArray(stale) || stale.length === 0) return result;
+  let refresh;
+  try {
+    refresh = (dependencies.refreshMandatoryHooks ?? refreshMandatoryHooks)(root, dependencies.refreshDependencies ?? {});
+  } catch (error) {
+    refresh = {
+      schema: MANDATORY_HOOK_REFRESH_SCHEMA, root, status: "failed",
+      code: typeof error?.code === "string" ? error.code : "HOOK-READINESS-REFRESH-THREW", message: String(error?.message ?? error),
+    };
+  }
+  if (refresh?.status === "ready") {
+    const after = inspectMandatoryHookReadiness(root);
+    return { ...result, required: after.required, nextAction: after.nextAction, status: "ready", refreshResult: refresh };
+  }
+  const script = fileURLToPath(new URL("./refresh-mandatory-hooks.mjs", import.meta.url));
+  return {
+    ...result,
+    status: "refresh-failed",
+    code: "HOOK-READINESS-REFRESH-FAILED",
+    reason: `the hooks were installed, but the stale mandatory hook(s) ${stale.join(", ")} could not be refreshed (refresh status ${refresh?.status ?? "unknown"}); the next start preflight will report hook-refresh-required. Repair: node ${script} --root ${root}`,
+    refreshResult: refresh,
+  };
+}
+
 export function applyMandatoryHookReadiness(rootDir = process.cwd(), dependencies = {}) {
+  const result = applyMandatoryHookInstalls(rootDir, dependencies);
+  return result.status === "ready" ? refreshStaleHooks(resolve(rootDir), result, dependencies) : result;
+}
+
+function applyMandatoryHookInstalls(rootDir, dependencies) {
   const before = inspectMandatoryHookReadiness(rootDir);
   const installPrePush = dependencies.applyPrePush ?? applyPrePush;
   if (before.status === "ready") {
