@@ -42,8 +42,13 @@ terminology, continue with this setup guide, then read the operator-facing
 ## A. Activate the pipeline in one project repository
 
 Repeat this routine path for every application or service repository. It uses
-the public onboarding Driver. In a folder without Pipeline governance, first
-explain the proposed installation and ask for explicit consent; stop before
+the public onboarding
+[Driver](docs/README.md#terms-used-across-these-documents). Who does what: the
+agent explains the installation, asks for consent, invokes `pipeline-start` and
+follows the Driver's returned actions; the human gives the consent, fully
+restarts the host and supplies the named inputs. In a folder without Pipeline
+governance, the agent first
+explains the proposed installation and asks for explicit consent; it stops before
 installing, invoking `pipeline-start`, or writing project files until the user
 agrees. Then bind the supported runner integration, start a new session in the
 project root, invoke `/pipeline-core:pipeline-start`, and follow its returned
@@ -61,14 +66,12 @@ choices through the normal reviewed workflow.
 
 The per-runner binding commands and the restart rule are in
 [step 0](#0-bind-the-supported-runner-integration-and-fully-restart-its-host).
-For a runner without a command there, use only its supported integration; do
-not copy another runner's commands or claim its hooks are installed.
 
 The resulting Verify receipt and delivery records can be inspected with the
 candidate's other evidence. They do not certify compliance or replace a human
 decision. [Audit and evidence](docs/audit-and-evidence.md) gives the artifact
-boundary; [the detailed consumer procedures](#consumer-onboarding-details)
-retain exact commands and migration cases for operators who need them.
+boundary; the [consumer onboarding guide](docs/v3-consumer-onboarding.md)
+retains the exact commands and the migration cases for operators who need them.
 
 ### Runner support, stated precisely
 
@@ -99,8 +102,14 @@ first binding, **fully end that host process and start a new session in the
 project root before invoking `pipeline-start` or classifying the root**. A
 refresh inside the existing host is insufficient for the first binding. Until
 `0.7.0` is released, bind only the approved GitHub-distributed version; a local
-candidate is not an installation source (see the
-[release status](docs/overview.md)). This applies to every bind step below.
+[candidate](docs/README.md#terms-used-across-these-documents) is not an
+installation source (see the [release status](docs/overview.md)). This applies
+to every bind step below. "Approved" means, for Claude Code and Codex, the
+version the official marketplace source delivers from its `main` branch (the
+published release branch); for Antigravity it is a final release tag of the
+official repository, such as `v0.7.0`. Before such a tag exists there is no
+approved Antigravity route, because a developer checkout is only for an
+explicit pre-release test.
 
 #### Claude Code: project-scoped binding
 
@@ -162,20 +171,24 @@ without scrolling past it. Follow that procedure, then continue at step 1.
 #### Missing prerequisite guidance in a consumer project
 
 The installed plugin's read-only toolchain preflight reports each configured
-tool, observed version, blocked claim and a copyable platform command. From
-the governed project root, run:
+tool, observed version, blocked claim and a copyable platform command. In this
+guide `<plugin-root>` is the installed Pipeline plugin directory and
+`<project-root>` the governed repository root (see the
+[command convention](docs/README.md)). From the governed project root, run:
 
 ```sh
 node "<plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
 ```
 
-`<plugin-root>` is the installed Pipeline plugin directory (see the
-[command convention](docs/README.md)). Review any offered installer command under your host/package-management
+Review any offered installer command under your host/package-management
 policy, then repeat the preflight. npm is never substituted for non-npm
 scanners; bounded Semgrep settings avoid treating ordinary home-directory
 writes as a missing installation.
 
 ### 1. After consent, let `pipeline-start` classify the consumer root
+
+The agent runs this step; the human's part is the consent and, for a fresh
+root, the explicit request to create or initialize the project.
 
 Do not copy `setup.mjs` into a consumer project or start a blank directory by
 manually creating Git/V3 runtime files. After completing the binding and full
@@ -201,7 +214,8 @@ or V3 authority checks and has these outcomes:
   adoption-required`. Its reviewed plan adds only absent Pipeline-owned targets
   and preserves project files plus valid Git metadata; it is neither a legacy
   migration nor permission to overwrite an existing `.claude`, `.codex`, or
-  `.agents` path.
+  `.agents` path. The [existing repository checklist](#existing-repository-checklist)
+  in step 2 lists the adoption steps.
 - A V0/V1/V2 authority uses the official migration inspect → plan → explicit
   apply workflow ([consumer procedure](docs/v3-consumer-onboarding.md#legacy-consumer-with-no-projections)),
   never the fresh initializer. A partial, invalid, unsafe, or
@@ -284,8 +298,10 @@ generated runtime files.
 ### 3. Declare the Git lifecycle before delivery
 
 An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
-the project calibration (see the authority-tier note in step 2): onboarding creates a repository but no initial commit,
-remote, or credential binding. Make the initial commit before normal work.
+the project calibration: onboarding creates a repository but no initial commit,
+remote, or credential binding (the authority-tier note in
+[step 2](#2-complete-project-calibration-after-onboarding) says where that
+calibration file is read from). Make the initial commit before normal work.
 When the project is intentionally connected to a shared remote, change the
 committed calibration to `repositoryMode: "remote-tracked"`; the session
 freshness check then requires an upstream and blocks writes when it is stale or
@@ -353,16 +369,20 @@ rules before writable work. A reminder hook is not a substitute for the
 bootstrap itself.
 
 If the bootstrap reports `hook-refresh-required`, see
-[Troubleshooting](#troubleshooting).
+[Troubleshooting](#troubleshooting). In the default `signature` approval mode,
+create the [human-approval key](#human-approval-key-one-time-setup) before the
+first human decision gate.
 
 ### Human-approval key (one-time setup)
 
-**When the key is required.** The human-approval key is needed whenever the
-project's approval mode is `signature`, which is the default (the
+**When the key is required.** The human-approval key is required in the
+default approval mode, `signature` (the
 [approval-strength selector](docs/usage.md#choose-the-human-approval-strength-deliberately)
-explains the choice). The Driver asks for the mode in its initial round
-(`signature` or `chat`); choosing `signature` makes it surface the separate
-trust-anchor step. Under `signature`, a human decision gate (for example PRD
+explains the choice), and not needed under `chat`. The approval mode is a
+routine onboarding question: the Driver asks for it (`signature` or `chat`) in
+its initial round, alongside the Git author, language and Advisor-consent
+inputs; choosing `signature` makes it surface the separate
+[trust anchor](docs/README.md#terms-used-across-these-documents) step. Under `signature`, a human decision gate (for example PRD
 approval, which [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) makes mandatory for
 rigor 1 or 2 and for high risk, or a push) needs a detached proof, so create
 the key once before the first such gate. Under `chat` no key is needed, but
@@ -398,9 +418,10 @@ irreversible action. See [PO approval](docs/po-human-approval.md).
 ### Antigravity (Agy): workspace-local binding
 
 Bind the plugin in the consumer workspace, then fully restart Agy before the
-common step 1 below. The pinned `v0.7.0` example applies only after that tag is
-published on the [official GitHub repository](https://github.com/agent-pipe-shared/agent-pipeline);
-until then see the [release status](docs/overview.md).
+common [step 1](#1-after-consent-let-pipeline-start-classify-the-consumer-root).
+The pinned `v0.7.0` example applies only after that tag is published on the
+[official GitHub repository](https://github.com/agent-pipe-shared/agent-pipeline);
+what *approved* means is stated in [step 0](#0-bind-the-supported-runner-integration-and-fully-restart-its-host).
 
 After the tag is published, run these commands with your shell in the
 **consumer project root**. The clone lives in a durable physical directory
@@ -504,11 +525,6 @@ with `--refresh`; on its own it is refused with a repair. After the refresh,
 `/pipeline-core:pipeline-start` of the new session reports it). `agy plugin
 list` and `plugins.json` are not proof of what is loaded, and neither is the
 installer's readback, which is a physical diagnostic only.
-
-**Inert outside opted-in repositories.** A global install acts only in
-repositories that opted in. Outside them the hooks are inert: no blocking, no
-injected instructions, no writes. The one exception is the destructive-git
-protection, which stays active everywhere.
 
 **Node.js on the host's PATH.** The pipeline hooks need the Agy host to resolve
 `node`; a desktop or service launcher may have a different PATH from an
@@ -679,9 +695,9 @@ write.
 Whether the Advisor may receive repository data is decided by the recorded
 `advisor_export.consent` (`approved` or `declined`) in `pipeline.user.yaml`;
 the onboarding Driver asks for it explicitly, and `declined` creates no advisor
-export, child launch, or receipt. This guide does not state a default for a
-missing field: read the recorded value instead of assuming one. To review that
-boundary, run:
+export, child launch, or receipt (see
+[Advisor export consent](docs/v3-consumer-onboarding.md#advisor-export-consent)
+for a missing field). To review that boundary, run:
 
 ```sh
 node setup.mjs --configure-advisor-export
