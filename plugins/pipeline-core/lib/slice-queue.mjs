@@ -51,6 +51,29 @@ export const SLICE_STATES = Object.freeze(["ready", "hold-po", "blocked-external
 export const SLICE_TIERS = Object.freeze(["mechanic", "implementor", "deep", "critic"]);
 export const COMMIT_MODES = Object.freeze(["host-commit", "worktree", "diff-only", "self-commit"]);
 export const LOAD_CLASSES = Object.freeze(["light", "test-heavy"]);
+/** D75: why a slice was cancelled. A later re-dispatch is decided from the class, never from the free-text reason. */
+export const CANCEL_CLASSES = Object.freeze(["budget", "wrong-premise", "review-defect", "integrated-elsewhere", "superseded"]);
+/** What a cancelled row without a class (cancelled before D75) is reported as; it is never an accepted input value. */
+export const UNCLASSIFIED_CANCEL = "unclassified";
+/** One line per class: what it asserts and what follows for a re-dispatch. Shown in every refusal so a fresh agent learns the vocabulary from the message alone. */
+export const CANCEL_CLASS_HELP = Object.freeze({
+  budget: "the Goldfish ran out of tool budget; the work itself is sound, so re-dispatch with a continuation card",
+  "wrong-premise": "the briefing rested on a false premise; run recon and rewrite the briefing before any re-dispatch",
+  "review-defect": "an independent review found the delivered work defective; re-dispatch with the review findings in the briefing",
+  "integrated-elsewhere": "the work already landed through another slice or commit; do not re-dispatch it",
+  superseded: "a newer slice or decision replaces it; do not re-dispatch it",
+});
+/** Validates a cancel class. A missing, empty, unknown or non-string value (including the reserved word `unclassified`) is refused SQ-CANCEL-CLASS with a repair. */
+export function checkCancelClass(value) {
+  if (typeof value === "string" && CANCEL_CLASSES.includes(value)) return { ok: true, cancelClass: value };
+  const shown = value === undefined || value === null ? "none" : JSON.stringify(value)?.slice(0, 40);
+  return {
+    ok: false,
+    code: "SQ-CANCEL-CLASS",
+    reason: `a cancel needs a reason class, one of ${CANCEL_CLASSES.join("|")}; got ${shown}`,
+    repair: `give the class that says why the slice ends: ${CANCEL_CLASSES.map((name) => `${name} (${CANCEL_CLASS_HELP[name]})`).join("; ")}`,
+  };
+}
 export const DEFAULT_MAX_ATTEMPTS = 2;
 /** Same value as fanout-ledger.mjs `DEFAULT_STALE_AFTER_MINUTES` (pinned by a test). */
 export const DEFAULT_STALE_AFTER_MINUTES = 20;
@@ -93,7 +116,7 @@ const TEST_LOOKING = /(^|\/)(tests?|__tests__)\/|\.(test|spec)\.[a-z0-9]+$/iu;
 const TOP_KEYS = new Set(["schema", "feature", "defaults", "limits", "monoliths", "slices"]);
 const DEFAULT_KEYS = new Set(["commitMode", "tier", "loadClass"]);
 const LIMIT_KEYS = new Set(["deadline", "maxAttemptsPerSlice"]);
-const SLICE_KEYS = new Set(["id", "title", "state", "holdReason", "dependsOn", "writeScope", "readScope", "tier", "tierReason", "commitMode", "loadClass", "briefing", "estimatedToolCalls"]);
+const SLICE_KEYS = new Set(["id", "title", "state", "holdReason", "dependsOn", "writeScope", "readScope", "tier", "tierReason", "commitMode", "loadClass", "briefing", "estimatedToolCalls", "cancelClass"]);
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const isSliceId = (value) => isSafeTaskId(value) && value.length <= 128 && !value.includes("..");
@@ -578,6 +601,16 @@ export function validateSliceQueue(input, options = {}) {
     if (state !== null && state !== "ready" && holdReason === null) err("SQ-HOLD-REASON", `slice ${id}: state ${state} needs a holdReason`, { sliceId: id });
     if (state === "ready" && raw.holdReason !== undefined && raw.holdReason !== null) err("SQ-HOLD-REASON", `slice ${id}: a ready slice must not carry a holdReason`, { sliceId: id });
 
+    // D75: a cancelled slice carries the class of its cancellation. A row cancelled before D75 has none and is
+    // reported `unclassified` (never as classified); any other state must not carry a class.
+    let cancelClass = null;
+    if (raw.cancelClass !== undefined) {
+      const verdict = checkCancelClass(raw.cancelClass);
+      if (!verdict.ok) err("SQ-CANCEL-CLASS", `slice ${id}: ${verdict.reason}. ${verdict.repair}`, { sliceId: id });
+      else if (state !== "cancelled") err("SQ-CANCEL-CLASS", `slice ${id}: cancelClass belongs on a cancelled slice only (its state is ${state}); a class says why a slice was cancelled, one of ${CANCEL_CLASSES.join("|")}. Remove the cancelClass or cancel the slice`, { sliceId: id });
+      else cancelClass = verdict.cancelClass;
+    } else if (state === "cancelled") cancelClass = UNCLASSIFIED_CANCEL;
+
     let dependsOn = [];
     if (raw.dependsOn !== undefined) {
       if (Array.isArray(raw.dependsOn) && raw.dependsOn.every((dep) => typeof dep === "string")) dependsOn = [...new Set(raw.dependsOn)];
@@ -646,6 +679,7 @@ export function validateSliceQueue(input, options = {}) {
       title: typeof raw.title === "string" ? raw.title : "",
       state,
       holdReason,
+      cancelClass,
       dependsOn,
       writeScope: writeScope.filter((scope) => typeof scope === "string").map((scope) => scope.trim()),
       readScope: readScope.filter((scope) => typeof scope === "string").map((scope) => scope.trim()),
@@ -920,6 +954,7 @@ export function readyAndLive(input, options = {}) {
     summaries.set(entry.id, summary);
     if (entry.state === "cancelled") {
       summary.status = "cancelled";
+      summary.cancelClass = entry.cancelClass;
       continue;
     }
     if (doneIds.has(entry.id)) {
