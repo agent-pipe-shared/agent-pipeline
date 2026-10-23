@@ -5,15 +5,15 @@ V3-Ablauf**. Sie hilft dir, einen Weg zu wählen und zu verstehen, wer was tut.
 Sie erlaubt nicht, ein Gate zu überspringen oder ein Projekt zu verändern. Das
 aktive PRD und die Spec definieren die Arbeit; das
 [Operating Model](docs/operating-model.md), die `pipeline.user.yaml` des
-Projekts, die optionale `.claude/pipeline.yaml` und die Projektkalibrierung auf ihrer
-aufgelösten Autoritätsstufe (`project/pipeline.json`, sonst
-`.claude/pipeline.json`) definieren den anwendbaren Vertrag. Bei einem
-Widerspruch mit einer dieser Authority-Quellen gilt die jeweilige Authority.
+Projekts, das optionale Manifest und die Projektkalibrierung definieren den
+anwendbaren Vertrag. Bei einem Widerspruch mit einer dieser Authority-Quellen
+gilt die jeweilige Authority.
 
 ## Hier beginnen: eine Änderung, ein ehrlicher Weg
 
 Du bringst ein Ergebnis in klarer Sprache ein: einen Bugfix, ein Feature oder
-ein sichereres Refactoring. Der **Elephant** formt daraus eine begrenzte
+ein sichereres Refactoring. Der **Elephant** (die dispatchende Hauptsession,
+in den Lieferschritten Koordinator genannt) formt daraus eine begrenzte
 schriftliche Aufgabe; frische **Goldfish**-Kontexte implementieren begrenzte
 Pakete; ein lesender **Critic** prüft das Ergebnis unabhängig. Du bleibst an den
 Freigabe- und Eskalationspunkten menschlicher Entscheider.
@@ -23,7 +23,8 @@ Vier Begriffe verhindern die meisten Missverständnisse:
 - Ein **Profil** (`epic`, `feature` oder `mini`) ist die V3-*Session-Hülle*. Es
   wählt die registrierte Route und die erlaubte Lifecycle-Zeremonie. Es ist kein
   Prioritätslabel und ersetzt keine Risikobewertung.
-- **Rigor** (0, 1 oder 2) bestimmt, wie viel schriftliche Spezifikation eine
+- **Rigor** (0, 1 oder 2; die README nennt sie issue-only, delta-spec und
+  spec-anchored) bestimmt, wie viel schriftliche Spezifikation eine
   Änderung verdient. **Risiko** (niedrig, mittel oder hoch) bestimmt, wie viel
   unabhängiges Review sie braucht. Eine winzige Guardrail-Änderung kann deshalb
   hohes Risiko haben.
@@ -140,12 +141,6 @@ Freigabe.
 
 ## 3. In unabhängig prüfbaren Paketen liefern
 
-Für eine auditrelevante Lieferung wird der kandidatengebundene Verify-Receipt
-mit dem Paket aufbewahrt: Er benennt Befehl, Kandidat, Tree, Suites und
-Ergebnis. Ein roter, übersprungener, veralteter oder nicht passender Receipt
-ist Nachweis seiner Grenze, kein grünes Ergebnis. [Audit und
-Evidenz](docs/audit-and-evidence.md) erklärt Paketinhalt und Nicht-Claims.
-
 ```mermaid
 flowchart LR
     SP[Freigegebene aktuelle Spec] --> PF[Preflight: Route, Authority, Kapazität, Scope]
@@ -161,34 +156,32 @@ flowchart LR
     RE -->|zulässige Korrektur| PF
 ```
 
+Guardrails und die Codex-Host-Bridge sind keine Lieferschritte; sie stehen in
+den [optionalen Ausführungs- und Host-Grenzen](#optionale-ausführungs--und-host-grenzen).
+
 | Schritt | Owner | Bedeutung | Nachweis und Grenze |
 |---|---|---|---|
-| Guardrails | Installierte Runner-Integration und Projektkonfiguration. | Konfigurierte Command- und Write-Path-Schutzmaßnahmen können unsichere Aktionen verweigern. | Claude und Antigravity haben die dokumentierte Hook-Integration; daraus folgen keine solchen Hooks auf Codex. |
-| Codex-Host-Bridge | Codex-Host und Plugin-Integration. | Die Bridge wendet nur die Command- und Write-Path-Policy an, die ihr Host anbietet. | Host-Lifecycle-Evidenz bleibt erforderlich; weder hostunabhängiges Enforcement noch Modellidentität werden behauptet. |
 | Preflight | Elephant und deterministische Checks. | Aktuelles PRD/Spec, Profil-/Phasenroute, Kapazität, Scope und Authority-Bindungen passen weiterhin zusammen. | Ein Mismatch vertagt oder öffnet eine Kursentscheidung; er wird nie zum informellen Dispatch. |
 | Tests im Item | Item-Goldfish. | Testfälle und neue Regressionstests entstehen im selben Kontext wie der Code. | Bestehende Akzeptanzprüfer erhalten; notwendige Änderungen sichtbar begründen und unabhängig prüfen lassen. Assertions auf ursprüngliche Kriterien abbilden; RED durch den Produktfehler belegen. |
-| Implementieren | Item-Goldfish. | Ein vollständiges, unabhängig prüfbares Akzeptanzkriterium oder Backlog-Ergebnis bis zu gezielten Checks und Korrekturen verantworten. | Elephant plant getrennte Dateien; kollidierende Items warten, und der Dispatch-Guard verweigert überlappende Schreibbereiche standardmäßig ([Details](docs/parallel-work.md)). Original-Owner enden nach getesteter Lieferung und Integration. |
+| Implementieren | Item-Goldfish. | Ein vollständiges, unabhängig prüfbares Akzeptanzkriterium oder Backlog-Ergebnis bis zu gezielten Checks und Korrekturen verantworten. | Das Fan-out selbst ist beratend: Der Elephant plant getrennte Dateien, kollidierende Items warten. Die Überlappungsverweigerung ist erzwungen: Der Dispatch-Guard verweigert überlappende Schreibbereiche standardmäßig ([Details](docs/parallel-work.md)). Original-Owner enden nach getesteter Lieferung und Integration. |
 | Kandidaten-Commit | Koordinator oder autorisierter Host nach Prüfung der Rückgabe. | Begrenztes Ergebnis integrieren und vor kandidatengebundenem Verify einen sauberen Commit-Kandidaten schaffen. | Tatsächlichen Commit und Tree festhalten; ein vorgeschlagener Child-Commit oder schmutziger Checkout ersetzt sie nicht. |
 | Verify — Pflicht | Der Koordinator ruft den konfigurierten Evidence-Producer für den committeten Kandidaten auf. | Für Releases fährt der Producer den einen konfigurierten Projektbefehl; dokumentierte grenzbewusste Modi fahren die feste Baseline plus registrierte Befehle für geänderte Bereiche. Der Projektbefehl allein erzeugt keinen Verify-Receipt. | Grün heißt: Der Producer hat ein exaktes maschinell geschriebenes Nachweis-Artefakt für den Kandidaten geschrieben. Rot ist Fehlernachweis, kein Teilerfolg. |
-| Critic — Pflicht | Frischer lesender Critic; Elephant besitzt die Disposition. | Code und Tests gegen ursprüngliche Kriterien prüfen: ein kohärenter Batch, vor Dispatch festgelegt und nach Integration eingefroren. | Ein Voll-Critic plus höchstens drei Delta-Critics; bei PASS sofort stoppen, Budget nie neu starten. Ein frischer Korrektur-Goldfish behält den gesamten Korrekturkontext. Ein Einzel-Item-Batch braucht eine erhebliche Risikobegründung. |
+| Critic — Pflicht | Frischer lesender Critic; Elephant besitzt die Disposition. | Code und Tests gegen ursprüngliche Kriterien prüfen: ein kohärenter Batch, vor Dispatch festgelegt und nach Integration eingefroren. | Review-Budget, Korrektur-Owner und Einzel-Item-Regel: [Usage](docs/usage.md#deliver-work-after-readiness) (englisch). |
 | Finales Verify — Pflicht für Releases | Der Koordinator führt nach dem substanziellen Critic-Review den vollständigen Evidence-Producer aus. | Der Release-Receipt bindet den reviewten Kandidaten und das konsumierte Critic-Paket; Korrekturen gehen erneut durch das Review. | Vor Close oder Promotion braucht der exakte Commit einen grünen finalen Receipt. |
 
 
 Ein Item-Owner behält Analyse, Testvorbereitung, Code und gezielte Korrekturen,
 um Übergaben zu reduzieren. Dabei kann derselbe Irrtum Code und Tests prägen.
 Erhaltene Akzeptanzprüfer und unabhängiges Critic-Urteil gegen ursprüngliche
-Kriterien bleiben nötig; Tests allein sind keine Abnahme. Main erhält alle
-Lieferungen und wiederholt gezielte Checks nicht routinemäßig. Nach manuellem
-Merge-Konflikt laufen betroffene Checks; Drift oder fehlende Evidenz verlangt
-Goldfish-Requalifikation. Full Verify qualifiziert anschließend einmal den
-integrierten, reviewten Kandidaten. Das gilt für jede Risikostufe. Bestehende
-Report-only-Entscheidungen für Whole Closure bleiben Report-only.
+Kriterien bleiben nötig; Tests allein sind keine Abnahme. Der Koordinator erhält
+alle Lieferungen und wiederholt gezielte Checks nicht routinemäßig. Nach
+manuellem Merge-Konflikt laufen betroffene Checks; Drift oder fehlende Evidenz
+verlangt Goldfish-Requalifikation. Full Verify qualifiziert anschließend einmal
+den integrierten, reviewten Kandidaten. Das gilt für jede Risikostufe.
 
-Jedes Projekt verwendet den einen vollständigen `verify`-Befehl seiner eigenen
-Kalibrierung. Für Nicht-Release-Grenzen darf der Evidence-Producer seine feste
-Baseline plus registrierte Impact-Befehle ausführen; dies erlaubt nicht, einen
-vollständigen Befehl durch einen bequemen Teilbefehl zu ersetzen. [Passenden Modus und geprüfte Basis
-wählen](docs/usage.md#verify-a-consumer-project).
+Verify-Modi und geprüfte Basis: [Verify a consumer
+project](docs/usage.md#verify-a-consumer-project) (englisch).
+
 Maintainer finden den Release-Ablauf dieses Source-Checkouts im
 [Push- und Release-Ablauf](docs/push-release-flow.md).
 
@@ -227,14 +220,9 @@ Close-Grenze unter eigenen Nachweis- und Freigaberegeln.
 |---|---|---|---|
 | Deterministisches Gate ist rot mit bekannter Produktursache | Goldfish, dann Elephant. | Ein automatischer Produkt-Retry für dieselbe Ursache (insgesamt zwei Versuche). | Ein bestandener Retry kehrt zum deterministischen Gate/normalen Review zurück. Der zweite Fehlschlag öffnet eine menschliche Kursentscheidung. |
 | Vertrauenswürdiger Umgebungsfehler vor Produktarbeit | Elephant. | Ein enger frischer Umgebungs-Failover mit eingefrorener Authority und ohne Delegation. | Bei Erfolg begrenzte Arbeit fortsetzen; bei weiterem Fehler oder unbewiesener Ursache für Kursentscheidung stoppen. |
-| Critic-Befund braucht semantische Korrektur | Ein frischer Korrektur-Goldfish verantwortet den Batch. | Derselbe Owner für alle Befunde, Fixes und Delta-Reviews; ein Voll-Critic plus höchstens drei Delta-Critics. | Bei PASS stoppen. Nach Budgetende gilt der bestehende Stopp-/Kurspfad; Umbenennung oder Selbstabnahme setzt das Budget nicht zurück. |
+| Critic-Befund braucht semantische Korrektur | Ein frischer Korrektur-Goldfish verantwortet den Batch. | Derselbe Owner für alle Befunde, Fixes und Delta-Reviews, innerhalb des [Review-Budgets](docs/usage.md#deliver-work-after-readiness). | Bei PASS stoppen. Nach Budgetende gilt der bestehende Stopp-/Kurspfad; Umbenennung oder Selbstabnahme setzt das Budget nicht zurück. |
 | Spec-, Scope-, Nachweis- oder Authority-Drift | Elephant und nötigenfalls Mensch. | Neu planen oder freigeben; alte Freigabe nie in einen veränderten Vertrag tragen. | Zur Triage, Spec, Readiness oder Freigabe zurück — je nachdem, was veraltet ist. |
 | Unbekannte Ursache, wiederholte Signatur, erschöpftes Budget oder Konflikt | Menschlicher Entscheider. | Mit neuer Richtung fortsetzen, verschieben oder stoppen. | Keine endlose Retry-Schleife und kein Erfolg ohne erforderliche Nachweise. |
-
-Migrationsbefehle für die Pipeline-Source gehören in den gelegentlichen
-Maintainer-Pfad und nicht in diesen Consumer-Lifecycle. [SETUP](SETUP.md)
-beschreibt diesen Pfad sowie die geordnete Runner-Bindung, den Neustart, die
-Klassifizierung und die Übernahme eines Projekts.
 
 ## Optionale Ausführungs- und Host-Grenzen
 
@@ -248,8 +236,9 @@ ein Standard für Hintergrundausführung.
 Bewahre für prüfbare Lieferungen den kandidatengebundenen Verify-Beleg auf.
 Rot, übersprungen, veraltet oder nicht passend bedeutet nicht grün; die
 [Audit- und Evidenzgrenzen](docs/audit-and-evidence.md) gelten weiter. Wo
-Claude- oder Antigravity-Hooks aktiv installiert sind, prüfen konfigurierte
-Guards Host-Aktionen. Codex nutzt nur die Command- und Write-Path-Kontrollen,
+Claude-Hooks aktiv installiert sind, prüfen konfigurierte Guards
+Host-Aktionen; bei Antigravity ist die Hook-Durchsetzung hostabhängig (native
+Hook-Messung steht aus). Codex nutzt nur die Command- und Write-Path-Kontrollen,
 die sein Host-Bridge tatsächlich bereitstellt; gleiche Hook-Ereignisse oder
 universelle Durchsetzung sind damit nicht behauptet. Einzelheiten stehen in
 der [englischen Host-Grenzen-Referenz](PIPELINE_FLOW.md#optional-execution-and-host-boundary-reference).
@@ -262,13 +251,20 @@ Durchsetzung, aus einem Governance-Pfad kein IAM, aus einer angefragten Route
 keine beobachtete Modellidentität und aus einem Maschinen-Gate keinen Beweis
 jeder semantischen Eigenschaft.
 
-`0.7.0` beschreibt ein noch nicht veröffentlichtes Source- und Plugin-
-Release, keinen verfügbaren Tag oder Installationspfad. Nutze die freigegebene
-veröffentlichte Version und prüfe die geladene Host-Version, bevor du eine
-Route wählst. Den detaillierten Implementierungs- und Abnahmestand hält der
-[Überblick](docs/overview.md) fest.
+`0.7.0` beschreibt ein noch nicht veröffentlichtes Release, keinen
+installierbaren Tag oder Installationspfad: Nutze die freigegebene veröffentlichte
+Version, prüfe die geladene Host-Version und den Stand im
+[Überblick](docs/overview.md).
+
+Wo die Dateien liegen: Das optionale Manifest ist `.claude/pipeline.yaml`, die
+Projektkalibrierung liegt auf ihrer aufgelösten Autoritätsstufe
+(`project/pipeline.json`, sonst `.claude/pipeline.json`).
 
 Normative Details stehen im [Operating Model](docs/operating-model.md). Für
 Adoption und Migration nutze [SETUP.md](SETUP.md) und
-[docs/migration.md](docs/migration.md). Für den optionalen Deploy-Ausklang siehe
+[docs/migration.md](docs/migration.md). Migrationsbefehle für die
+Pipeline-Source gehören in den gelegentlichen Maintainer-Pfad und nicht in
+diesen Consumer-Lifecycle; SETUP beschreibt diesen Pfad sowie die geordnete
+Runner-Bindung, den Neustart, die Klassifizierung und die Übernahme eines
+Projekts. Für den optionalen Deploy-Ausklang siehe
 [docs/deploy/README.md](docs/deploy/README.md).

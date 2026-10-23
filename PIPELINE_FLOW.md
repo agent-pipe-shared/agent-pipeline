@@ -6,10 +6,8 @@ This is the **one maintained visual guide to the user-facing V3 flow**. It helps
 you choose a route and understand who does what. It is not permission to skip a
 gate or change a project. The active PRD and Spec define the work; the
 [Operating Model](docs/operating-model.md), the project's `pipeline.user.yaml`,
-optional `.claude/pipeline.yaml` manifest, and project calibration at its
-resolved authority tier (`project/pipeline.json`, else
-`.claude/pipeline.json`) define the applicable contract. If this guide
-disagrees with one of them, use that source.
+its optional manifest, and its project calibration define the applicable
+contract. If this guide disagrees with one of them, use that source.
 
 ## Start here: one change, one honest route
 
@@ -17,7 +15,8 @@ disagrees with one of them, use that source.
 <a id="capability-specialist-agent-roles"></a>
 
 Bring an outcome in plain language: a bug to fix, a feature to add, or a
-refactor to make safer. The **Elephant** turns it into a bounded written task;
+refactor to make safer. The **Elephant** (the main session that dispatches,
+called the Coordinator in the delivery steps) turns it into a bounded written task;
 fresh **Goldfish** contexts implement bounded packages; a read-only **Critic**
 checks the result independently. You remain the human decision-maker at the
 approval and escalation points.
@@ -27,7 +26,8 @@ Four terms prevent most confusion:
 - A **profile** (`epic`, `feature`, or `mini`) is the V3 *session envelope*. It
   selects the registered route and allowable lifecycle ceremony. It is not a
   priority label and it does not replace risk assessment.
-- **Rigor** (0, 1, or 2) decides how much written specification a change earns.
+- **Rigor** (0, 1, or 2; the README calls these issue-only, delta-spec and
+  spec-anchored) decides how much written specification a change earns.
   **Risk** (low, medium, or high) decides how much independent review it needs.
   A tiny guardrail change can therefore be high risk.
 - A **Sprint** is a planning grouping for related work. It is not a profile and
@@ -174,32 +174,31 @@ flowchart LR
     RE -->|allowed correction| PF
 ```
 
+Guardrails and the Codex host bridge are not delivery steps; they are described
+in the [host-boundary reference](#optional-execution-and-host-boundary-reference).
+
 | Step | Owner | Meaning | Evidence and boundary |
 |---|---|---|---|
-| Guardrails | Installed runner integration and project configuration. | Configured command and write-path safeguards may refuse unsafe actions before delivery proceeds. | Claude and Antigravity have the documented hook integration; this does not claim those hooks on Codex. |
-| Codex host bridge | Codex host and plugin integration. | The bridge applies only the command and write-path policy its host exposes. | Host lifecycle evidence remains required; no host-independent enforcement or model identity is implied. |
 | Preflight | Elephant and deterministic checks. | Current PRD/Spec, profile/phase route, capacity, scope, and authority bindings still match. | A mismatch defers or opens a course decision; it never becomes an informal dispatch. |
 | Tests within the item | Item Goldfish. | Prepare test cases and add regression tests in the same context as the implementation. | Preserve existing acceptance examiners; expose and justify necessary changes for independent review. Map assertions to original criteria and show product-caused RED evidence. |
-| Implement | Item Goldfish. | Own one complete, independently verifiable acceptance criterion or backlog outcome through targeted checks and fixes. | Elephant schedules disjoint files; colliding items wait, and the dispatch guard refuses overlapping write scopes by default ([details](docs/parallel-work.md)). Original owners end after tested delivery and integration. |
+| Implement | Item Goldfish. | Own one complete, independently verifiable acceptance criterion or backlog outcome through targeted checks and fixes. | Fan-out itself is advisory: the Elephant schedules disjoint files and colliding items wait. The overlap refusal is enforced: the dispatch guard refuses overlapping write scopes by default ([details](docs/parallel-work.md)). Original owners end after tested delivery and integration. |
 | Candidate commit | Coordinator or authorized host, after validating the returned package. | Integrate the bounded result and create a clean committed candidate before candidate-bound Verify. | Record the actual commit and tree; a Child's proposed commit or a dirty checkout is not a substitute. |
 | Verify — mandatory | Coordinator invokes the configured evidence producer on the committed candidate. | For release, the producer runs the one configured project command; documented boundary-aware modes run the fixed baseline plus registered changed-area commands. Running the project command alone does not create the Verify receipt. | Green means the producer wrote an exact machine-written evidence artifact for the candidate. Red is evidence of failure, not partial success. |
-| Critic — mandatory | Fresh read-only Critic; Elephant owns disposition. | Review code and tests against original criteria once per coherent batch declared before dispatch and frozen after integration. | One full Critic plus at most three delta Critics, stop on PASS; no budget reset. One fresh Correction Goldfish retains the entire correction context. Singleton batches need a substantial risk rationale. |
+| Critic — mandatory | Fresh read-only Critic; Elephant owns disposition. | Review code and tests against original criteria once per coherent batch declared before dispatch and frozen after integration. | Review budget, correction owner and singleton-batch rule: [Usage](docs/usage.md#deliver-work-after-readiness). |
 | Final Verify — mandatory for release | Coordinator runs the configured full evidence producer after the substantive Critic review. | The release-mode receipt binds the reviewed candidate and consumed Critic packet; corrections return through review. | The exact committed candidate needs a passing final receipt before close or promotion. |
 
 
 One item owner keeps analysis, test preparation, code and targeted fixes together
 to reduce handoffs. The trust tradeoff is a shared blind spot in code and tests.
 Preserved examiners and independent Critic judgment against the original criteria
-remain essential; tests alone are not acceptance. Main preserves deliveries and
-does not routinely repeat targeted checks. A manual merge conflict requires the
-affected checks; drift or missing evidence requires Goldfish requalification.
-Full Verify then qualifies the integrated reviewed candidate once. This applies
-to every risk tier. Whole-closure report-only decisions remain report-only.
+remain essential; tests alone are not acceptance. The Coordinator preserves
+deliveries and does not routinely repeat targeted checks. A manual merge conflict
+requires the affected checks; drift or missing evidence requires Goldfish
+requalification. Full Verify then qualifies the integrated reviewed candidate
+once. This applies to every risk tier.
 
-Each project uses the one full `verify` command named by its own calibration.
-For non-release boundaries, the evidence producer may run its fixed baseline
-plus registered impact commands; it does not authorize substituting a convenient
-partial command. [Choose the appropriate mode and reviewed base](docs/usage.md#verify-a-consumer-project).
+Verify modes and the reviewed base: [Verify a consumer project](docs/usage.md#verify-a-consumer-project).
+
 > **Maintainer reference only:** the release procedure for the distributed
 > plugin itself is [push and release flow](docs/push-release-flow.md). It is
 > not a delivery step for a repository that merely uses the installed plugin.
@@ -250,14 +249,15 @@ follows the close boundary under its own evidence and approval rules.
 |---|---|---|---|
 | Deterministic gate is red with a known product cause | Goldfish, then Elephant. | One automatic product retry at the same cause (two total attempts). | A passing retry returns to the deterministic gate/normal review. A second failure opens a human course decision. |
 | Trusted environment fault before product work | Elephant. | One narrow, fresh environment failover with frozen authority and no delegation. | On success resume bounded work; on another fault or an unproven cause, stop for a course decision. |
-| Critic finding needs semantic correction | One fresh Correction Goldfish owns the batch. | Same owner through all findings, fixes and delta reviews; one full plus at most three delta Critics. | Stop on PASS. Exhausted budgets use the existing stop/course path; no renamed batch or direct self-acceptance resets the limit. |
+| Critic finding needs semantic correction | One fresh Correction Goldfish owns the batch. | Same owner through all findings, fixes and delta reviews, within the [review budget](docs/usage.md#deliver-work-after-readiness). | Stop on PASS. Exhausted budgets use the existing stop/course path; no renamed batch or direct self-acceptance resets the limit. |
 | Spec, scope, evidence, or authority drift | Elephant and human as needed. | Re-plan or re-approve; never carry stale approval into a changed contract. | Return to triage, Spec, readiness, or approval — whichever became stale. |
 | Unknown cause, repeated signature, exhausted budget, or conflict | Human decision-maker. | Continue with a new direction, defer, or stop. | No unbounded retry loop and no success claim without required evidence. |
 
 <!-- capability:handover-hard-size-gate -->
 <a id="capability-handover-hard-size-gate"></a>
 
-For a proposed handover write, the configured cap refuses when the computed
+For a proposed handover write on Claude or Antigravity (the guard is
+unavailable on Codex), the configured cap refuses when the computed
 post-write size—or the guard's non-exact `NotebookEdit` size estimate—reaches
 its hard limit and is not provably smaller than the current file. A proven
 net decrease remains allowed so an oversized handover can be repaired.
@@ -266,10 +266,6 @@ write boundary.
 For a refused write, shorten or split the handover and retry with a bounded
 replacement. Do not treat a permitted edit as evidence that every other
 handover or repository policy has passed.
-
-Pipeline-source migration commands belong to the occasional maintainer path,
-not this consumer lifecycle. See [SETUP](SETUP.md) for that path and for the
-ordered runner binding, restart, classification, and adoption procedure.
 
 ## Optional execution and host-boundary reference
 
@@ -306,10 +302,11 @@ what a review package can contain and what it cannot prove.
 <!-- capability:claude-hook-safety -->
 <a id="capability-claude-hook-safety"></a>
 
-Where the Claude or Antigravity hook integration is installed and active,
-configured guards check command, write-path, plan, test-path, push and
-lifecycle-readiness actions at the host boundary. These controls do not imply
-that a different runner exposes the same hook events.
+Where the Claude hook integration is installed and active, configured guards
+check command, write-path, plan, test-path, push and lifecycle-readiness
+actions at the host boundary. Antigravity's hook enforcement is host-dependent
+(native hook measurement is pending). These controls do not imply that a
+different runner exposes the same hook events.
 Confirm the installed plugin copy and the host's active hook registration
 before relying on a denial or approval. Repository source code alone cannot
 prove that a particular user's runner enforced the hook during a session.
@@ -327,14 +324,17 @@ rule is not host-wide enforcement; a governance path is not IAM; a requested
 route is not observed model identity; and a machine gate does not prove every
 semantic property.
 
-`0.7.0` describes a pending source and plugin release, not an available
-tag or installation source. Use the approved published plugin and check the
-loaded host version before following a route. The [overview](docs/overview.md)
-maintains the detailed implementation and candidate-acceptance status.
+`0.7.0` describes a pending release, not an installable tag or source: use the
+approved published plugin, check the loaded host version, and see the
+[overview](docs/overview.md) for the detailed status.
+
+Where the files live: the optional manifest is `.claude/pipeline.yaml`, and
+project calibration sits at its resolved authority tier (`project/pipeline.json`,
+else `.claude/pipeline.json`).
 
 For the normative details, read the [Operating Model](docs/operating-model.md).
 For adoption and migration, use [SETUP](SETUP.md) and
-[migration](docs/migration.md). For optional deployment, see
-[deploy](docs/deploy/README.md).
-
-[Deutsche Lesefassung](PIPELINE_FLOW.de.md)
+[migration](docs/migration.md). Pipeline-source migration commands belong to
+the occasional maintainer path, not this consumer lifecycle; [SETUP](SETUP.md)
+covers that path and the ordered runner binding, restart, classification, and
+adoption procedure. For optional deployment, see [deploy](docs/deploy/README.md).
