@@ -43,7 +43,7 @@
 - PO list (only on request): `specs/sprint-alfred-epic/plans/po-list-afk-2026-10-22.md`, rows 1 to 30 (19 Critic digest re-pin, 23/24
   K2 reds, 27 K1D case C, 28 to 30 K8/K9 findings).
 - Ledger after fresh counted runs: K3, K4, K5, K9, K11, K12 closed (named rests in the plan file); K8 repairs held; K1D, K2, K6, K7, K13
-  open on ceremonies or PO decisions. Not started: stamp, push, Full Verify, Critic batch, Reader course, final matrix remeasure.
+  open on ceremonies or PO decisions. Matrix remeasured 2026-10-23 (`evidence/delivery-remeasure-2026-10-23/`): 3/56/115 at 25/50/75, index 66.09% (was 63.65%); repeat after the PO tests. Not started: stamp, push, Full Verify, Critic batch, Reader course.
 
 **Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
 Read these three files first, in this order, before any other work:
