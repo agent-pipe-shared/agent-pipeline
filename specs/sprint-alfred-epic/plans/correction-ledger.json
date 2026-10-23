@@ -73,7 +73,7 @@
       "id": "K8",
       "title": "guard hook suites that crash or time out",
       "status": "in-progress",
-      "next": "three suites stay red in the 2026-10-23 counted run (pin-counted-results-2026-10-23-c.md): lifecycle-denial-loop-guard case RC04C001, guard-apply-patch (whole file dies at line 472 after two failing cases), antigravity-pretool-guard (dies at line 406 after 'rejects invalid JSON'); diagnose each by cause, protected sources become drop-ins"
+      "next": "all three red suites are diagnosed and repaired in clones as held protected patches (C21 guard-apply-patch fixtures, C22 antigravity fixtures cumulative, C24 evaluate.mjs observation fix for RC04C001) and green there except the two GS-1 cases of the antigravity file (PO list row 29); close K8 once the sitting applied C21, C22 and C24 and the suites are counted green"
     },
     {
       "id": "K9",
