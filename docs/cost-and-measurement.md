@@ -1,4 +1,4 @@
-# What real trial data says about effort
+# Cost and measurement: what real trial data says about effort
 
 Agent-Pipeline adds planning, review, verification and controlled delivery to
 an agent-led software workflow. That creates real coordination and waiting
@@ -8,7 +8,8 @@ runners.
 
 ## Observations from small greenfield runs
 
-Three 0.6.2 sessions exercised meaningful lifecycle work in Claude Code,
+Three 0.6.2 sessions (Greenfield runs, see the
+[Terms](README.md#terms-used-across-these-documents)) exercised meaningful lifecycle work in Claude Code,
 Codex and Antigravity. The scopes, environments and measurement methods were
 not identical, so the figures must not be ranked as a runner benchmark.
 
@@ -18,10 +19,13 @@ not identical, so the figures must not be ranked as a runner benchmark.
 | Claude Code | About 89 minutes machine-observed; the report attributes about 31 minutes to dispatched product/quality work and estimates administration at roughly 55% of its session time. | A Critic found a missing restart-test assertion; the signed push and audit path completed. Time categories and administration share are the runner's estimates. |
 | Codex | Recovery, verification and worker-dispatch paths were exercised; an under-delivering worker was replaced by a fresh dispatch. | The summary does not provide directly comparable wall-time or token figures. Do not infer a cost number from this run. |
 
-The detailed [three-runner findings](../backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md)
-retain the evidence boundaries and specific follow-ups.
+The detailed three-runner findings (maintainer reference, not part of a
+consuming project: `backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`
+in the plugin's own repository) retain the evidence boundaries and specific
+follow-ups.
 
-One separate Claude happy-path transcript covered a tiny minigame from kickoff
+A different Claude session, not the Claude Code run in the table, was one
+separate happy-path transcript. It covered a tiny minigame from kickoff
 through attempted push. It spans 1 hour 37 minutes 53 seconds; the forensic
 accounting attributes 77 minutes 34 seconds to Pipeline-operation phases and
 17 minutes 15 seconds to waiting for a human response. **The push was
@@ -44,6 +48,12 @@ quality and recovery as well as speed. Subscription allowance and model access
 vary by provider, plan and task, so these repository observations cannot
 predict your bill or plan usage.
 
+## What is not measured yet
+
+The Greenfield runs are too heterogeneous to establish a cross-runner cost
+ranking or a representative consumer-overhead estimate. Comparable
+multi-runner task telemetry is still needed before making those claims.
+
 ## Proposed item and waiting measurements
 
 For item-owned delivery (one Goldfish per complete outcome, see
@@ -54,7 +64,7 @@ identity, correction rounds, targeted-check executions and requalification
 reasons with the actual candidate. These are proposed measurements, not
 collected results. Compare identical original criteria and outcomes before
 claiming fewer handoffs, shorter item closure or less waiting. No performance
-guarantee follows from the new policy.
+guarantee follows from item-owned delivery.
 
 ## Maintainer reference: 0.7 verification measurements
 
@@ -72,9 +82,3 @@ do not authorize changing pool width, moving a suite out of a serial lane, or
 reusing a receipt; those choices still require evidence about isolation and
 candidate-bound inputs and outputs. They also do not measure the cost of a
 consuming project's full agent workflow.
-
-## What is not measured yet
-
-The Greenfield runs are too heterogeneous to establish a cross-runner cost
-ranking or a representative consumer-overhead estimate. Comparable
-multi-runner task telemetry is still needed before making those claims.
