@@ -5,8 +5,9 @@ This folder holds everything the operator needs for the bundled sitting: the ord
 ## Before the first command
 
 1. The main checkout is on `feat/sprint-alfred` with a clean tree; note `git rev-parse HEAD`. Nothing else heavy runs (no agents, no test suites).
-2. Do not change the tree between a command that is bound to a HEAD or tree state and the operator's next command (an approve or override step reads `repository.head` and `statusSha256`).
-3. The commits are made by the operator as the human operator with `git commit --no-verify -F <message file> -- <paths>` for protected paths, exactly as `runbook.md` prints them. A diff that touches a protected target is applied by the operator's own shell, not by an agent.
+2. Freeze: the diffs were cut and replayed on main at commit `375055799` plus evidence-only commits. Import no further commit that touches a file named in the runbook before the sitting is done.
+3. Do not change the tree between a command that is bound to a HEAD or tree state and the operator's next command (an approve or override step reads `repository.head` and `statusSha256`).
+4. The commits are made by the operator as the human operator with `git commit --no-verify -F <message file> -- <paths>` for protected paths, exactly as `runbook.md` prints them. A diff that touches a protected target is applied by the operator's own shell, not by an agent.
 
 ## Order
 
