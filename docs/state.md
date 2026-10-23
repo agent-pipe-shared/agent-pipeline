@@ -38,6 +38,7 @@
 **AFK window (2026-10-23, written during the window; wins over the session cut where they differ):**
 - Agents imported on `feat/sprint-alfred` (implementation complete; Critic read and PO acceptance pending): K53 to K132 batches (scripts,
   backlog sweep, D75/D76, D140 docs, pins, Reader corrections, ledger); counted runs `evidence/pin-counted-results-2026-10-23*.md`.
+- Sitting preparation index (start here, links every file, rehearsal and open task): `specs/sprint-alfred-epic/plans/sitting-preparation-index-2026-10-23.md`.
 - Held for the PO sitting (about 15:00 on 2026-10-23): ordered runbook `specs/sprint-alfred-epic/evidence/sitting/runbook.md` (steps
   01 to 47; step 35, the Critic preimage re-pin, waits until just before the stamp); patches also in `evidence/held-patches/`.
 - PO list: `plans/po-list-afk-2026-10-22.md`, rows 1 to 44; tile decisions up to batch 12 in `plans/po-decisions-2026-10-23-tiles.md`.
