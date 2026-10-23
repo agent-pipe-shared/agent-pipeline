@@ -185,7 +185,7 @@ export function finishedCommitMessageFindings(message, {
     const exact = trailers.length === 2 && trailers[0].key === "Dispatch" && trailers[1].key === "AI-Assisted" && trailers[1].value === "true";
     const admitted = exact && administrativeAdmission?.ok === true && administrativeAdmission.schema === "pipeline.administrative-commit-content.v1"
       && administrativeAdmission.code === "GIT-03-ADMINISTRATIVE-VERIFIED" && administrativeAdmission.messageSha256 === messageDigest(text);
-    if (!admitted) findings.push({code:"GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED",detail:"administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred"});
+    if (!admitted) findings.push({code:"GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED",detail:"administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred. The admitted Elephant form for a bounded commit of your own is `Dispatch: stage-0 (elephant)` with `AI-Assisted: true`"});
   }
   const integration = trailers.filter((entry) => entry.key === "Dispatch" && entry.value.startsWith("quality-package-"));
   if (integration.length > 0) {

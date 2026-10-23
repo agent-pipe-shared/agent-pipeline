@@ -440,7 +440,14 @@ export function applyTrustAnchorBootstrap({
     ?? homedir();
   const machineDependencies = { homedirFn: () => home };
   const machinePath = machinePlaneFilePath(machineDependencies);
-  if (machinePath === null) return { ok: false, code: "TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE" };
+  if (machinePath === null) {
+    return {
+      ok: false,
+      code: "TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE",
+      reason: `the machine-plane file path cannot be derived from the home directory ${typeof home === "string" && home !== "" ? `"${home}"` : "(none: HOME, USERPROFILE and PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE are all unset)"}; `
+        + "name an existing absolute home directory in HOME (or USERPROFILE on Windows) and run the command again",
+    };
+  }
   const common = runGit("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], {
     encoding: "utf8", shell: false, env: effectiveEnv,
   });
