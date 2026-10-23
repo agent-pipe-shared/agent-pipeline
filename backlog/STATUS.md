@@ -158,6 +158,7 @@
 | pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.capability-inventory-checker-is-red-at-head | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.capability-is-built-tested-and-declared-ahead-of-anything-that-could-call-it | closed | workflow-improvement | pipeline | nova-b | 2026-09-06 | — | — |
+| pipeline.capture-evidence-does-not-normalize-windows-npm-launch | open | workflow-improvement | pipeline | none | 2026-10-23 | — | — |
 | pipeline.capture-evidence-refuses-fixture-literal-as-host-path | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- capture-evidence.mjs's windows-drive-letter leak heuristic (scripts/capture-evidence.mjs:120) matches a synthetic fixture literal such as C:\Users\Foo\repo inside a test's own description and body, and on any match refuses to write the capture (:197). The tool has no allowlist. Consequence measured 2026-09-06: guard-maintenance-window-tests clears every serial-lane safety signal and passes solo 62/62, but its self-race evidence cannot be captured because GMW45's description contains that literal -- so the suite stays in the lane on a tooling refusal, not a safety finding, at 16.3s of lane time. |
 | pipeline.catalogue-admit-prescribed-lifecycle-verbs | closed | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
@@ -304,6 +305,7 @@
 | pipeline.documentation-has-no-reader-facing-review-and-no-machine-binding-for-one | closed | requirement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.documentation-information-architecture | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
+| pipeline.domain-scanner-findings-need-reproduction-before-remedy | open | workflow-improvement | pipeline | none | 2026-10-23 | — | — |
 | pipeline.draft-phase-blocks-commit-and-unstage-of-po-concept-files | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.dual-channel-publication | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
@@ -483,6 +485,7 @@
 | pipeline.identical-lifecycle-argv-must-have-shell-lane-parity | closed | defect | pipeline | nova-b | 2026-09-13 | — | Nova B — the Claude Windows run observed an exact `--push-approval signature` lifecycle invocation rejected as Bash parse-unsupported but admitted via PowerShell. |
 | pipeline.identity-attestation-fails-open-on-unresolved-transcript-path | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
+| pipeline.implementation-without-dispatch-escapes-review-coverage | open | workflow-improvement | pipeline | none | 2026-10-23 | — | — |
 | pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.initial-answers-guidance-claims-git-author-recorded-but-config-is-empty | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.inode-identity-decides-deletion-in-a-second-rollback-path | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
@@ -966,7 +969,7 @@
 
 ## Counts
 
-- open: 270
+- open: 273
 - in_progress: 0
 - closed: 674
 - rejected: 3

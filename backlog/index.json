@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "996af27bd591cd493b2a65fac3c155261a4f712e3954862a57e70fdc63c90499"
+    "transitionHead": "c1bb8406a8a161d81d5f44537b60d7098b83a33b9eab7d1f7aabd438f66b39b1"
   },
   "counts": {
-    "open": 270,
+    "open": 273,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -1961,6 +1961,16 @@
       "closureEvidence": "backlog/evidence/2026-09-18-capability-reachability-closure.md"
     },
     {
+      "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-23",
+      "source": "Reconstructed 2026-10-23 with explicit PO permission for exactly this file (decision tile batch 11). The original item file has no public text; this text is derived 1:1 from the acceptance points P1-P3 in the header of plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs (AC-122, ALF-C-P7-06), whose reconstruction the PO confirmed on 2026-10-23.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.capture-evidence-refuses-fixture-literal-as-host-path",
       "status": "closed",
       "type": "defect",
@@ -3817,6 +3827,16 @@
       "closureRepository": "self",
       "closureCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
       "closureEvidence": "backlog/items/2026-09-02-documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it.md"
+    },
+    {
+      "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-23",
+      "source": "Reconstructed 2026-10-23 with explicit PO permission for exactly this file (decision tile batch 8, row 17). The original item file has no git history; this text is derived 1:1 from the acceptance points in the header of plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs (ALF-C-P21-05 / AC-166).",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.draft-phase-blocks-commit-and-unstage-of-po-concept-files",
@@ -6089,6 +6109,16 @@
       "closureRepository": "self",
       "closureCommit": "01d2c3c06780bd4e9553767e0cd56a076c16c377",
       "closureEvidence": "backlog/items/2026-08-08-immutable-manifest-entries-can-be-rebound-with-no-amendment-record.md"
+    },
+    {
+      "id": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-23",
+      "source": "Reconstructed from the pin header, PO permission 2026-10-23, for exactly this file (decision tile batch 12, row 37). The original item file has no public text; this text is derived 1:1 from the header and the cases of plugins/pipeline-core/lib/pins/implementation-without-dispatch-escapes-review-coverage.test.mjs (ALF-C-P14-03, AC-204).",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home",
