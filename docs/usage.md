@@ -24,6 +24,9 @@ need to rediscover it.
 A trust anchor is not a routine onboarding input. Prepare one only when the
 project deliberately configures a human decision gate that requires the
 signature path; see [the one-time human-approval key setup](../SETUP.md#human-approval-key-one-time-setup).
+If the trust-anchor step stops with `TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE`,
+its `reason` names the unusable home-directory value (or says that no home
+directory is set) and the repair.
 
 A refusal, recovery result, or restart boundary is also an action contract.
 Use its named public recovery step; do not edit generated state or guard files
@@ -212,6 +215,14 @@ Do not use `chat` for security-sensitive, regulated, production-critical,
 financially consequential, or otherwise valuable repositories. Tests, action
 bindings, and other safety rules still apply, but none turn the chat answer
 into an attestation.
+
+In chat mode, `pipeline-state.mjs approve-push` run from a plain shell in a
+project that has an initialised session-authority catalogue is refused with
+`SDC-AUTHORITY-UNAVAILABLE: state-push-source-requester`, because a shell binds
+no host requester. No approval is recorded. The refusal states the cause and the
+runnable repair: the signature route, that is, set `gates.push_approval` to
+`signature` and run `approve-push` with `--proof-request`, `--proof-authority`
+and `--proof`, as in [the push and release flow](push-release-flow.md).
 
 ## Assess architecture adoption in an existing project
 
