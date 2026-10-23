@@ -12,7 +12,13 @@ import { existsSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, u
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { continuityAuthorityRepository, observeSessionCleanupState } from "./onboarding-continuity.mjs";
+import {
+  applyOrphanSessionCleanupBindingRelease,
+  continuityAuthorityRepository,
+  observeSessionCleanupState,
+  planOrphanSessionCleanupBindingRelease,
+  readOnboardingSessionCleanupBinding,
+} from "./onboarding-continuity.mjs";
 import {
   inspectSessionAuthorityRegistryRead,
   releaseLostSessionAuthorityMember,
@@ -31,6 +37,7 @@ import {
   applyRecoveryInFreshProcess,
   createLegacyLayoutFixture,
   invokeCleanupCli,
+  migrateToNeutral,
   sessionCleanupInFreshProcess,
   writeHistoricLegacyBinding,
 } from "./test-session-cleanup-requester-fixture.mjs";
@@ -297,6 +304,63 @@ test("D44 a lost binding on a root that never had a session-authority registry r
     assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "absent" });
     assert.equal(existsSync(catalogue), false);
     assert.equal(existsSync(join(registryRoot(root), "releases")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// D73 (E5b): the ordinary orphan release runs the registry member step FIRST and deletes the private binding second. A crash
+// between the two leaves the member released and the binding present; rerunning the same release plans `ready` again, finds
+// the receipt, the member step returns `none` for the already released member, and the binding delete completes.
+function discardFeatureState(root) {
+  const statePath = join(root, "project", "pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  const featureId = state.activeFeature.id;
+  state.discardedFeatures = [{
+    id: featureId, planPath: state.activeFeature.planPath, phaseAtDiscard: state.activeFeature.phase,
+    discardedAt: "2026-09-20T08:00:00.000Z", discardedBy: "PO", reason: "crash recovery", forCommit: null,
+  }];
+  delete state.activeFeature;
+  delete state.continuity;
+  state.planApproved = false;
+  state.updatedAt = "2026-09-20T08:00:00.000Z";
+  const bytes = Buffer.from(`${JSON.stringify(state, null, 2)}\n`);
+  return { statePath, featureId, bytes, sha256: createHash("sha256").update(bytes).digest("hex") };
+}
+
+test("D73 E5b: a crash between the member release and the binding delete is recovered by rerunning the orphan release", () => {
+  const root = createLegacyLayoutFixture({ prefix: "lost-binding", name: "orphan-crash-after-member", goal: "Test orphan release crash recovery" });
+  try {
+    migrateToNeutral(root);
+    const started = invokeCleanupCli(["start", "--repo", root, "--session", "session-orphan-crash-after-member"], {});
+    assert.equal(started.code, 0);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    const tuple = readOnboardingSessionCleanupBinding({ rootDir: root }).sessionCleanup;
+    assert.equal(tuple.sessionId, started.output.sessionId);
+    unlinkSync(loadSessionDescriptor(root, started.output.sessionId, { expectedDescriptorSha256: started.output.descriptorSha256 }).path);
+    const discard = discardFeatureState(root);
+    const plan = planOrphanSessionCleanupBindingRelease({
+      rootDir: root, by: "PO", reason: "crash recovery", featureId: discard.featureId, expectedStateAfterSha256: discard.sha256,
+      deps: { now() { return "2026-09-20T08:00:01.000Z"; } },
+    });
+    assert.equal(plan.status, "ready");
+    writeFileSync(discard.statePath, discard.bytes);
+    assert.deepEqual(releaseTerminalsIfAny(root), []);
+
+    // The process "dies" after the member release and before the binding delete.
+    assert.throws(() => applyOrphanSessionCleanupBindingRelease({
+      plan, expectedPlanSha256: plan.planSha256,
+      deps: { beforeBindingDelete() { throw new Error("simulated crash between the member release and the binding delete"); } },
+    }), (error) => error.code === "SESSION-CLEANUP-ORPHAN-RELEASE-WRITE" && error.committed === true);
+    assert.equal(existsSync(bindingPath), true);
+    assert.equal(releaseTerminalsIfAny(root).length, 1);
+
+    const rerun = applyOrphanSessionCleanupBindingRelease({ plan, expectedPlanSha256: plan.planSha256 });
+    assert.equal(rerun.status, "released");
+    assert.equal(rerun.receipt.stateSha256, discard.sha256);
+    assert.equal(existsSync(bindingPath), false);
+    // The rerun released no second member and left the registry strictly readable.
+    assert.equal(releaseTerminalsIfAny(root).length, 1);
+    assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository: inspectSignedDescriptorCustodyRepository(root) }), { status: "readable" });
+    assert.deepEqual(releaseLostMember(root, tuple), { status: "none" });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
