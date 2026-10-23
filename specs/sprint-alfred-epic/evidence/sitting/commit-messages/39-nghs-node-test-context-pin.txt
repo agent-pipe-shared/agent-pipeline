@@ -1,0 +1,7 @@
+test(host-state): pin that a governed delivery check verdict ignores an inherited NODE_TEST_CONTEXT
+
+The pin is green only with the protected fix of the previous step; it was
+held back from main until then.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

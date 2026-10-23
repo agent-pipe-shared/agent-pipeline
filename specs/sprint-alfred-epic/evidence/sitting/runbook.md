@@ -316,3 +316,21 @@ node harness/scripts/check-verify-suite-registration.mjs
 git add -- docs/product-capability-inventory.json
 git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/37-register-decision-round-inventory.txt -- docs/product-capability-inventory.json
 ```
+
+## 38 PRO K120 governed delivery check ignores an inherited NODE_TEST_CONTEXT [clone k120]
+One line in plugins/pipeline-core/lib/native-goldfish-host-state.mjs plus the suite registration of the new pin. Verified to apply (plain and 3-way) on the state after step 37. Run after 37 (verify-suites.json is touched by 36 as well).
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k120-nghs-node-test-context-protected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k120-nghs-node-test-context-protected.diff
+git add -- plugins/pipeline-core/lib/native-goldfish-host-state.mjs harness/verify-suites.json
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/38-nghs-node-test-context-protected.txt -- plugins/pipeline-core/lib/native-goldfish-host-state.mjs harness/verify-suites.json
+```
+
+## 39 UN K120 pin
+The pin is green only with step 38 applied.
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k120-nghs-pin-unprotected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k120-nghs-pin-unprotected.diff
+git add -- plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/39-nghs-node-test-context-pin.txt -- plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs
+```

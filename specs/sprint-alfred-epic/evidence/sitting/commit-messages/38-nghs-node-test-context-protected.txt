@@ -1,0 +1,16 @@
+fix(host-state): keep a governed delivery check verdict independent of an inherited NODE_TEST_CONTEXT
+
+Under `node --test <file>` the outer runner sets NODE_TEST_CONTEXT=child-v8.
+executeGovernedItemDeliveryChecks built the check child's environment with
+agyHostGitEnvironment (strips GIT_* only), so a nested `node --test <check>`
+inherited it, exited 0 with empty output although its test failed, and the
+check was recorded as SQ-TARGETED-CHECKS-PASSED (NGHS09 and NGHS13 red, 37/39).
+
+Drop NODE_TEST_CONTEXT from the check child's environment at the single spawn
+site, next to the existing PIPELINE_VERIFY_CASE_COMPLETION_* deletions. The
+shared builder is left untouched so its git callers keep their behaviour.
+Register the pin governed-check-child-ignores-inherited-node-test-context
+(committed separately) in harness/verify-suites.json.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
