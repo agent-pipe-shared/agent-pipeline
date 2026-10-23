@@ -213,13 +213,22 @@ for (const command of mutatingChains) {
   });
 }
 test('AC-181 residual: a chain with one mutating stash verb stays in the git-working-tree-write lane and is refused in draft',
-  { todo: 'RED: an `&&` chain is outside the closed grammar, so no git-working-tree-write target is extracted and the draft lane admits it (null); the fix site is the raw-token fallback of extractShellWriteTargets in lib/protected-test-paths.mjs, not changed here' },
   () => {
     for (const command of mutatingChains) {
       assert.ok(targetsOf(command).some(t => t.lane === 'git-working-tree-write'), 'must name the write lane: ' + command);
       assert.equal(devPlanShellRefusalHit(command, fixture, deps)?.verdict, 'block', command);
     }
   });
+
+test('AC-181 residual: negative controls - a mutating stash verb is a write in any chain operator or position, a reader-only chain is not', () => {
+  for (const command of ['git stash list || git stash pop', 'git stash list; git stash drop', 'git status && git stash push',
+    'git -C . stash list && git stash pop', 'git stash show && git stash clear']) {
+    assert.ok(targetsOf(command).some(t => t.lane === 'git-working-tree-write'), 'must name the write lane: ' + command);
+  }
+  for (const command of readerChains) {
+    assert.deepEqual(targetsOf(command), [], command);
+  }
+});
 
 // perl/ruby in-place edit (-i[SUFFIX]) is the same family as `sed -i`: the real file operand must be a write candidate.
 for (const interpreter of ['perl', 'ruby']) {
@@ -231,7 +240,6 @@ for (const interpreter of ['perl', 'ruby']) {
     assert.equal(hit?.verdict, 'block');
   });
   test('AC-181 residual: `' + interpreter + ' -i.bak -pe` names the real file operand as a write-command candidate, like `sed -i.bak`',
-    { todo: 'RED: the glued-suffix in-place spelling is not recognised in the parsed lane (extractShellWriteTargets returns no target); the fix site is the in-place option handling in lib/protected-test-paths.mjs, not changed here' },
     () => {
       assert.ok(writeCommandCandidates(`${interpreter} -i.bak -pe 's/a/b/' ${F}`).includes(F));
     });

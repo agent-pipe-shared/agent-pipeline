@@ -414,12 +414,23 @@ test("AC-201 residual: `git apply --check <patch>` (validation only) names no wr
 });
 
 test("AC-201 residual: `git apply --check --reverse <patch>` is a read-only check and is admitted in either flag order",
-  { todo: "RED: the classifier faults with 'mutating git apply has unbound patch targets' for a --check form that also carries --reverse; fix site is the git apply grammar in protected-test-paths.mjs / guard grammar (protected), not changed here" },
   () => {
     for (const command of ["git apply --check --reverse scratch/p.patch", "git apply --reverse --check scratch/p.patch"]) {
       assert.deepEqual(applyTargets(command), [], command);
     }
   });
+
+test("AC-201 residual: a --reverse check mixed with a real apply, or an ambiguous option beside it, stays mutating", () => {
+  for (const command of [
+    "git apply --check --reverse scratch/p.patch && git apply scratch/p.patch",
+    "git apply --check --reverse scratch/p.patch && git apply --reverse scratch/p.patch",
+    "git apply --reverse --check --reverse scratch/p.patch",
+    "git apply --reverse --whitespace=error --check scratch/p.patch",
+    "git apply --check --reverse --index scratch/p.patch",
+  ]) {
+    assert.throws(() => applyTargets(command), /mutating git apply/u, command);
+  }
+});
 
 test("AC-201 residual: plain `git apply <patch>` (and --reverse without --check) stays mutating, never admitted as a check", () => {
   for (const command of ["git apply scratch/p.patch", "git apply --reverse scratch/p.patch"]) {
