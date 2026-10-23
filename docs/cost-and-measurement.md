@@ -44,7 +44,22 @@ quality and recovery as well as speed. Subscription allowance and model access
 vary by provider, plan and task, so these repository observations cannot
 predict your bill or plan usage.
 
-## 0.7 verification measurements
+## Proposed item and waiting measurements
+
+For item-owned delivery (one Goldfish per complete outcome, see
+[parallel work](parallel-work.md)), record each outcome's dispatch, tested
+delivery, integration and closure times; distinguish active work from waiting
+for a colliding file, integration, review or human decision. Keep batch
+identity, correction rounds, targeted-check executions and requalification
+reasons with the actual candidate. These are proposed measurements, not
+collected results. Compare identical original criteria and outcomes before
+claiming fewer handoffs, shorter item closure or less waiting. No performance
+guarantee follows from the new policy.
+
+## Maintainer reference: 0.7 verification measurements
+
+This subsection is for maintainers of the plugin; a consuming project does not
+need it to read the figures above.
 
 Each new exact-candidate Verify receipt can record its selected pool width,
 journal wall duration, executed and reused suite-duration sums, and counts for
@@ -63,14 +78,3 @@ consuming project's full agent workflow.
 The Greenfield runs are too heterogeneous to establish a cross-runner cost
 ranking or a representative consumer-overhead estimate. Comparable
 multi-runner task telemetry is still needed before making those claims.
-
-
-## Proposed item and waiting measurements
-
-For item-owned EGM, record each outcome's dispatch, tested delivery, integration
-and closure times; distinguish active work from waiting for a colliding file,
-integration, review or human decision. Keep batch identity, correction rounds,
-targeted-check executions and requalification reasons with the actual candidate.
-These are proposed measurements, not collected results. Compare identical
-original criteria and outcomes before claiming fewer handoffs, shorter item
-closure or less waiting. No performance guarantee follows from the new policy.
