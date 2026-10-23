@@ -169,7 +169,8 @@ Advisor and Critic export consent is not an onboarding precondition; see
 [private review export](usage.md#private-review-export). Whether the Advisor may
 receive repository data depends on the recorded `advisor_export.consent`
 (`approved` or `declined`), which the onboarding Driver asks for explicitly;
-this guide does not state a default for a missing field. Do not run a
+nothing is exported without a recorded consent, and this guide does not state a
+default for a missing field. Do not run a
 consultation merely to activate or bootstrap.
 
 ## Legacy consumer with no projections

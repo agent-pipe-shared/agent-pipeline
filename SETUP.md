@@ -413,7 +413,8 @@ node "<plugin-root>/scripts/po-human-approval.mjs" approve-all --repo-root "$REP
 Passkey/WebAuthn, IAM/hardware-key adapters, and remote provisional codes are
 future adapter work, not current CLI features. A code pasted into the same agent
 chat is visible to that agent and cannot replace final local proof for an
-irreversible action. See [PO approval](docs/po-human-approval.md).
+irreversible action. Background for maintainers, not a required step:
+[PO approval](docs/po-human-approval.md).
 
 ### Antigravity (Agy): workspace-local binding
 
@@ -525,6 +526,11 @@ with `--refresh`; on its own it is refused with a repair. After the refresh,
 `/pipeline-core:pipeline-start` of the new session reports it). `agy plugin
 list` and `plugins.json` are not proof of what is loaded, and neither is the
 installer's readback, which is a physical diagnostic only.
+
+**Inert outside opted-in repositories.** A global install acts only in
+repositories that opted in. Outside them the hooks are inert: no blocking, no
+injected instructions, no writes. The one exception is the destructive-git
+protection, which stays active everywhere.
 
 **Node.js on the host's PATH.** The pipeline hooks need the Agy host to resolve
 `node`; a desktop or service launcher may have a different PATH from an
@@ -694,7 +700,8 @@ write.
 
 Whether the Advisor may receive repository data is decided by the recorded
 `advisor_export.consent` (`approved` or `declined`) in `pipeline.user.yaml`;
-the onboarding Driver asks for it explicitly, and `declined` creates no advisor
+the onboarding Driver asks for it explicitly, nothing is exported without a
+recorded consent, and `declined` creates no advisor
 export, child launch, or receipt (see
 [Advisor export consent](docs/v3-consumer-onboarding.md#advisor-export-consent)
 for a missing field). To review that boundary, run:
