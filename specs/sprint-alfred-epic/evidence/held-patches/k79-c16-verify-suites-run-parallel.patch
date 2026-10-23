@@ -1,0 +1,17 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 391465c75..26003adc7 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3742,6 +3742,12 @@
+       "file": "plugins/pipeline-core/lib/pins/partial-readiness-names-the-authority-restore-when-the-committed-bytes-match.test.mjs",
+       "invariantPinned": "The inspect output and the reopen-design guidance name the exact authority restore command first when an edited bound PRD or Spec still has committed bytes equal to the approved digest, and name nothing when the committed bytes differ or the working bytes already equal the digest (D31, D137, D141, AC-115)",
+       "nonOverlapNote": "Unique cases: the restore advice in the partial-readiness inspect text"
++    },
++    {
++      "name": "run-parallel-tests",
++      "file": "scripts/run-parallel.test.mjs",
++      "invariantPinned": "The parallel candidate runner runs the exact committed HEAD of a clean source, refuses a source with an uncommitted new case unless told to leave it out, and survives a rewritten history in its reused worker clone",
++      "nonOverlapNote": "Unique test suite for scripts/run-parallel.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
+     }
+   ]
+ }
