@@ -55,6 +55,7 @@ export function runOrphanSessionAuthorityMemberStep({
   recheck = () => {},
   releaseBinding = () => {},
   codePrefix = "SESSION-CLEANUP-ORPHAN-RELEASE",
+  rerun = "the same orphan release",
   deps = {},
 } = {}) {
   const api = {
@@ -71,7 +72,7 @@ export function runOrphanSessionAuthorityMemberStep({
   let root = "<repository root>";
   let stage = boundary === null ? "open" : "inside";
   const repairFor = (error) => (typeof error?.repair === "string" ? error.repair
-    : `node ${REPAIR_SCRIPT} inspect --root ${root}, then rerun the same orphan release (it is replay-safe once its receipt exists)`);
+    : `node ${REPAIR_SCRIPT} inspect --root ${root}, then rerun ${rerun} (it is replay-safe once its receipt exists)`);
   const refuse = (suffix, message, error) => {
     throw new OrphanMemberStepError(`${codePrefix}-${suffix}`, message, repairFor(error));
   };
