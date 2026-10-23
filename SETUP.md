@@ -327,6 +327,13 @@ begins. For a material feature, it also follows the V3 profile and advisory
 rules before writable work. A reminder hook is not a substitute for the
 bootstrap itself.
 
+If the bootstrap reports `hook-refresh-required`, a mandatory git hook snapshot
+in the repository is stale. `node <plugin-root>/scripts/clone-hook-readiness.mjs
+--root <project-root> --apply` installs missing mandatory hooks and also
+refreshes stale ones. If a refresh fails, it reports
+`HOOK-READINESS-REFRESH-FAILED` and names the command to repair it,
+`refresh-mandatory-hooks.mjs --root <project-root>`.
+
 <a id="c-bring-an-existing-repository-under-the-pipeline"></a>
 
 ### Existing repository checklist
