@@ -1,5 +1,7 @@
 # Pipeline-Flow — der V3-Optionenführer
 
+> _Gekürzte deutsche Lesefassung: Der vollständige Text, etwa zum Handover-Größenlimit und zu den Host-Grenzen, steht in [PIPELINE_FLOW.md](PIPELINE_FLOW.md)._
+
 Diese Datei ist der **eine gepflegte visuelle Leitfaden für den nutzerseitigen
 V3-Ablauf**. Sie hilft dir, einen Weg zu wählen und zu verstehen, wer was tut.
 Sie erlaubt nicht, ein Gate zu überspringen oder ein Projekt zu verändern. Das
@@ -37,10 +39,74 @@ Bestätige zuerst das aktive Profil für diese Aufgabe und nutze dann vor der
 Lieferarbeit `/pipeline-core:pipeline-start`. Seine Bestätigungszeile ist
 der Bootstrap-Nachweis: Sie validiert V3-Quelle und Runtime-Projektion,
 Kalibrierung, anwendbaren Status und das verfügbare Verify-Gate. Sie nutzt Profil
-und Phase der aktiven Aufgabe; ein angefragtes Modell ist kein Nachweis des
-tatsächlich gelaufenen Modells.
+und Phase der aktiven Aufgabe.
 
 ## Die Hauptreise
+
+```mermaid
+flowchart LR
+    SP[Freigegebene aktuelle Spec] --> PF[Preflight: Route, Authority, Kapazität, Scope]
+    PF --> G[Ein Goldfish: vollständiges Ergebnis, Tests, Code und gezielte Korrekturen]
+    G --> CM[Koordinator committet sauberen Kandidaten]
+    CM --> VE[Ein konfigurierter Verify-Befehl]
+    VE -->|grüner Nachweis| CR[Frischer lesender Critic]
+    VE -->|roter Nachweis| RE[Eingeordnete Recovery]
+    CR -->|klar / Disposition| FV[Finales Full Verify zum Review]
+    FV -->|grün| CO[Close]
+    FV -->|rot| RE
+    CR -->|Korrektur| RE
+    RE -->|zulässige Korrektur| PF
+```
+
+Der vollständige Weg mit allen optionalen Zweigen ist das Diagramm in
+[Abschnitt 3](#3-in-unabhängig-prüfbaren-paketen-liefern).
+
+Die Pfeile versprechen nicht, dass jede Änderung jede Box besucht. Die Tabellen
+sagen, wann ein Zweig existiert, wer ihn besitzt, welcher Nachweis ihn real macht
+und wo er wieder einmündet.
+
+Skills machen Bootstrap, Beratung, Observation Intake, Review und Close
+auffindbar; ein Skill genehmigt weder Plan noch Commit oder Release. Eine
+V3-Route benennt Runner, Pflichtnachweis und Verhalten bei Nichtverfügbarkeit.
+Prüfe ihre tatsächliche Verfügbarkeit auf dem aktuellen Host: eine deklarierte
+Route ist noch kein erfolgreicher Dispatch, und ein angefragtes Modell belegt
+nicht das effektiv gelaufene Modell. Die englische Fassung enthält die
+[ausführliche Routen- und Evidenzgrenze](PIPELINE_FLOW.md#1-confirm-the-v3-profile-before-bootstrap).
+
+## 1. Zuerst das V3-Profil wählen
+
+| Profil | Einstieg, wenn | Owner | Nachweis / Schutz | Wiedereinstieg oder Stopp |
+|---|---|---|---|---|
+| `epic` | Die Arbeit Architektur, mehrere Blöcke oder ein breites koordiniertes Ergebnis umfasst. | Elephant; der Mensch entscheidet materiellen Scope. | Registrierte V3-`epic`-Route sowie modellfreier V2-Capability-Status und Assurance. Beratung erfolgt nur für eine konkrete Frage. | Direkt zur Triage. `unknown` oder `unavailable` dokumentiert den Capability-Status; es ist weder ein Bootstrap-Timeout noch ein Beratungsergebnis. |
+| `feature` | Eine begrenzte Produktänderung trotzdem normale Design- und Lieferdisziplin braucht. | Elephant. | Registrierte V3-`feature`-Route sowie modellfreier V2-Capability-Status und Assurance. Beratung erfolgt nur für eine konkrete Frage. | Direkt zur Triage. SessionStart, Resume und Compact starten keinen Advisor. |
+| `mini` | Es wirklich ein kleines, eng begrenztes Feature oder ein Hotfix ist. | Elephant. | V3-`mini`-Route; Beratung ist absichtlich deaktiviert. Die leichte Grenze umfasst etwa fünf Dateien, keine Guardrail-/Canon-Dateien und keine neue Abhängigkeit. | Leichten Pfad fortsetzen. Wächst der Scope oder erscheint eine geschützte Oberfläche, zu `feature` oder `epic` eskalieren und den vollen Pfad erneut betreten. |
+
+Das Profil kommt aus aktivem Feature und Aufgabenform, nicht aus einem alten
+`advisor`-, `design-first`- oder `speed`-Label. Das sind keine V3-Profile.
+
+## 2. Umfang von Design und Review entscheiden
+
+| Entscheidung | Einstiegsbedingung | Owner | Nachweis | Wiedereinstieg |
+|---|---|---|---|---|
+| Optionale Design-Phase | Problem, Alternativen, User Experience, Architektur oder Aufgabenschnitt brauchen bewusste Exploration. | Elephant; der Mensch entscheidet materielle Abwägungen. | Schriftliche Optionen, gewählte Richtung, Nicht-Ziele und Akzeptanzkriterien. | Rigor-/Risiko-Triage, dann PRD/Spec. |
+| Rigor 0 | Eine echte kleine, reversible Änderung ohne Architektur-, Schema-, öffentliche API-, Test-, Guardrail-, Abhängigkeits- oder Security-Oberflächenwirkung. | Elephant. | Kurzes begrenztes Briefing und normaler Verify-Nachweis. | Execution-Preflight; kein voller PRD-Pfad, außer das Risiko verlangt ihn trotzdem. |
+| Rigor 1 | Eine normale Änderung braucht eine Delta-Spec mit prüfbaren Akzeptanzkriterien. | Elephant. | Aktuelles PRD/Spec und nötigenfalls ausdrückliche Freigabe. | Readiness/Freigabe, dann Execution. |
+| Rigor 2 | Architektur-, Guardrail-, Core-Contract- oder sonst substanzielle Arbeit. | Elephant und Mensch am Freigabe-Gate. | Gepflegte Spec, verpflichtendes Readiness-Ergebnis, ausdrückliche PRD-Freigabe und aktuelle Bindungen. | Execution erst nach allen erforderlichen Nachweisen. |
+| Hohes Risiko | Sensible Security-, Guardrail-, Architektur-, irreversible, kostspielige oder extern sichtbare Wirkung — unabhängig von Zeilenzahl. | Elephant klassifiziert; Mensch klärt unklare Stakes. | Festgehaltenes Risiko, stärkere Critic-Route und konfigurierte Security-Nachweise. | Critic- und menschliche Gates gelten vor Close. |
+
+**PRD, Spec und Readiness.** Ein PRD beschreibt Produktabsicht; eine Spec den
+implementierbaren Vertrag und die Akzeptanzkriterien. Ausdrückliche menschliche
+PRD-Freigabe ist bei Rigor 1 oder 2 sowie bei hohem Risiko Pflicht. Ein
+Readiness-Review ist bei Rigor 2, Architektur-/Guardrail-/Core-Contract-Arbeit
+oder hohem Risiko Pflicht; sonst kann der Elephant es wählen. Ein frischer
+lesender Reviewer muss das Dokument allein verstehen und umsetzen können. Lücken
+gehen zurück in die Spec, dann prüft ein *neuer* Reviewer erneut. Weder eine
+optionale Readiness-Entscheidung noch ein `mini`-Profil umgehen eine verpflichtende
+Freigabe.
+
+## 3. In unabhängig prüfbaren Paketen liefern
+
+Der vollständige Weg von der Absicht bis zur abgeschlossenen Änderung:
 
 ```mermaid
 flowchart TD
@@ -96,66 +162,6 @@ flowchart TD
     PO -->|neue Richtung freigegeben| T
 ```
 
-Die Pfeile versprechen nicht, dass jede Änderung jede Box besucht. Die Tabellen
-sagen, wann ein Zweig existiert, wer ihn besitzt, welcher Nachweis ihn real macht
-und wo er wieder einmündet.
-
-Skills machen Bootstrap, Beratung, Observation Intake, Review und Close
-auffindbar; ein Skill genehmigt weder Plan noch Commit oder Release. Eine
-V3-Route benennt Runner, Pflichtnachweis und Verhalten bei Nichtverfügbarkeit.
-Prüfe ihre tatsächliche Verfügbarkeit auf dem aktuellen Host: eine deklarierte
-Route ist noch kein erfolgreicher Dispatch, und ein angefragtes Modell belegt
-nicht das effektiv gelaufene Modell. Die englische Fassung enthält die
-[ausführliche Routen- und Evidenzgrenze](PIPELINE_FLOW.md#1-confirm-the-v3-profile-before-bootstrap).
-
-## 1. Zuerst das V3-Profil wählen
-
-| Profil | Einstieg, wenn | Owner | Nachweis / Schutz | Wiedereinstieg oder Stopp |
-|---|---|---|---|---|
-| `epic` | Die Arbeit Architektur, mehrere Blöcke oder ein breites koordiniertes Ergebnis umfasst. | Elephant; der Mensch entscheidet materiellen Scope. | Registrierte V3-`epic`-Route sowie modellfreier V2-Capability-Status und Assurance. Beratung erfolgt nur für eine konkrete Frage. | Direkt zur Triage. `unknown` oder `unavailable` dokumentiert den Capability-Status; es ist weder ein Bootstrap-Timeout noch ein Beratungsergebnis. |
-| `feature` | Eine begrenzte Produktänderung trotzdem normale Design- und Lieferdisziplin braucht. | Elephant. | Registrierte V3-`feature`-Route sowie modellfreier V2-Capability-Status und Assurance. Beratung erfolgt nur für eine konkrete Frage. | Direkt zur Triage. SessionStart, Resume und Compact starten keinen Advisor. |
-| `mini` | Es wirklich ein kleines, eng begrenztes Feature oder ein Hotfix ist. | Elephant. | V3-`mini`-Route; Beratung ist absichtlich deaktiviert. Die leichte Grenze umfasst etwa fünf Dateien, keine Guardrail-/Canon-Dateien und keine neue Abhängigkeit. | Leichten Pfad fortsetzen. Wächst der Scope oder erscheint eine geschützte Oberfläche, zu `feature` oder `epic` eskalieren und den vollen Pfad erneut betreten. |
-
-Das Profil kommt aus aktivem Feature und Aufgabenform, nicht aus einem alten
-`advisor`-, `design-first`- oder `speed`-Label. Das sind keine V3-Profile.
-
-## 2. Umfang von Design und Review entscheiden
-
-| Entscheidung | Einstiegsbedingung | Owner | Nachweis | Wiedereinstieg |
-|---|---|---|---|---|
-| Optionale Design-Phase | Problem, Alternativen, User Experience, Architektur oder Aufgabenschnitt brauchen bewusste Exploration. | Elephant; der Mensch entscheidet materielle Abwägungen. | Schriftliche Optionen, gewählte Richtung, Nicht-Ziele und Akzeptanzkriterien. | Rigor-/Risiko-Triage, dann PRD/Spec. |
-| Rigor 0 | Eine echte kleine, reversible Änderung ohne Architektur-, Schema-, öffentliche API-, Test-, Guardrail-, Abhängigkeits- oder Security-Oberflächenwirkung. | Elephant. | Kurzes begrenztes Briefing und normaler Verify-Nachweis. | Execution-Preflight; kein voller PRD-Pfad, außer das Risiko verlangt ihn trotzdem. |
-| Rigor 1 | Eine normale Änderung braucht eine Delta-Spec mit prüfbaren Akzeptanzkriterien. | Elephant. | Aktuelles PRD/Spec und nötigenfalls ausdrückliche Freigabe. | Readiness/Freigabe, dann Execution. |
-| Rigor 2 | Architektur-, Guardrail-, Core-Contract- oder sonst substanzielle Arbeit. | Elephant und Mensch am Freigabe-Gate. | Gepflegte Spec, verpflichtendes Readiness-Ergebnis, ausdrückliche PRD-Freigabe und aktuelle Bindungen. | Execution erst nach allen erforderlichen Nachweisen. |
-| Hohes Risiko | Sensible Security-, Guardrail-, Architektur-, irreversible, kostspielige oder extern sichtbare Wirkung — unabhängig von Zeilenzahl. | Elephant klassifiziert; Mensch klärt unklare Stakes. | Festgehaltenes Risiko, stärkere Critic-Route und konfigurierte Security-Nachweise. | Critic- und menschliche Gates gelten vor Close. |
-
-**PRD, Spec und Readiness.** Ein PRD beschreibt Produktabsicht; eine Spec den
-implementierbaren Vertrag und die Akzeptanzkriterien. Ausdrückliche menschliche
-PRD-Freigabe ist bei Rigor 1 oder 2 sowie bei hohem Risiko Pflicht. Ein
-Readiness-Review ist bei Rigor 2, Architektur-/Guardrail-/Core-Contract-Arbeit
-oder hohem Risiko Pflicht; sonst kann der Elephant es wählen. Ein frischer
-lesender Reviewer muss das Dokument allein verstehen und umsetzen können. Lücken
-gehen zurück in die Spec, dann prüft ein *neuer* Reviewer erneut. Weder eine
-optionale Readiness-Entscheidung noch ein `mini`-Profil umgehen eine verpflichtende
-Freigabe.
-
-## 3. In unabhängig prüfbaren Paketen liefern
-
-```mermaid
-flowchart LR
-    SP[Freigegebene aktuelle Spec] --> PF[Preflight: Route, Authority, Kapazität, Scope]
-    PF --> G[Ein Goldfish: vollständiges Ergebnis, Tests, Code und gezielte Korrekturen]
-    G --> CM[Koordinator committet sauberen Kandidaten]
-    CM --> VE[Ein konfigurierter Verify-Befehl]
-    VE -->|grüner Nachweis| CR[Frischer lesender Critic]
-    VE -->|roter Nachweis| RE[Eingeordnete Recovery]
-    CR -->|klar / Disposition| FV[Finales Full Verify zum Review]
-    FV -->|grün| CO[Close]
-    FV -->|rot| RE
-    CR -->|Korrektur| RE
-    RE -->|zulässige Korrektur| PF
-```
-
 Guardrails und die Codex-Host-Bridge sind keine Lieferschritte; sie stehen in
 den [optionalen Ausführungs- und Host-Grenzen](#optionale-ausführungs--und-host-grenzen).
 
@@ -165,9 +171,9 @@ den [optionalen Ausführungs- und Host-Grenzen](#optionale-ausführungs--und-hos
 | Tests im Item | Item-Goldfish. | Testfälle und neue Regressionstests entstehen im selben Kontext wie der Code. | Bestehende Akzeptanzprüfer erhalten; notwendige Änderungen sichtbar begründen und unabhängig prüfen lassen. Assertions auf ursprüngliche Kriterien abbilden; RED durch den Produktfehler belegen. |
 | Implementieren | Item-Goldfish. | Ein vollständiges, unabhängig prüfbares Akzeptanzkriterium oder Backlog-Ergebnis bis zu gezielten Checks und Korrekturen verantworten. | Das Fan-out selbst ist beratend: Der Elephant plant getrennte Dateien, kollidierende Items warten. Die Überlappungsverweigerung ist erzwungen: Der Dispatch-Guard verweigert überlappende Schreibbereiche standardmäßig ([Details](docs/parallel-work.md)). Original-Owner enden nach getesteter Lieferung und Integration. |
 | Kandidaten-Commit | Koordinator oder autorisierter Host nach Prüfung der Rückgabe. | Begrenztes Ergebnis integrieren und vor kandidatengebundenem Verify einen sauberen Commit-Kandidaten schaffen. | Tatsächlichen Commit und Tree festhalten; ein vorgeschlagener Child-Commit oder schmutziger Checkout ersetzt sie nicht. |
-| Verify — Pflicht | Der Koordinator ruft den konfigurierten Evidence-Producer für den committeten Kandidaten auf. | Für Releases fährt der Producer den einen konfigurierten Projektbefehl; dokumentierte grenzbewusste Modi fahren die feste Baseline plus registrierte Befehle für geänderte Bereiche. Der Projektbefehl allein erzeugt keinen Verify-Receipt. | Grün heißt: Der Producer hat ein exaktes maschinell geschriebenes Nachweis-Artefakt für den Kandidaten geschrieben. Rot ist Fehlernachweis, kein Teilerfolg. |
+| Verify — Pflicht | Der Koordinator ruft den konfigurierten Evidence-Producer für den committeten Kandidaten auf. | In den Modi `candidate` und `release` fährt der Producer den einen konfigurierten Projektbefehl; dokumentierte grenzbewusste Modi fahren die feste Baseline plus registrierte Befehle für geänderte Bereiche. Der Projektbefehl allein erzeugt keinen Verify-Receipt. | Grün heißt: Der Producer hat ein exaktes maschinell geschriebenes Nachweis-Artefakt für den Kandidaten geschrieben. Rot ist Fehlernachweis, kein Teilerfolg. |
 | Critic — Pflicht | Frischer lesender Critic; Elephant besitzt die Disposition. | Code und Tests gegen ursprüngliche Kriterien prüfen: ein kohärenter Batch, vor Dispatch festgelegt und nach Integration eingefroren. | Review-Budget, Korrektur-Owner und Einzel-Item-Regel: [Usage](docs/usage.md#deliver-work-after-readiness) (englisch). |
-| Finales Verify — Pflicht für Releases | Der Koordinator führt nach dem substanziellen Critic-Review den vollständigen Evidence-Producer aus. | Der Release-Receipt bindet den reviewten Kandidaten und das konsumierte Critic-Paket; Korrekturen gehen erneut durch das Review. | Vor Close oder Promotion braucht der exakte Commit einen grünen finalen Receipt. |
+| Finales Verify — Pflicht | Der Koordinator führt nach dem substanziellen Critic-Review einmal den vollständigen Evidence-Producer aus; das gehört zu jeder Lieferung, der Modus `release` gilt, wenn ein Release deklariert ist. | Der Receipt im Modus `candidate` (oder `release`) bindet den reviewten Kandidaten und das konsumierte Critic-Paket; Korrekturen gehen erneut durch das Review. | Vor Close oder Promotion braucht der exakte Commit einen grünen finalen Receipt. |
 
 
 Ein Item-Owner behält Analyse, Testvorbereitung, Code und gezielte Korrekturen,
@@ -247,18 +253,14 @@ der [englischen Host-Grenzen-Referenz](PIPELINE_FLOW.md#optional-execution-and-h
 
 Dieser Leitfaden beschreibt den V3-Prozess und seine
 Konfigurationspunkte. Er macht aus einer Repository-Regel keine hostweite
-Durchsetzung, aus einem Governance-Pfad kein IAM, aus einer angefragten Route
-keine beobachtete Modellidentität und aus einem Maschinen-Gate keinen Beweis
-jeder semantischen Eigenschaft.
+Durchsetzung, aus einem Governance-Pfad kein IAM und aus einem Maschinen-Gate
+keinen Beweis jeder semantischen Eigenschaft.
 
-`0.7.0` beschreibt ein noch nicht veröffentlichtes Release, keinen
-installierbaren Tag oder Installationspfad: Nutze die freigegebene veröffentlichte
-Version, prüfe die geladene Host-Version und den Stand im
-[Überblick](docs/overview.md).
+Release-Stand von `0.7.0`: siehe [Überblick](docs/overview.md).
 
-Wo die Dateien liegen: Das optionale Manifest ist `.claude/pipeline.yaml`, die
-Projektkalibrierung liegt auf ihrer aufgelösten Autoritätsstufe
-(`project/pipeline.json`, sonst `.claude/pipeline.json`).
+Das optionale Manifest ist `.claude/pipeline.yaml`; wo die Kalibrierungsdatei
+liegt, steht in
+[SETUP, Schritt 2](SETUP.md#2-complete-project-calibration-after-onboarding).
 
 Normative Details stehen im [Operating Model](docs/operating-model.md). Für
 Adoption und Migration nutze [SETUP.md](SETUP.md) und

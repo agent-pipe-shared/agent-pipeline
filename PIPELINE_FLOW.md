@@ -16,7 +16,8 @@ contract. If this guide disagrees with one of them, use that source.
 
 Bring an outcome in plain language: a bug to fix, a feature to add, or a
 refactor to make safer. The **Elephant** (the main session that dispatches,
-called the Coordinator in the delivery steps) turns it into a bounded written task;
+called the Coordinator in the delivery steps; see the
+[terms](docs/README.md#terms-used-across-these-documents)) turns it into a bounded written task;
 fresh **Goldfish** contexts implement bounded packages; a read-only **Critic**
 checks the result independently. You remain the human decision-maker at the
 approval and escalation points.
@@ -38,64 +39,27 @@ Four terms prevent most confusion:
 Confirm the active profile for this task, then use
 `/pipeline-core:pipeline-start` before delivery work. Its confirmation is bootstrap
 evidence: it validates the V3 source/runtime projection, calibration, applicable
-state, and available verify gate. It uses the active profile and phase; a
-requested model is not proof of the model that actually ran.
+state, and available verify gate. It uses the active profile and phase.
 
 ## The primary journey
 
 ```mermaid
-flowchart TD
-    I[Intent: feature, fix, or refactor] --> P{Confirm active V3 profile}
-    P --> B[Bootstrap session using that profile]
-    B -->|Epic or Feature| A[Model-free Advisor capability preflight]
-    B -->|Mini| T[Triage]
-    A --> T
-    T --> D{Design useful or required?}
-    D -->|yes| DS[Design phase: options, UI when applicable, and acceptance criteria]
-    D -->|no| RR[Rigor and risk recorded]
-    DS --> RR
-    RR --> EL{Epic or Feature?}
-    EL -->|yes| AQ{Concrete Advisor question and reason?}
-    EL -->|no (Mini)| S
-    AQ -->|yes| AC[Demand-bound fresh read-only consultation]
-    AQ -->|no| S
-    AC --> S
-    S[PRD and Spec as required]
-    S --> R{Readiness required or elected?}
-    R -->|yes| RD[Fresh read-only readiness review]
-    RD -->|gaps| S
-    RD -->|ready| G{Explicit human PRD approval required?}
-    R -->|no| G
-    G -->|yes, approved| X[Execution preflight and dispatch]
-    G -->|no, valid fast path| X
-    X --> IM[One Goldfish owns analysis, tests, code and targeted fixes for one outcome]
-    IM --> CM[Coordinator integrates and commits; clean candidate]
-    CM --> V[Configured verify creates machine evidence]
-    V -->|red| RC[Classify and recover]
-    V -->|green| SQ{Security required?}
-    SQ -->|yes| SEC[Security evidence]
-    SQ -->|no| GQ{Governance required?}
-    SEC --> GQ
-    GQ -->|yes| GOV[Guideline or policy evaluation]
-    GQ -->|no| C[Fresh independent Critic]
-    GOV --> C
-    C --> CR[Critic result and disposition]
-    CR -->|correction needed| RC
-    CR -->|clear or disposition recorded| FV[Final full Verify bound to the reviewed candidate]
-    FV -->|red| RC
-    FV -->|green| HA{Human acceptance required?}
-    HA -->|no| CL[Close feature lifecycle]
-    HA -->|yes| HD[Human decision on delivered candidate]
-    HD -->|accepted| CL
-    HD -->|rejected| RC
-    CL --> REL{Release phase declared?}
-    REL -->|yes| RP[Release evidence and human promotion gate]
-    REL -->|no| DONE[Closed change]
-    RP --> DONE
-    RC -->|bounded correction| X
-    RC -->|limit, ambiguity, or conflict| PO[Human course decision or stop]
-    PO -->|approved new direction| T
+flowchart LR
+    SP[Approved current Spec] --> PF[Preflight: route, authority, capacity, scope]
+    PF --> G[One Goldfish: complete outcome, tests, code and targeted fixes]
+    G --> CM[Coordinator commits a clean candidate]
+    CM --> VE[One configured verify command]
+    VE -->|green evidence| CR[Fresh read-only Critic]
+    VE -->|red evidence| RE[Classified recovery]
+    CR -->|clear / disposition| FV[Final full Verify bound to review]
+    FV -->|green| CO[Close]
+    FV -->|red| RE
+    CR -->|correction| RE
+    RE -->|allowed correction| PF
 ```
+
+The full route with every optional branch is the diagram in
+[section 3](#3-deliver-in-independently-checkable-packages).
 
 The arrows do not promise that every change visits every box. The tables state
 when a branch exists, who owns it, the evidence that makes it real, and where it
@@ -159,19 +123,60 @@ a *new* reviewer checks it again. Neither an optional readiness decision nor a
 
 ## 3. Deliver in independently checkable packages
 
+The full route, from intent to a closed change:
+
 ```mermaid
-flowchart LR
-    SP[Approved current Spec] --> PF[Preflight: route, authority, capacity, scope]
-    PF --> G[One Goldfish: complete outcome, tests, code and targeted fixes]
-    G --> CM[Coordinator commits a clean candidate]
-    CM --> VE[One configured verify command]
-    VE -->|green evidence| CR[Fresh read-only Critic]
-    VE -->|red evidence| RE[Classified recovery]
-    CR -->|clear / disposition| FV[Final full Verify bound to review]
-    FV -->|green| CO[Close]
-    FV -->|red| RE
-    CR -->|correction| RE
-    RE -->|allowed correction| PF
+flowchart TD
+    I[Intent: feature, fix, or refactor] --> P{Confirm active V3 profile}
+    P --> B[Bootstrap session using that profile]
+    B -->|Epic or Feature| A[Model-free Advisor capability preflight]
+    B -->|Mini| T[Triage]
+    A --> T
+    T --> D{Design useful or required?}
+    D -->|yes| DS[Design phase: options, UI when applicable, and acceptance criteria]
+    D -->|no| RR[Rigor and risk recorded]
+    DS --> RR
+    RR --> EL{Epic or Feature?}
+    EL -->|yes| AQ{Concrete Advisor question and reason?}
+    EL -->|no (Mini)| S
+    AQ -->|yes| AC[Demand-bound fresh read-only consultation]
+    AQ -->|no| S
+    AC --> S
+    S[PRD and Spec as required]
+    S --> R{Readiness required or elected?}
+    R -->|yes| RD[Fresh read-only readiness review]
+    RD -->|gaps| S
+    RD -->|ready| G{Explicit human PRD approval required?}
+    R -->|no| G
+    G -->|yes, approved| X[Execution preflight and dispatch]
+    G -->|no, valid fast path| X
+    X --> IM[One Goldfish owns analysis, tests, code and targeted fixes for one outcome]
+    IM --> CM[Coordinator integrates and commits; clean candidate]
+    CM --> V[Configured verify creates machine evidence]
+    V -->|red| RC[Classify and recover]
+    V -->|green| SQ{Security required?}
+    SQ -->|yes| SEC[Security evidence]
+    SQ -->|no| GQ{Governance required?}
+    SEC --> GQ
+    GQ -->|yes| GOV[Guideline or policy evaluation]
+    GQ -->|no| C[Fresh independent Critic]
+    GOV --> C
+    C --> CR[Critic result and disposition]
+    CR -->|correction needed| RC
+    CR -->|clear or disposition recorded| FV[Final full Verify bound to the reviewed candidate]
+    FV -->|red| RC
+    FV -->|green| HA{Human acceptance required?}
+    HA -->|no| CL[Close feature lifecycle]
+    HA -->|yes| HD[Human decision on delivered candidate]
+    HD -->|accepted| CL
+    HD -->|rejected| RC
+    CL --> REL{Release phase declared?}
+    REL -->|yes| RP[Release evidence and human promotion gate]
+    REL -->|no| DONE[Closed change]
+    RP --> DONE
+    RC -->|bounded correction| X
+    RC -->|limit, ambiguity, or conflict| PO[Human course decision or stop]
+    PO -->|approved new direction| T
 ```
 
 Guardrails and the Codex host bridge are not delivery steps; they are described
@@ -183,9 +188,9 @@ in the [host-boundary reference](#optional-execution-and-host-boundary-reference
 | Tests within the item | Item Goldfish. | Prepare test cases and add regression tests in the same context as the implementation. | Preserve existing acceptance examiners; expose and justify necessary changes for independent review. Map assertions to original criteria and show product-caused RED evidence. |
 | Implement | Item Goldfish. | Own one complete, independently verifiable acceptance criterion or backlog outcome through targeted checks and fixes. | Fan-out itself is advisory: the Elephant schedules disjoint files and colliding items wait. The overlap refusal is enforced: the dispatch guard refuses overlapping write scopes by default ([details](docs/parallel-work.md)). Original owners end after tested delivery and integration. |
 | Candidate commit | Coordinator or authorized host, after validating the returned package. | Integrate the bounded result and create a clean committed candidate before candidate-bound Verify. | Record the actual commit and tree; a Child's proposed commit or a dirty checkout is not a substitute. |
-| Verify — mandatory | Coordinator invokes the configured evidence producer on the committed candidate. | For release, the producer runs the one configured project command; documented boundary-aware modes run the fixed baseline plus registered changed-area commands. Running the project command alone does not create the Verify receipt. | Green means the producer wrote an exact machine-written evidence artifact for the candidate. Red is evidence of failure, not partial success. |
+| Verify — mandatory | Coordinator invokes the configured evidence producer on the committed candidate. | In `candidate` and `release` modes the producer runs the one configured project command; documented boundary-aware modes run the fixed baseline plus registered changed-area commands. Running the project command alone does not create the Verify receipt. | Green means the producer wrote an exact machine-written evidence artifact for the candidate. Red is evidence of failure, not partial success. |
 | Critic — mandatory | Fresh read-only Critic; Elephant owns disposition. | Review code and tests against original criteria once per coherent batch declared before dispatch and frozen after integration. | Review budget, correction owner and singleton-batch rule: [Usage](docs/usage.md#deliver-work-after-readiness). |
-| Final Verify — mandatory for release | Coordinator runs the configured full evidence producer after the substantive Critic review. | The release-mode receipt binds the reviewed candidate and consumed Critic packet; corrections return through review. | The exact committed candidate needs a passing final receipt before close or promotion. |
+| Final Verify — mandatory | Coordinator runs the configured full evidence producer once after the substantive Critic review; this is part of every delivery; `release` mode is used when a release is declared. | The `candidate`-mode (or `release`-mode) receipt binds the reviewed candidate and consumed Critic packet; corrections return through review. | The exact committed candidate needs a passing final receipt before close or promotion. |
 
 
 One item owner keeps analysis, test preparation, code and targeted fixes together
@@ -320,17 +325,14 @@ that host. It does not imply Claude-style hook delivery or universal enforcement
 ## Support boundary and current scope
 
 This guide describes the V3 process and its configuration points. A repository
-rule is not host-wide enforcement; a governance path is not IAM; a requested
-route is not observed model identity; and a machine gate does not prove every
-semantic property.
+rule is not host-wide enforcement; a governance path is not IAM; and a machine
+gate does not prove every semantic property.
 
-`0.7.0` describes a pending release, not an installable tag or source: use the
-approved published plugin, check the loaded host version, and see the
-[overview](docs/overview.md) for the detailed status.
+Release status of `0.7.0`: see the [overview](docs/overview.md).
 
-Where the files live: the optional manifest is `.claude/pipeline.yaml`, and
-project calibration sits at its resolved authority tier (`project/pipeline.json`,
-else `.claude/pipeline.json`).
+The optional manifest is `.claude/pipeline.yaml`; where the calibration file
+lives is in
+[SETUP step 2](SETUP.md#2-complete-project-calibration-after-onboarding).
 
 For the normative details, read the [Operating Model](docs/operating-model.md).
 For adoption and migration, use [SETUP](SETUP.md) and
