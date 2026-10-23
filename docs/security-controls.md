@@ -1,12 +1,12 @@
 # Security controls
 
-Agent Pipeline provides security-oriented checks and evidence contracts for a delivery candidate. They reduce specific risks; they are not a warranty that a repository, deployment, or organization is secure or compliant.
+Agent-Pipeline provides security-oriented checks and evidence contracts for a delivery candidate. They reduce specific risks; they are not a warranty that a repository, deployment, or organization is secure or compliant.
 
 ## What is checked
 
-The [security control catalog](../governance/security-controls/catalog.json) defines applicable controls, their evidence binding, and waiver expiry. Its NIST SSDF and OWASP ASVS mappings help teams connect a local control to a framework, but the catalog is not an automatically active scanner or runner control. A caller must resolve and evaluate it.
+The security control catalog (`governance/security-controls/catalog.json`, a maintainer source reference in the plugin's own repository, not a file your project has) defines applicable controls, their evidence binding, and waiver expiry. Its NIST SSDF and OWASP ASVS mappings help teams connect a local control to a framework, but the catalog is not an automatically active scanner or runner control. A caller must resolve and evaluate it.
 
-The Verify security scan combines configured adapters for secret detection, dependency vulnerability scanning, static analysis, and license checks. The scanners behind the first three categories are named in [SETUP](../SETUP.md); no license-check tool is named in the public documentation. A skipped adapter is not a pass, and an adapter error fails closed in the completeness result. Scanner findings still have the limits of their rules, available inputs, and execution environment. They do not prove the absence of all vulnerabilities, insecure configuration, or operational exposure.
+The Verify security scan combines configured adapters for secret detection, dependency vulnerability scanning, static analysis, and license checks. The scanners behind the first three categories are named in [SETUP](../SETUP.md); the license check is a built-in control, not a third-party tool. A skipped adapter is not a pass, and an adapter error fails closed in the completeness result. Scanner findings still have the limits of their rules, available inputs, and execution environment. They do not prove the absence of all vulnerabilities, insecure configuration, or operational exposure.
 
 ## Guard enforcement
 
