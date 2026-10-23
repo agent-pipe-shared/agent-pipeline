@@ -942,3 +942,145 @@ test("K106 pin: the queue lib has no stored delivered state and the derived deli
   assert.equal(result.slices.find((entry) => entry.id === "A").status, "done", "done is the one completed-delivery status");
   assert.notEqual(result.slices.find((entry) => entry.id === "B").status, "done");
 });
+
+// --- K142 (Greenfield finding G1): the model check is runner-aware, never removed ---
+
+const codexRouteOf = async (taskRoute) => {
+  const { registeredFunctionalTaskRoutes, functionalTaskRoutesForRunner } = await import("../lib/model-role-route-source.mjs");
+  const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "codex");
+  assert.equal(scoped.ok, true, "the committed registry yields a Codex route source");
+  return scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute);
+};
+const CODEX = ["--runner", "codex"];
+
+test("K142 --runner codex is admitted and the model id is checked against the model the Codex route yields for the role", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { resolveActiveRunner } = await import("./pipeline-start-preflight.mjs");
+  const fx = makeFixture();
+  const route = await codexRouteOf("duty.implement");
+  assert.equal(route.selector.kind, "model-id", "the Codex implement route selects an exact model id");
+  let seen = null;
+  const result = runDispatchBriefing(argvOf(fx, { "--model-id": route.selector.value }, CODEX), depsOf(fx, { observePreflight: (arg) => { seen = arg; return availableObserver(); } }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  const b = result.binding;
+  assert.equal(b.runner, "codex");
+  assert.equal(b.model, route.selector.value);
+  assert.equal(b.effort, route.effort, "the effort of a Codex dispatch is the Codex route's, not the Claude agent definition's");
+  assert.equal(b.nativeAgentType, "worker", "the host's Codex-native briefing shape");
+  assert.equal(b.role, "pipeline-core:goldfish-implementor");
+  assert.equal(b.agentType, "goldfish-implementor", "the read-back binding carries the agent type the host derives from the role");
+  const parsed = parseNativeGoldfishBriefing(result.skeleton);
+  assert.equal(parsed.ok, true, parsed.code);
+  assert.equal(parsed.binding.runner, "codex");
+  assert.equal(parsed.binding.model, route.selector.value);
+  assert.equal(result.skeleton.includes('"agentType"'), false, "the Codex block does not carry the Claude-only agentType key");
+  assert.ok(result.skeleton.includes(`\`${route.selector.value}\``), "field 6 names the route model");
+  assert.equal(resolveActiveRunner({ env: seen.env }), "codex", "the preflight observation is made as the requested runner");
+  assert.equal(seen.cwd, fx.root);
+});
+
+test("K142 a Claude-family model under --runner codex is refused DBG-MODEL-FAMILY with a repair that names the route model and the flag", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const route = await codexRouteOf("duty.implement");
+  const result = runDispatchBriefing(argvOf(fx, {}, CODEX), depsOf(fx));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "DBG-MODEL-FAMILY", result.message);
+  assert.ok(result.message.includes(route.selector.value), `names the model the route selected: ${result.message}`);
+  assert.match(result.message, /repair:/u);
+  assert.match(result.message, /--model-id /u);
+  assert.match(result.message, /--runner/u);
+  assert.equal(result.skeleton, undefined);
+});
+
+test("K142 a Codex route that is unavailable refuses typed with a repair, and a custom route source decides the expected model", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const entry = { taskRoute: "duty.implement", runner: "codex", role: "worker", effort: "high", state: "unavailable", selector: { kind: "model-id", value: "fixture-codex-model" } };
+  const unavailable = runDispatchBriefing(argvOf(fx, { "--model-id": "fixture-codex-model" }, CODEX), depsOf(fx, { codexRoute: () => entry }));
+  assert.equal(unavailable.ok, false);
+  assert.equal(unavailable.code, "DBG-MODEL-ROUTE-UNAVAILABLE", unavailable.message);
+  assert.match(unavailable.message, /repair:/u);
+  assert.match(unavailable.message, /duty\.implement/u);
+  const missing = runDispatchBriefing(argvOf(fx, { "--model-id": "fixture-codex-model" }, CODEX), depsOf(fx, { codexRoute: () => null }));
+  assert.equal(missing.code, "DBG-MODEL-ROUTE-UNAVAILABLE", missing.message);
+  const ok = runDispatchBriefing(argvOf(fx, { "--model-id": "fixture-codex-model" }, CODEX), depsOf(fx, { codexRoute: () => ({ ...entry, state: "default" }) }));
+  assert.equal(ok.ok, true, JSON.stringify(ok).slice(0, 300));
+  assert.equal(ok.binding.model, "fixture-codex-model");
+  const other = runDispatchBriefing(argvOf(fx, { "--model-id": "gpt-other" }, CODEX), depsOf(fx, { codexRoute: () => ({ ...entry, state: "default" }) }));
+  assert.equal(other.code, "DBG-MODEL-FAMILY", other.message);
+  assert.ok(other.message.includes("fixture-codex-model"));
+});
+
+test("K142 each agent type maps to its own Codex duty route", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const asked = [];
+  const deps = depsOf(fx, { codexRoute: (taskRoute) => { asked.push(taskRoute); return { taskRoute, runner: "codex", role: "worker", effort: "high", state: "default", selector: { kind: "model-id", value: "fixture-codex-model" } }; } });
+  for (const type of ["goldfish-implementor", "goldfish-mechanic", "goldfish-deep"]) {
+    const result = runDispatchBriefing(argvOf(fx, { "--agent-type": type, "--model-id": "fixture-codex-model" }, CODEX), deps);
+    assert.equal(result.ok, true, `${type}: ${JSON.stringify(result).slice(0, 300)}`);
+  }
+  assert.deepEqual(asked, ["duty.implement", "duty.mechanic", "duty.deep"]);
+});
+
+test("K142 an unknown runner and a repeated runner flag are refused with a repair", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const unknown = runDispatchBriefing(argvOf(fx, {}, ["--runner", "gpt"]), depsOf(fx));
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.code, "DBG-RUNNER-UNKNOWN", unknown.message);
+  assert.ok(unknown.message.includes("gpt"));
+  assert.match(unknown.message, /repair:/u);
+  assert.match(unknown.message, /claude/u);
+  assert.match(unknown.message, /codex/u);
+  const repeated = runDispatchBriefing(argvOf(fx, {}, [...CODEX, ...CODEX]), depsOf(fx));
+  assert.equal(repeated.code, "DBG-FLAG-REPEATED", repeated.message);
+  const valueless = runDispatchBriefing(argvOf(fx, {}, ["--runner"]), depsOf(fx));
+  assert.equal(valueless.code, "DBG-FLAG-VALUE", valueless.message);
+});
+
+test("K142 the Claude default path is unchanged: no --runner and --runner claude yield the identical skeleton and the preflight is observed exactly as before", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const calls = [];
+  const observe = (arg) => { calls.push(arg); return availableObserver(); };
+  const plain = runDispatchBriefing(argvOf(fx), depsOf(fx, { observePreflight: observe }));
+  const explicit = runDispatchBriefing(argvOf(fx, {}, ["--runner", "claude"]), depsOf(fx, { observePreflight: observe }));
+  assert.equal(plain.ok, true); assert.equal(explicit.ok, true);
+  assert.equal(explicit.skeleton, plain.skeleton);
+  assert.equal(plain.binding.runner, "claude");
+  assert.equal(Object.hasOwn(plain.binding, "nativeAgentType"), false);
+  assert.deepEqual(calls, [{ cwd: fx.root }, { cwd: fx.root }], "the Claude observation passes no runner-specific input");
+});
+
+test("K142 the Claude family refusal names a repair and keeps naming the alias family", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx, { "--model-id": "claude-opus-5" }), depsOf(fx));
+  assert.equal(result.code, "DBG-MODEL-FAMILY");
+  assert.ok(result.message.includes("sonnet"), result.message);
+  assert.match(result.message, /repair:/u);
+  assert.match(result.message, /--model-id/u);
+  assert.match(result.message, /--agent-type/u);
+  assert.match(result.message, /--runner codex/u);
+  assert.match(result.message, /MP-29/u, "the escalation route stays named: only the tool-layer model parameter selects the model");
+});
+
+test("K142 build: a package that names runner codex renders a Codex briefing that parses back and verifies (needs the package-key part of the protected diff)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { verifyGeneratedBriefing } = await buildLib();
+  const route = await codexRouteOf("duty.implement");
+  const { fx, argv } = packageFixture({ runner: "codex", modelId: route.selector.value });
+  const result = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  const parsed = parseNativeGoldfishBriefing(result.text);
+  assert.equal(parsed.ok, true, parsed.code);
+  assert.equal(parsed.binding.runner, "codex");
+  assert.equal(parsed.binding.model, route.selector.value);
+  assert.deepEqual(verifyGeneratedBriefing(result.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+  const claude = packageFixture({ runner: "claude" });
+  const claudeResult = runDispatchBriefing(claude.argv, depsOf(claude.fx));
+  assert.equal(claudeResult.ok, true, JSON.stringify(claudeResult).slice(0, 300));
+  assert.equal(parseNativeGoldfishBriefing(claudeResult.text).binding.runner, "claude");
+});

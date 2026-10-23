@@ -12,7 +12,9 @@
  *
  *   candidateCommit / candidateTree  HEAD of --root (read-only git)
  *   effort + model alias             agents/<type>.md through lib/agent-model-registry.mjs
- *   model                            --model-id, checked against the alias's family
+ *   model                            --model-id, checked against the alias's family; with `--runner codex`
+ *                                    (default `claude`) against the model the Codex route yields for the
+ *                                    role (duty.implement|mechanic|deep of the V3 runner-profile registry)
  *   tool budget                      min(tier cap, maxTurns - 15), the cap read from dispatch-policy
  *   rulesetSha                       the preflight's loaded content identity; when that is
  *                                    unavailable, the installed identity, then the content hash of
@@ -51,6 +53,7 @@ import {
   validateItemDeliveryBriefing,
 } from "../lib/native-goldfish-host-return.mjs";
 import { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } from "../lib/agent-model-registry.mjs";
+import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
 import {
   BRIEFING_BUILD_SCHEMA,
   BriefingPackageRefusal,
@@ -88,7 +91,19 @@ const ACCEPTED_CRITERION_STATUSES = Object.freeze(["explicit-actual-independent-
 const SINGLE_FLAGS = Object.freeze({
   "--root": "root", "--dispatch-id": "dispatchId", "--item": "item", "--agent-type": "agentType",
   "--model-id": "modelId", "--check": "check", "--spec": "spec", "--criterion": "criterion", "--recon-note": "reconNote",
+  "--runner": "runner",
 });
+// K142 (Greenfield finding G1): the runners a binding can be generated for. `claude` is the default and every Claude
+// behaviour is unchanged; `codex` checks the model id against the model the Codex route yields for the role, read from
+// the V3 runner-profile registry that `model-role-dispatch-select.mjs --runner codex` also reads (this generator never
+// calls that selector itself: with the model family active it prepares an invocation, and the generator is read-only).
+// Antigravity is deliberately not admitted here (its behaviour is unchanged: an unknown runner is refused with a repair).
+const RUNNERS = Object.freeze(["claude", "codex"]);
+const DUTY_ROUTE_OF_AGENT = Object.freeze({
+  "goldfish-implementor": "duty.implement", "goldfish-mechanic": "duty.mechanic", "goldfish-deep": "duty.deep",
+});
+// The environment keys through which `resolveActiveRunner` (pipeline-start-preflight.mjs) learns the runner of a process.
+const RUNNER_SIGNAL_KEYS = Object.freeze(["CLAUDECODE", "ANTIGRAVITY_AGENT", "AI_AGENT"]);
 const REPEATED_FLAGS = Object.freeze({ "--path": "paths" });
 const REQUIRED_FLAGS = Object.freeze(["--dispatch-id", "--item", "--agent-type", "--model-id", "--check"]);
 const READ_ONLY_GIT = new Set(["rev-parse", "status"]);
@@ -123,6 +138,26 @@ function validRepoPath(value) {
   return typeof value === "string" && value.length > 0 && value.length <= 240
     && !/[\\\0\r\n]/u.test(value) && !value.startsWith("/") && !/^[A-Za-z]:/u.test(value)
     && value.split("/").every((part) => part !== "" && part !== "." && part !== ".." && part !== ".git");
+}
+
+/** The Codex task route of a duty (read-only registry projection), or null when the registry yields none. */
+function defaultCodexRoute(taskRoute) {
+  try {
+    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "codex");
+    return scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute) ?? null : null;
+  } catch { return null; }
+}
+
+/**
+ * What the preflight observation receives. Claude: exactly `{ cwd }`, as before this change. Codex: the same call with an
+ * environment whose runner signals say Codex (the preflight resolves its runner from the environment of the process, so a
+ * Claude or Antigravity marker inherited from the calling shell would otherwise make it observe the wrong runner).
+ */
+function preflightInputFor(runner, root) {
+  if (runner !== "codex") return { cwd: root };
+  const env = { ...process.env };
+  for (const key of RUNNER_SIGNAL_KEYS) delete env[key];
+  return { cwd: root, env };
 }
 
 /** Strict flag parse: unknown, repeated and valueless flags are refusals, never ignored. */
@@ -438,6 +473,8 @@ export function generateDispatchBinding(options, deps = {}) {
   const warnings = [];
 
   const { dispatchId, item, agentType, modelId, check } = options;
+  const runner = options.runner ?? "claude";
+  if (!RUNNERS.includes(runner)) refuse("DBG-RUNNER-UNKNOWN", `unknown runner ${JSON.stringify(runner)}; repair: pass --runner ${RUNNERS.join(" or ")} (default ${RUNNERS[0]}), or omit the flag for a Claude dispatch`);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/u.test(dispatchId)) refuse("DBG-DISPATCH-ID", `dispatch id ${JSON.stringify(dispatchId)} must match [A-Za-z0-9][A-Za-z0-9._:-]{0,119}`);
   if (!/^[a-z0-9][a-z0-9-]{0,127}$/u.test(item)) refuse("DBG-ITEM-SLUG", `item slug ${JSON.stringify(item)} must be lowercase letters, digits and hyphens`);
   if (options.criterion !== undefined && !isCriterionId(options.criterion)) refuse("DBG-CRITERION-ID", `criterion ${JSON.stringify(options.criterion)} must be ${CRITERION_ID_FORMS}`);
@@ -564,9 +601,27 @@ export function generateDispatchBinding(options, deps = {}) {
   const resolved = resolveAgentModel(agentType, { agentsDir });
   if (!resolved) refuse("DBG-AGENT-UNRESOLVED", `no agent definition with a model for ${agentType} under the plugin agents directory`);
   if (typeof resolved.effort !== "string" || resolved.effort === "") refuse("DBG-AGENT-UNRESOLVED", `agent definition ${agentType} declares no effort`);
-  if (!modelBelongsToFamily(modelId, resolved.model)) {
-    refuse("DBG-MODEL-FAMILY", `model id ${modelId} does not belong to the ${resolved.model} family that agent definition ${agentType} declares`);
+  // The check protects one thing: the briefed model must be the family the dispatch will really run (MP-29: only the
+  // tool-layer `model` parameter of the dispatch call selects it; this flag states and checks the briefed id, nothing more,
+  // and no effect on a Codex dispatch beyond that is claimed). Claude: the alias family of the agent definition. Codex: the
+  // agent definition's alias is a Claude concept, so the id is checked against the model the Codex route yields for the role.
+  let codexRoute = null;
+  if (runner === "codex") {
+    const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
+    codexRoute = (deps.codexRoute ?? defaultCodexRoute)(taskRoute);
+    if (!codexRoute || codexRoute.state === "unavailable" || typeof codexRoute.selector?.value !== "string") {
+      refuse("DBG-MODEL-ROUTE-UNAVAILABLE", `the Codex route ${taskRoute} for ${agentType} is ${codexRoute?.state === "unavailable" ? "unavailable" : "not registered"} in the runner profile registry, so model id ${modelId} cannot be checked against it; repair: pick the --agent-type whose Codex route is available (${Object.entries(DUTY_ROUTE_OF_AGENT).map(([type, route]) => `${type} = ${route}`).join(", ")}; \`node <plugin-root>/scripts/model-role-dispatch-select.mjs --repo-root <repo> --runner codex --task-route ${taskRoute}\` shows the route), or dispatch with --runner claude`);
+    }
+    const expected = codexRoute.selector.value;
+    const matches = codexRoute.selector.kind === "alias" ? modelBelongsToFamily(modelId, expected) : modelId === expected;
+    if (!matches) {
+      refuse("DBG-MODEL-FAMILY", `model id ${modelId} is not the model the Codex route ${taskRoute} selects for ${agentType} (${expected}); repair: pass --model-id ${expected} together with --runner codex, or omit --runner for a Claude dispatch`);
+    }
+  } else if (!modelBelongsToFamily(modelId, resolved.model)) {
+    refuse("DBG-MODEL-FAMILY", `model id ${modelId} does not belong to the ${resolved.model} family that agent definition ${agentType} declares; repair: pass a --model-id of the ${resolved.model} family (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}), or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)`);
   }
+  // The effort the run is briefed with: the Codex route's own effort for a Codex dispatch (the agent definition's effort is the Claude one).
+  const effort = typeof codexRoute?.effort === "string" && codexRoute.effort !== "" ? codexRoute.effort : resolved.effort;
   let maxTurns;
   try { maxTurns = Number.parseInt(parseAgentFrontmatter(readFileSync(resolve(agentsDir, `${agentType}.md`), "utf8")).maxTurns, 10); } catch { maxTurns = NaN; }
   if (!Number.isSafeInteger(maxTurns)) refuse("DBG-AGENT-UNRESOLVED", `agent definition ${agentType} declares no integer maxTurns`);
@@ -581,7 +636,7 @@ export function generateDispatchBinding(options, deps = {}) {
   let observationFault = null;
   const observeOnce = () => {
     observationFault = null;
-    try { observation = observePreflight({ cwd: root }); } catch (error) { observation = undefined; observationFault = error?.code ?? "observer-threw"; }
+    try { observation = observePreflight(preflightInputFor(runner, root)); } catch (error) { observation = undefined; observationFault = error?.code ?? "observer-threw"; }
   };
   observeOnce();
   let identity = observation?.rulesetSource?.loadedIdentity;
@@ -662,11 +717,11 @@ export function generateDispatchBinding(options, deps = {}) {
     dispatchId,
     candidateCommit,
     candidateTree,
-    runner: "claude",
+    runner,
     role: `pipeline-core:${agentType}`,
     agentType,
     model: modelId,
-    effort: resolved.effort,
+    effort,
     rulesetSha,
     allowedPaths,
     criticDecision: {
@@ -686,11 +741,18 @@ export function generateDispatchBinding(options, deps = {}) {
     },
   };
   assertBindingInvariants(binding);
+  // The host's Codex-native v3 shape names the agent by `nativeAgentType: "worker"` instead of `agentType` (the host derives
+  // the agent type from the role); the Claude shape is serialised exactly as before.
+  const serialised = runner === "codex"
+    ? Object.fromEntries(Object.entries(binding).map(([key, value]) => (key === "agentType" ? ["nativeAgentType", "worker"] : [key, value])))
+    : binding;
 
-  const block = `${BLOCK_OPEN}\n${JSON.stringify(binding)}\n${BLOCK_CLOSE}`;
+  const block = `${BLOCK_OPEN}\n${JSON.stringify(serialised)}\n${BLOCK_CLOSE}`;
   const field6 = [
     `- Ruleset: ${rulesetVersion ? `\`${rulesetVersion}\` · ` : ""}content identity \`${rulesetSha}\`${rulesetFallback ? ` (fallback: ${rulesetFallback})` : ""}.`,
-    `- Model/effort: \`${modelId}\` / ${resolved.effort} (${agentType}; agent definition alias \`${resolved.model}\`).`,
+    runner === "codex"
+      ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Codex route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
+      : `- Model/effort: \`${modelId}\` / ${resolved.effort} (${agentType}; agent definition alias \`${resolved.model}\`).`,
     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
     `- Slice: ${dispatchId}`,
@@ -712,13 +774,17 @@ export function generateDispatchBinding(options, deps = {}) {
   if (skeleton.split(BLOCK_OPEN.slice(0, BLOCK_OPEN.lastIndexOf(":v") + 2)).length !== 2) refuse("DBG-SELFCHECK-MARKER", "the skeleton must contain the binding opening marker exactly once");
   const parsed = parseNativeGoldfishBriefing(skeleton);
   if (!parsed.ok) refuse("DBG-SELFCHECK-PARSE", `the host parser rejects the generated skeleton: ${parsed.code}`);
-  const { criticDecision: _decision, ...parsedRest } = parsed.binding;
-  const { criticDecision: _own, ...ownRest } = binding;
+  const { criticDecision: _decision, ...parsedAll } = parsed.binding;
+  // The host adds `agentType` and `adapterVersion` to a Codex-native binding it reads back; neither is in the block.
+  const { agentType: _derived, adapterVersion: _adapter, ...parsedCodex } = parsedAll;
+  const parsedRest = runner === "codex" ? parsedCodex : parsedAll;
+  const { criticDecision: _own, ...ownRest } = serialised;
   if (JSON.stringify(parsedRest) !== JSON.stringify(ownRest)) refuse("DBG-SELFCHECK-PARSE", "the host parser read back a different binding than was generated");
   const named = parseDispatchSlice(skeleton);
   if (named.sliceId !== dispatchId || JSON.stringify(named.writeScope) !== JSON.stringify([...allowedPaths])) refuse("DBG-SELFCHECK-SLICE", "the admission parser reads a different slice or write scope from the generated skeleton");
 
-  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding, skeleton, warnings };
+  // A Codex result carries `agentType` beside `nativeAgentType`, as the host's read-back does (renderGoldfishBriefing reads it).
+  return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding: runner === "codex" ? { ...serialised, agentType } : binding, skeleton, warnings };
 }
 
 const BUILD_FLAGS = Object.freeze({ "--root": "root", "--package": "package", "--out": "out" });
@@ -757,7 +823,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   const calibration = resolveBriefingCalibration(root, deps.calibration);
   const bind = (agentType) => generateDispatchBinding({
     root, dispatchId: pkg.id, item: pkg.item, agentType, modelId: pkg.modelId,
-    check: pkg.check, paths: [...pkg.paths], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote,
+    check: pkg.check, paths: [...pkg.paths], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
   }, deps);
   // Test-first budget (PO 2026-10-21): an estimate above the tier cap moves the dispatch to the deep tier.
   let generated = bind(pkg.agentType);
