@@ -541,6 +541,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
   KickoffError as OnboardingContinuityKickoffError,
   applyOrphanSessionCleanupBindingRelease,
+  finishOrphanSessionCleanupBindingRelease,
   readSourceOwnedOnboardingContinuityCompanionContext,
   isOwnedOnboardingContinuityCompanionContextHandle,
   readOnboardingSessionCleanupBinding,
@@ -12425,6 +12426,19 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           stateWriteSucceeded(written);
         }
         return 2;
+      }
+      // D73 (E): the apply above ran under writeState's State lock and so stopped at `receipt-committed`; the registry member
+      // step and the binding delete run here, after that lock is released (the continuity snapshot refuses a foreign State lock).
+      if (releasePlan.status === "ready" && written.afterCommit?.release?.status === "receipt-committed") {
+        const finishRelease = deps.finishOrphanSessionCleanupBindingReleaseFn
+          ?? finishOrphanSessionCleanupBindingRelease;
+        try {
+          finishRelease({ plan: releasePlan });
+        } catch (error) {
+          const code = typeof error?.code === "string" ? error.code : "SESSION-CLEANUP-ORPHAN-RELEASE-FAILED";
+          console.error(`Error: discard-feature public State committed; orphan-cleanup-required (${code}). Inspect session onboarding and replay the advertised release-orphan-binding action.`);
+          return 2;
+        }
       }
       syncNextActionDocs(dir, discardNext);
       console.log(
