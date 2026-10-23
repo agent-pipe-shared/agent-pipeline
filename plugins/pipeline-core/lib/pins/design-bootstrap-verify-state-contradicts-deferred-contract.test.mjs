@@ -8,13 +8,17 @@
 //   A3. A real command can be supplied once and yields an exact readback
 //       without repeating unrelated onboarding questions.
 //
-// Measured source behaviour on this candidate for A2: the DESIGN->IMPLEMENTATION
-// transition ADMITS the typed baseline-only state without a command (explicit newer
-// baseline-implementation policy, pinned by pipeline-state.test.mjs NVA-CF-VERIFYDEADLOCK),
-// while an explicit placeholder/blank --verify-command is refused and release stays
-// blocked ("release remains blocked" in checkVerifyContractConfigured). Case A2-literal
-// below pins that measured behaviour; it is the point whose wording the newer policy
-// supersedes and is named as an open PO question in the dispatch report.
+// A2 under PO decision D124 (2026-10-22, "Contract A2 stays"): the typed design-stage state `verify: null` (distinct from
+// PASS) remains the intended design result; implementation entry and release Verify reject it, and the newer
+// baseline-implementation policy (pinned by pipeline-state.test.mjs NVA-CF-VERIFYDEADLOCK and
+// pipeline-state-late-verify.test.mjs) SUPPLIES that rejection and does not replace A2. Measured on this source: an explicit
+// placeholder/blank --verify-command and a missing calibration are refused at the transition; the entry without a command is
+// carried only as the typed baseline-only contract, which is never relabelled as configured, writes no command, and keeps
+// release blocked ("release remains blocked" in checkVerifyContractConfigured). Case "A2 (D124)" below pins that rejection
+// shape. The earlier "A2-literal (measured policy)" case asserted that the transition ADMITS baseline-only as a supersession
+// of A2; D124 decided the opposite premise, so it was restated (QG-04, K86-PIN-RESTATEMENTS, 2026-10-23).
+// NOT PROVEN HERE (open, see the K86 notes): a transition REFUSAL of an unconfigured baseline-only entry. The shipped
+// set-phase still returns 0 for it (pipeline-state.mjs is a protected path), so this pin does not assert a refusal there.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -123,14 +127,30 @@ test("A2: a missing calibration is refused (not silently treated as deferred) at
   assert.equal(phaseOf(root), "design");
 });
 
-test("A2-literal (measured policy): without --verify-command the transition ADMITS baseline-only; release is the blocked side", () => {
-  // Pins current behaviour so a change in either direction is a visible, deliberate decision.
+test("A2 (D124): the deferred verify state is never accepted as a real contract: it stays typed baseline-only through implementation entry, is not relabelled configured, and release stays blocked", () => {
+  // QG-04 restatement, bounded to D124 (PO 2026-10-22: contract A2 stays; the baseline-implementation policy supplies the
+  // rejection and does not replace A2). The former case "A2-literal (measured policy)" asserted that the transition ADMITS
+  // baseline-only as a supersession of A2 and so pinned the premise D124 rejected. Every assertion it held (entry result,
+  // phase, release status, release message) is kept below as the carried-not-accepted shape; the added assertions state the
+  // rejection: the deferred value is not rewritten into a command, never reads as configured, and an explicit placeholder is
+  // still refused after the entry.
   for (const verify of [null, PLACEHOLDER]) {
     const { root, deps } = fixture({ verify });
+    const files = [join(root, "project", "pipeline.json"), join(root, ".claude", "pipeline.json")];
+    const calibrationBefore = files.map((path) => readFileSync(path, "utf8"));
     assert.equal(quiet(() => run(["set-phase", "--phase", "implementation"], deps)).result, 0);
     assert.equal(phaseOf(root), "implementation");
-    assert.equal(checkVerifyContractConfigured(root).status, "baseline-only");
-    assert.match(checkVerifyContractConfigured(root).message, /release remains blocked/u);
+    assert.deepEqual(files.map((path) => readFileSync(path, "utf8")), calibrationBefore, "entry must not turn the deferred state into a command");
+    assert.equal(classifyVerifyCommand(readJson(files[0]).verify), "baseline-only", "the carried value is still the deferred state");
+    const release = checkVerifyContractConfigured(root);
+    assert.equal(release.status, "baseline-only");
+    assert.notEqual(release.status, "configured", "release Verify must not read the deferred state as a configured contract");
+    assert.match(release.message, /release remains blocked/u);
+    // The deferred state is not accepted as a way to supply a command either: re-entering with the placeholder is refused, zero mutation.
+    const stateBefore = readFileSync(join(root, "project", "pipeline-state.json"), "utf8");
+    assert.equal(quiet(() => run(["set-phase", "--phase", "implementation", "--verify-command", PLACEHOLDER], deps)).result, 2);
+    assert.equal(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"), stateBefore);
+    assert.deepEqual(files.map((path) => readFileSync(path, "utf8")), calibrationBefore);
   }
 });
 
