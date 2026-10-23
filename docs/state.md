@@ -40,8 +40,8 @@
   items reconciled, D75 S2, D76 S3/S4/S6, D140 doc fixes, K74 pins, K78 fixtures; counted runs `evidence/pin-counted-results-2026-10-23*.md`.
 - Held for the bundled PO sitting: ceremonies C15 to C28 in `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`, patches in
   `specs/sprint-alfred-epic/evidence/held-patches/`. No row yet: the D78 dispatch-hook default.
-- PO list (only on request): `specs/sprint-alfred-epic/plans/po-list-afk-2026-10-22.md`, rows 1 to 30 (19 Critic digest re-pin, 23/24
-  K2 reds, 27 K1D case C, 28 to 30 K8/K9 findings).
+- PO list (only on request): `specs/sprint-alfred-epic/plans/po-list-afk-2026-10-22.md`, rows 1 to 34 (19 Critic digest re-pin, 23/24
+  K2 reds, 27 K1D case C, 28 to 34 K8/K9/remeasure).
 - Ledger after fresh counted runs: K3, K4, K5, K9, K11, K12 closed (named rests in the plan file); K8 repairs held; K1D, K2, K6, K7, K13
   open on ceremonies or PO decisions. Matrix remeasured 2026-10-23 (`evidence/delivery-remeasure-2026-10-23/`): 3/56/115 at 25/50/75, index 66.09% (was 63.65%); repeat after the PO tests. Not started: stamp, push, Full Verify, Critic batch, Reader course.
 
