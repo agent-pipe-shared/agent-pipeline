@@ -1,0 +1,71 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 391465c75..6fed7fb1c 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -434,7 +434,8 @@
+           "NGHR02",
+           "NGHR03",
+           "NGHR04",
+-          "NGHR05"
++          "NGHR05",
++          "NGHR06"
+         ],
+         "maxBytes": 65536
+       },
+@@ -707,7 +708,20 @@
+           "UC02C004",
+           "UC02C005",
+           "UC02C006",
+-          "UC02C007"
++          "UC02C007",
++          "UC02C008",
++          "UC02C009",
++          "UC02C010",
++          "UC02C011",
++          "UC02C012",
++          "UC02C013",
++          "UC02C014",
++          "UC02C015",
++          "UC02C016",
++          "UC02C017",
++          "UC02C018",
++          "UC02C019",
++          "UC02C020"
+         ],
+         "maxBytes": 65536
+       },
+@@ -1214,7 +1228,8 @@
+           "MFH001",
+           "MFH002",
+           "MFH003",
+-          "MFH004"
++          "MFH004",
++          "MFH005"
+         ],
+         "maxBytes": 65536
+       },
+@@ -1527,7 +1542,10 @@
+           "K3C003",
+           "K3C004",
+           "K3C005",
+-          "K3C006"
++          "K3C006",
++          "K3C007",
++          "K3C008",
++          "K3C009"
+         ],
+         "maxBytes": 65536
+       },
+@@ -3742,6 +3760,12 @@
+       "file": "plugins/pipeline-core/lib/pins/partial-readiness-names-the-authority-restore-when-the-committed-bytes-match.test.mjs",
+       "invariantPinned": "The inspect output and the reopen-design guidance name the exact authority restore command first when an edited bound PRD or Spec still has committed bytes equal to the approved digest, and name nothing when the committed bytes differ or the working bytes already equal the digest (D31, D137, D141, AC-115)",
+       "nonOverlapNote": "Unique cases: the restore advice in the partial-readiness inspect text"
++    },
++    {
++      "name": "run-parallel-tests",
++      "file": "scripts/run-parallel.test.mjs",
++      "invariantPinned": "The parallel candidate runner runs the exact committed HEAD of a clean source, refuses a source with an uncommitted new case unless told to leave it out, and survives a rewritten history in its reused worker clone",
++      "nonOverlapNote": "Unique test suite for scripts/run-parallel.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
+     }
+   ]
+ }
