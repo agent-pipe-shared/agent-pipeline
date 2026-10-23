@@ -8,8 +8,9 @@
 // 2026-10-16 #12 (superseding T12) admits exactly `Dispatch: design (elephant)` alongside
 // `Dispatch: stage-0 (elephant)`; the pin asserts the guard lanes and the authorship verifier admit
 // exactly those two Elephant forms and still refuse near-misses (other roles/ids); (3) verifier, generator
-// and guard share one classification; (4) provenance debt is a disposition of history, not behavior,
-// and is not testable here (named, not claimed).
+// and guard share one classification; (4) provenance debt: existing stage-0-labelled design commits are
+// dispositioned by PO decision D129 as accepted debt in an evidence note (history not rewritten, no verifier
+// allowance); case AC4 asserts that note and that its commit list equals the stated rule's set in git history.
 //
 // The real modules run (commit-message-policy.mjs, dispatch-authorship-verify.mjs); only the
 // verifier's documented dependency seam (readCommitMessage/readChangedPaths) is driven. Fixtures
@@ -248,4 +249,63 @@ test("AC1 (real installed hooks): the same harness refuses a near-miss in both h
     assert.match(commit.stderr, /GIT-03-DISPATCH-MALFORMED/u);
   });
 
-test("AC4 (host limitation, not claimed): provenance-debt disposition of existing stage-0-labelled history is a history/documentation decision with no executable surface", { skip: "host-limitation: not a behavior; reported as manual disposition, history is not rewritten" }, () => {});
+// ---- AC4: provenance-debt disposition of existing stage-0-labelled design commits (PO decision D129) -------------
+// QG-04 restatement, bounded to D129 (PO 2026-10-22: the existing stage-0-labelled design commits are recorded as accepted
+// provenance debt in a short evidence note with the commit list; history is not rewritten, no verifier allowance is built).
+// The former AC4 case was a skipped empty body ("no executable surface"). D129 gave the disposition a checkable surface:
+// the evidence note. The case now asserts the note states the disposition and that its commit list is exactly the set the
+// stated rule draws from git history (exact trailer, admission commit or ancestor, every changed path under specs/).
+// Where git history is not available (a shallow or history-less checkout) only the note's own structure is asserted.
+const DEBT_NOTE = "specs/sprint-alfred-epic/evidence/stage-0-labelled-design-commits-provenance-debt-d129.md";
+const DEBT_ADMISSION_COMMIT = "8e7dce0f4";
+
+/** The commits the note's rule selects from history: exact stage-0 trailer, admission commit or ancestor, every path under specs/. */
+function stage0DesignCommitsFromHistory() {
+  const log = spawnSync("git", ["-C", REPO_ROOT, "log", DEBT_ADMISSION_COMMIT, "--grep=Dispatch: stage-0 .elephant.",
+    "--format=%x01%H%x02%B%x03", "--name-only"], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024, timeout: 120000 });
+  if (log.error || log.status !== 0) return null;
+  const hashes = [];
+  for (const chunk of log.stdout.split("\u0001").slice(1)) {
+    const [meta, rest] = chunk.split("\u0003");
+    const [hash, body] = meta.split("\u0002");
+    const files = (rest ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
+    if (!/^Dispatch: stage-0 \(elephant\)\s*$/mu.test(body)) continue;
+    if (files.length > 0 && files.every((file) => file.startsWith("specs/"))) hashes.push(hash);
+  }
+  return hashes;
+}
+
+/** Compares the note's 12-character ids with the full history set; returns the ids missing from the note and the foreign ones. */
+function compareDebtList(noteIds, historyHashes) {
+  const noted = new Set(noteIds);
+  const fromHistory = new Set(historyHashes.map((hash) => hash.slice(0, 12)));
+  return {
+    missing: [...fromHistory].filter((id) => !noted.has(id)),
+    foreign: [...noted].filter((id) => !fromHistory.has(id)),
+  };
+}
+
+test("AC4 (D129): the evidence note records the existing stage-0-labelled design commits as accepted provenance debt, and its list is exactly what the stated rule draws from history", () => {
+  const note = readFileSync(join(REPO_ROOT, DEBT_NOTE), "utf8");
+  assert.match(note, /D129/u, "the note cites the PO decision");
+  assert.match(note, /accepted provenance debt/u);
+  assert.match(note, /History is \*\*not rewritten\*\*/u);
+  assert.match(note, /No verifier allowance is built/u);
+  assert.match(note, new RegExp(`\`${DEBT_ADMISSION_COMMIT}\``, "u"), "the note names the admission commit that bounds the list");
+  const ids = [...note.matchAll(/^- `([0-9a-f]{12})` \d{4}-\d{2}-\d{2} \S/gmu)].map((match) => match[1]);
+  const declared = Number(/Count: \*\*(\d+)\*\* commits/u.exec(note)?.[1]);
+  assert.ok(ids.length > 0, "the note lists commits");
+  assert.equal(ids.length, declared, "the declared count equals the number of listed commits");
+  assert.equal(new Set(ids).size, ids.length, "no commit is listed twice");
+  if (!realGitAvailable) return;
+  const fromHistory = stage0DesignCommitsFromHistory();
+  if (fromHistory === null) return; // history-less checkout: the structure above is all that can be asserted here
+  assert.deepEqual(compareDebtList(ids, fromHistory), { missing: [], foreign: [] }, "the listed commits are exactly the rule's set in git history");
+});
+
+test("AC4 (D129) RED proof: the comparison reports a commit missing from the note and a foreign commit listed in it", () => {
+  const history = ["a".repeat(40), "b".repeat(40)];
+  assert.deepEqual(compareDebtList(["a".repeat(12), "b".repeat(12)], history), { missing: [], foreign: [] });
+  assert.deepEqual(compareDebtList(["a".repeat(12)], history), { missing: ["b".repeat(12)], foreign: [] });
+  assert.deepEqual(compareDebtList(["a".repeat(12), "b".repeat(12), "c".repeat(12)], history), { missing: [], foreign: ["c".repeat(12)] });
+});

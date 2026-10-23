@@ -1,0 +1,403 @@
+# Stage-0-labelled design commits: accepted provenance debt (D129)
+
+Status: evidence note, 2026-10-23. Backlog item: `pipeline.installed-design-trailer-example-is-rejected-by-git-guard`
+(acceptance bullet 4). Decision: D129 (2026-10-22, PO tiles) in `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`.
+
+## Disposition
+
+The existing stage-0-labelled design commits listed below are recorded as **accepted provenance debt**. D129 fixes the
+disposition and its limits:
+
+- History is **not rewritten**. No commit below is amended, rebased or relabelled.
+- **No verifier allowance is built.** `dispatch-authorship-verify` keeps its stage-0 size bound and its three-form
+  Elephant grammar; nothing here widens what it admits.
+- The form `Dispatch: design (elephant)` is the sanctioned trailer for direct Elephant design authoring from commit
+  `8e7dce0f4` on (PO decision 2026-10-16 #12). The debt is that these commits predate it and carry the stage-0 label,
+  whose narrow implementation exception is not an accurate provenance description for design work.
+
+## How the list was drawn (reproducible, pinned)
+
+A commit is listed when all of the following hold:
+
+1. its message carries the exact trailer line `Dispatch: stage-0 (elephant)`;
+2. it is `8e7dce0f4` (the commit that admitted `Dispatch: design (elephant)`, full id `8e7dce0f406c87c634b99f8c7ee336bb7ce6b9f9`) or an ancestor of it,
+   so only commits made while no sanctioned design trailer existed are in scope;
+3. every path it changed lies under `specs/` (the spec and design package area). A commit that also touched `docs/`,
+   `backlog/`, `plugins/`, `harness/` or any other path is not counted as a design commit and is outside this note.
+
+Count: **368** commits, 2026-08-17 to 2026-10-16, oldest first. The pin
+`plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs` (case AC4)
+recomputes the same set from git history on every run and fails when this list and the history disagree, and when
+the disposition statements above are removed. Stage-0-labelled commits made after `8e7dce0f4` are outside this note: from
+that commit on, the design form is available and a stage-0 label on design work would be a new finding, not debt.
+
+## Commits
+
+- `efab6bd10ece` 2026-08-17 docs(backlog): add the partial-authority closure evidence file
+- `c153f6f0a650` 2026-08-17 docs(matrix): reconcile #14's workflow-boundary-suite discrepancy
+- `12edd709bb6c` 2026-08-17 docs(nova): seal NVA-A54-4/11 delta-lineage evidence from two real correction cycles
+- `c833deb4f9d2` 2026-08-17 docs(nova-a): correct #98's R4 claim -- the lineage module already exists
+- `965f995721bf` 2026-08-17 docs(nova-a): exercise and evidence #98's R3 (resumable Full Verify)
+- `2b8d7f7b35a4` 2026-08-18 chore(nova): sync lifecycle.json's prd/spec digests to their current bytes
+- `03d6a3f2d11b` 2026-08-18 docs(nova): record PO plan acknowledgement for sprint-nova-epic's PRD
+- `75cf2a1437a9` 2026-08-18 chore(nova): sync PRD's technical-spec-sha256 marker to spec.md's current bytes
+- `a5a42962362b` 2026-08-23 docs(agy): record the PO disposition of F2, F14, F10 and close F11
+- `acadd7824612` 2026-08-23 docs(agy): record the delta Critic review verdict for the correction range
+- `26547eb1d126` 2026-08-24 docs(agy): record the fourth and final delta Critic review (FAIL)
+- `4c0227015c66` 2026-08-24 docs(agy): record the PO disposition of delta-3 findings F3, F4, F5
+- `c077ac7faea6` 2026-08-24 docs(agy-spec): reconcile spec.md Wave 3 with the retired hooks.json generator (F7)
+- `0db2021b79da` 2026-08-24 docs(agy): record the third delta Critic review verdict (FAIL)
+- `b4ffd4607df1` 2026-08-24 docs(agy): correct D4 disposition to fixed and record the ceremony's two obstacles
+- `4c67b2d3c6e9` 2026-08-24 docs(agy): record the PO disposition of D1-D7, close D5, flag D4 blocked
+- `e7110c7d930e` 2026-08-24 docs(agy-spec): correct PRD's stale .agents/hooks.json references to plugins.json
+- `c2a0fa7acaa1` 2026-09-06 docs(alfred): record A1 schema and registration decisions
+- `0370f121a90f` 2026-09-06 docs(alfred): record A1 schema and registration decisions
+- `3c16a272e27b` 2026-09-06 docs(alfred): record A1 schema and registration decisions
+- `163d58e010e8` 2026-09-09 docs(reader-review): record docset reader-review binding for sprint-nova-epic round 1
+- `0b82ebe49207` 2026-09-09 docs(spec): align candidate review with the current completion goal
+- `12d214f6bc4b` 2026-09-11 docs(critic): keep prior reports coordinator side
+- `c80d7e6ab6ad` 2026-09-11 docs(critic): align inventory correction inputs
+- `08615ec0f0e7` 2026-09-11 docs(inventory): define delta rollback
+- `833d84cb16b4` 2026-09-13 revert(nova): drop deferred case-completion batch
+- `d2b1dbfc9f70` 2026-09-13 docs(nova): bind case-completion migration batch
+- `55d7debb1cfe` 2026-09-14 docs(review): seal reader-review binding
+- `1bca8acba9a2` 2026-09-14 docs(review): bind final reader-review disposition
+- `ccb1833a1c36` 2026-09-14 chore(lifecycle): rebind Nova B8.3 authority artifacts
+- `6a4edafc8dc7` 2026-09-14 chore(nova): rebind B8 plan artifact digest
+- `f7787b922d18` 2026-09-15 test(backlog): record reconciliation drift verification
+- `8b7d5189f611` 2026-09-15 test(antigravity): bind ANDC07 deadline evidence
+- `ee2cc66685ab` 2026-09-15 test(backlog): record reconciliation drift verification
+- `06beb1822728` 2026-09-15 test(antigravity): bind ANDC07 deadline evidence
+- `27ead1e302a3` 2026-09-17 docs(reader-review): bind 0.6.2 release candidate
+- `b7797309cf6a` 2026-09-18 docs(alfred): record current verification blocker
+- `10d58d293013` 2026-09-18 docs(nova): freeze Nova B candidate evidence and seal manifest
+- `1b34494df1d5` 2026-09-18 docs(nova): freeze Nova B candidate evidence and seal manifest
+- `bca8f61571f8` 2026-09-18 docs(reader): bind 0.6.3 release documentation
+- `34c33f7d3c12` 2026-09-18 docs(reader): close 0.6.3 review binding
+- `a5a425081ce3` 2026-09-18 docs(reader): record 0.6.3 review round three
+- `3873c3eb0b0d` 2026-09-18 docs(reader): record 0.6.3 review round two
+- `f56c310ee9e9` 2026-09-18 docs(reader): record 0.6.3 review round one
+- `d175af6e0606` 2026-09-19 docs(alfred): retain expanded local candidate requirements
+- `eb036d1f0b1a` 2026-09-22 docs(nova): aktualisiert Spec-Bindung
+- `1fc699a7f89b` 2026-09-22 docs(nova): bindet signierte 0.7 Integrationsfreigabe
+- `1091ac0a2244` 2026-09-22 docs(nova): bindet spec-digest erneut
+- `9bc329deea8a` 2026-09-22 docs(nova): autorisiert integrierten 0.7 kandidaten
+- `a01d97dc4634` 2026-09-27 docs(alfred): map greenfield input to 0.7 acceptance
+- `481e5cc16da4` 2026-09-27 docs(alfred): prepare 0.7 greenfield remediation plan
+- `630247866739` 2026-09-27 docs(alfred): triage Codex greenfield Advisor blocker
+- `e8ad0b0fca76` 2026-09-27 docs(alfred): record candidate-bound reader and AC audit
+- `ca929b14e965` 2026-09-28 docs(evidence): bind directed signing checks to delivered Source
+- `4f26f3a08ef7` 2026-09-28 docs(alfred): bind extended PRD to current specification
+- `491a1ac8ccbc` 2026-09-28 docs(evidence): retain historical advisor route observations
+- `6aab6da07234` 2026-09-28 docs(0.7): materialize reviewed design workflow corrections
+- `ec7183dd313f` 2026-10-03 docs(alfred): draft wave plan for the 0.7.0 local candidate
+- `bf278531e328` 2026-10-03 docs(alfred): record small-maxTurns budget defect and budget-line parsing
+- `892fe09502be` 2026-10-03 docs(alfred): map every greenfield report finding to the register
+- `9c5c5c57eb18` 2026-10-03 docs(alfred): add PO queue for the 0.7.0 local candidate goal
+- `ebf715e75255` 2026-10-03 docs(alfred): record applied Windows budget-lock operator hotfix
+- `f6d89f0418b3` 2026-10-03 docs(alfred): record mini-patch route decision
+- `73729245d2ac` 2026-10-03 docs(alfred): record PO scope and design-route decisions for the findings round
+- `b3903ce7c4c0` 2026-10-04 docs(alfred): record the PO decisions of 2026-10-04 in the design sources
+- `6b7f14e15a3d` 2026-10-04 docs(alfred): define when a native subagent counts as a host-observed child
+- `98c99013f5e6` 2026-10-04 docs(alfred): align the 0.7.0 wave plan with design revision 3
+- `9add755f7d71` 2026-10-04 docs(alfred): queue hotfixes 7-8 and the dispatch-supersede override for the PO
+- `4cb05a886bcf` 2026-10-05 docs(alfred): record the third night batch in the execution order
+- `35760797f140` 2026-10-05 docs(alfred): keep the WINACLFIX run evidence in a tracked file
+- `abcb6bf32eb1` 2026-10-05 docs(alfred): record the second night batch and the queued PO decisions
+- `b18b348b9a79` 2026-10-05 docs(alfred): record the third PUSHSIG Critic round (partial, no findings)
+- `2add38ce326c` 2026-10-05 docs(alfred): record the Critic results for PUSHSIG S1-S3
+- `3aa610967e5b` 2026-10-05 docs(alfred): record the first night results in the execution order
+- `eb1988f024ea` 2026-10-05 docs(alfred): track the readiness-flap measurements and the Opus Critic notes
+- `8a9a2f21f1ff` 2026-10-05 docs(alfred): record IC-2c and the night queue in the execution order
+- `2a3fc83c0ce8` 2026-10-05 docs(alfred): record the overnight fan-out progress in the execution order
+- `a14e908881ca` 2026-10-05 docs(alfred): record the push decision, the overnight wave and the push-route research
+- `36237bf73b48` 2026-10-05 docs(alfred): stop using the unsigned checkpoint push lane
+- `a9618edb5a40` 2026-10-05 docs(alfred): record the fan-out results and the two new working rules
+- `31451269e12c` 2026-10-05 docs(alfred): record the in-flight Verify-fix slices in the execution order
+- `c6e49a06507e` 2026-10-05 docs(alfred): record the checkpoint push route for the device switch
+- `acb7d8d52f2b` 2026-10-05 docs(alfred): keep the parked RGGRAM grammar work in tracked notes
+- `31518002535c` 2026-10-05 docs(alfred): track the Fable review reports behind restructure stages S0-S8
+- `9540f5f47939` 2026-10-06 docs(alfred): record the PO's 2026-10-06 device-switch decisions as design input
+- `64e8b9c2740b` 2026-10-06 docs(evidence): keep the package builder and proof drivers of quality package d6d2a8b2 tracked
+- `878050884aba` 2026-10-06 docs(alfred): record the PO's round-2 decisions and the morning directive
+- `6b200569d1db` 2026-10-06 docs(alfred): record the PO's round-1 decisions of 2026-10-06
+- `cdd27328c62c` 2026-10-06 docs(alfred): record the night run's morning handover in the execution order
+- `8e6aca6c173c` 2026-10-06 docs(alfred): add the nested-wrapper and here-string shapes to PO question Q12
+- `ce056b5b37a0` 2026-10-06 docs(evidence): record the GPGL-9t3 Critic round (fail) and stop the pin chase
+- `cc7e6f4e0346` 2026-10-06 docs(evidence): record the GLREP-t3 Critic round (pass)
+- `bf522f510b92` 2026-10-06 docs(evidence): record the second S3 plan delta Critic round (partial, two majors)
+- `dc9faaaa1c61` 2026-10-06 docs(evidence): persist the GPGL-9t2 and GPGL-9t3 red runs
+- `d2c9e0e2e28e` 2026-10-06 docs(evidence): record the REGADD Critic round (pass)
+- `72ce394009f2` 2026-10-06 docs(evidence): record the DOCCAP2 Critic round (partial, no findings)
+- `1442cd1e0358` 2026-10-06 docs(evidence): record the GPGL-9t2 Critic round (partial, one minor)
+- `e13e1b337e11` 2026-10-06 docs(evidence): record the GLREP-t2 Critic round and persist its runs
+- `5bc359dffa41` 2026-10-06 docs(alfred): add the brace-expansion shape to PO question Q12
+- `c5374fd6421e` 2026-10-06 docs(evidence): record the GPGL-9t Critic round (fail, brace expansion unpinned)
+- `9c11cbc519a6` 2026-10-06 docs(evidence): record the Goldfish template cap and record-path Critic round (pass, two minors)
+- `eb336ad7ade8` 2026-10-06 docs(evidence): record the SF22v and PKGFIX Critic round (partial, one minor)
+- `953f7394cf72` 2026-10-06 docs(evidence): record the S3 plan delta Critic round (partial, four minors)
+- `7dd276dab04a` 2026-10-06 docs(evidence): record the GLREP Critic round (pass, two minors)
+- `8d27bb120ece` 2026-10-06 docs(evidence): record the package-split delta Critic round
+- `4ae2fb8382ab` 2026-10-06 docs(evidence): record the Critic round over the S3 split plan (FAIL)
+- `542cb99ab177` 2026-10-06 docs(evidence): record the GLWIN-t2 Critic round (PASS)
+- `3330eeb306ef` 2026-10-06 docs(evidence): record the GLWIN Critic round and correct the diagnosis note
+- `56ef3797ae5f` 2026-10-06 docs(evidence): record the Critic round over the S2 guard split
+- `df22ded2033c` 2026-10-06 docs(alfred): record night progress to 03:45 and the S2 package split decision
+- `5b3fb8358724` 2026-10-06 docs(evidence): record the Critic round over the S2 package-1 registration patches
+- `6b569ec84e11` 2026-10-06 docs(alfred): add PO question Q12 on the push classifier and verify the push lane
+- `826a13886eaf` 2026-10-06 docs(evidence): record the GPGL-8 Critic round
+- `44813b0bf27f` 2026-10-06 docs(alfred): record night progress to 02:40 and the push note
+- `c68218541b23` 2026-10-06 docs(evidence): record the S1c and SF22 Critic round
+- `af00cc588251` 2026-10-06 docs(evidence): record the GPGL-7 fix-verification Critic round
+- `3634a64c80e8` 2026-10-06 docs(specs): register CHRB009 in the staged rollback suite policy
+- `28c3922414fc` 2026-10-06 docs(alfred): record night progress to 02:30 and three new PO questions
+- `72f1d3906bd3` 2026-10-06 docs(alfred): record the Critic re-review of the WINACLFIX-G correction
+- `8237226a6006` 2026-10-06 docs(alfred): register the Stop adapter suite with its 23 cases
+- `8cba650a271b` 2026-10-06 docs(alfred): record the Critic re-review of the dispatch guard correction
+- `fa765f888c85` 2026-10-06 docs(alfred): record the Critic re-review of the Stop adapter correction
+- `12e0c1897ec1` 2026-10-06 docs(alfred): record the Critic re-review of the WINACLFIX-F correction
+- `4726225bae4c` 2026-10-06 docs(alfred): record the fourth night batch in the execution order
+- `49149b3c374f` 2026-10-06 docs(alfred): register the Stop adapter suite with its 20 cases
+- `c7247ace69ca` 2026-10-06 docs(alfred): record the Critic review of the push classifier change
+- `6a36c0c4df32` 2026-10-06 docs(alfred): record the Critic review of the fan-out Stop adapter and dispatch guard
+- `b57b8ed33213` 2026-10-06 docs(alfred): record the Critic review of the fan-out governor
+- `83a7904f63a4` 2026-10-07 docs(alfred): log toil T56 (a budget grant by message does not raise the cap)
+- `8e011078d55f` 2026-10-07 docs(alfred): log toil T54-T55 (enforced budget cap, abbreviated record SHAs)
+- `87e9c1098594` 2026-10-07 docs(alfred): add the signed-package index and the ENVDUMP-F patch
+- `71c33c9a7881` 2026-10-07 docs(alfred): record PO decisions AI-AR from the night round
+- `bdb53249a501` 2026-10-07 docs(alfred): record night reconciliation results and rulings 10-11
+- `e4e95600546b` 2026-10-07 docs(alfred): record PO decision AH - every deferred triage item is in scope
+- `638e84f187a4` 2026-10-07 docs(alfred): record toil T51-T53 on GG-22 trailers, close-out cost and manual hook installs
+- `f551240d8328` 2026-10-07 docs(alfred): record PO decision AG - one full Critic per package, then delta Critics until pass
+- `03b0d565e19d` 2026-10-07 docs(alfred): record Elephant rulings 8 and 9 on R7-6 TOFU and the disclosure pin
+- `43f12cbf8943` 2026-10-07 docs(alfred): record the U3 Critic round, ruling 7 and the fix-wave progress
+- `d04fb4d23289` 2026-10-07 docs(alfred): record four Elephant rulings, the fix-wave results and toil T50
+- `4f09a1675334` 2026-10-07 docs(alfred): record the test wave results, toil T47-T49 and the fix wave in flight
+- `e27dee45965b` 2026-10-07 docs(alfred): record four Critic rounds, the orchestrator commit-act provenance and toil T43-T45
+- `4a6d5354ea2c` 2026-10-07 docs(alfred): record the Elephant self-verification of R7-11 finding F-A
+- `e890910d0678` 2026-10-07 docs(alfred): record PO decisions AC-AE on key selection, anchor admission and the probe class
+- `17376cb21642` 2026-10-07 docs(alfred): add the multi-key analysis for decision AA and correct the U1 CRLF note
+- `659f8d5a7bc6` 2026-10-07 docs(alfred): refresh the execution order with the afternoon wave
+- `1213f17a4103` 2026-10-07 docs(alfred): record PO decisions Y-AB and resolve the U1-U3 contract questions
+- `d401fdf46e35` 2026-10-07 docs(alfred): add the ADR-0085 U1-U3 API contract
+- `db7a40543e35` 2026-10-07 docs(alfred): record PO decision X and the R7-11, R7-6, R7-1 Critic rounds
+- `6ba7c81f2fc5` 2026-10-07 docs(alfred): log toil rows T39-T42 from the parallel dispatch wave
+- `7127d96e60a0` 2026-10-07 docs(alfred): record PO decisions T-W on the ADR-0085 open questions
+- `f983887405c7` 2026-10-07 docs(alfred): add the ADR-0085 implementation plan
+- `c07f177f3333` 2026-10-07 docs(alfred): add the slice plan for HOOKREFRESH, the hardened test temp root and scratch durability
+- `248b01f7b484` 2026-10-07 docs(alfred): record the R7-11 round-1 Critic FAIL and its dispositions
+- `5a96add67b0b` 2026-10-07 docs(alfred): record PO decisions M-P and the full backlog triage for the candidate
+- `8bb937cf90f4` 2026-10-07 docs(alfred): add toil rows T36-T38 (stale older tests, lost dispatch binding, git grep as push)
+- `64b8f1d52699` 2026-10-07 docs(alfred): record landed slices and the R7-6 spec-settled test alignment
+- `0de8412e9ec6` 2026-10-07 docs(alfred): add toil rows T34 and T35 (win32 hook latency, transient drift refusals)
+- `a3b1d7ea7ab6` 2026-10-07 docs(alfred): add toil rows T31-T33 from the implementation run
+- `0ea0aaa2a79e` 2026-10-07 docs(alfred): add toil rows T29 and T30 from the implementation run
+- `6bc47e82f290` 2026-10-07 docs(alfred): update the execution-order anchor for revision-5 implementation
+- `5a037eb5a122` 2026-10-07 docs(alfred): record the 2026-10-07 process decisions and the device-switch toil log
+- `087652e73edc` 2026-10-07 docs(alfred): close the second readiness round of revision 5
+- `8f476711a644` 2026-10-07 docs(alfred): move the revision-5 authoring route to a new dispatch id for the child Advisor course
+- `195644fe2eaf` 2026-10-07 docs(alfred): extend the revision-5 authoring route record with the readiness fix
+- `49b41f5c1887` 2026-10-07 docs(alfred): close the two readiness blockers of revision 5
+- `b89a9b504219` 2026-10-07 docs(alfred): record the revision-5 authoring route for the dispatch registration
+- `ca7a325b7a07` 2026-10-07 docs(alfred): map T18-T20 and the 2026-10-07 PO decisions in traceability and PRD 15
+- `bf6c691dd0c4` 2026-10-07 docs(alfred): record the PO's 2026-10-07 decisions on the R7 open questions
+- `56b21d68d394` 2026-10-07 docs(alfred): refresh the PRD spec digest marker after the R7 corrections
+- `40852a076097` 2026-10-08 docs(alfred): rulings 66-67, PROBE-B results, toil T85-T86
+- `91dd34cd6ee9` 2026-10-08 docs(alfred): living PO list for the 0.7.0 candidate and toil T84
+- `6b5966c3e8cf` 2026-10-08 docs(alfred): wave anchor for the late-2 fan-out and R5-T0c ratification
+- `dd0a888098b8` 2026-10-08 docs(alfred): PO decisions BK-BN, rulings 64-65, toil T82-T83
+- `7f830ed732eb` 2026-10-08 docs(alfred): backlog survey, d-item dispositions, TOILRES Critic findings, toil T80-T81
+- `92b507dce547` 2026-10-08 docs(alfred): rulings 62-63 for RV-S6, R4, R6 and R7-5 pins
+- `564c6a47aa10` 2026-10-08 docs(alfred): amend PO decision BI to a per-toil-row resolution with a Critic review
+- `47d70533faf3` 2026-10-08 docs(alfred): tranche post-images for the ENVDUMP lane; crash recovery, ruling 56
+- `bedddbd42be8` 2026-10-08 docs(alfred): record wave-7 results, rulings 43-47, three Critic records and PO questions N14-N15
+- `36460ca524d9` 2026-10-08 docs(alfred): record rulings 39-42, wave-6 results and the tranche-1 Critic record
+- `3801c3bbe4b8` 2026-10-08 docs(alfred): record rulings 35-38, wave-5 results and PO question N13
+- `03e86f419ffd` 2026-10-08 docs(alfred): record the AM Critic review, rulings 31-34, host items H9-H12 and toil T61
+- `331c96bb9565` 2026-10-08 docs(alfred): record rulings 25-30, wave-3 results, N12 design pointer and toil T60
+- `debad610d66e` 2026-10-08 docs(alfred): record the RV S1-S4, FSYNC, PR-S1 and AC-34 Critic reviews and rulings 25-29
+- `a1ae88eacdf6` 2026-10-08 docs(alfred): record rulings 19-24, PO question N12 and toil T59
+- `d3a19207d5e3` 2026-10-08 docs(alfred): record the AC-6 full Critic review and rulings 22-23
+- `42a65082f7d9` 2026-10-08 docs(alfred): record wave results and rulings 16-18 in the execution order
+- `a710b8e3d19c` 2026-10-08 docs(alfred): add the 0.7.0 candidate host-run checklist
+- `da8fb44533a1` 2026-10-08 docs(alfred): add PO question N11 (PR delivery record)
+- `148b9d9c119a` 2026-10-08 docs(alfred): record toil T58 (hook snapshot drift race in a shared tree)
+- `4f6f6370c8f1` 2026-10-08 docs(alfred): add PO questions N9 (Linux-only C1 store) and N10 (worktree-per-Goldfish)
+- `88bd961f9a82` 2026-10-08 docs(alfred): record the 2026-10-08 autonomous wave in the execution order
+- `dc65afff4edd` 2026-10-08 docs(alfred): record scratch-sweep delta-3 Critic and its disposition
+- `3003ef6d2322` 2026-10-08 docs(alfred): add PO question N8 (AP vs HGO author root) and toil T57
+- `5beea0d9f57b` 2026-10-08 docs(alfred): add open PO questions N5 (write lease) and N7 (recovery choices)
+- `d0fa637fe661` 2026-10-08 docs(alfred): add open PO question N6 (script-mediated writes option)
+- `dcb89fc81571` 2026-10-08 docs(alfred): record Elephant ruling 15 (AC-6 baseline and promotion check)
+- `d8786d8f9947` 2026-10-08 docs(alfred): record R7-6 push-prepare delta 1
+- `fc7827473e09` 2026-10-09 chore(evidence): preserve final Alfred R9 assembly and focused validation
+- `57ebd96d0ed1` 2026-10-09 chore(alfred): preserve exact postinstall repair assembly and evidence
+- `efa7565643a7` 2026-10-09 chore(alfred): preserve postinstall verification failures and repair proposals
+- `7850d8d8a948` 2026-10-09 docs(alfred): retain independent capture-header regression before repair
+- `f95100c5e38c` 2026-10-09 docs(alfred): retain postinstall checks and independent regression evidence
+- `911828069261` 2026-10-09 docs(alfred): preserve post-candidate verification evidence
+- `459f448a1e9d` 2026-10-09 fix(alfred): freeze tested local candidate proposals
+- `de2f94982920` 2026-10-09 fix(alfred): complete composed approval flow and candidate registrations
+- `38f2fc513767` 2026-10-09 chore(alfred): bind complete validator and anchored approval test proposals
+- `0e21eccd9acb` 2026-10-09 chore(alfred): preserve verified bootstrap and capacity proposals
+- `9c788838c6d3` 2026-10-09 docs(schema): preserve validator context in shared-capacity proposal
+- `b64bee9b7219` 2026-10-09 fix(alfred): park verified greenfield onboarding corrections
+- `5d1f17abd470` 2026-10-09 feat(alfred): park compatible shared-capacity proposals
+- `daf810e40c9f` 2026-10-09 docs(evidence): record Alfred checkout verification and delivery limits
+- `c1cde98afd5b` 2026-10-09 docs(alfred): toil T130 (checkpoint signature spent on a HEAD without the intent trailer)
+- `01f6c5121cb9` 2026-10-09 docs(alfred): toil T130 (checkpoint signature spent on a HEAD without the intent trailer)
+- `692fa703f4a3` 2026-10-09 docs(alfred): keep the dispatch records written under specs evidence by mistake
+- `af2dc2913f62` 2026-10-09 chore(tranche-2): preserve the GREP-PUSH-F and CRITIC-CKPT-F2 post-images; park uncommitted edits
+- `978c8479eb3d` 2026-10-09 docs(alfred): persist the ignored 2026-10-09 intermediate results for a fresh WSL clone
+- `27c44870e45e` 2026-10-09 docs(alfred): Ruling 164 (wrap-up without stamp; PO decides empty trust anchors are refused)
+- `3d5c858c048e` 2026-10-09 docs(alfred): anchor CRITIC-CKPT-T4 and ADOPT-SIGN-T2 returns
+- `d916a54594ab` 2026-10-09 docs(alfred): toil T128 (finisher re-orientation) and T129 (guard-push on git inside wsl.exe)
+- `127ead916baa` 2026-10-09 docs(alfred): rule on the E2E-ONB-B2 and WIN-AP-S5-D returns
+- `f9a2a8409f25` 2026-10-09 docs(alfred): split CRITIC-CKPT-F per QG-04; the default Critic base cap stays 30
+- `9709982dc702` 2026-10-09 docs(alfred): record Ruling 163 (CONT36 returns, ONB pin location, F3 language contract)
+- `3211c15eafe9` 2026-10-09 docs(alfred): anchor CONT35/36 returns and the Critic confinement ruling
+- `dd25190e3ec0` 2026-10-09 docs(alfred): PO list — design-question round default (E2E-ONB F6), adoption status; toil T127
+- `b4c607f6c8a7` 2026-10-09 docs(alfred): record the architecture currency measurement; ADOPT-P1 required
+- `00e62f8b4e31` 2026-10-09 docs(alfred): anchor the CONT35 wave; toil T125-T126
+- `3f7708289400` 2026-10-09 docs(alfred): record Ruling 162 — adoption scope, CONT33/34 returns, interim-candidate path
+- `30194de72980` 2026-10-09 docs(alfred): record Ruling 161 — mechanic route split, Critic cap arithmetic, critical path only
+- `434a01bb172b` 2026-10-09 docs(alfred): record Ruling 160 — adopt the architecture map in 0.7.0
+- `862db7a68de4` 2026-10-09 docs(alfred): record the cleared T90 audit lock and the remaining PO items
+- `2bf124da9e9d` 2026-10-09 docs(alfred): record Ruling 159 — Critic checkpoint logic, D1 signature, CONT30-32 returns
+- `ec2c218209eb` 2026-10-09 docs(alfred): Ruling 155 (guard fix review closed on provenance, producer chain closed)
+- `4b79b33a0f1e` 2026-10-09 docs(alfred): Ruling 154 (hardener idempotent, binding DACL check, producer route and TR-C landed)
+- `c7abe2c1a303` 2026-10-09 docs(alfred): Ruling 153 (stamp gate admits the live approval, T90 closed, WIN-GMW first round partial)
+- `d8b5d5a64676` 2026-10-09 docs(alfred): Ruling 152 (a rollback cell encodes the old repository-pointer contract)
+- `103d4b4bae28` 2026-10-09 docs(alfred): Ruling 151 (event store on the hardened root, hardener pins red, read-grammar review closed)
+- `ea5401ec6981` 2026-10-09 docs(alfred): Ruling 150 (the commit-flow producer route is named but never admitted)
+- `f58ced7bc346` 2026-10-09 docs(alfred): wave anchor update 5 (running set, blockers, pre-signing checklist)
+- `6305f867ffa7` 2026-10-09 docs(alfred): Ruling 149 (v7 boundary edit plan and stamp-gate probe, recovery-files pin landed)
+- `225f9b1eeacb` 2026-10-09 docs(alfred): Rulings 147-148 (kernel-list patch drift, win32 hardener not idempotent)
+- `ad3e7f2bcf77` 2026-10-09 docs(alfred): Ruling 146 (hardened root entry point landed, event store next)
+- `887d4fa50d89` 2026-10-09 docs(alfred): Ruling 145 (post-cap fix landed, read-grammar review partial, rg -g kept refused)
+- `625ddd1f1919` 2026-10-09 docs(alfred): Ruling 144 (T90 delta review settled, cross-volume pin and stored verifier landed)
+- `52d21336b972` 2026-10-09 docs(alfred): Ruling 143 (store host-class skips landed, possible win32 re-harden defect)
+- `b6d29f4718b8` 2026-10-09 docs(alfred): Ruling 142 (audit-lock recovery live, stored-verifier and post-cap pins)
+- `f43bc8564f61` 2026-10-09 docs(alfred): Ruling 141 (one hardened creator for the private root; D0 default)
+- `ae446410c4d1` 2026-10-09 docs(alfred): Ruling 140 (cross-volume scope escape in the maintenance window, win32 store binding)
+- `eae79f881a53` 2026-10-09 docs(alfred): Ruling 139 (several unhardened agent-pipeline creators on win32)
+- `4ade16cc182f` 2026-10-09 docs(alfred): Ruling 138 (win32 store lock, recovery pins, re-read test restart, TR-G-F review)
+- `a662f4dc6e8e` 2026-10-09 docs(alfred): Ruling 137 (repository key pointer written by the bootstrap owner)
+- `03bddc63d665` 2026-10-09 docs(alfred): Ruling 136 (audit-lock recovery path meaning, re-read accepted, F2b split)
+- `0f8c297c7372` 2026-10-09 docs(alfred): Ruling 135 (win32 creator fixes, T90-T2 native, TR-G-F)
+- `bcbb5e9c3bc3` 2026-10-09 docs(alfred): Ruling 134 (read-grammar and push-classifier pins complete, obligations spelling)
+- `5e19c84c58dd` 2026-10-09 docs(alfred): Ruling 131 (win32 event-store hardening, ceremony readback, push-guard commit spelling)
+- `393b8c8a27c3` 2026-10-09 docs(alfred): Ruling 130 (DWP21 owned by the boundary slice, T90 pins, win32 privacy)
+- `9d2c4b27fd85` 2026-10-09 docs(alfred): Ruling 129 (TR-I Critic pass, ceremony re-point, partial post-images)
+- `7c9c63365e2a` 2026-10-09 docs(alfred): Ruling 128 (DP23 probe skip, budget pins, bound-path gate kept)
+- `03cd3eedeb76` 2026-10-09 docs(alfred): Ruling 127 (preflight test native-green, budget pins continue, DP23 skip)
+- `dcf0faab9595` 2026-10-09 docs(alfred): Ruling 126 (TR-I Critic reference stop, TR-L pins, corrected restore command)
+- `17a0897095be` 2026-10-09 docs(alfred): Ruling 125 (T90 Critic fail and cure design, pre-push frozen copy)
+- `d056137d2046` 2026-10-09 docs(alfred): Rulings 122-124 (frozen clone-hook copy, TR-I Critic re-routed, encrypted ceremony)
+- `7e2d001deda8` 2026-10-09 docs(alfred): Ruling 121 (TR-S2 delta pass, F1e hold lifted, key-gate neighbours)
+- `c050c41160e1` 2026-10-09 docs(alfred): Ruling 120 (win32 audit-lock liveness landed, G Critic)
+- `328fc5d8f7f0` 2026-10-09 docs(alfred): Ruling 119 (completion recorder inert without signal, TR-I Critic)
+- `c39356584ad8` 2026-10-09 docs(alfred): Ruling 118 (zero-bytes pin green, toolchain copy, TOILRES fan-out)
+- `32ebb854b180` 2026-10-09 docs(alfred): Ruling 116 (fd 3 announced; HOOKREFRESH recap reds are live-tree drift)
+- `11657e2d1386` 2026-10-09 docs(alfred): Ruling 115 (T90 pins, package Critic self-verify, T97)
+- `8066b8f8f16c` 2026-10-09 docs(alfred): Ruling 114 (TR-S2-F2b re-captured, R7-3-F1e held for discrimination)
+- `193c405117e4` 2026-10-09 docs(alfred): Ruling 113 (deep-night returns, HOOKREFRESH delta Critic, T96)
+- `b549240e3710` 2026-10-09 docs(alfred): Ruling 112 (Critic budget landed, snapshot design accepted, SF22b registration)
+- `1fa682af992b` 2026-10-09 docs(alfred): Ruling 111 (RC14C009 split holds; win32 audit-lock liveness design)
+- `c75b70babcdd` 2026-10-09 docs(alfred): Ruling 110 (v8 validator may carry enumerated interim reds)
+- `34c0abb1dd65` 2026-10-09 docs(alfred): Ruling 109 (Critic budget pins, hook-refresh fix, rg option pins)
+- `e0f7328b1ee5` 2026-10-09 docs(alfred): Rulings 107-108 (snapshot scan design, completion fd, F2 re-dispatch; toil T95)
+- `7608555b19f9` 2026-10-09 docs(alfred): Rulings 103-106 (win32 skips, R7-3 fixtures, preflight roots, rg pattern options)
+- `6ebec9435e16` 2026-10-09 docs(alfred): Ruling 102 (split-map entry needs its count pin; deep-night anchor)
+- `cbd004719ee6` 2026-10-09 docs(alfred): Ruling 101 (v7 boundary post-image landed; ADR-0085 F order)
+- `972c936e6146` 2026-10-09 docs(alfred): Rulings 97-100 (TR-S2 pins, TR-K1 stop, kernel docs, win32 ACL pin)
+- `df5d562d1adb` 2026-10-09 docs(alfred): Ruling 96 (kernel-list follow-ups: threat-model doc sync, split-map entry)
+- `e64b30b72dd8` 2026-10-09 docs(alfred): Ruling 95 (RC14C009 is a host limitation; win32 ACL coverage gap)
+- `836511755414` 2026-10-09 docs(alfred): Ruling 94 (HOOKREFRESH pins landed; CHRB007 re-point, both readback sites)
+- `40ee6b60a144` 2026-10-09 docs(alfred): Ruling 93 (seven win32 reds are green under WSL)
+- `95377b0ffebd` 2026-10-09 docs(alfred): Rulings 90-92 (TR-S2 Critic FAIL, TR-S1-T4 sets, v1 descendant gap)
+- `5031d4dc474c` 2026-10-09 docs(alfred): night wave anchor and tranche-2 list changes
+- `8969a81b8454` 2026-10-09 docs(alfred): toil T94 (budget checkpoints, immutable records, unbound integration commit)
+- `f9007f38f4cf` 2026-10-09 docs(alfred): Rulings 86a-89 (kernel fixpoint, FANOUT-WIN, R7-3 fixtures, GREENFIELD)
+- `935f32f9b1d6` 2026-10-09 docs(alfred): Ruling 86 (kernel closure repair grows the kernel, measured first)
+- `16af5328e561` 2026-10-09 docs(alfred): Rulings 84-85 (HOOKREFRESH and GS-RETRY Critic findings)
+- `1ba019d0be00` 2026-10-09 docs(alfred): Rulings 81-82 (GREP-PUSH a PO decision, FANOUT-WIN re-scoped, patch check), SCANNER-PROV verified
+- `05384deea52d` 2026-10-09 docs(alfred): late-afternoon wave anchor; tranche-2 members in the PO list
+- `60b9111e2514` 2026-10-09 docs(alfred): Rulings 78-79 (TR-S1 A4 re-scoped, ADR0085-T0a ratified), toil T93
+- `ddf1d5b6f63e` 2026-10-09 docs(alfred): Ruling 76 (TR-S2 contract ratified; tranche-2 carries a patch)
+- `bdb0a5501c5d` 2026-10-09 docs(alfred): PROBE-A live dispositions, toil T91, Ruling 75 (TR-S1 contract)
+- `d2f647bc74da` 2026-10-09 docs(alfred): Ruling 74 ratifies the GS-RETRY contract
+- `3404a9200c0e` 2026-10-09 docs(alfred): Critic R7-3-CB PASS with one minor finding (candidate tree)
+- `b05867bffe12` 2026-10-09 docs(alfred): Ruling 73 and the ADR0085-D2 delta Critic findings
+- `f8ae2d2399ea` 2026-10-09 docs(alfred): PO list carries TOILRES a3 decisions 1-9 and the self-verification
+- `fd6060adea7b` 2026-10-09 docs(alfred): Ruling 72 (R4-S3b stop, TOILRES slice start, TR-S2 module placement)
+- `949f0e720aaa` 2026-10-09 docs(alfred): afternoon wave anchor and Ruling 71 (HOOKREFRESH-F1c stop)
+- `a8dba59ffce7` 2026-10-09 docs(alfred): toil row T90, PO-list lock clearance, partial Critic R7-3-F1c2
+- `0944b1193157` 2026-10-09 docs(alfred): toil row T89, fixed dispatch overhead eats the work budget
+- `37644457a687` 2026-10-09 docs(alfred): wave anchor 2026-10-09 midday, Ruling 70 follow-up and T88 third case
+- `07935b23cc9f` 2026-10-09 docs(alfred): persist Critic TOILRES-D2b a1 findings and toil row T88
+- `b49b7fb99b48` 2026-10-09 docs(alfred): persist Critic ADR0085-D a1 findings and the revision dispatch
+- `f929da250b59` 2026-10-09 docs(alfred): pipeline-state probe result and the 2026-10-09 morning wave
+- `e8dcc8c79f9c` 2026-10-09 docs(alfred): wave anchor 2026-10-09 early and the pipeline-state suite finding
+- `410d0addf8da` 2026-10-09 docs(alfred): rulings 68-69, gate outage T87 and its consequences
+- `56a2ffc0c5b8` 2026-10-10 docs(alfred): retain integrated source and current qualification checkpoint
+- `bfdb4b1cc9f5` 2026-10-10 docs(alfred): retain current source inventory and complete item mapping
+- `ed9121379e52` 2026-10-10 docs(alfred): retain complete criterion and work evidence checkpoint
+- `6bcf5ee4a8c2` 2026-10-10 docs(alfred): archive intermediate stages and actual integration progress
+- `5d19fb655456` 2026-10-10 docs(alfred): retain fanout and intermediate item progress rules
+- `44b78dc0751a` 2026-10-10 docs(alfred): record next owners after the consolidated checkpoint
+- `70846423749f` 2026-10-10 docs(alfred): consolidate item progress and preserve shared-state attempt
+- `3a5a79b51698` 2026-10-10 docs(alfred): preserve current item routes and late source handoffs
+- `6bf45f1f5a0f` 2026-10-10 test(alfred): archive independent own-session audit qualification
+- `8ca8e1b63046` 2026-10-10 test(alfred): preserve actual headroom route qualification
+- `0198cbab20d4` 2026-10-10 docs(alfred): archive item handoffs and qualified assembly progress
+- `6e6acf113017` 2026-10-12 docs(alfred): record batch-Critic standard, parallelism limits and W1-02 finding
+- `e145eec34107` 2026-10-12 docs(alfred): record dispatch-route blockers, hotfixes T20/T21 and PO decisions
+- `952597aad675` 2026-10-12 docs(alfred): register the Alfred package manifest and record the design-route blockers
+- `5f62ea7bb216` 2026-10-12 docs(alfred): bind traceability.md as a companion in the T10 delta receipt
+- `aea3f754f0fa` 2026-10-12 docs(alfred): record the T10 delta design review and its receipt
+- `f8f75a50c9a1` 2026-10-12 docs(alfred): record that the item-delivery operating model is not yet shipped
+- `75af012837ff` 2026-10-12 docs(alfred): record the PO decision on the Critic notes writer
+- `d2e0fb2d6075` 2026-10-12 docs(alfred): record the T10 delta review input bindings
+- `e2233e026015` 2026-10-12 docs(alfred): record the filled T10 design review briefing
+- `5d1fa36180af` 2026-10-12 docs(alfred): resolve the T10 design review findings in spec §23
+- `9ffccb323ac2` 2026-10-12 docs(alfred): record the filled T10 design review briefing
+- `12bb3fb1c0d7` 2026-10-12 docs(alfred): bind the PRD to the spec carrying the item register
+- `4007afcd5061` 2026-10-12 docs(alfred): add the item acceptance criteria register to the spec
+- `ea28313aff1a` 2026-10-12 docs(alfred): record the live T11 check and the per-machine capacity topic
+- `395fed9b11c1` 2026-10-12 docs(alfred): record the T11 decision and the ten-dispatch capacity
+- `d153cc81926f` 2026-10-12 docs(alfred): record the wave pre-check and item-level PO topics
+- `a219ab3b0332` 2026-10-12 docs(alfred): prepare the T11 eol=lf attribute patch
+- `1c00f59263af` 2026-10-12 docs(alfred): record the wave pre-check and item-level PO topics
+- `076bac84cd2f` 2026-10-12 docs(alfred): record the 174-item scope fanout and wave plan
+- `31285691aae7` 2026-10-12 docs(alfred): prepare the T10 item register and the T11 helper patch
+- `2f3f6c70e321` 2026-10-12 docs(alfred): record the Windows authority helper digest mismatch
+- `906b73cec1f4` 2026-10-12 docs(alfred): record the partial T6-A full Critic result
+- `65f77acdfe44` 2026-10-12 docs(alfred): record item-admission preconditions found after T6-A
+- `864d1d9eb442` 2026-10-12 docs(alfred): record the filled T6-A Critic briefing
+- `8089fd33820a` 2026-10-12 docs(alfred): record blocking security-scan result as topic T7
+- `ba1e025e8ed9` 2026-10-12 docs(alfred): record pilot dispatch block and its verified cause
+- `cecaf83b35f8` 2026-10-12 docs(alfred): add reuse index, pilot briefing and batch C1 declaration
+- `fe6c6f99e5ff` 2026-10-13 docs(alfred): record the PO decisions of 2026-10-13
+- `c697b7bffeed` 2026-10-13 docs(alfred): record the C3 diff review and the W1-07 corpus run
+- `e840f186f010` 2026-10-13 docs(alfred): record batch C3 review, corrections and new PO topics
+- `e6b51acd84ea` 2026-10-13 docs(alfred): record the night pin wave and its findings
+- `6ac1dc519bfa` 2026-10-14 docs(alfred): record the night continuation and the stale lock removal
+- `488c975143a7` 2026-10-14 docs(alfred): record the PO answers to the 2026-10-14 decision tiles
+- `70894fb6273b` 2026-10-14 docs(alfred): record the PO decision to admit agy releases from 1.2.12
+- `26a431f196ea` 2026-10-14 docs(alfred): record the stamped 2026-10-14 interim candidate
+- `e2631e55ed25` 2026-10-14 docs(alfred): record the second partial C5 Critic part
+- `bb800143702a` 2026-10-14 docs(alfred): record the partial batch C5 Critic result
+- `f822dcc85ead` 2026-10-14 docs(alfred): package the prepared read-grammar postimages as a patch
+- `913d70c141af` 2026-10-14 docs(alfred): record the midday and afternoon session results
+- `15afd4f3c1e5` 2026-10-14 docs(alfred): bind the 2026-10-14 audit findings to in-scope items
+- `f65edecfe8de` 2026-10-15 docs(alfred): record the later night results in the session ledger
+- `2c57888a31f9` 2026-10-15 docs(alfred): record the batch C4 Critic briefing and its partial result
+- `69ca3171bf6f` 2026-10-15 docs(alfred): record the later night results in the session ledger
+- `dd08f47d1eb3` 2026-10-15 docs(alfred): record the C5 diff Critic part 2 result
+- `cb97b4a1fd3c` 2026-10-15 docs(alfred): record the C5 diff Critic part 1 result and the part 2 briefing
+- `6339929c765b` 2026-10-15 docs(alfred): record the night results and the C5 diff Critic briefing
+- `011642c6f4e1` 2026-10-16 docs(sprint-alfred-epic): record the 2026-10-16 engineering-stage remeasure
+- `d509bfffe9c8` 2026-10-16 docs(sprint-alfred): record pin waves P13-P16 and Critic C6c
+- `9826b2f77a18` 2026-10-16 docs(sprint-alfred): record pin waves P11-P13 and Critic C6b
+- `616de7606281` 2026-10-16 docs(sprint-alfred): record the 2026-10-16 pin waves and Critic C6a
