@@ -1239,6 +1239,9 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate}=
     // child. No inherited descriptor is advertised when it is not passed.
     delete checkEnv.PIPELINE_VERIFY_CASE_COMPLETION_FD;
     delete checkEnv.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES;
+    // An inherited outer test-runner context makes a nested `node --test` exit 0 with empty output even when its
+    // test fails; the verdict of a check must not depend on the runner that happens to host this process.
+    delete checkEnv.NODE_TEST_CONTEXT;
     for(const check of itemDelivery.checks) {
       const run=spawnSync(process.execPath,['--test',resolve(root,check.path)],{cwd:before.repository.primaryRoot,env:checkEnv,shell:false,timeout:60000,maxBuffer:1024*1024});
       results.push({id:check.id,path:check.path,executable:process.execPath,args:['--test',check.path],status:run.status,signal:run.signal,error:run.error?.code??null,

@@ -2868,6 +2868,12 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/governance-scope-rejects-readonly-host-git-control.test.mjs"
     },
     {
+      "name": "pin-governed-check-child-ignores-inherited-node-test-context-tests",
+      "file": "plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs"
+    },
+    {
       "name": "pin-greenfield-approval-policy-applies-after-intake-transition-tests",
       "file": "plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs",
