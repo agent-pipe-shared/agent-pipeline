@@ -42,6 +42,14 @@ const RECEIPT_KEYS = [
   "featureId", "kind", "openFindingIds", "previousReceiptPath", "previousReceiptSha256", "report",
   "reviewedAt", "reviewer", "round", "schema", "sources", "verdict",
 ];
+// K128 (PO decision 2026-10-23, batch 12, row 41): one OPTIONAL, closed field. It records that the review ran on the typed
+// fallback-self-dispatch route instead of the native one, so a presented plan never passes a single-review route off as an
+// independent review. Names come from records that already exist: `route`/`reasonCode` (canonical fallback result) and
+// `requestedRoute`/`observedIdentity` (this receipt's producer). A receipt without it is valid and byte-unchanged.
+const FALLBACK_ROUTE = "fallback-self-dispatch";
+const FALLBACK_KEYS = ["observedIdentity", "reasonCode", "requestedRoute", "route"];
+const FALLBACK_REASON_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$/u;
+const FALLBACK_REQUESTED_ROUTE = /^[\x21-\x7e]{1,128}$/u;
 
 // Strict decoding: invalid UTF-8 is not a receipt. `ignoreBOM: true` keeps a leading BOM in the
 // text, so a BOM-prefixed file fails JSON parsing instead of being silently normalised.
@@ -109,6 +117,11 @@ const reportPairIsValid = (report) => !Object.hasOwn(report, "originalSha256") |
 const isReviewer = (value) => isObject(value) && hasExactKeys(value, ["model", "runner"]) && isString(value.runner) && RUNNER.test(value.runner) && isString(value.model) && MODEL.test(value.model);
 const isSourcesShape = (value) => isObject(value) && hasExactKeys(value, ["companions", "prd", "spec"]) && isRef(value.prd) && isRef(value.spec) && Array.isArray(value.companions) && allOf(value.companions, isRef);
 const isStringList = (value) => Array.isArray(value) && allOf(value, isString);
+/** The closed fallback record: the fallback route, a reason code, the requested route and the observed identity (or `unknown`). */
+export const isDesignReviewFallback = (value) => isObject(value) && hasExactKeys(value, FALLBACK_KEYS) && value.route === FALLBACK_ROUTE
+  && isString(value.reasonCode) && FALLBACK_REASON_CODE.test(value.reasonCode)
+  && isString(value.requestedRoute) && FALLBACK_REQUESTED_ROUTE.test(value.requestedRoute)
+  && isString(value.observedIdentity) && MODEL.test(value.observedIdentity);
 const isPreviousInput = (value) => isObject(value) && hasExactKeys(value, ["bytes", "path"]) && isString(value.path) && value.bytes instanceof Uint8Array;
 
 // ----------------------------------------------------------------------------- semantic checks
@@ -146,9 +159,11 @@ function findingIdsAreAcceptable(ids) {
 
 /** First failing code of a decoded receipt value, in the contract order, or null. */
 function receiptRefusal(receipt) {
-  if (!isObject(receipt) || !hasExactKeys(receipt, RECEIPT_KEYS)) return "DRR-SHAPE";
+  const hasFallback = isObject(receipt) && Object.hasOwn(receipt, "fallback");
+  if (!isObject(receipt) || !hasExactKeys(receipt, hasFallback ? [...RECEIPT_KEYS, "fallback"] : RECEIPT_KEYS)) return "DRR-SHAPE";
   const { sources, report, previousReceiptPath, previousReceiptSha256 } = receipt;
   const shapeOk = receipt.schema === DESIGN_REVIEW_RECEIPT_SCHEMA
+    && (!hasFallback || isDesignReviewFallback(receipt.fallback))
     && isFeatureId(receipt.featureId)
     && (receipt.kind === "initial" || receipt.kind === "delta")
     && Number.isSafeInteger(receipt.round) && receipt.round >= 1
@@ -307,7 +322,10 @@ export function assessSpecDecisionContinuity(specBytes) {
 export function createDesignReviewReceipt(input) {
   if (!isObject(input)) return refuse("DRR-SHAPE");
   const { featureId, previous, sources, reviewer, report, openFindingIds, reviewedAt } = input;
+  // `fallback` is optional; present (even null) it must be the closed fallback record.
+  const hasFallback = input.fallback !== undefined;
   const shapeOk = isFeatureId(featureId)
+    && (!hasFallback || isDesignReviewFallback(input.fallback))
     && (previous === null || isPreviousInput(previous))
     && isSourcesShape(sources)
     && isReviewer(reviewer)
@@ -371,6 +389,7 @@ export function createDesignReviewReceipt(input) {
     verdict: ids.length === 0 ? "pass" : "open-findings",
     openFindingIds: ids,
     reviewedAt,
+    ...(hasFallback ? { fallback: Object.fromEntries(FALLBACK_KEYS.map((key) => [key, input.fallback[key]])) } : {}),
   };
   const bytes = ENCODER.encode(`${canonical(receipt)}\n`);
   // Self-check: what is returned is exactly what parse accepts from these bytes.
@@ -405,6 +424,8 @@ export function summarizeDesignReviewReceipt(input) {
       report: receipt.report,
       verdict: receipt.verdict,
       openFindingIds: receipt.openFindingIds,
+      // K128: present only when the review ran on the typed fallback route; a native receipt's summary is unchanged.
+      ...(Object.hasOwn(receipt, "fallback") ? { fallback: receipt.fallback } : {}),
     },
   };
 }

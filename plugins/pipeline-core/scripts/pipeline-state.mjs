@@ -11035,6 +11035,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan presentation recorded by "${by}" on ${presentedAt}; bound to submission ${submissionSha256.slice(0, 12)}....`);
       if (approvalReview !== null) {
+        // K128 (PO decision 2026-10-23, batch 12, row 41): a receipt produced on the typed fallback route is named here, so the
+        // presented plan never passes a single-review fallback off as an independent native review.
+        for (const entry of approvalReview.reviewReceipts) {
+          if (entry.fallback !== undefined) console.log(`Review route: ${entry.path} ran on the fallback-self-dispatch route (${entry.fallback.reasonCode}; requested ${entry.fallback.requestedRoute}, observed ${entry.fallback.observedIdentity}) -- a single-review fallback, not an independent native review.`);
+        }
         console.log("Complete bounded design-workflow review (still pending PO approval):");
         console.log(JSON.stringify(approvalReview, null, 2));
         console.log(`Exact PO request: ${approvalRequestPath}.`);

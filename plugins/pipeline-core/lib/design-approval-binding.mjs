@@ -25,7 +25,7 @@
 import { createHash } from "node:crypto";
 
 import { DesignConsistencyCheckError, reviewChainInconsistencies } from "./design-consistency-check.mjs";
-import { summarizeDesignReviewReceipt } from "./design-review-receipt.mjs";
+import { isDesignReviewFallback, summarizeDesignReviewReceipt } from "./design-review-receipt.mjs";
 import { PO_APPROVAL_INTENT_SCHEMA, canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
 
 export const DESIGN_APPROVAL_BINDING_SCHEMA = "pipeline.design-approval-binding.v1";
@@ -109,7 +109,9 @@ function isSourceSet(value) {
 /** One to two entries, ascending rounds 1 and 2. */
 function isReceiptList(value) {
   if (!Array.isArray(value) || value.length < 1 || value.length > MAX_RECEIPTS) return false;
-  return allOf(value, (entry, index) => hasExactKeys(entry, ["path", "sha256", "round"]) && isSafePath(entry.path) && isSha(entry.sha256) && entry.round === index + 1);
+  // K128: an entry may carry the closed `fallback` record of a receipt produced on the typed fallback route; otherwise it is exactly three keys.
+  return allOf(value, (entry, index) => (hasExactKeys(entry, ["path", "sha256", "round"]) || (hasExactKeys(entry, ["path", "sha256", "round", "fallback"]) && isDesignReviewFallback(entry.fallback)))
+    && isSafePath(entry.path) && isSha(entry.sha256) && entry.round === index + 1);
 }
 
 /** The complete open set: unique, ascending by code unit, in the finding-id pattern. */
@@ -216,7 +218,7 @@ export function createDesignApprovalBinding(input) {
     schema: DESIGN_APPROVAL_BINDING_SCHEMA,
     featureId,
     sources: copySources(currentSources),
-    reviewReceipts: summaries.map(({ path, sha256, round }) => ({ path, sha256, round })),
+    reviewReceipts: summaries.map(({ path, sha256, round, fallback }) => ({ path, sha256, round, ...(fallback === undefined ? {} : { fallback: { ...fallback } }) })),
     verdict: latest.verdict,
     openFindingIds: [...latest.openFindingIds],
   };

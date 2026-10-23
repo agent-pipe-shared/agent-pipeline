@@ -215,7 +215,11 @@ function assertSourceSet(set, label, allowNull) {
 }
 
 function assertSummary(summary) {
-  if (!hasExactKeys(summary, SUMMARY_KEYS)) fail("a review receipt summary must carry exactly the ReceiptSummary keys");
+  // K128: `fallback` is the one optional key (present only when the review ran on the typed fallback route).
+  const hasFallback = isObject(summary) && Object.hasOwn(summary, "fallback");
+  if (!hasExactKeys(summary, hasFallback ? [...SUMMARY_KEYS, "fallback"] : SUMMARY_KEYS)) fail("a review receipt summary must carry exactly the ReceiptSummary keys");
+  if (hasFallback && !(hasExactKeys(summary.fallback, ["observedIdentity", "reasonCode", "requestedRoute", "route"])
+    && Object.values(summary.fallback).every((value) => typeof value === "string"))) fail("a review receipt summary fallback is malformed");
   if (typeof summary.path !== "string" || !isSha(summary.sha256)) fail("a review receipt summary path or digest is malformed");
   if (typeof summary.featureId !== "string" || !FEATURE_ID.test(summary.featureId)) fail("a review receipt summary featureId is malformed");
   const linkPath = summary.previousReceiptPath;
