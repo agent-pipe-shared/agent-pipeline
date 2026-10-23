@@ -875,7 +875,18 @@ export function readOnlyGitApplyCheckArguments(argv) {
       directory = value;
     } else if (!["--no-pager", "--literal-pathspecs"].includes(option)) return null;
   }
-  if (argv[index++] !== "apply" || argv[index++] !== "--check") return null;
+  if (argv[index++] !== "apply") return null;
+  // `--reverse` only flips the direction of a validation; it is admitted once, directly
+  // before or directly after `--check`, and nowhere else.
+  let reverse = false;
+  const takeReverse = () => {
+    if (reverse || argv[index] !== "--reverse") return;
+    reverse = true;
+    index += 1;
+  };
+  takeReverse();
+  if (argv[index++] !== "--check") return null;
+  takeReverse();
   const modes = ["nowarn", "warn", "fix", "error", "error-all"];
   if (argv[index] === "--whitespace") {
     index += 1;
@@ -888,6 +899,37 @@ export function readOnlyGitApplyCheckArguments(argv) {
   if (patches.length === 0 || patches.some(path => !path || path.startsWith("-")
     || !/\.(?:diff|patch)$/iu.test(path) || path.split(/[\\/]/u).includes(".."))) return null;
   return Object.freeze({directory,patches:Object.freeze(patches)});
+}
+
+// The direct, closed stash readers (`stash list`, `stash show [N]`); every other stash form is a writer.
+function isClosedStashReader(stashArgs) {
+  return (stashArgs.length === 1 && stashArgs[0] === "list")
+    || (stashArgs[0] === "show" && (stashArgs.length === 1
+      || (stashArgs.length === 2 && /^[0-9]+$/u.test(stashArgs[1]))));
+}
+
+// Unparsed-command fallback only: a command outside the closed grammar (an `&&`/`||`/`;`/`|` chain)
+// has no authoritative argv, so split the raw text at the chain operators and give every segment that
+// starts with `git` the same git-working-tree-write verdict the parsed lane gives a lone invocation.
+// Quoting is ignored on purpose (a quoted operator only over-splits, which can add a candidate, never
+// drop one); the raw-token candidates the caller appends stay in addition to these.
+function gitChainWriteTargets(command) {
+  const targets = [];
+  for (const piece of command.split(/&&|\|\||[;|&\n]/u)) {
+    const words = piece.replace(/^[\s(){}!]+/u, "").split(/\s+/u).filter(Boolean)
+      .map((word) => stripShellQuoteDelimiters(word) || word);
+    if (words.length === 0 || normalizedExecutable(words[0]) !== "git") continue;
+    const argv = words.slice(1);
+    const verbIndex = gitVerbIndex(argv);
+    const verb = argv[verbIndex] ?? null;
+    if (!GIT_WRITE_VERBS.has(verb ?? "") || verb === "apply"
+      || isGitIndexOnlyInvocation(verb, argv.slice(verbIndex + 1))) continue;
+    if (verb === "stash" && verbIndex === 0 && isClosedStashReader(argv.slice(1))) continue;
+    for (const operand of gitWriteTargetOperands(verb, argv.slice(verbIndex + 1))) {
+      targets.push({ candidate: operand, lane: "git-working-tree-write", classification: "conservative-possible-write" });
+    }
+  }
+  return targets;
 }
 
 export function extractShellWriteTargets({ command, root, toolName = "Bash", platform = process.platform } = {}) {
@@ -927,7 +969,7 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       }
 
       const sed = executable === "sed" ? sedWriteTargets(argv) : null;
-      const inPlace = IN_PLACE_EXECUTABLES.has(executable) && (sed?.inPlace || argv.some((arg) => IN_PLACE_FLAGS.has(arg) || /^-[a-z]*i[a-z]*$/u.test(arg)));
+      const inPlace = IN_PLACE_EXECUTABLES.has(executable) && (sed?.inPlace || argv.some((arg) => IN_PLACE_FLAGS.has(arg) || /^-[a-z]*i(?:[a-z]*|[^a-z].*)$/u.test(arg)));
       const isGit = executable === "git";
       const verbIndex = isGit ? gitVerbIndex(argv) : 0;
       const verb = isGit ? (argv[verbIndex] ?? null) : null;
@@ -935,10 +977,7 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       if (!WRITE_EXECUTABLES.has(executable) && !inPlace && !gitWrite) continue;
       // Match only the direct, closed stash readers; every other stash form stays a writer.
       if (gitWrite && verb === "stash" && verbIndex === 0) {
-        const stashArgs = argv.slice(verbIndex + 1);
-        if ((stashArgs.length === 1 && stashArgs[0] === "list")
-          || (stashArgs[0] === "show" && (stashArgs.length === 1
-            || (stashArgs.length === 2 && /^[0-9]+$/u.test(stashArgs[1]))))) continue;
+        if (isClosedStashReader(argv.slice(verbIndex + 1))) continue;
       }
       if (gitWrite && verb === "apply") {
         if (readOnlyGitApplyCheckArguments(argv) !== null) continue;
@@ -1003,7 +1042,9 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
     || [...WRITE_EXECUTABLES].some((name) => containsWholeToken(lowered, name))
     || inPlaceNamed
     || opaqueCodeNamed;
-  if (!writerNamed) return [];
+  // A chain whose only writer is a git verb returns just its verb-derived targets, not every raw path token.
+  if (!writerNamed) return gitChainWriteTargets(command);
+  targets.push(...gitChainWriteTargets(command));
   const rawTokens = command.match(PATH_TOKEN) ?? [];
   for (const token of rawTokens) {
     targets.push({ candidate: token, lane: "unparsed-command", classification: "conservative-possible-write" });
