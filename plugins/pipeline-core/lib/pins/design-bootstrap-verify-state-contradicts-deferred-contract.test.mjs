@@ -8,17 +8,20 @@
 //   A3. A real command can be supplied once and yields an exact readback
 //       without repeating unrelated onboarding questions.
 //
-// A2 under PO decision D124 (2026-10-22, "Contract A2 stays"): the typed design-stage state `verify: null` (distinct from
-// PASS) remains the intended design result; implementation entry and release Verify reject it, and the newer
-// baseline-implementation policy (pinned by pipeline-state.test.mjs NVA-CF-VERIFYDEADLOCK and
-// pipeline-state-late-verify.test.mjs) SUPPLIES that rejection and does not replace A2. Measured on this source: an explicit
-// placeholder/blank --verify-command and a missing calibration are refused at the transition; the entry without a command is
-// carried only as the typed baseline-only contract, which is never relabelled as configured, writes no command, and keeps
-// release blocked ("release remains blocked" in checkVerifyContractConfigured). Case "A2 (D124)" below pins that rejection
-// shape. The earlier "A2-literal (measured policy)" case asserted that the transition ADMITS baseline-only as a supersession
-// of A2; D124 decided the opposite premise, so it was restated (QG-04, K86-PIN-RESTATEMENTS, 2026-10-23).
-// NOT PROVEN HERE (open, see the K86 notes): a transition REFUSAL of an unconfigured baseline-only entry. The shipped
-// set-phase still returns 0 for it (pipeline-state.mjs is a protected path), so this pin does not assert a refusal there.
+// A2 under PO decision D124, as decided by the PO on 2026-10-23 (decision tiles, row 34 a: "typed baseline-only carry as built"):
+// the typed design-stage state `verify: null` (distinct from PASS) remains the intended design result. It is ADMITTED at
+// implementation entry only as a typed baseline-only carry (the baseline-implementation policy, pinned by
+// pipeline-state.test.mjs NVA-CF-VERIFYDEADLOCK and pipeline-state-late-verify.test.mjs): never relabelled as configured, no
+// command written, the entry still returns 0. It is REJECTED at release Verify: checkVerifyContractConfigured reports it as
+// "baseline-only", never "configured", and states that release remains blocked. Two refusals remain at the transition itself:
+// an explicit placeholder/blank --verify-command and a missing calibration. No protected source change is part of D124: the
+// earlier gap this header recorded (an entry refusal that the shipped set-phase does not give) is closed by this decision,
+// not by code. Case "A2 (D124)" below pins both sides of the decision. The earlier "A2-literal (measured policy)" case
+// asserted that the transition ADMITS baseline-only as a supersession of A2, which D124 does not decide; it was restated
+// (QG-04, K86-PIN-RESTATEMENTS, 2026-10-23) and is restated again here to the decision as made (K94-THREE-TEST-DECISIONS).
+// Release-side note: the rejection is the typed status plus the "release remains blocked" statement of the satisfiability
+// check (the check itself reports ok: true; the push stays unready because no full Verify command or evidence exists), so the
+// pin asserts the status and message, not an invented refusal return value.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -127,13 +130,12 @@ test("A2: a missing calibration is refused (not silently treated as deferred) at
   assert.equal(phaseOf(root), "design");
 });
 
-test("A2 (D124): the deferred verify state is never accepted as a real contract: it stays typed baseline-only through implementation entry, is not relabelled configured, and release stays blocked", () => {
-  // QG-04 restatement, bounded to D124 (PO 2026-10-22: contract A2 stays; the baseline-implementation policy supplies the
-  // rejection and does not replace A2). The former case "A2-literal (measured policy)" asserted that the transition ADMITS
-  // baseline-only as a supersession of A2 and so pinned the premise D124 rejected. Every assertion it held (entry result,
-  // phase, release status, release message) is kept below as the carried-not-accepted shape; the added assertions state the
-  // rejection: the deferred value is not rewritten into a command, never reads as configured, and an explicit placeholder is
-  // still refused after the entry.
+test("A2 (D124, typed baseline-only carry as built): the deferred verify state is admitted at implementation entry only as a typed baseline-only carry, is not relabelled configured, and is rejected at release Verify (release stays blocked)", () => {
+  // QG-04 restatement, bounded to D124 as decided by the PO on 2026-10-23 (row 34 a: typed baseline-only carry as built, no
+  // protected source change). Only this case name and these comments change in K94; no assertion is added, weakened or removed.
+  // Entry side: the transition returns 0, the phase becomes implementation, the deferred value is carried unchanged as
+  // baseline-only (no command invented) and an explicit placeholder is still refused afterwards. Release side: the satisfiability
+  // check reports baseline-only, never configured, and states that release remains blocked.
   for (const verify of [null, PLACEHOLDER]) {
     const { root, deps } = fixture({ verify });
     const files = [join(root, "project", "pipeline.json"), join(root, ".claude", "pipeline.json")];
