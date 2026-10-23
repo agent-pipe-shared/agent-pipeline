@@ -1,6 +1,6 @@
 # Post-sitting check table, 2026-10-23
 
-Measured by `node scripts/post-sitting-checks.mjs` at commit `f4eff0f7b` (step 48b of the sitting runbook, the last step), after the operator applied steps 01 to 34, 36 to 47, 48a and 48b (step 35, the Critic preimage re-pin C28, deferred by PO decision). Status: sitting steps committed by the operator; the two `CLAUDE.md` lines of the sitting sheet and PO acceptance are still pending.
+Measured by `node scripts/post-sitting-checks.mjs` at commit `f4eff0f7b` (step 48b of the sitting runbook, the last step), after the operator applied steps 01 to 34, 36 to 47, 48a and 48b (step 35, the Critic preimage re-pin C28, deferred by PO decision). Status: sitting steps committed by the operator; the two `CLAUDE.md` lines of the sitting sheet were added by the operator in `a144b415a`; PO acceptance is still pending.
 
 | Check | Verdict | Result |
 |---|---|---|
