@@ -8,7 +8,7 @@ import { types } from "node:util";
 import { parseStrictJson } from "./governance-event.mjs";
 import { validateInvocationChain, invocationResolutionKey } from "./invocation-reliability.mjs";
 import { validateSelectedSandboxDisposition, selectedSandboxDispositionDigest } from "./selected-sandbox-disposition.mjs";
-import { validateCriticReviewHistory } from "./critic-review-lineage.mjs";
+import { validateCriticReviewHistory } from "./critic-review-lineage-core.mjs";
 import { REVIEW_LIMITS } from "./review-economy.mjs";
 
 const DOCUMENT_BYTES = 1_048_576;

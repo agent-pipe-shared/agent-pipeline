@@ -317,6 +317,9 @@ below assumes it holds and is written to catch a change that would break it.
   also remain protected: `lib/onboarding-initial-answers-state.mjs`,
   `lib/onboarding-initial-answers-transaction.mjs`,
   `lib/onboarding-later-language.mjs`, and `lib/critic-course-admission.mjs`.
+  The pure validation half split out of `lib/critic-review-lineage.mjs`
+  (`lib/critic-review-lineage-core.mjs`, imported by that kernel path and re-exported
+  unchanged) is protected for the same reason.
   Guards and close coordination import these modules to enforce verified feature close audit and critic lifecycle readback.
 - The 2026-09-27 design-workflow, model-role and readiness closure adds:
   `lib/design-workflow-package.mjs`, `lib/design-workflow-approval.mjs`,
