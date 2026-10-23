@@ -26,4 +26,16 @@ protected patches still go through the bundled sitting.
 | 5 | 33 | `agy-el01` three fail-open conditions | 0.7.1, as D86 says | Named residual risks; the Critic batch does the D86 security read |
 | 5 | 33 | Quick route (`verify.quick`) | After 0.7.0 per ADR-0088 / D69 | The generator keeps reporting "quick route: missing" typed; item stays open with that reason |
 | 5 | 33 | Elephant context before/after | Live sessions only; measured in the Greenfield test | Item stays at its stage without a before/after number until then |
+| 6 | 16 | Triage `first-enrollment-enters-retirement-before-consent` | Mark as built (pending PO acceptance) | Triage block: built, evidence the 23/23 governance-scope callbacks and continuity 306/306; acceptance in the Greenfield test |
+| 6 | 16 | Triage `three-runner-happy-path-with-two-po-approvals` | Keep open: Greenfield acceptance | Acceptance criterion of the Greenfield tests on all three runners |
+| 6 | 16 | Triage `codex-wsl-required-advisor-has-no-completable-route` | Keep open: real Codex/WSL run | Host run in the Greenfield test |
+| 6 | 16 | Triage `design-generator-repeats-large-source-material` | Built once C18 is applied (follows the C18 decision) | Triage block written after the sitting |
+| 6 | 16 | Triage `read-blocks-and-misleading-denial-texts-across-runners` | Decide M7 now (see next rows); stays open for U3 (Windows run) | See M5 and M7 |
+| 6 | 16 | M7 credential-read refusal text | Own typed code naming the path as cause and a repair (a human provides the content or releases the path by override) | Protected patch in `lib/guard/evaluate.mjs`; the M7 todo case becomes a plain pass (K97) |
+| 6 | 16 | M5 Antigravity native `view_file` of credential files | Secure the native read tools against the same credential check | Protected adapter patch; the AGY adapter test that pins "all read-only tools allowed" is restated (K97) |
+| 6 | 15 | AP11 `git show HEAD:<path> -- \| head` | Widen the grammar | Protected grammar patch admitting the bounded `git show … \| head -N` form; the closed grammar keeps every other pipe refused (K98); item `advertised-git-to-head-pipeline-is-refused` closes with it |
+| 6 | 13 | Security scan scope | Exclude `scratch/clones` | The scan source is the repository without `scratch/`; re-run on a quiet machine (K99, unprotected unless the scan config is protected) |
+| 6 | 11 | CLAUDE.md lines | Take both lines; the wording is delivered at the sitting | The agent may not edit `CLAUDE.md`; wording goes into the sitting notes |
+| 6 | 14 | German README box | The Reader course handles it | Finding for the 2+1 Reader course (D140) |
+| 6 | 20 | C18 | Apply at the sitting, before C26 | Design-generator pin 13/13 after |
 | 1 | 19 | K6 / C28 Critic preimage re-pin | Re-pin at the end, right before the stamp, after the Critic batch | Test stays red until then; the re-pin patch is regenerated from the digests at that moment (never applied earlier) |
