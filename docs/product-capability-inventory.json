@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "91f728f85534e768a19fea62c587a35d10855cf4",
-    "tree": "98460ee135a11ab34d729cbad0b5ebf2bb51194d"
+    "commit": "85049e2157c0e987e12c5d3e1fe5dc629c793584",
+    "tree": "07dade02dbd6de0ea3ab54ed75f77d8032d50380"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -316,6 +316,7 @@
         "verify-phase:harness/scripts/verify.mjs:clean-candidate-run-tests",
         "verify-phase:harness/scripts/verify.mjs:cli-help-tests",
         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-partial-tests",
+        "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-refresh-tests",
         "verify-phase:harness/scripts/verify.mjs:close-block-fanout-report-tests",
         "verify-phase:harness/scripts/verify.mjs:close-coordinator-audit-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
@@ -358,8 +359,10 @@
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-tool-free-design-readiness-tests",
+        "verify-phase:harness/scripts/verify.mjs:commit-message-policy-administrative-refusal-tests",
         "verify-phase:harness/scripts/verify.mjs:commit-message-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-install-tests",
+        "verify-phase:harness/scripts/verify.mjs:commit-pipeline-owned-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-baseline-verify-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-authority-drift-tests",
@@ -433,6 +436,7 @@
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-write-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-recovery-admission-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-scope-overlap-tests",
         "verify-phase:harness/scripts/verify.mjs:doc-reader-course-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:doc-reader-terminal-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:elephant-agy-implementation-dispatch-tests",
@@ -473,6 +477,7 @@
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
         "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
         "verify-phase:harness/scripts/verify.mjs:gitleaks-repair-ignore-value-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:gitleaks-scratch-clones-exclusion-tests",
         "verify-phase:harness/scripts/verify.mjs:gitleaks-tests",
         "verify-phase:harness/scripts/verify.mjs:gitleaks-windows-suppression-tests",
         "verify-phase:harness/scripts/verify.mjs:goldfish-antigravity-host-tests",
@@ -641,6 +646,7 @@
         "verify-phase:harness/scripts/verify.mjs:onboarding-first-restart-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-greenfield-walk-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-init-intake-author-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-init-machine-plane-reason-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-init-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-inspect-prefilter-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
@@ -859,6 +865,7 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-announce-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-push-argv-closure-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-push-chat-catalogue-repair-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-close-audit-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-decision-reference-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-discard-feature-tests",
