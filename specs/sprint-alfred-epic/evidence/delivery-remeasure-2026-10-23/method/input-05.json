@@ -1,0 +1,1830 @@
+{
+ "base": "9a12beab7",
+ "unmappedCommits": [
+  {
+   "sha": "c4a1432fc",
+   "subject": "test(pins): extend the admitted-recovery pin to every other denial that names a command",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "844ddec0c",
+   "subject": "fix(project-uninstall): own a tracked repo-relative Antigravity registry entry",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "feb6a3724",
+   "subject": "docs(pins): record the AC-109 disposition in the Antigravity EL-01 pin header",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a2a1c8be0",
+   "subject": "test(pins): give the host-commit hooks of the SubagentStop pin their registered 300 s",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "52edff7a5",
+   "subject": "test(resource-headroom): replace the empty skipped symlink stub with real alias-refusal cases",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6d44dfa85",
+   "subject": "docs(pins): cite the counted Linux run in the process-start pin header",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "be9d8615b",
+   "subject": "test(pins): accept either custody layer for a hard-linked review file; date the recorded run honestly",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d11a0b266",
+   "subject": "test(advisor-provenance): pin the kept ancestor-drift cause at the DWP2-PHYSICAL-OR-GIT relabel",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8998a5299",
+   "subject": "test(approved-lifecycle-pin): give the docs link-escape case a real body",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5f1b1a573",
+   "subject": "test(brownfield-entry-pin): add the onboarding consumer and win32-dialect cases",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "18c06f27b",
+   "subject": "test(first-enrollment-pin): give the symlinked-history case a real body",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2ab34a064",
+   "subject": "test(catalogue-admit-pin): give the receipt-alias case a real body",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5c9ad8e97",
+   "subject": "test(lifecycle-coordination-pin): make the Git Bash case a typed conditional skip",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "99d477455",
+   "subject": "test(pins): drive the productive readiness host/store path with forged and missing output custody",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "71ab3eda7",
+   "subject": "fix(advisor): compare the host execution's candidate tree in the answered-receipt verifier",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a4c0b4dad",
+   "subject": "test(pins): pin the preserved not-ready Readiness reports of the advisor-observation item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2a5687f6e",
+   "subject": "test(pins): pin that Critic evidence for an older commit leaves a dirty shared checkout untouched",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "184a75fbb",
+   "subject": "docs(pins): name the real open question of the dispatch liveness readback",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "853ba6e60",
+   "subject": "docs(guard-maintenance-window): name the two modules that become kernel paths with operator patches 37 and 39",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3e1f669de",
+   "subject": "test(guard-dispatch): create scratch/ before the fixtures that make a temp dir under it",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "22620853d",
+   "subject": "test(no-autoupdate-key): accept the empty project binding decided in AS",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "61faa698b",
+   "subject": "chore(architecture): raise the guard-maintenance-window line ratchet to 2084",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "784db8eb6",
+   "subject": "fix(gmw): list seven first-party imports of kernel paths that the closure check found unlisted (GMWKC01)",
+   "dispatch": []
+  },
+  {
+   "sha": "84a377300",
+   "subject": "fix(gmw): list lib/dispatch-briefing-build.mjs as a kernel path (GMWKC01)",
+   "dispatch": []
+  },
+  {
+   "sha": "69ea3cf3e",
+   "subject": "fix(guard-dispatch): bind the hook-observed session owner for a Codex spawn_agent dispatch too (GDW01)",
+   "dispatch": []
+  },
+  {
+   "sha": "8c57f3e77",
+   "subject": "test(notebook-write-coverage): scan the guard-lifecycle-ready logic where it now lives (NB07, K2)",
+   "dispatch": []
+  },
+  {
+   "sha": "3534b0ab8",
+   "subject": "feat(guard-dispatch): require a configured model on a Claude Task/Agent dispatch (D84)",
+   "dispatch": []
+  },
+  {
+   "sha": "f93c13854",
+   "subject": "test(guard-dispatch): pin the D84 model enforcement through the real hook",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "cbfcc602e",
+   "subject": "fix(guard): admit push-init --checkpoint and print a runnable command in the checkpoint denial",
+   "dispatch": []
+  },
+  {
+   "sha": "d3bc82194",
+   "subject": "feat(guard): admit rg -c/--count, -I/--no-filename and -H/--with-filename in the read grammar",
+   "dispatch": []
+  },
+  {
+   "sha": "29b18d9e0",
+   "subject": "feat(guard): name the flag in an unsupported-read refusal, register its suites, extend the kernel list",
+   "dispatch": []
+  },
+  {
+   "sha": "cf21bfc56",
+   "subject": "fix(guard): classify index-only git forms as no working-tree write (D64)",
+   "dispatch": []
+  },
+  {
+   "sha": "5710ea06d",
+   "subject": "fix(guard): refuse perl, ruby, php and lua scripts in the devplan shell lane like node",
+   "dispatch": []
+  },
+  {
+   "sha": "b9d35dc06",
+   "subject": "docs(backlog): record the PO decision on the Elephant fast-path (D95)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "cbbf5e90d",
+   "subject": "test(antigravity-guard): restate the allow-every-read-only-tool case after D87",
+   "dispatch": [
+    "ALF-I3-AGYREAD"
+   ]
+  },
+  {
+   "sha": "da6a48021",
+   "subject": "test(pins): make M5 and M6 of the read-blocks pin strict",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "88c8a6be9",
+   "subject": "docs(evidence): record counted Linux runs for five open agent clauses",
+   "dispatch": [
+    "ALF-J1-COUNTED"
+   ]
+  },
+  {
+   "sha": "74055b194",
+   "subject": "fix(dispatch-briefing): bind a numbered or R-n row of a two-column acceptance table",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6dacb508c",
+   "subject": "test(git-cmd): split the second half of the push-classifier tables into a sibling suite",
+   "dispatch": [
+    "ALF-J5-SPLIT"
+   ]
+  },
+  {
+   "sha": "9664ace2a",
+   "subject": "fix(commit-producer): name the repair in a GF-COMMAND-INPUT refusal",
+   "dispatch": [
+    "ALF-J3-FIXES"
+   ]
+  },
+  {
+   "sha": "9fbc6230c",
+   "subject": "docs(inventory): move the capability-inventory source baseline past the three suites patch 43 registered",
+   "dispatch": [
+    "ALF-J3-FIXES"
+   ]
+  },
+  {
+   "sha": "b537001a3",
+   "subject": "test(pins): pin the generated design-review receipt in the dispatch-record log item",
+   "dispatch": [
+    "ALF-J3-FIXES"
+   ]
+  },
+  {
+   "sha": "59c3a756b",
+   "subject": "test(pins): cite and guard the counted final-package-validation coverage of the Readiness input pin",
+   "dispatch": [
+    "ALF-J2-PINS"
+   ]
+  },
+  {
+   "sha": "d49737b34",
+   "subject": "test(pins): pin that the signing openssl spawn never starts a working-directory decoy",
+   "dispatch": [
+    "ALF-J2-PINS"
+   ]
+  },
+  {
+   "sha": "a9bd9a4eb",
+   "subject": "test(pins): count the D64 criterion-parser and review-chain clauses of the one-review item",
+   "dispatch": [
+    "ALF-J2-PINS"
+   ]
+  },
+  {
+   "sha": "a485808ab",
+   "subject": "perf(session-authority): observe the repository topology once per registry boundary",
+   "dispatch": [
+    "ALF-I2-HOSTCOMMIT"
+   ]
+  },
+  {
+   "sha": "0294eff4d",
+   "subject": "test(worktree-lifecycle): pin that the custody topology scope never serves a stale HEAD",
+   "dispatch": [
+    "ALF-I2-HOSTCOMMIT"
+   ]
+  },
+  {
+   "sha": "55f698c72",
+   "subject": "docs(decisions): record the PO decisions D85 to D98 of 2026-10-22",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "131a1eb10",
+   "subject": "chore(backlog): reconcile the ledger after the grooming merge",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7786b3ac7",
+   "subject": "docs(decisions): record the PO decisions D99 to D102 of 2026-10-22",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b766a8564",
+   "subject": "feat(security-scan): add scanMode option so a dirty shared tree can be scanned at HEAD (D102)",
+   "dispatch": [
+    "ALF-K4"
+   ]
+  },
+  {
+   "sha": "efe42fa2b",
+   "subject": "chore(architecture): raise five line ratchets temporarily for the delivered 0.7.0 decisions",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c289d4bc4",
+   "subject": "fix(harness): verify-suite append check no longer needs a local receipt",
+   "dispatch": [
+    "ALF-K3"
+   ]
+  },
+  {
+   "sha": "00d4f2d74",
+   "subject": "feat(harness): add a check that required evidence is not ignored or machine-local",
+   "dispatch": [
+    "ALF-K3"
+   ]
+  },
+  {
+   "sha": "fbaec36bc",
+   "subject": "docs(decisions): record the PO decisions D103 to D106 of 2026-10-22",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1db4cceac",
+   "subject": "docs(decisions): record the PO decisions D107 and D108 of 2026-10-22",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5d94d4ad5",
+   "subject": "docs(decisions): record the PO decision D109 of 2026-10-22 on sensitive host locations",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c67c05e48",
+   "subject": "docs(decisions): record the PO decisions D110 to D117 of 2026-10-22",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "73e6df2d2",
+   "subject": "docs(evidence): counted result of every pin file on fbaec36bc, second run of 2026-10-22",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5165041ce",
+   "subject": "feat(dispatch): read-only liveness readback of an open dispatch record's owner (D110)",
+   "dispatch": [
+    "ALF-K13"
+   ]
+  },
+  {
+   "sha": "98c0e3a81",
+   "subject": "test(pins): pin that the session-authority registry stays clean beside a registry-writing dispatch (ALF-K13)",
+   "dispatch": [
+    "ALF-K13"
+   ]
+  },
+  {
+   "sha": "e454442ca",
+   "subject": "docs(critic): reconcile CR-03 and the notes texts with the guard-allocated notes route",
+   "dispatch": [
+    "ALF-K14"
+   ]
+  },
+  {
+   "sha": "524b53726",
+   "subject": "chore(backlog): record the restated goldfish test-briefs item in the ledger",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "220257cbc",
+   "subject": "fix(harness): register the ten completion-classified suites missing from the case-completion registry",
+   "dispatch": [
+    "ALF-K12"
+   ]
+  },
+  {
+   "sha": "920ebc00e",
+   "subject": "test(harness): re-pin VCR01 to the real registry and classifier totals",
+   "dispatch": [
+    "ALF-K12"
+   ]
+  },
+  {
+   "sha": "c2785e9e5",
+   "subject": "docs(critic): regenerate the vendored role copy after the CR-03 reconciliation",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "592c5c2b7",
+   "subject": "test(pipeline-core): restate SDF001 to the decided drift-heal admission",
+   "dispatch": [
+    "ALF-K21"
+   ]
+  },
+  {
+   "sha": "cf058de9d",
+   "subject": "test(pipeline-core): restate SDR002 to the decided request-first readiness order",
+   "dispatch": [
+    "ALF-K21"
+   ]
+  },
+  {
+   "sha": "cf74e13fd",
+   "subject": "docs(plans): one ordered plan for the remaining content work before the 0.7.0 test candidate",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8753e566c",
+   "subject": "fix(dispatch-record): measure why log entries are skipped and carry them on existing record writes",
+   "dispatch": [
+    "ALF-K24"
+   ]
+  },
+  {
+   "sha": "ae48d8858",
+   "subject": "test(pipeline-core): pin the Workflow registration and the dynamic-script boundary of V-10",
+   "dispatch": [
+    "ALF-K28"
+   ]
+  },
+  {
+   "sha": "10d12d897",
+   "subject": "docs(pipeline-start): require a static string literal for a Goldfish Workflow agent() prompt",
+   "dispatch": [
+    "ALF-K35"
+   ]
+  },
+  {
+   "sha": "989bed173",
+   "subject": "chore(architecture): raise the over-line-bound ratchets for the 2026-10-22 content wave",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "00eb2584d",
+   "subject": "docs(decisions): record the PO decisions D118 to D121 of 2026-10-22",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2790014d6",
+   "subject": "docs(decisions): record the PO decisions D122 to D130 of 2026-10-22",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8845dc494",
+   "subject": "test(guard-git): split the GG-22 cases into a sibling suite",
+   "dispatch": [
+    "ALF-J5-SPLIT"
+   ]
+  },
+  {
+   "sha": "0727bb18a",
+   "subject": "chore(verify): register the two sibling suites created by the over-bound splits",
+   "dispatch": []
+  },
+  {
+   "sha": "54599f998",
+   "subject": "test(gate-strength): accept two named, expiring closure exceptions in GST33 (D89)",
+   "dispatch": []
+  },
+  {
+   "sha": "3b3f6bb78",
+   "subject": "fix(session-authority): wait a bounded time for a live registry lock and keep a bounded set of retired locks (K12)",
+   "dispatch": [
+    "ALF-K5"
+   ]
+  },
+  {
+   "sha": "05d869b9b",
+   "subject": "feat(authority): journal asynchronous native producer effects with a source-owned begin and settle step (D113)",
+   "dispatch": [
+    "ALF-K8"
+   ]
+  },
+  {
+   "sha": "fd2f97332",
+   "subject": "feat(harness): admit insertion into the verify-suite registry and drop the vestigial abandoned-v3 recovery index (D103, D104)",
+   "dispatch": [
+    "ALF-K6"
+   ]
+  },
+  {
+   "sha": "888518eaa",
+   "subject": "feat(guard): admit read-only git -C <repo> in the bounded git-to-head/tail pipeline and architecture-baseline --compile-summary (D114, D115)",
+   "dispatch": [
+    "ALF-K9"
+   ]
+  },
+  {
+   "sha": "afee1a33d",
+   "subject": "fix(lifecycle): refuse unsupported criterion rows at present-plan and bind the sanitized report digest pair (D64)",
+   "dispatch": [
+    "ALF-K11"
+   ]
+  },
+  {
+   "sha": "92c3ccffd",
+   "subject": "fix(harness): add the missing Verify case-completion policies for required suites",
+   "dispatch": [
+    "ALF-K12"
+   ]
+  },
+  {
+   "sha": "7fc01310e",
+   "subject": "test(harness): declare completion policy for four converted suites",
+   "dispatch": [
+    "ALF-K23"
+   ]
+  },
+  {
+   "sha": "2d9c226b9",
+   "subject": "test(harness): register the dispatch-record liveness suite in Verify",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3038e20ce",
+   "subject": "feat(pipeline-core): follow a newer version inside an approved model family in the legacy V3 bootstrap (D99)",
+   "dispatch": [
+    "ALF-K20"
+   ]
+  },
+  {
+   "sha": "f76a3eb42",
+   "subject": "fix(pipeline-core): skip override capabilities bound to another input before drift and audit",
+   "dispatch": [
+    "ALF-K22"
+   ]
+  },
+  {
+   "sha": "8e2a83190",
+   "subject": "fix(pipeline-core): name the missing device-local part and one repair when a pre-approval reader runs on another device",
+   "dispatch": [
+    "ALF-K29"
+   ]
+  },
+  {
+   "sha": "c080a1e22",
+   "subject": "feat(guard-dispatch): warn when a Goldfish Workflow agent() prompt cannot be resolved statically",
+   "dispatch": [
+    "ALF-K35"
+   ]
+  },
+  {
+   "sha": "fccaf118d",
+   "subject": "fix(onboarding): do not ask for the Git author again after the intake already recorded it",
+   "dispatch": [
+    "ALF-K2-GITAUTHOR"
+   ]
+  },
+  {
+   "sha": "27f0430e7",
+   "subject": "test(harness): register the required-evidence-not-ignored suite in Verify (D101)",
+   "dispatch": [
+    "ALF-K3"
+   ]
+  },
+  {
+   "sha": "1874da3ac",
+   "subject": "test(agy): pin D96 outside-the-repository native reads and record the PO decision",
+   "dispatch": [
+    "ALF-K1-READPOLICY"
+   ]
+  },
+  {
+   "sha": "3869bb2ac",
+   "subject": "fix(session-authority): name a transient registry lock instead of degrading the ruleset identity (K12)",
+   "dispatch": [
+    "ALF-K5"
+   ]
+  },
+  {
+   "sha": "ff6fd22b6",
+   "subject": "test(model-family): pin the source-owned settled phase for asynchronous native producers (D113)",
+   "dispatch": [
+    "ALF-K8"
+   ]
+  },
+  {
+   "sha": "fa7c73af3",
+   "subject": "test(verify): keep the reorder refusal in the append-policy test while D103 relaxes insertion",
+   "dispatch": [
+    "ALF-K6"
+   ]
+  },
+  {
+   "sha": "56446896c",
+   "subject": "feat(harness): evaluate the registry history against the relaxed D103 contract",
+   "dispatch": [
+    "ALF-K6"
+   ]
+  },
+  {
+   "sha": "d7834e331",
+   "subject": "test(pipeline-core): pin that an absent abandoned-v3 recovery index is the normal case",
+   "dispatch": [
+    "ALF-K6"
+   ]
+  },
+  {
+   "sha": "f948eada4",
+   "subject": "feat(harness): make the required-evidence check a gate with a named accepted baseline",
+   "dispatch": [
+    "ALF-K6"
+   ]
+  },
+  {
+   "sha": "6f48db0c1",
+   "subject": "feat(harness): add a byte-bound, unsigned exception for a duplicate row added and removed again (D107)",
+   "dispatch": [
+    "ALF-K6"
+   ]
+  },
+  {
+   "sha": "478e3f324",
+   "subject": "chore(harness): record the duplicate-row repair pair 5cc6b7006 and 6940723ae (D107)",
+   "dispatch": [
+    "ALF-K6"
+   ]
+  },
+  {
+   "sha": "c9ce52737",
+   "subject": "test(guard): pin git -C <repo> read forms in the bounded git-to-head pipeline (D114)",
+   "dispatch": [
+    "ALF-K9"
+   ]
+  },
+  {
+   "sha": "8158f7593",
+   "subject": "test(guard): pin architecture-baseline --compile-summary as admitted in its exact form (D115)",
+   "dispatch": [
+    "ALF-K9"
+   ]
+  },
+  {
+   "sha": "67435e5cc",
+   "subject": "test(guard): pin tail as the second sink of the bounded git read pipeline (D114)",
+   "dispatch": [
+    "ALF-K9"
+   ]
+  },
+  {
+   "sha": "8f3ae3e81",
+   "subject": "test(pins): drive the two open D64 clauses of the one-review item instead of counting them as todo",
+   "dispatch": [
+    "ALF-K11"
+   ]
+  },
+  {
+   "sha": "e144dc3c8",
+   "subject": "test(pins): walk the prescribed lifecycle commands through the real guards with zero overrides",
+   "dispatch": [
+    "ALF-K11"
+   ]
+  },
+  {
+   "sha": "b09dddc88",
+   "subject": "test(pins): pin the write targets of every sed -i shape and the draft-lane File it names (PF-16)",
+   "dispatch": [
+    "ALF-K16"
+   ]
+  },
+  {
+   "sha": "02eb66be3",
+   "subject": "test(pipeline-core): pin the in-family version follow of the legacy V3 model-role bootstrap (D99)",
+   "dispatch": [
+    "ALF-K20"
+   ]
+  },
+  {
+   "sha": "3865f11f9",
+   "subject": "test(pipeline-core): require a non-matching signed capability to leave no audit trace",
+   "dispatch": [
+    "ALF-K22"
+   ]
+  },
+  {
+   "sha": "62c7fda35",
+   "subject": "test(pipeline-core): convert four legacy suites to the case-completion protocol",
+   "dispatch": [
+    "ALF-K23"
+   ]
+  },
+  {
+   "sha": "c882a4467",
+   "subject": "test(harness): restate the VCR01 classifier pin for four converted suites",
+   "dispatch": [
+    "ALF-K23"
+   ]
+  },
+  {
+   "sha": "752e618ca",
+   "subject": "test(pins): pin the EL-01 tripwire fail-closed contract and classify every fail-open condition",
+   "dispatch": [
+    "ALF-K25"
+   ]
+  },
+  {
+   "sha": "972a5f769",
+   "subject": "chore(harness): drop the consumer-safe-paths allowlist entry for the retired EL-01 WARN message",
+   "dispatch": [
+    "ALF-K25"
+   ]
+  },
+  {
+   "sha": "6ee6ba125",
+   "subject": "feat(advisor): pin the admitted Codex consult executor seam and align the skill matrix (AC-135)",
+   "dispatch": [
+    "ALF-K32"
+   ]
+  },
+  {
+   "sha": "ca8934bde",
+   "subject": "test(pins): restate the WSL mirror needle for the conditional deferral (QG-04, PO tile 2026-10-22)",
+   "dispatch": [
+    "ALF-K32"
+   ]
+  },
+  {
+   "sha": "8f1d38376",
+   "subject": "feat(advisor): admit the selected-sandbox Codex route on WSL only behind a passing sandbox preflight (AC-135)",
+   "dispatch": [
+    "ALF-K32"
+   ]
+  },
+  {
+   "sha": "fa67c5e7b",
+   "subject": "test(pins): pin the unclaimed-path admission of the next post-commit checkpoint",
+   "dispatch": [
+    "ALF-K34"
+   ]
+  },
+  {
+   "sha": "f294d0fa3",
+   "subject": "test(pins): pin the typed advisory for an unresolvable Goldfish Workflow prompt",
+   "dispatch": [
+    "ALF-K35"
+   ]
+  },
+  {
+   "sha": "a5762bf45",
+   "subject": "test(harness): register six suites in Verify",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "70ff299a6",
+   "subject": "chore(harness): add the capability inventory lines for the new suites and re-baseline the source baseline",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "85ba79bcc",
+   "subject": "test(harness): restate two site counts of the VCR01 observed-descriptor pin for suites that grew",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1cbd22393",
+   "subject": "feat(guard): refuse a second writer while an open dispatch record's owner is alive",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "faecd4bfa",
+   "subject": "feat(guard): report an unqualified fitness model at the implementation boundary",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "beb610fcb",
+   "subject": "fix(pipeline-core): parse the Bash tool as POSIX in the remaining chain and redirect lanes and make the lifecycle suite portable to native Windows",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2d5892b13",
+   "subject": "test(pins): pin the guard-side second-writer refusal against an open record with a live owner",
+   "dispatch": [
+    "K39-LIVENESS-WIRING"
+   ]
+  },
+  {
+   "sha": "d22d6e458",
+   "subject": "test(pins): pin the report-only fitness-model qualification at the implementation boundary",
+   "dispatch": [
+    "K37-FITNESS-BOUNDARY"
+   ]
+  },
+  {
+   "sha": "2e0b2c928",
+   "subject": "test(harness): register the fitness-model qualification pin in Verify",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "04f2b7000",
+   "subject": "chore(harness): add the capability inventory line for the fitness-model pin and re-baseline the source baseline",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6738a8f8d",
+   "subject": "chore(architecture): raise two line-bound ratchets for the post-sitting protected delta",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "95728d5be",
+   "subject": "docs(decisions): record the PO decision D133 on the Windows test economy",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "043758c83",
+   "subject": "docs(decisions): record D134 and D135 and add the worktree-isolation follow-up item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "deb1b8632",
+   "subject": "docs(decisions): record D136 to D139 on the pipeline-state bundle (C7)",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7ab880ee2",
+   "subject": "chore(backlog): sync the ledger and projections to the closed Codex bootstrap item",
+   "dispatch": [
+    "K43-DOC-CLOSURES"
+   ]
+  },
+  {
+   "sha": "df027eaee",
+   "subject": "docs(decisions): record D140 on the bounded-reader terminal record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3bbbaafca",
+   "subject": "feat(plan-handoff): add the typed refusal text and strict wiring pin for the submit/present hand-off check",
+   "dispatch": [
+    "K40-HANDOFF-WIRING"
+   ]
+  },
+  {
+   "sha": "ef6de035b",
+   "subject": "test(fixtures): give governed plan fixtures a Spec with one admitted criterion row for the hand-off check",
+   "dispatch": [
+    "K40-HANDOFF-WIRING"
+   ]
+  },
+  {
+   "sha": "902afcd8d",
+   "subject": "test(d64-pin): run the unsupported-shape cases ungoverned and pin the governed ordering with the hand-off wired",
+   "dispatch": [
+    "K40-HANDOFF-WIRING"
+   ]
+  },
+  {
+   "sha": "fcb7c8670",
+   "subject": "test(pipeline-state): drop the governed submit-plan scenario added in the previous commit of this branch",
+   "dispatch": [
+    "K40-HANDOFF-WIRING"
+   ]
+  },
+  {
+   "sha": "02c998d72",
+   "subject": "feat(pipeline-core): add the dispatch recovery verb as the first caller of dispatch-recovery-state",
+   "dispatch": [
+    "K41-DISPATCH-RECOVERY-VERB"
+   ]
+  },
+  {
+   "sha": "841da26dc",
+   "subject": "feat(guard): add the digest-checked self-revert of an edited bound authority document",
+   "dispatch": [
+    "K42-D31-WARN-AND-REVERT"
+   ]
+  },
+  {
+   "sha": "37060e4b4",
+   "subject": "feat(plan-handoff): refuse an unready delivery hand-off at submit-plan and present-plan",
+   "dispatch": [
+    "K40-HANDOFF-WIRING"
+   ]
+  },
+  {
+   "sha": "8aac49b45",
+   "subject": "feat(guard): admit the dispatch recovery verb and the typed restore of the approved authority bytes",
+   "dispatch": [
+    "K41-DISPATCH-RECOVERY-VERB"
+   ]
+  },
+  {
+   "sha": "0bf80bb49",
+   "subject": "test(harness): register the dispatch recovery, its admission and the authority restore suites in Verify",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "540e96f71",
+   "subject": "chore(harness): add the capability inventory lines for the recovery and restore suites and re-baseline the source baseline",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "213497dca",
+   "subject": "docs(architecture): record the signed D4 adoption decision and its AC-9 evidence",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f9ad83077",
+   "subject": "docs(decisions): record D141 on the Spec amendment route and D142 on the AC-9 adoption",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d80719e5f",
+   "subject": "test(pins): turn the AC-108 Antigravity Critic/Advisor todo into an asserting case",
+   "dispatch": [
+    "K46-AGY-FALLBACK"
+   ]
+  },
+  {
+   "sha": "aa9b85443",
+   "subject": "feat(preflight): admit the recorded self-dispatch fallback for the Antigravity Advisor and Critic",
+   "dispatch": [
+    "K46-AGY-FALLBACK"
+   ]
+  },
+  {
+   "sha": "b041fb39b",
+   "subject": "test(pins): give the WSL /mnt foreign-worktree case a real body",
+   "dispatch": [
+    "K47-FOREIGN-WORKTREE-BODY"
+   ]
+  },
+  {
+   "sha": "18495fe4e",
+   "subject": "test(onboarding): give the governed lifecycle fixtures of the onboarding controller a Spec with one admitted criterion row",
+   "dispatch": [
+    "K49-HANDOFF-FIXTURES"
+   ]
+  },
+  {
+   "sha": "c978f8692",
+   "subject": "test(model-family): type the three cross-owner contention cases as pending per D66",
+   "dispatch": [
+    "K48-MODEL-FAMILY-CONTENTION"
+   ]
+  },
+  {
+   "sha": "6d6489f71",
+   "subject": "test(model-family): let the local test wrapper register a typed pending (todo) case",
+   "dispatch": [
+    "K48-MODEL-FAMILY-CONTENTION"
+   ]
+  },
+  {
+   "sha": "021e3f9e9",
+   "subject": "test(model-family): keep the host-store test wrapper inside its accepted line bound",
+   "dispatch": [
+    "K48-MODEL-FAMILY-CONTENTION"
+   ]
+  },
+  {
+   "sha": "e8dcf4d5b",
+   "subject": "feat(state): name the authority restore as the first repair in inspect",
+   "dispatch": [
+    "K45-RESTORE-POINTER"
+   ]
+  },
+  {
+   "sha": "85d46b825",
+   "subject": "test(harness): register the authority restore advice pin in Verify",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "113fe4785",
+   "subject": "chore(harness): add the capability inventory line for the restore advice pin and re-baseline the source baseline",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3412d5622",
+   "subject": "test(model-family): return MFI011 to an active case, it is a single-process case that passes alone",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f676571a3",
+   "subject": "docs(evidence): record the Linux single verifys of 2026-10-22 with their counts",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "98a53938e",
+   "subject": "fix(recovery): show the plan-digest request through the readline question so the terminal keeps it",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "fa090269a",
+   "subject": "docs(evidence): record the gap reader rounds of 2026-10-22 with prompts, inputs and verdicts",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "109ce619f",
+   "subject": "test(git-null-device): pin a real git status run with core.excludesFile set to the shared constant",
+   "dispatch": [
+    "K50-PINS-A"
+   ]
+  },
+  {
+   "sha": "4a1891cef",
+   "subject": "docs(state): record the 2026-10-22 content-final handover with order, evidence and follow-ups",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "79cda4601",
+   "subject": "chore(release): mark the 0.7.0 test candidate content state as a feature checkpoint",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "9355151ff",
+   "subject": "chore(pipeline-core): stamp the 0.7.0 Alfred local test candidate for 79cda46",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "51b4b0450",
+   "subject": "docs(state): record the stamp, the approve-push route blocker and the post-install script consolidation",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "86d2892f5",
+   "subject": "docs(state): record the PO-set order after the push and the approve-push option A decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f18c28057",
+   "subject": "test(push-anchor): pin signature-mode approve-push while the session-authority catalogue exists",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ec1c22db2",
+   "subject": "fix(state): let signature-mode approve-push run its proof-verified route while the session-authority catalogue exists",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "57aa08996",
+   "subject": "chore(release): mark the 0.7.0 test candidate content state with the approve-push route fix as a feature checkpoint",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a5a727318",
+   "subject": "docs(state): record the 2026-10-22 session cut with the push result, the PO list and the post-resume order",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3a05c831a",
+   "subject": "docs(state): add the ordered path to close 0.7.0 with an owner per step to the session-cut handover",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "dfad883f2",
+   "subject": "chore(state): record the 2026-10-22 push approval for the 0.7.0 test candidate checkpoint",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a35446cf0",
+   "subject": "docs(plans): start the PO list for the AFK window with the carried items and the first session findings",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "80624e959",
+   "subject": "feat(scripts): move the reusable operating helpers from untracked scratch into scripts/",
+   "dispatch": [
+    "K53-SCRIPTS-CONSOLIDATION"
+   ]
+  },
+  {
+   "sha": "7fe279950",
+   "subject": "docs(operating-tools): add the procedure document for the tracked helper scripts",
+   "dispatch": [
+    "K53-SCRIPTS-CONSOLIDATION"
+   ]
+  },
+  {
+   "sha": "c80a9fd5e",
+   "subject": "docs(governance): classify docs/operating-tools.md as a maintained maintainer document",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "866c1584d",
+   "subject": "docs(plans): add the K53 import, the run-parallel finding and the gitleaks load timeout to the PO list",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e4bdffdb2",
+   "subject": "docs(onboarding): relocate the Codex host-managed contract into the threat model",
+   "dispatch": [
+    "K56-D140-DOC-FIXES"
+   ]
+  },
+  {
+   "sha": "2a2fbad15",
+   "subject": "docs(readme): reduce the retained availability passage to the availability boundary",
+   "dispatch": [
+    "K56-D140-DOC-FIXES"
+   ]
+  },
+  {
+   "sha": "e3f8661a2",
+   "subject": "docs(plans): add the backlog sweep findings, the stale remeasure rows and the German README drift to the PO list",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "08e2609a7",
+   "subject": "test(pins): state the ALF-K35 dispositions in the V-10 pin header",
+   "dispatch": [
+    "K55-TEST-FIXES"
+   ]
+  },
+  {
+   "sha": "d6df0554d",
+   "subject": "test(pins): correct the header of the three-runner happy-path pin",
+   "dispatch": [
+    "K55-TEST-FIXES"
+   ]
+  },
+  {
+   "sha": "3bc1a0167",
+   "subject": "docs(plans): hold the guard-lifecycle-ready fixture path patch for the bundled sitting as ceremony C17",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1f3fc1b96",
+   "subject": "docs(roles): state the budget continuation card and the grant-notice-only authentication (D75 S2)",
+   "dispatch": [
+    "K62-K11-S2-BRIEFING-WORDING"
+   ]
+  },
+  {
+   "sha": "c04d4dfee",
+   "subject": "test(pins): drop the stale pending-patch tags from the stored-patch preflight pin titles (AC-201)",
+   "dispatch": [
+    "K64-SMALL-FIXES"
+   ]
+  },
+  {
+   "sha": "411e2dbf3",
+   "subject": "test(pins): pin the generated staging banner wording so it permits elaboration (AC-152)",
+   "dispatch": [
+    "K64-SMALL-FIXES"
+   ]
+  },
+  {
+   "sha": "a6f0fa3a4",
+   "subject": "docs(plans): hold the staging banner patch as ceremony C18 and add the Critic digest re-pin and the known red case to the PO list",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "edb56af00",
+   "subject": "docs(plans): hold the D75 classified cancel series (slices S4 and S5) as ceremony C19",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "abb58235e",
+   "subject": "docs(evidence): record counted results for six suites on 2026-10-23",
+   "dispatch": [
+    "K57-COUNTED-RUNS"
+   ]
+  },
+  {
+   "sha": "8aaa523d4",
+   "subject": "fix(measure): follow the published consent, intake-capture and architecture-authoring actions in the onboarding turn helper",
+   "dispatch": [
+    "K70-K2-TWO-RED-SUITES"
+   ]
+  },
+  {
+   "sha": "d85bf5e40",
+   "subject": "docs(plans): add the two K2 red suites with their options and recommendations to the PO list",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "38acd203a",
+   "subject": "feat(dispatch-briefing): refuse a write scope that overlaps a running dispatch (D76)",
+   "dispatch": [
+    "K69-K12-D76-FANOUT-RULE"
+   ]
+  },
+  {
+   "sha": "bb8abad7d",
+   "subject": "test(onboarding): pin the orphan release crash recovery between the member release and the binding delete (D73 E5b)",
+   "dispatch": [
+    "K67-K1D-E-DISCARD-CALL"
+   ]
+  },
+  {
+   "sha": "76037da16",
+   "subject": "docs(evidence): record counted results for thirteen more test files on 2026-10-23",
+   "dispatch": [
+    "K66-COUNTED-RUNS-2"
+   ]
+  },
+  {
+   "sha": "905fb7568",
+   "subject": "docs(plans): add the K12 fan-out choices and the cluster status summary to the PO list",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "11b56a10e",
+   "subject": "docs(evidence): hold the discard-feature finish patch as ceremony C20 and record the K1D case diagnosis",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "703f3ab31",
+   "subject": "docs(state): record the AFK window status, the held ceremonies and the PO list location",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "beed546d9",
+   "subject": "docs(evidence): record counted results for clusters K3, K4, K5 and K8 on 2026-10-23",
+   "dispatch": [
+    "K68-COUNTED-RUNS-3"
+   ]
+  },
+  {
+   "sha": "512d5edf9",
+   "subject": "docs(plans): close clusters K3, K4 and K5 on a fresh serial counted run and re-point K8",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d9be23e4f",
+   "subject": "docs(evidence): hold the two K8 guard-test fixture patches as ceremonies C21 and C22 and list the two K8 decisions",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d93fc1680",
+   "subject": "docs(evidence): hold the shell classifier fix series as ceremony C23",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "756248e0d",
+   "subject": "docs(evidence): hold the evaluate.mjs observation fix as ceremony C24 and the cumulative Antigravity fixture patch",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d7e32ba08",
+   "subject": "docs(plans): re-point cluster K8 at the held repairs C21, C22 and C24",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6107f5f52",
+   "subject": "docs(evidence): record counted results for cluster K9 on 2026-10-23",
+   "dispatch": [
+    "K77-COUNTED-RUNS-K9"
+   ]
+  },
+  {
+   "sha": "f4a89baaa",
+   "subject": "test(agy): run the consent-admission and live-host session cases in a bound real checkout",
+   "dispatch": [
+    "K78-K9-THREE-REDS"
+   ]
+  },
+  {
+   "sha": "54ed24f22",
+   "subject": "docs(plans): close cluster K9 with the supervisor CLI suite as a named rest and list the choice",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "27128feda",
+   "subject": "docs(plans): close clusters K11 and K12 with named rests and bring the ledger and the state block up to date",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "977903ac7",
+   "subject": "docs(plans): add the D78 dispatch-hook default to the PO list",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8fcb8f27d",
+   "subject": "docs(evidence): hold the adapter purity split as ceremony C25",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c78bcd4a2",
+   "subject": "docs(evidence): hold the C15 and C16 registration patches built and measured by K79",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "4fa2ce408",
+   "subject": "docs(evidence): hold the closed-feature release member step as ceremony C26",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6e3ef4ffc",
+   "subject": "docs(state): note ceremonies up to C26 in the AFK block",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3e2cc8d34",
+   "subject": "docs(plans): correct ceremony C7 for the AC-245 recovery verb that is already built outside pipeline-state",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "096e363fb",
+   "subject": "docs(evidence): hold the case-drift registration patches as C27 and the Critic preimage re-pin as C28",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "52953602b",
+   "subject": "docs(plans): add the two verify findings to the PO list and note ceremonies up to C28",
+   "dispatch": [
+    "stage-0"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "itemId": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 13/13 green (0 skip) for the no-NUL-open ratchet (acceptance 1), but the pin explicitly allows the NUL spelling for GIT_CONFIG_GLOBAL and never checks GIT_NULL_DEVICE, so acceptance 2 (Git null-device values use GIT_NULL_DEVICE, never the NUL literal) is not shown qualified. No commit since base touches this subject.",
+   "mappedCommits": [
+    {
+     "sha": "a8284bae2",
+     "subject": "docs(backlog): record counted evidence for the two NUL null-device items"
+    },
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 9/9 green covering the reader results, typed fail-closed cases and the 23-callback completion policy, but the acceptance clause to qualify the actual Source corpus and the complete original onboarding controller (and reconcile remaining failures) is not shown by any counted result.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 7/7 green, 0 skip; the pin's cases A1-A5 cover every acceptance bullet (injected home B vs OS home A, absent/malformed/invalid plane never borrows ambient data, explicit reader override and no-override default retained, source immutability, real CLI override), so the earlier 'override retention not shown' gap is closed.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 8 cases, 7 pass, 1 skip: the nineteen-cell matrix, selectable cell and bounded pool are pinned, but the acceptance clause that the full Verify path has a measured lower wall time is the typed measurement-hold skip and is not qualified.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 12/12 green for criteria 1-3 (settlement ordering, scanner fixture closure, per-child coverage reports) and the 216-case partition check; criterion 4, a final complete-suite run with consistent counts and exit 0, is explicitly out of the pin's scope and not shown.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 15/15 green, 0 skip, covering rules 1-4, the critic-review template batch scope, the Opus-rationale dispatch check, the mechanical re-critic delta check, the German MP-07 half and item (e) Mechanic at Haiku/medium; ff83a1509 closed the runner-profile registry half of item (e). That closes the Triage's 'still open' (c), (d), (e).",
+   "mappedCommits": [
+    {
+     "sha": "60d2ea73c",
+     "subject": "docs(backlog): reconcile three items with their pins and record counted runs"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+   "stageBaseline": "75",
+   "reasonBaseline": "Baseline kept: pin evidence file counts 13/13 green, 0 skip, covering rg --ignore-file and grep --exclude-from outside, in-root and non-file values, pattern tokens and a RED mirror; no commit since base changes the picture.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 11/11 green for counter-lock (M1), record-collision (M2) and readiness-wait (M3) cases, but the later acceptance is open: restart liveness readback is not implemented, 65452bd6f (producer --commit) states no counted result and no pin for the older-commit/dirty-checkout case or the parallel Critic+Goldfish registry check is shown, and AGY worktree-parallel preparation is not built. 3a267d569 only added findings.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    },
+    {
+     "sha": "5167e6e71",
+     "subject": "docs(backlog): reconcile three more item texts with what is built and decided"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 10/10 green, 0 skip on Linux; the pin covers both acceptance bullets (one shared credential-root constant with a synthetic-home refusal per entry incl. .git-credentials, .pypirc, .netrc, .npmrc, /etc/shadow, host and WSL UNC spellings; rg -L/--follow refused in every spelling) plus RED mirrors, so the earlier 'not this item's clauses' gap is closed.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    },
+    {
+     "sha": "5b3990a37",
+     "subject": "feat(read-policy): allow reads outside the repository except credentials, and enrol sensitive host locations"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 14/14 green, 0 skip (the earlier non-git skip now runs); the pin drives the real hook entrypoints enumerated from the wiring files and covers proposal points 1-8 (one predicate, ungoverned/declined inert, destructive git union always on, process rules only after enrollment, durable decline, fail-closed checks behind the predicate, governed path still enforcing, docs).",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 21/21 green, 0 skip; the pin drives the real pipeline-state.mjs writer and covers all acceptance bullets (no acknowledgement or signature on submission, no implementation authority, both approval modes, forged/stale authority, drift, incomplete package, replay, Advisor and independent readiness before presentation, unavailable-Advisor exception inside the final decision).",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 6/6 green, 0 skip; the pin runs the real guard (powerShellScopeVerdict) for acceptance A1-A4: PowerShell and Bash both refuse synthetic outside-root key reads and non-ready commands, returned onboarding actions work on the PowerShell lane, Read/Grep/Glob refuse synthetic outside-root paths, hook registration matches enforced tools.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 8/8 green, 0 skip; the pin drives the real governance-scope module, preflight envelope and diagnostic script and covers the whole Proposal (bounded path-redacted cause, topologyDiagnostic and typed read-only nextAction in the envelope, non-authoritative, runnable nextAction), so the earlier 'error not surfaced' gap is closed.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+   "stageBaseline": "75",
+   "reasonBaseline": "Baseline kept: the Windows count (12 pass, 1 POSIX-only skip, 29984e731/31bd8c354) stands. The new Linux pin run shows 12 cases, 1 pass, 11 typed Windows-only skips, which neither renews nor contradicts it; no commit since base touches this subject.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 8 cases, 2 pass, 6 typed Windows-only skips: the seam and NOT_SECURE refusal cases (P1/P2 and the RED mirrors) run only on win32, so on the measured Linux run the acceptance is not qualified; no commit since base touches this subject.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 28/28 green, 0 skip, but the pin states its S1-S8 are the Elephant's reconstruction pending PO release (no public original), and S4 (non-placeholder alias accepted as configured-alias) differs from the released R1 wording (aliased identity refused); the pin therefore does not yet qualify a released acceptance.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.project-resource-budget-headroom-is-not-reported",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 21 cases, 20 pass, 1 skip, 0 fail; A1-A4 (reporter arithmetic, unknown for missing/stale/malformed, no compliance claim, read-only CLI and guard route) and A5-A8 (run-time budget within/exceeded/unknown, Verify wiring, exit code unchanged) all run green, closing the earlier 'no counted result for A5-A7 and verify wiring' gap. R1 reconstruction is RELEASED (PO 2026-10-16).",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+   "stageBaseline": "75",
+   "reasonBaseline": "Baseline kept: pin evidence file counts 7/7 green, 0 skip (AC1-AC3: idle State without closedFeatures is available and empty, malformed/unreadable/escape cases fail closed, valid bindings stay protected); no commit since base changes the picture.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.push-classifier-deny-list-does-not-converge",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 28/28 green, 0 skip; the pin covers the Q12 option B proposal (marker allowlist, the Critic's traced GPGL-8 shapes F1-F3 as candidates, narrow loosening branches, both consumers on one shared function, removed shape-specific helpers, RED mirror), so the earlier 'no pass count' gap is closed.",
+   "mappedCommits": [
+    {
+     "sha": "354553193",
+     "subject": "docs(backlog): carry the knowledge of nine duplicate items into their canonical items"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+   "stageBaseline": "75",
+   "reasonBaseline": "Baseline kept: pin evidence file counts 19/19 green, 0 skip (backtick escape, $() in double quotes, here-strings, backtick-spelled git word, fail-closed controls, RED mirror); no commit since base changes the picture.",
+   "mappedCommits": [
+    {
+     "sha": "37497803d",
+     "subject": "docs(backlog): close nine items as duplicates of their canonical items"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 5/5 green, 0 skip; the pin covers the Proposal (GL-B13, echo-wrapped escaped-quote shapes and quoted-executable shapes classified as pushes, harmless controls stay plain, RED mirror, stripQuotedSegments no longer treats an escaped quote as a delimiter), closing the earlier 'no counts' gap.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+   "stageBaseline": "75",
+   "reasonBaseline": "Pin evidence file counts 67/67 green, 0 skip, and commit 4838c0efc states git-cmd.test.mjs 477/477 after pinning redirect-before-push, nested quotes and the two accepted false positives; together they cover the whole Proposal, closing the earlier 'no count' gap.",
+   "mappedCommits": [
+    {
+     "sha": "37497803d",
+     "subject": "docs(backlog): close nine items as duplicates of their canonical items"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 11 cases, 10 pass, 1 skip: the Claude-guard cases (in-root reads, credential roots denied, blocked-not-absent wording, Grep glob/type/subtree decisions) are green, but the WSL UNC admit clause (U3) is a typed skip and a cross-runner matrix is not shown, since the pin drives evaluateLifecycleReadyGuard only.",
+   "mappedCommits": [
+    {
+     "sha": "f7540a07c",
+     "subject": "test(pins): add the Codex and Antigravity rows to the read-shape matrix"
+    },
+    {
+     "sha": "e382eb43f",
+     "subject": "fix(guard): stop telling every runner to use native Read, Glob or Grep in the unsupported-read note"
+    },
+    {
+     "sha": "26bfb7524",
+     "subject": "fix(antigravity-guard): refuse native read tools that target a credential root"
+    },
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    },
+    {
+     "sha": "be992e858",
+     "subject": "docs(backlog): reconcile five more item texts with what is built and decided"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 74 cases, 73 pass, 1 skip: the closed per-command grammars (rg, node, git) and credential-root cases are green, but the Windows drive-letter spelling clause is a typed non-win32 skip, and the acceptance requires an independent security Critic with mutation probes.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.readiness-input-omits-current-advisor-observation",
+   "stageBaseline": "50",
+   "reasonBaseline": "a8e203d1a replaced the three typed host-limitation stubs with real cases (commit states AC-241 pin 9/9) and the evidence file counts 9/9 green, 0 skip, so the earlier skip gap is closed; but the pin names points 1,2,3,5,6 only: final-package validation of Advisor and readiness provenance, preservation of old not-ready reports, and the real independent re-run are not covered, and the item states synthetic host fixtures are not real provider acceptance.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 6/6 green, 0 skip, covering empty child output as a typed read-only recovery, valid result, malformed state kept distinct, and a real bootstrap readback on an ordinary root (acceptance bullets 1-3); bullet 4, reconnecting a Codex session and completing the readback, is a native-host clause not shown.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 5/5 green, 0 skip, covering typed unsafe results for symlink roots and unsafe descendants, no mutation, and the reader still running on admitted roots (acceptance bullets 1-3); bullet 4, qualifying the complete original onboarding controller (named test exceeded 600 s), is not shown.",
+   "mappedCommits": [
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 7/7 green, 0 skip, covering the retired CLI route (ADR-0085), child-course owner-decision binding with reuse refused, and idempotent re-export (acceptance bullets 2 and 3); bullet 1 (one design revision as one emitted step, zero PO interactions) is neither pinned nor re-targeted to the replacement review-receipt route.",
+   "mappedCommits": [
+    {
+     "sha": "b02abaa78",
+     "subject": "test(pipeline-core): pin the single-step design revision on the replacement route"
+    },
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    },
+    {
+     "sha": "be992e858",
+     "subject": "docs(backlog): reconcile five more item texts with what is built and decided"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+   "stageBaseline": "50",
+   "reasonBaseline": "Pin evidence file counts 15/15 green, 0 skip, covering per-role route preflight, fallback preparation, no self-review, surfaced producer stderr and the admission function; but the pin itself states the end-to-end course acceptance clause stays HELD (runDesignCourseV2 is retired), and the added acceptance for host-boundary routing of test commands and the atomic recovery state is not shown (b59e44303: recovery verb, live Codex sandbox check and template change open).",
+   "mappedCommits": [
+    {
+     "sha": "642b2df02",
+     "subject": "feat(pipeline-core): keep an atomic recovery state per failed role dispatch"
+    },
+    {
+     "sha": "dd8845e39",
+     "subject": "feat(dispatch): brief Goldfish to run every check at the declared host boundary from the first call"
+    },
+    {
+     "sha": "d24f5ac31",
+     "subject": "docs(backlog): record the blocker analysis of 2026-10-22 on the items and as evidence"
+    },
+    {
+     "sha": "be992e858",
+     "subject": "docs(backlog): reconcile five more item texts with what is built and decided"
+    }
+   ]
+  }
+ ]
+}
