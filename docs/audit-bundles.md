@@ -51,15 +51,15 @@ approval, a deployment record, or release authorization.
 The bundle service refuses an invalid package, a missing candidate binding, an
 incompatible policy pack, changed source bytes, and an existing destination.
 Verification rehashes each bundled artifact and returns `invalid` for a missing
-or tampered byte. Signing and long-term retention are separate operations: a
-signature can bind bytes but cannot prove legal identity, key custody, trusted
-time, or external authorization.
+or tampered byte.
 
 ## What a successful check means
 
 `verify` confirms that the bundle's present files still match its manifest.
-It does not prove who created or approved them, who controlled a signing key,
-when they were produced, or how an exported bundle was stored or transported.
+It does not prove who created or approved them, when they were produced, or how
+an exported bundle was stored or transported. Signing and long-term retention
+are separate operations: a signature can bind bytes but cannot prove legal
+identity, key custody, trusted time, or external authorization.
 Keep the bundle under your own access and retention policy. For the exact
 threats, code-level checks and policy derivation, see the
 [maintainer's Audit Bundle reference](audit-bundles-technical.md).
