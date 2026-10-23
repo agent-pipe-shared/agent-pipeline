@@ -38,13 +38,14 @@ Packages inside the steps (task id, notes): K92 GS-1 signature route, K93/K104 f
 
 ## 5. Preparation tasks that were still running when this index was written
 
-Their results are NOT yet in the repository: they sit in build clones under `scratch/clones/` and in `scratch/agent-out/` of the machine that ran them (both untracked). A later session on that machine imports them with `git fetch scratch/clones/<name> HEAD` and `git cherry-pick <base>..FETCH_HEAD`; on another machine they do not exist and must be re-run.
+Rows marked IMPORTED are in the repository. For the others the results are NOT yet in the repository: they sit in build clones under `scratch/clones/` and in `scratch/agent-out/` of the machine that ran them (both untracked). A later session on that machine imports them with `git fetch scratch/clones/<name> HEAD` and `git cherry-pick <base>..FETCH_HEAD`; on another machine they do not exist and must be re-run.
 
 | Task | Result | Clone / output |
 |---|---|---|
-| K134 | `scripts/post-sitting-checks.mjs` and the extended count-pass suite list | `scratch/clones/k134`, `scratch/agent-out/K134-notes.md` |
-| K135 | release notes draft `specs/sprint-alfred-epic/plans/release-notes-0.7.0-draft.md` (draft, not published) | `scratch/clones/k135`, `scratch/agent-out/K135-notes.md` |
-| K136 | checklists for the native host runs `specs/sprint-alfred-epic/plans/host-run-checklists-2026-10-23.md` | `scratch/clones/k136`, `scratch/agent-out/K136-notes.md` |
+| K134 | IMPORTED: `scripts/post-sitting-checks.mjs` and the extended count-pass suite list (129 entries; list of suites that are red before the sitting by design in `count-pass-suites.md`) | notes in `scratch/agent-out/K134-notes.md` |
+| K135 | IMPORTED: release notes draft `specs/sprint-alfred-epic/plans/release-notes-0.7.0-draft.md` (draft, not published, not PO-accepted) | notes in `scratch/agent-out/K135-notes.md` |
+| K136 | IMPORTED: checklists for the native host runs `specs/sprint-alfred-epic/plans/host-run-checklists-2026-10-23.md` (eight gaps marked "command not found", PO list row 50) | notes in `scratch/agent-out/K136-notes.md` |
+| K139 | MP-04 readback (`CLAUDE_CODE_SUBAGENT_MODEL` set/unset, never the value) in the Elephant preflight; PO decision batch 7 row 8, never built before; becomes runbook step 48 if its diff verifies on the post-sitting state | `scratch/clones/k139`, `scratch/agent-out/K139-notes.md` |
 | K137 | Reader closure drafts (dispositions, owner decision, record skeleton, runbook) | `scratch/agent-out/K137-draft/`, `scratch/agent-out/K137-notes.md`; nothing committed by design |
 | K138 | Critic batch plan `specs/sprint-alfred-epic/plans/critic-batch-plan-2026-10-23.md` (fields only, nothing dispatched) | `scratch/clones/k138`, `scratch/agent-out/K138-notes.md` |
 
