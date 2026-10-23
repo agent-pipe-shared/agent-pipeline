@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: SUL-1.0
 // Pin for pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block (AC-119).
-// PARTIAL (interim): covers the draft-time applicability predicate and the entry-readiness
-// fall-through to the adoption disposition through the real modules. The implementation-entry
-// inspector itself is pinned by lib/architecture-design.test.mjs (hotfix 9 cases) and is not
-// re-pinned here; the net-new ratchet point is NOT covered (see the dispatch report). Sections (d) and (e) add the
-// project-onboarding-v3 consumer (reopen-design only on ok:false) and the win32-dialect plan-path case.
+// PARTIAL: covers the draft-time applicability predicate and the entry-readiness fall-through to the
+// adoption disposition through the real modules. The implementation-entry inspector itself is pinned by
+// lib/architecture-design.test.mjs (hotfix 9 cases) and is not re-pinned here. The net-new ratchet under
+// a deferred adoption (a6641cce4, PO decision 2026-10-16 #5) IS covered: section (c) names both states the
+// item distinguishes -- an already-existing path stays ready/report-only, a net-new path gets the full
+// fitness check -- plus the mixed surface. NOT covered (D66, signed once with AC-9 under D142, built after
+// 0.7.0): the explicit "established with ratchet" repository state and a frozen accepted baseline whose worsened
+// findings block. Sections (d) and (e) add the project-onboarding-v3 consumer (reopen-design only on ok:false)
+// and the win32-dialect plan-path case.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -191,6 +195,40 @@ test("a deferred established project is NOT admitted, not ready, for a net-new t
     checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }),
     evaluateArchitectureFitness: () => ({ overallStatus: "blocked", outcomes: tenOutcomes(true), summary: {} }) } });
   assert.notEqual(result.status, "ready", "net-new path with a blocking finding is admitted under deferral");
+});
+
+// Both states of the net-new ratchet under a deferred adoption, with existence injected through the module's
+// `deps.pathExists` seam so the verdict does not depend on the checkout's file tree.
+function deferredEntry(paths, existing, fitnessOutcomes) {
+  const existingSet = new Set(existing.map((p) => resolve(repoRoot, p)));
+  return inspectArchitectureEntryReadiness({ rootDir: repoRoot, planningSurface: { planPath: PLAN, paths }, deps: {
+    inspectArchitectureDesign: () => ({ ok: true, status: "not-required", required: false, scope: null }),
+    readCheckpointArchitectureDebt: () => ({ ok: true, debt: [], resolvedDebt: [] }),
+    checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }),
+    pathExists: (absolute) => existingSet.has(absolute),
+    evaluateArchitectureFitness: () => ({ overallStatus: "blocked", outcomes: fitnessOutcomes, summary: {} }) } });
+}
+
+test("state 1, net-new under deferral: a blocking finding refuses with the typed fitness code and names only the net-new paths", () => {
+  const result = deferredEntry(["CLAUDE.md", "src/brand-new.mjs"], ["CLAUDE.md"], tenOutcomes(true));
+  assert.equal(result.status, "blocked", JSON.stringify(result));
+  assert.equal(result.code, "ARCHITECTURE-FITNESS-NOT-READY");
+  assert.deepEqual(result.fitness.netNewPaths, ["src/brand-new.mjs"], "the already-existing path stays under the deferral and is not listed");
+  assert.equal(result.fitness.blockingOverallStatus, "blocked");
+  const allNew = deferredEntry(["src/a.mjs", "src/b.mjs"], [], tenOutcomes(true));
+  assert.equal(allNew.code, "ARCHITECTURE-FITNESS-NOT-READY");
+  assert.deepEqual(allNew.fitness.netNewPaths, ["src/a.mjs", "src/b.mjs"]);
+});
+
+test("state 2, existing paths only under deferral: the same blocking finding stays report-only and ready; a net-new path with a clean fitness result is admitted by the full check, not by the deferral", () => {
+  const frozen = deferredEntry(["CLAUDE.md", "README.md"], ["CLAUDE.md", "README.md"], tenOutcomes(true));
+  assert.equal(frozen.status, "ready", JSON.stringify(frozen));
+  assert.equal(frozen.fitness.blockingOverallStatus, "deferred");
+  assert.equal(frozen.fitness.reportOnly.length, 10, "every outcome stays visible");
+  assert.equal(frozen.fitness.reportOnly.some((o) => o.outcome === "finding"), true);
+  const cleanNewPath = deferredEntry(["src/brand-new.mjs"], [], tenOutcomes(false));
+  assert.equal(cleanNewPath.status, "ready", JSON.stringify(cleanNewPath));
+  assert.equal(cleanNewPath.fitness.blockingOverallStatus, "pass", "admitted because the full check passed, not because it was deferred");
 });
 
 // ---- (d) consumer: lib/project-onboarding-v3.mjs designToImplementationHandoverAction recommends reopen-design only on ok:false ----
