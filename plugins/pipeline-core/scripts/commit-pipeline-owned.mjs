@@ -44,7 +44,18 @@ function parse(argv) {
   return flags.agent === undefined ? { error: `state who runs it: --agent (an agent session) or --human (a PO terminal commit); ${usage}` } : flags;
 }
 
-export function commitPipelineOwned(argv, { spawn = spawnSync } = {}) {
+const FOREIGN_BASE = "other files are uncommitted; this command commits only the Pipeline's own state files";
+const PUSH_APPROVAL_RECORD = "project/pipeline-state.json";
+
+/** The refusal text: it names the working form for the one dirty file agents most often meet here. */
+export function foreignChangesReason(others) {
+  if (!Array.isArray(others) || !others.includes(PUSH_APPROVAL_RECORD)) return FOREIGN_BASE;
+  return `${FOREIGN_BASE}. ${PUSH_APPROVAL_RECORD} is the push-approval record: the next push-prepare run folds it into a commit by itself, so do not commit it by hand and do not add it to a commit of other work. `
+    + "To commit other work in the meantime, leave that file out of the pathspec and use the Elephant trailer form `Dispatch: stage-0 (elephant)` with `AI-Assisted: true`; "
+    + "`Dispatch: administrative (elephant)` is refused without independently inspected evidence.";
+}
+
+export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
   const parsed = parse(argv);
   if (parsed.error) return { status: "refused", code: "CPO-ARGS", reason: parsed.error };
   let root;
@@ -54,7 +65,7 @@ export function commitPipelineOwned(argv, { spawn = spawnSync } = {}) {
   const status = git(["status", "--porcelain=v1", "--untracked-files=all"]);
   if (!isSuccessfulSpawn(status) || typeof status.stdout !== "string") return { status: "refused", code: "CPO-GIT", reason: "git status failed" };
   const { owned, others } = classifyDirtyTree(status.stdout);
-  if (others.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: "other files are uncommitted; this command commits only the Pipeline's own state files", others, owned };
+  if (others.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(others), others, owned };
   if (!owned.length) return { status: "nothing-to-commit", owned: [] };
   if (parsed.dryRun) return { status: "dry-run", owned };
   const add = git(["add", "--", ...owned]);
