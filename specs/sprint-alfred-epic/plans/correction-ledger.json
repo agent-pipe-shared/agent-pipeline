@@ -37,7 +37,7 @@
       "id": "K2",
       "title": "ADR-0085 retirement not followed by tests",
       "status": "open",
-      "next": "5 of 7 suites green; the two reds are PO list rows 23 (measure-tofu-push-e2e scope) and 24 (interruption source adapter purity)"
+      "next": "5 of 7 suites green; the two reds are PO list rows 23 (measure-tofu-push-e2e scope, a decision) and 24 (interruption source adapter purity, repair held as C25)"
     },
     {
       "id": "K3",
