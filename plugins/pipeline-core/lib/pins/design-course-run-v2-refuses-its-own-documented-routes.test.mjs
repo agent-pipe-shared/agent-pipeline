@@ -165,6 +165,71 @@ test("A8 legacy repair consumers stay exported and callable (nothing deleted, no
   assert.equal(existsSync(join(REPO, "scratch")), true);
 });
 
+// A10 (D125 / ADR-0085, K111): the revision path under the restated single-review acceptance. The library contract of a
+// revision (delta receipt, rebind, one request) is pinned by revised-native-design-cannot-reach-a-new-advisor-course (v);
+// command admission of the initial and delta receipt spellings by the D64 walk (lifecycle-coordination-commands-refused-as-
+// implementation-writes). What neither runs is the whole revision chain through the real guards: reopen-design, submit-plan,
+// the delta receipt producer, and the present-plan that carries BOTH receipts (the CLI accepts one or two).
+// Real lifecycle-ready guard plus real dev-plan shell lane; the recording seam answers `ineligible`, so a refusal is a refusal.
+async function revisionChainSteps(f, hooks, { receiptCount }) {
+  const { PIPELINE_STATE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT } = await import("../guard/constants.mjs");
+  const { devPlanShellRefusalHit } = await import("../guard/devplan-shell-lane.mjs");
+  const lane = { inspectProjectOnboardingV3Fn() { throw new Error("fixture: no onboarding observation"); } };
+  const quote = (word) => `'${word.replaceAll("'", "'\"'\"'")}'`;
+  const render = (action) => [action.executable, ...action.argv].map(quote).join(" ");
+  const action = (script, ...argv) => ({ executable: process.execPath, argv: [script, ...argv] });
+  const review = `specs/${f.featureId}/review`;
+  const first = `${review}/design-review-receipt-1.json`;
+  const delta = `${review}/design-review-receipt-2.json`;
+  const third = `${review}/design-review-receipt-3.json`;
+  const receipts = [first, delta, third].slice(0, receiptCount).flatMap((path) => ["--review-receipt", path]);
+  // The producer runs for real, as in the D64 walk: round 1 is on disk before the revision, round 2 is its delta.
+  mkdirSync(join(f.root, review), { recursive: true });
+  writeFileSync(join(f.root, `${review}/design-review-1.md`), "# Critic report\n\nVerdict: FINDINGS\n");
+  writeFileSync(join(f.root, `${review}/design-review-2.md`), "# Critic report\n\nVerdict: PASS\n");
+  const produce = (...argv) => spawnSync(process.execPath, [join(PLUGIN, "scripts", "design-review-receipt.mjs"), "create", "--repo", f.root,
+    "--feature", f.featureId, "--prd", f.sources.prd.path, "--spec", f.sources.spec.path, ...argv],
+  { cwd: f.root, encoding: "utf8", env: { ...process.env, CLAUDECODE: "1" }, timeout: 60_000 });
+  const round1 = produce("--report", `${review}/design-review-1.md`, "--open-finding", "F-1", "--out", first);
+  assert.equal(round1.status, 0, `round 1 receipt producer: ${round1.stderr}`);
+  const steps = [
+    ["reopen-design", action(PIPELINE_STATE_SCRIPT, "reopen-design", "--by", "Fixture PO")],
+    ["submit-plan", action(PIPELINE_STATE_SCRIPT, "submit-plan", "--by", "Fixture", "--profile", "feature")],
+    ["delta receipt", action(DESIGN_REVIEW_RECEIPT_SCRIPT, "create", "--repo", f.root, "--feature", f.featureId, "--report", `${review}/design-review-2.md`,
+      "--prd", f.sources.prd.path, "--spec", f.sources.spec.path, "--previous", first, "--out", delta)],
+    ["present-plan with the receipt chain", action(PIPELINE_STATE_SCRIPT, "present-plan", "--by", "Fixture", ...receipts)],
+  ];
+  return steps.map(([label, a]) => {
+    if (label === "present-plan with the receipt chain") {
+      // The revision itself: the finding is fixed in the Spec, so the delta receipt has a changed source to review.
+      writeFileSync(join(f.root, f.sources.spec.path), `${readFileSync(join(f.root, f.sources.spec.path), "utf8")}\nF-1 fixed.\n`);
+      const made = produce("--report", `${review}/design-review-2.md`, "--previous", first, "--out", delta);
+      assert.equal(made.status, 0, `round 2 delta receipt producer: ${made.stderr}`);
+      writeFileSync(join(f.root, third), readFileSync(join(f.root, delta)));
+    }
+    const guard = hooks.actualGuard(a, f.root);
+    const hit = devPlanShellRefusalHit(render(a), f.root, lane);
+    return { label, code: guard.code, lane: hit?.lane ?? null, stderr: String(guard.stderr).split("\n")[0] };
+  });
+}
+
+test("A10 revision path (single-review route): reopen-design, submit-plan, the delta receipt and present-plan over both receipts are admitted by the real guards with zero overrides", async () => {
+  const hooks = await import("../../hooks/design-course-command-admission.test.mjs");
+  const f = hooks.fixture("feature");
+  try {
+    const admitted = await revisionChainSteps(f, hooks, { receiptCount: 2 });
+    assert.deepEqual(admitted.filter((s) => s.code !== 0 || s.lane !== null).map((s) => `${s.label}: guard exit ${s.code}${s.lane ? `, lane ${s.lane}` : ""}; ${s.stderr}`), [],
+      "a revision-path command is refused by a real guard");
+    assert.equal(admitted.length, 4);
+    // Control: the CLI takes one or two receipts; a third is not part of the route and must not be admitted by the same lane.
+    const g = hooks.fixture("feature");
+    try {
+      const three = await revisionChainSteps(g, hooks, { receiptCount: 3 });
+      assert.equal(three.at(-1).code !== 0 || three.at(-1).lane !== null, true, "present-plan with a third receipt is refused");
+    } finally { g.cleanup(); }
+  } finally { f.cleanup(); }
+});
+
 test("A9 RED mirror: with the retirement line removed from a scratch mirror, the same K5-9 input is NOT retired, so A1 can fail", async () => {
   const source = readFileSync(SCRIPT, "utf8");
   const marker = "  return retiredDesignResult(DESIGN_COURSE_RETIRED);\n  if (input.confirmProducerExecution";
