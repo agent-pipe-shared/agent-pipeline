@@ -1,0 +1,272 @@
+# Critic batch plan for the 0.7.0 content (prepared 2026-10-23; nothing dispatched)
+
+Status: preparation only. No Critic is started, no batch is registered, no candidate is stamped. This file is a field table, not a prompt: at dispatch time the Elephant fills `templates/prompts/critic-review.md` (and includes `templates/prompts/agent-obligations.md` per its USAGE step 0) from the tables below, copying Phase A verbatim. No Critic prompt body is written here (CLAUDE.md, "Dispatch from the template, never freehand"; `critic-review.md` section 2).
+
+Rules this plan obeys, so the Elephant can paste without re-deciding:
+
+- Values marked PASTE go into the template as written. Columns named "plan-only" are traceability for the Elephant and are NEVER pasted (a topic label or PO-decision wording in a dispatch is a hunt list).
+- Open points of the PO decisions reach the Critic only as bare repository paths inside the `BATCH_SCOPE` field (candidate range plus "also in the search surface: <path>"). No claim, no expectation, no characterization, no "who noticed it".
+- Evidence is passed as artifact paths. No command to re-run is named. Prior verdicts and implementor prose are not input (see "Evidence boundary").
+- Raw `backlog/items/*.md` paths are never named: strip first with `node plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.mjs --item <path> --out <stripped-path>` and name the stripped copy. Dispatch records are named only as stripped projections from `node plugins/pipeline-core/scripts/dispatch-record-strip-for-critic.mjs --record <path> --out <stripped-path>`.
+
+## 1. Fixed facts today and placeholders
+
+| Name | Value | Source |
+|---|---|---|
+| Ruleset SHA | `0.7.0+claude.20261022204428.79cda46` | dispatch metadata of this task |
+| Sitting freeze base | `375055799` (diffs cut and replayed at this commit plus evidence-only commits) | `specs/sprint-alfred-epic/evidence/sitting/README.md` |
+| Rehearsal base | `e46b4b0cb` | `specs/sprint-alfred-epic/evidence/sitting/runbook.md` line 1 |
+| Branch head when this plan was written | `edabf0156` | `git rev-parse HEAD` in the clone |
+| `<pre-sitting-head-sha>` | HEAD of `feat/sprint-alfred` immediately before runbook step 01 | operator records it at the sitting (README, "Before the first command") |
+| `<sha-NN>` | the commit created by runbook step NN at the sitting (`NN` as printed in `runbook.md`, e.g. `<sha-08>`, `<sha-39b>`) | operator's commit output / `git log` after the sitting |
+| `<sitting-head-sha>` | HEAD after step 47 | after the sitting |
+| `<stamped-candidate-sha>` | the candidate commit the PO stamps / the head the Critic batch is bound to (after sitting, post-sitting checks and Full Verify) | PO's call (README, "After the sitting", item 5) |
+| `<content-base-sha>` | base of the 0.7.0 content range for group G9 | NOT RECORDED in any tracked file read (see Blockers B3) |
+
+Step 35 (C28 preimage re-pin) is not part of the sitting and is not part of any range below. It runs after the Critic batch and its corrections, right before the stamp (PO decisions 2026-10-23, batch 1 row 19; `runbook.md` step 35).
+
+## 2. Grouping of the content into Critic reviews
+
+One group = one declared batch = one full Critic plus at most three correction-diff Critics (`critic-review.md` item 5; MP-07 item 4). Groups are by write surface and risk. Enumerated SHAs are placeholders until the sitting happens. "added" marks a step outside the briefing's step list that is included because a PO decision names its area for the Critic or because it shares the write surface; the Elephant may drop it.
+
+Protected/kernel changes of the sitting (first):
+
+| Group | Area | Runbook steps (PRO = protected, UN = unprotected partner) | Main write surface |
+|---|---|---|---|
+| G1 | guard | 12 PRO, 13 PRO, 14 PRO; added: 15 PRO, 16 UN, 17 PRO, 18 UN | `hooks/guard-apply-patch.test.mjs`, `hooks/antigravity-pretool-guard.test.mjs`, `lib/guard/evaluate.mjs`, `lib/protected-test-paths.mjs`, `lib/critic-review-lineage*.mjs`, `lib/guard-maintenance-window.mjs`, `docs/guard-maintenance-window-threat-model.md`, `lib/interruption-source-adapter.mjs`, two pins under `lib/pins/` |
+| G2 | onboarding-continuity | 11 PRO; 31 PRO; added: 05 PRO, 06 PRO, 07 UN | `scripts/pipeline-state.mjs`, `lib/onboarding-continuity.mjs`, `lib/session-authority-orphan-member-step.mjs`, `scripts/session-cleanup-binding.test.mjs`, `lib/commit-message-policy.mjs` (+test), `scripts/onboarding-init.mjs` (+test) |
+| G3 | dispatch / fanout | 08 PRO, 09 UN, 10 PRO, 21 PRO, 22 UN, 23 PRO, 24 UN, 38 PRO, 39 UN | `lib/native-goldfish-host-state.mjs`, `lib/slice-queue.mjs`, `hooks/guard-dispatch.mjs`, `lib/dispatch-record-liveness.mjs`, `lib/dispatch-briefing-build.mjs`, `scripts/dispatch-briefing.mjs`, `scripts/slice-queue.mjs`, `scripts/session-authority-repair.mjs`, the listed tests, `skills/pipeline-start/references/workflow-dispatch.md` |
+| G4 | read-credential and shell grammar | 25 PRO, 26 PRO, 27 UN, 28 UN, 29 PRO, 30 UN | `lib/guard/denial-route.mjs`, `lib/guard/evaluate.mjs`, `lib/guard/grammar-denials.mjs`, `lib/guard/shell-grammar.mjs`, `lib/guard/read-scope.mjs`, `lib/passive-read-policy.mjs`, `hooks/guard-command-grammar.mjs`, `hooks/antigravity-pretool-guard.mjs`, the listed pins |
+| G5 | approval / receipts | 19 PRO, 20 UN, 32 PRO, 33 UN, 44 PRO, 45 UN | `lib/human-guard-override.mjs`, `scripts/pipeline-state.mjs`, `lib/design-review-receipt.mjs`, `lib/design-approval-binding.mjs`, `lib/design-consistency-check.mjs`, `scripts/design-review-receipt.mjs`, the listed tests and pins |
+| G6 | identity / calibration | 42 PRO, 43 UN; added: 46 PRO | `lib/project-calibration-identity.mjs`, `lib/consumer-verify.mjs`, `scripts/consumer-verify-check.mjs`, `scripts/verify-evidence-producer.mjs`, `.claude/pipeline.json`, the listed pins |
+| G7 | Reader mirrors (code only) | 47 PRO (code files only) | `lib/doc-reader-documentation-snapshot.mjs`, `harness/scripts/check-consumer-safe-paths.mjs`; the generated mirrors under `plugins/pipeline-core/reader-inputs` are documents covered by the Reader and are NOT a Critic input |
+
+Then the unprotected and history groups:
+
+| Group | Content | Range |
+|---|---|---|
+| G9 | Unprotected product changes of 0.7.0 that are not part of a sitting step (the clusters landed on the branch before the sitting, K99/K101/K94/K96-pin and the others in `plans/candidate-content-plan-2026-10-22.md` sections 1 and 2). Excludes commits whose changed paths are only documents covered by the Reader, specs, backlog or evidence | `<content-base-sha>..<sitting-head-sha>`, minus the commits of G1-G7 and G10, enumerated at dispatch time |
+| G10 | Existing history items the PO decisions send to the Critic: the signed-import commit `b7c660282` (path `harness/verify-suites.json`) and the three commits whose messages cite the task `ALF-ADOPTION-PROOF` (`f948eada4`, `e6a309968`, `f7321f418`) | exact SHAs exist today; see group table |
+
+Documents covered by the Reader are not Critic-reviewed again: the consumer documents (SETUP, usage, overview, migration, README, GEMINI.md and the rest of the Reader set), the generated Reader-input mirrors and manifest in `plugins/pipeline-core/reader-inputs`, and the two `CLAUDE.md` lines the operator adds by hand. Evidence of the Reader course: `specs/sprint-alfred-epic/evidence/reader-review`, `specs/sprint-alfred-epic/plans/reader-round-20261023a-working-disposition.json`, `specs/sprint-alfred-epic/plans/reader-round-20261023b-working-disposition.json` (these are the Reader's records; they are not Critic input, see Evidence boundary).
+
+Step coverage (nothing falls through):
+
+| Steps | Disposition |
+|---|---|
+| 01 PRO, 02 PRO, 03 PRO, 04 PRO | not in the briefing's list; PROPOSED: 01/04 into G1 as "added", 02/03 treated as mechanical (registry/inventory rebaseline; MP-07 T0 auto-pass candidate). Elephant/PO decides (Blocker B5) |
+| 05-07 | G2 (added) |
+| 08-10 | G3 |
+| 11 | G2 |
+| 12-14 | G1 |
+| 15-18 | G1 (added) |
+| 19-20 | G5 |
+| 21-24 | G3 |
+| 25-30 | G4 |
+| 31 | G2 |
+| 32-33 | G5 |
+| 34, 36, 37, 39b, 40, 41 | ratchet / registry / inventory / governance data: mechanical; PROPOSED T0 auto-pass unless the Elephant adds them to G1 (Blocker B5) |
+| 35 | after the batch (see section 6) |
+| 38, 39 | G3 |
+| 42, 43 | G6 |
+| 44, 45 | G5 |
+| 46 | G6 (added) |
+| 47 | G7 (code files only) |
+
+Shared write surfaces (a correction in one group can change bytes another group reviewed; a correction Goldfish and every delta range must name the overlap):
+
+| File | Steps (groups) |
+|---|---|
+| `scripts/pipeline-state.mjs` | 11 (G2), 32 (G5), 44 (G5) |
+| `lib/guard/evaluate.mjs` | 14 (G1), 25 (G4) |
+| `lib/guard/shell-grammar.mjs` | 25 (G4), 29 (G4) |
+| `hooks/guard-dispatch.mjs` | 10 (G3), 21 (G3) |
+| `scripts/dispatch-briefing.mjs` | 09 (G3), 22 (G3), 24 (G3) |
+| `hooks/antigravity-pretool-guard.test.mjs` | 13 (G1), 20 (G5), 27 (G4) |
+| `lib/onboarding-continuity.mjs` | 05 (G2), 06 (G2) |
+| `harness/verify-suites.json` | 38 (G3), 36 (not grouped), signed import `b7c660282` (G10) |
+
+## 3. Template fields common to every group
+
+| Field (template) | Value (PASTE) | Source |
+|---|---|---|
+| Agent definition | `pipeline-core:critic` (Agent tool `subagent_type`; Workflow `agentType` needs the `pipeline-core:` prefix) | `plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md` |
+| Obligations | include `templates/prompts/agent-obligations.md` verbatim at the top, or name that path | `critic-review.md` USAGE step 0 |
+| `{{RULESET_SHA}}` | `0.7.0+claude.20261022204428.79cda46` | dispatch metadata |
+| `{{PROJECT_NAME}}` | `agent-pipeline` | `project/pipeline.json` |
+| `{{CALIBRATION_FILE\|n/a}}` | `project/pipeline.json` | bootstrap line of this repo |
+| `{{GUARDRAILS_PATHS}}` | `guardrails/global.md`, `guardrails/git.md`, `guardrails/security.md`, `guardrails/quality-gates.md`, `guardrails/token-budget.md`, `project/pipeline.json`, `project/guard-config.json`, `architecture/boundary-policy.json`; kernel groups (G1, G3, G4, G5, G6) add `docs/guard-maintenance-window-threat-model.md` | `CLAUDE.md` "Where things live"; `runbook.md` steps 17-18 |
+| `{{RISK_ZONES}}` | `per calibration` | template default |
+| `{{SPEC_PATH}}` | `specs/sprint-alfred-epic/spec.md` (AC table from line 3050: rows `AC-nnn`); original acceptance texts: `specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json`; any backlog item an AC row cites enters only as a stripped copy | `git ls-files`-verified paths; template item 3 backlog rule |
+| `{{CORRECTION_INPUT_BINDINGS_PATH_OR_NOT_APPLICABLE}}` | `not applicable` for the full review of every group (no retained prior result in the range). For a correction round: the bindings file the Elephant prepares under `harness/review-protocol.md` section 2.2 | `critic-review.md` item 5 |
+| `{{REVIEWED_DIFF_SNAPSHOT_PATH}}` | `not applicable` (committed range). The sitting diffs exist as files only before the sitting and are not the review object | `runbook.md` |
+| `{{DISPATCH_LIST_PATH}}` | stripped projection paths for the origin dispatches of the group's patches, if records exist; see Blocker B2 | `dispatch-record-strip-for-critic.mjs` |
+| `{{CLAIMS_EVIDENCE_PATH}}` | the counted-result file(s) in the group's evidence row (command/exit/counts only) | section 4 |
+| `{{VERDICT_REQUESTED}}` | `yes - pass/fail required` (a correction round starts only from a consumed non-PASS review) | `critic-review.md` item 5 and the report-format item 5 |
+| `{{T1_ASSURANCE}}` | `functional-equivalent-read-only; OS isolation not asserted` | `roles/critic.md` section 3; `agents/critic.md` |
+| `{{ADVISOR_DEMAND_LINE}}` | delete the line unless the Elephant holds a current bounded Advisor demand (none known to this plan) | template |
+| `{{RECRITIC_LINE}}`, `{{REVIEW_ORDINAL_LINE}}` | delete both for the full review. Correction rounds: `Re-critic (MP-07): <previous-reviewed-sha>..<new-candidate-sha>` and `Review ordinal: 2`, `3` or `4` | template |
+| Batch registration (Coordinator, inline) | `node plugins/pipeline-core/scripts/session-critic-finalizer.mjs register-batch --root <repository> --request scratch/<registration>.json` with schema `pipeline.critic-generic-batch-registration-request.v2`; declaration fields `taskId`, `baseCommit`, `candidateCommit`, `logicalWorkIds`, `specPath`, `guardrailPaths`, `signedQualityImportAnchor`, `reviewUnitPath`. `taskId` and `logicalWorkIds` are Elephant-assigned; `baseCommit` = `<pre-sitting-head-sha>` (G10: `b7c660282^`), `candidateCommit` = `<stamped-candidate-sha>` | `critic-review.md` last section |
+| Pre-dispatch check | `node plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs` for the fixed range, before the dispatch | `skills/critic-review` (refuses without Spec path and fixed range) |
+
+## 4. Model and budget per group (dispatch metadata)
+
+Source of the route: `pipeline.user.yaml`, `routing.duties`: `critic_high_risk.claude` = alias `opus`, effort `max`; `critic_normal.claude` = alias `opus`, effort `medium`. Rule applied: the dispatch model comes from `pipeline.user.yaml` only. The user config carries an alias, not a concrete identifier: `{{MODEL_ID}}` is resolved by the Elephant from the runtime at dispatch (Blocker B1). The Critic agent definition pins `model: sonnet`, effort `max` in its frontmatter (`plugins/pipeline-core/agents/critic.md`), so naming the model in the text does not route it: every group below needs the tool-layer `model` parameter set to `opus` on the dispatch call (MP-29; check the frontmatter pin before dispatch, MP-29 item 2). The route pre-check in the template runs for the groups marked high-risk.
+
+| Group | Route key | `{{CRITICALITY_MODEL}}` rationale (PASTE the sentence) | `{{MODEL_ID}} at {{EFFORT}}` | Tool budget |
+|---|---|---|---|---|
+| G4 | critic_high_risk | genuinely critical security change (credential-read refusal and shell-grammar admission), ONE batched Critic (MP-07 item 2, item 3) | `<opus model id> at max` | `<=50 tool uses` |
+| G5 | critic_high_risk | genuinely critical security change (human-override signature route, push approval, receipts), ONE batched Critic (MP-07 item 2, item 3) | `<opus model id> at max` | `<=50 tool uses` |
+| G1 | critic_high_risk | genuinely critical security/architecture change (kernel path `lib/guard-maintenance-window.mjs`, protected-test-path classifier), ONE batched Critic (MP-07 item 2, item 3) | `<opus model id> at max` | `<=50 tool uses` |
+| G6 | critic_high_risk | security read of the identity binding named by the PO decision (project identity, source-checkout exemption), ONE batched Critic (MP-07 item 2) | `<opus model id> at max` | `<=30 tool uses` |
+| G3 | critic_normal | guardrail diff that is not security-critical, ONE batched Critic (MP-07 item 2: guardrail-only does not escalate on its own) | `<opus model id> at medium` | `<=50 tool uses` |
+| G2 | critic_normal | guardrail/lifecycle diff, not security-critical, ONE batched Critic | `<opus model id> at medium` | `<=30 tool uses` |
+| G7 | critic_normal | code-only part of a generated-mirror step, ONE batched Critic (see Blocker B4 on merging into G9) | `<opus model id> at medium` | `<=30 tool uses` |
+| G9 | critic_normal for the unprotected product changes; the AC-127 V-10, AC-249 and D86 reads are security-adjacent: Elephant may split a high-risk sub-batch | `<opus model id> at medium` | `<=50 tool uses` |
+| G10 | critic_normal | history review of a signed import and three commits | `<opus model id> at medium` | `<=30 tool uses` |
+
+Budget basis: the template default is 30 base plus a closing allowance of 5; the shipped agent has `maxTurns: 65`, effective working cap `min(base, 65 - 5 - 10) = 50`. A base of 50 is the most that fits; numbers above are my reading by number of steps and files, not a measured diff size (Blocker B6). Closing allowance +5 is stated in the template field.
+
+## 5. Per-group field tables
+
+For every group, `{{COMMIT_SHAS}}` is an ENUMERATED list (never only a range); the Critic confirms that `FIRST^..LAST` covers exactly the list. `{{AC_IDS}}` lists only rows verified by title against `spec.md`; rows I could not verify are not invented (Blocker B7). Evidence paths all exist today under `specs/sprint-alfred-epic/evidence/` (counted results) unless marked.
+
+Evidence artifacts that exist today and are usable as `{{EVIDENCE_PATHS}}` / `{{CLAIMS_EVIDENCE_PATH}}` (command/exit/count content):
+
+- E1 `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md`
+- E2 `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md`
+- E3 `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23.md`
+- E4 `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-b.md`
+- E5 `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-c.md` (clusters K3 K4 K5 K8: guard, override, doc-contract suites)
+- E6 `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-d.md` (K9 and single suites, dispatch budget, Windows pins)
+- E7 `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md`
+- E8 `specs/sprint-alfred-epic/evidence/sitting/notes/k133-results.md` (rehearsal replay results)
+
+Held-patch notes and sitting notes are NOT in these lists (see Evidence boundary and B8): `specs/sprint-alfred-epic/evidence/held-patches/*.notes.md`, `specs/sprint-alfred-epic/evidence/held-patches/d75-cancel-class/s4-notes.md`, `.../s5-notes.md`, `specs/sprint-alfred-epic/evidence/sitting/notes/*.md`, `specs/sprint-alfred-epic/evidence/sitting/k118-notes.md`, `.../k120-notes.md`, `.../rehearsal-notes.md`.
+
+### G1 guard
+
+| Field | Value (PASTE) | Source |
+|---|---|---|
+| `{{COMMIT_SHAS}}` | `<sha-12>, <sha-13>, <sha-14>, <sha-15>, <sha-16>, <sha-17>, <sha-18>` (15-18 added) | runbook |
+| Diff construction | `<sha-12>^..<sha-18>` after confirming it covers exactly the list; range base `<pre-sitting-head-sha>` | template |
+| `{{AC_IDS}}` | none verified from titles; Blocker B7 (fallback `all in the spec` is too wide for a diff-scoped batch) | spec.md |
+| `{{EVIDENCE_PATHS}}` | E5, E4 (guard suites), E8 | section 5 header |
+| `{{BATCH_SCOPE}}` | declare after the stamp: the slice ids are runbook steps 12-18; evidence boundary E5, E4, E8; no other search surface beyond the enumerated commits | MP-07 item 3 |
+| Plan-only pointers | none | decisions batch 1 rows 24, 28 name C24 and C25 as accepted, not as Critic items |
+
+### G2 onboarding-continuity
+
+| Field | Value (PASTE) | Source |
+|---|---|---|
+| `{{COMMIT_SHAS}}` | `<sha-05>, <sha-06>, <sha-07>, <sha-11>, <sha-31>` (05-07 added) | runbook |
+| `{{AC_IDS}}` | AC-219 (title match for step 31's machine-plane reason; Elephant confirms) | spec.md line 3142 |
+| `{{EVIDENCE_PATHS}}` | E4 (session-cleanup-binding row), E6 (`lib/onboarding-continuity.test.mjs` row), E8 | section 5 header |
+| `{{BATCH_SCOPE}}` bare-path pointers | `plugins/pipeline-core/lib/onboarding-continuity.mjs`, `plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs`, `plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs` (each at `<sha-06>` and `<sha-07>`) | decisions batch 1 row 27 (plan-only: the C26 extra snapshot-admission rule) |
+
+### G3 dispatch / fanout
+
+| Field | Value (PASTE) | Source |
+|---|---|---|
+| `{{COMMIT_SHAS}}` | `<sha-08>, <sha-09>, <sha-10>, <sha-21>, <sha-22>, <sha-23>, <sha-24>, <sha-38>, <sha-39>` | runbook |
+| `{{AC_IDS}}` | AC-224 (parallel-work-in-one-checkout, title match; Elephant confirms) | spec.md line 3147 |
+| `{{EVIDENCE_PATHS}}` | E4 (dispatch-budget suites), E6 (slice-queue, local-worker rows), E3 (`dispatch-briefing.test.mjs` row), E8 | section 5 header |
+| `{{BATCH_SCOPE}}` bare-path pointers | the D75 take-over class change: `plugins/pipeline-core/lib/slice-queue.mjs`, `plugins/pipeline-core/lib/native-goldfish-host-state.mjs`, `plugins/pipeline-core/scripts/slice-queue.mjs` | decisions batch 3 row 22 (plan-only: take-over class) |
+
+### G4 read-credential and shell grammar
+
+| Field | Value (PASTE) | Source |
+|---|---|---|
+| `{{COMMIT_SHAS}}` | `<sha-25>, <sha-26>, <sha-27>, <sha-28>, <sha-29>, <sha-30>` | runbook |
+| `{{AC_IDS}}` | AC-225, AC-255 | spec.md lines 3148, 3178 |
+| `{{EVIDENCE_PATHS}}` | E4 (`advertised-git-to-head-pipeline-is-refused`), E7 (`passive-read-policy...`, `read-blocks...`, `shell-grammar-file-is-a-kernel-path...` rows), E8 | section 5 header |
+| `{{BATCH_SCOPE}}` | enumerated commits only; no extra pointer | decisions batch 6 rows (M5, M7, AP11) are build decisions, not Critic items |
+
+### G5 approval / receipts
+
+| Field | Value (PASTE) | Source |
+|---|---|---|
+| `{{COMMIT_SHAS}}` | `<sha-19>, <sha-20>, <sha-32>, <sha-33>, <sha-44>, <sha-45>` | runbook |
+| `{{AC_IDS}}` | AC-172, AC-193, AC-201, AC-258 (title matches; Elephant confirms) | spec.md lines 3095, 3116, 3124, 3181 |
+| `{{EVIDENCE_PATHS}}` | E5 (K4 override and approval suites), E7, E8 | section 5 header |
+| `{{BATCH_SCOPE}}` | enumerated commits only | decisions batch 2 row 29 and batch 12 row 41 are build decisions |
+
+### G6 identity / calibration
+
+| Field | Value (PASTE) | Source |
+|---|---|---|
+| `{{COMMIT_SHAS}}` | `<sha-42>, <sha-43>, <sha-46>` (46 added) | runbook |
+| `{{AC_IDS}}` | none verified from titles (Blocker B7) | spec.md |
+| `{{EVIDENCE_PATHS}}` | E8 | section 5 header |
+| `{{BATCH_SCOPE}}` bare-path pointers | `plugins/pipeline-core/lib/project-calibration-identity.mjs`, `plugins/pipeline-core/lib/consumer-verify.mjs`, `plugins/pipeline-core/scripts/consumer-verify-check.mjs` (each at `<sha-42>`) | decisions batch 12 row 42 (plan-only: K127 security read) |
+
+### G7 Reader mirrors (code only)
+
+| Field | Value (PASTE) | Source |
+|---|---|---|
+| `{{COMMIT_SHAS}}` | `<sha-47>`, restricted in the batch scope to the two code paths | runbook |
+| `{{AC_IDS}}` | none verified from titles (Blocker B7) | spec.md |
+| `{{EVIDENCE_PATHS}}` | E8 | section 5 header |
+| `{{BATCH_SCOPE}}` | `plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs`, `harness/scripts/check-consumer-safe-paths.mjs`; the mirrors under `plugins/pipeline-core/reader-inputs` are outside the search surface | decisions batch 12; Reader-covered |
+
+### G9 unprotected product changes
+
+| Field | Value (PASTE) | Source |
+|---|---|---|
+| `{{COMMIT_SHAS}}` | enumerated at dispatch from `git log <content-base-sha>..<sitting-head-sha>` (Blocker B3) | plan |
+| `{{AC_IDS}}` | AC-127, AC-249, AC-147, AC-148, AC-187 (rows named by the batch 9 decision) | spec.md lines 3050, 3172, 3070, 3071, 3110 |
+| `{{EVIDENCE_PATHS}}` | E3, E6, E7, E1, E2 | section 5 header |
+| `{{BATCH_SCOPE}}` bare-path pointers | `plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs` (header lines 9-47); `plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs` plus the scanner diagnostic builder and the two schema copies it names (paths not recorded, B3b); `plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs`; `setup.mjs`; `docs/sprint-alfred-completion-report.md` | decisions batch 9 (AC-127 V-10, AC-249), batch 5 (D86), batch 12 rows 43 (Advisor-consent wording, German completion report) |
+
+### G10 history items with fixed SHAs
+
+| Field | Value (PASTE) | Source |
+|---|---|---|
+| `{{COMMIT_SHAS}}` | `b7c660282, f948eada4, e6a309968, f7321f418` | git log of the clone |
+| Diff construction | `git show` per SHA (the four are not a contiguous range) | template |
+| `{{AC_IDS}}` | `AC-163` for `f7321f418` only (its subject cites it); none verified for the others | git log subject |
+| `{{EVIDENCE_PATHS}}` | `harness/verify-suites.json` hunks of `b7c660282` are the search surface (path only); counted evidence: E4 | decisions batch 4 rows 32 |
+| `{{BATCH_SCOPE}}` bare-path pointers | `harness/verify-suites.json`; `harness/config/verify-case-completion.v1.json` | decisions batch 4 (plan-only: VSA-PRIOR-ENTRY-CHANGED, D93) |
+| `{{DISPATCH_LIST_PATH}}` | the commits' own trailers are the authorship reference; do NOT list `evidence/dispatch-record-ALF-ADOPTION-PROOF.json`: a missing required reference makes the Critic stop (`Briefing violation`) | template fail-closed rule; Blocker B2 |
+
+## 6. Dispatch order and parallelism
+
+Nothing starts before the stamp (section 7). Afterwards:
+
+1. Before any dispatch: strip the backlog items and dispatch records the group needs; run `critic-dispatch-preflight.mjs` per group; run `register-batch` per group (one registration per batch, stored in the private packet store; the packet store reserves ordinal 1 on `admit`).
+2. Wave 1 (read-only, independent, may fan out): G4, G5, G1, G6 (high-risk route). The Critics are read-only and write only their own notes directory, so concurrent reviews are safe; the limit is cost (MP-07 "Why": per-diff Opus rounds cost about 20 percent of a weekly budget in one night), so the Elephant caps the width (two to three at a time is my reading).
+3. Wave 2: G3, G2, G7, G9, G10 (normal route), same fan-out rule.
+4. Findings: each group's findings go to ONE fresh Correction Goldfish per batch (fixed owner across ordinals 2-4). Protected files in a finding need another operator commit (a Goldfish cannot commit them), so a correction round in G1, G3, G4, G5, G6 can wait on a sitting.
+5. A correction review (ordinal 2-4) starts only from a consumed non-PASS review of the same batch, on the exact previous reviewed commit through the new correction candidate; the shared-file table in section 2 says which other groups' bytes a correction may move (re-state the overlap in the Coordinator's accounting, not in the dispatch).
+6. After PASS (or the fourth review) of all groups: regenerate and apply the C28 preimage re-pin (step 35: re-measure the six Critic-contract digests first, `node scratch/k108-repin.mjs` as the runbook names; the held patch `specs/sprint-alfred-epic/evidence/held-patches/k82-critic-preimage-repin.patch` is valid today), then the stamp, then the push gate.
+7. Only the Elephant orchestrates fan-out (workflow-dispatch.md, first section); a Workflow `agent()` Critic prompt is built from the same template plus the `pipeline-core:` prefix and a stated tool budget; the V-10 static-literal rule applies to Goldfish prompts only.
+
+## 7. What cannot start before the stamp/candidate exists
+
+- Every dispatch, every `register-batch` and every `critic-dispatch-preflight` run: they need the commits (`<sha-NN>`) and `<stamped-candidate-sha>`. Today the protected changes exist only as patch files under `specs/sprint-alfred-epic/evidence/sitting/` and `.../held-patches/`; the review object is the committed diff, not the patch file.
+- Filling the `<sha-NN>` lists, the route pre-check, the final tool-budget numbers and `{{BATCH_SCOPE}}`.
+- The C28 re-pin and anything after it.
+
+What can start now (no candidate needed): stripping the backlog items cited by the AC rows of section 5; stripping existing dispatch records; confirming each listed path with `git ls-files` on the post-sitting tree; resolving the opus model identifier (B1); recording the order question B9.
+
+## 8. Evidence boundary (not passed to any Critic)
+
+- Prior verdict artifacts: the `specs/sprint-alfred-epic/evidence/critic-*.md` files, `specs/sprint-alfred-epic/evidence/critic/`, `specs/sprint-alfred-epic/evidence/critic-2026-10-05`, `specs/sprint-alfred-epic/evidence/critic-2026-10-07`, `specs/sprint-alfred-epic/review/`.
+- Handover, state and plan narrative: `docs/state.md`, `specs/sprint-alfred-epic/plans/**` (this file included), `specs/sprint-alfred-epic/WORK-STATUS.md`, `po-decisions-2026-10-23-tiles.md`.
+- Implementor prose: the notes files listed in section 5; passed only if the Elephant decides they satisfy CR-01 (B8).
+
+## 9. Blockers and open points (also in `scratch/agent-out/K138-notes.md`)
+
+| Id | Point |
+|---|---|
+| B1 | `pipeline.user.yaml` names the Critic model by alias (`opus`) only. The template wants a concrete identifier in `{{MODEL_ID}}`; unfilled until the Elephant resolves it from the runtime. Effort `medium` for `critic_normal` differs from the agent frontmatter `effort: max`; whether it can be set at the tool layer is not verified here. |
+| B2 | Dispatch records for the K-numbered Goldfish clones that built the patches were not found in tracked evidence (only the 2026-10-09 records and a few ALF records exist), and the sitting trailer is `Dispatch: stage-0 (elephant)`; `{{DISPATCH_LIST_PATH}}` therefore has nothing to point at for G1-G7. The task `ALF-ADOPTION-PROOF` has no record file (PO decision: accepted); a required but missing path would stop the Critic, so it is not listed. |
+| B3 | `<content-base-sha>` (G9) is not recorded in a tracked file I read; the clone has no `origin/main` ref. G9 cannot be enumerated until the Elephant names the base. B3b: the exact paths of the AC-249 builder and two schema copies are not recorded in the files I read. The Reader-finding-49 policy-pack point has no known path and is not in any scope. |
+| B4 | MP-07 says one Critic per batch of slices; this plan makes ten batches. G7 is nearly a singleton ("a singleton batch requires a substantial independent delivery"); merging G7 into G9 or G1 is an Elephant/PO call. |
+| B5 | Steps 01-04, 34, 36, 37, 39b, 40, 41 are not in the briefing's list and have no group; proposed dispositions are in the coverage table, not decided. |
+| B6 | Tool budgets are estimated from step counts; diff sizes were not measured. |
+| B7 | AC ids are filled only where a spec row title matches the area; groups G1, G6, G7 have none verified (traceability was not mapped per step). |
+| B8 | The briefing asks for held-patch notes and sitting notes as evidence paths, but they are implementor narrative (CR-01, `critic-review.md` section 2). Default here: not passed. |
+| B9 | Order wording differs: README lists "stamp and install, Full Verify, Critic batch, the C28 re-pin, push"; runbook step 35 and PO decision row 19 say the re-pin comes "right before the stamp, after the Critic batch". Read here as: dev-build candidate, Full Verify, Critic batch, corrections, re-pin, final stamp. PO to confirm. |
+| B10 | MP-07 item 1 gives non-critical Critics the Sonnet review tier; `pipeline.user.yaml` routes `critic_normal` to opus at medium. This plan follows the user config (rule: dispatch model from `pipeline.user.yaml` only) and flags the difference for the Elephant. |
+| B11 | The sitting commits carry the stage-0 trailer for Goldfish-built patches; the Critic's authorship check (hunt category 4) will see the same fact for every group. Not a plan defect, but the dispatch cannot supply authorship evidence beyond what B2 lists. |
