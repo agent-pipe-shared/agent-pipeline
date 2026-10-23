@@ -413,7 +413,8 @@ check("Antigravity pretool guard allows ordinary read-only tools immediately and
   for (const path of [join(root, "vault", "id_rsa"), "vault/id_rsa"]) {
     const secret = decision(run({ toolCall: { name: "view_file", args: { AbsolutePath: path } } }, root));
     assert.equal(secret.decision, "deny", path);
-    assert.match(secret.reason, /GUARD-READ-TARGET/u, path);
+    // QG-04 restatement (K96, PO decision 2026-10-23, rows 6/16, M5 with M7): the credential target now carries the typed code.
+    assert.match(secret.reason, /GUARD-READ-CREDENTIAL-TARGET/u, path);
   }
   rmSync(root, { recursive: true, force: true });
 });

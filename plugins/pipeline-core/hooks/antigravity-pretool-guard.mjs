@@ -10,7 +10,8 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readToolScopeVerdict } from "../lib/guard/read-scope.mjs";
-import { isAllowedPassiveReadTarget } from "../lib/passive-read-policy.mjs";
+import { nativeReadCredentialTargetDenialText } from "../lib/guard/grammar-denials.mjs";
+import { isAllowedPassiveReadTarget, isCredentialReadTarget } from "../lib/passive-read-policy.mjs";
 import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
 import {
   consumeHumanGuardOverride,
@@ -343,6 +344,12 @@ export function nativeReadTargets(toolName, toolInput) {
 /** null when the target is admitted, otherwise the agent-visible denial text. */
 export function nativeReadTargetRefusal(target, projectRoot, workspaceRoots = []) {
   if (target.malformed) return NATIVE_READ_TARGET_DENIAL;
+  // K96 (PO decision 2026-10-23, rows 6/16, M5, with M7): a credential TARGET is refused with the typed GUARD-READ-CREDENTIAL-TARGET code
+  // and its repair, the same code and classification (passive-read-policy's isCredentialReadTarget) the shell lane uses. Every other
+  // refusal below keeps its own code.
+  if (isCredentialReadTarget(target.value, {
+    rootDir: projectRoot, recursive: target.kind === "content", directoryListing: target.kind === "listing",
+  })) return nativeReadCredentialTargetDenialText().trimEnd();
   if (target.kind === "file") {
     const verdict = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: target.value } }, projectRoot, {});
     return verdict.exitCode === 0 ? null : (String(verdict.stderr).trim() || NATIVE_READ_TARGET_DENIAL);

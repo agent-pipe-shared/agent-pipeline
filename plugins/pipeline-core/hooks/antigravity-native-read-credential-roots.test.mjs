@@ -49,13 +49,19 @@ function decide(root, toolCall) {
 }
 const native = (name, args) => ({ toolCall: { name, args } });
 const CODE = /GUARD-READ-TARGET\b/u;
+// QG-04 restatement (K96, PO decision 2026-10-23, rows 6/16, M5 with M7): a native read whose TARGET is itself a credential location
+// (a secret-named file, a path inside a credential root, a symlink that resolves to one) is refused with the typed code
+// GUARD-READ-CREDENTIAL-TARGET and its repair instead of the generic GUARD-READ-TARGET. The criterion of every case below is unchanged
+// (the read is denied, the text never implies absence); only the expected label of the credential-target cases moves to CRED. A refusal
+// whose cause is not the target itself (a directory that merely CONTAINS a credential) keeps GUARD-READ-TARGET, asserted with CODE.
+const CRED = /GUARD-READ-CREDENTIAL-TARGET\b/u;
 
 test("D87-1 view_file of a credential file is denied with the Claude typed code, absolute and relative, in-root and under the home credential root", { timeout: 300000 }, () => withFixture((root) => {
   const sshKey = join(homedir(), ".ssh", "id_rsa");
   for (const path of [join(root, "vault", "id_rsa"), "vault/id_rsa", "./vault/id_rsa", sshKey, "~/.ssh/id_rsa"]) {
     const d = decide(root, native("view_file", { AbsolutePath: path }));
     assert.equal(d.denied, true, `${path} must be denied (exit ${d.exit}): ${d.text}`);
-    assert.match(d.text, CODE, path);
+    assert.match(d.text, CRED, path);
     assert.doesNotMatch(d.text, /not found|not present|no such file/iu, path);
   }
 }));
@@ -76,7 +82,9 @@ test("D87-2 the denial of the directory-shaped and search tools carries the same
   for (const [name, args] of cases) {
     const d = decide(root, native(name, args));
     assert.equal(d.denied, true, `${name} ${JSON.stringify(args)} must be denied (exit ${d.exit}): ${d.text}`);
-    assert.match(d.text, CODE, `${name} ${JSON.stringify(args)}`);
+    // A directory that merely contains a credential (vault) keeps the generic code; a credential target itself carries the typed one.
+    const containsOnly = args.SearchPath === join(root, "vault") || args.SearchPath === "vault";
+    assert.match(d.text, containsOnly ? CODE : CRED, `${name} ${JSON.stringify(args)}`);
   }
 }));
 
@@ -84,10 +92,10 @@ test("D87-3 a file:// URL read and the canonical Read/Grep envelope reach the sa
   const key = join(root, "vault", "id_rsa");
   const url = decide(root, native("read_url_content", { Url: pathToFileURL(key).href }));
   assert.equal(url.denied, true, `file:// of a credential file: ${url.text}`);
-  assert.match(url.text, CODE);
+  assert.match(url.text, CRED);
   const read = decide(root, { tool_name: "Read", tool_input: { file_path: key } });
   assert.equal(read.denied, true, `canonical Read: ${read.text}`);
-  assert.match(read.text, CODE);
+  assert.match(read.text, CRED);
   const relativeRead = decide(root, { tool_name: "Read", tool_input: { file_path: "vault/id_rsa" } });
   assert.equal(relativeRead.denied, true, `canonical Read, relative: ${relativeRead.text}`);
   const grep = decide(root, { tool_name: "Grep", tool_input: { pattern: "x", path: "vault/id_rsa" } });
@@ -100,7 +108,7 @@ test("D87-4 an in-project symlink that resolves to a credential file is denied (
   for (const path of [join(root, "docs", "innocent.md"), "docs/innocent.md"]) {
     const d = decide(root, native("view_file", { AbsolutePath: path }));
     assert.equal(d.denied, true, `${path}: ${d.text}`);
-    assert.match(d.text, CODE, path);
+    assert.match(d.text, CRED, path);
   }
 }));
 
@@ -138,7 +146,7 @@ test("D87-7 a second workspace folder keeps its ordinary reads, and its credenti
   assert.equal(allowedFile.allowed, true, allowedFile.text);
   const denied = decide(root, { ...both, ...native("view_file", { AbsolutePath: join(other, "vault", "id_rsa") }) });
   assert.equal(denied.denied, true, denied.text);
-  assert.match(denied.text, CODE);
+  assert.match(denied.text, CRED);
   const deniedSearch = decide(root, { ...both, ...native("grep_search", { SearchPath: join(other, "vault"), Query: "private" }) });
   assert.equal(deniedSearch.denied, true, deniedSearch.text);
 })));
@@ -190,7 +198,8 @@ test("D96-1 a native read outside the project is admitted unless it is a credent
     for (const [name, args] of refused) {
       const d = decide(root, native(name, args));
       assert.equal(d.denied, true, `${name} ${JSON.stringify(args)} must stay refused (exit ${d.exit}): ${d.text}`);
-      assert.match(d.text, CODE, `${name} ${JSON.stringify(args)}`);
+      // The two grep_search entries are directories that merely contain credentials (generic code); the others are credential targets.
+      assert.match(d.text, name === "grep_search" ? CODE : CRED, `${name} ${JSON.stringify(args)}`);
     }
     // A pseudo-root of the single credential list stays refused (the shared list names /etc, /proc, /sys, /dev, /run).
     const etc = decide(root, native("view_file", { AbsolutePath: "/etc/hostname" }));
@@ -199,15 +208,22 @@ test("D96-1 a native read outside the project is admitted unless it is a credent
 }));
 
 test("D87-6 the denial text is the one the Claude native Read produces, so the typed code cannot drift", { timeout: 300000 }, () => withFixture((root) => {
+  // QG-04 restatement (K96, PO decision 2026-10-23, rows 6/16, M5): the criterion (the adapter never invents its own text for a refusal the
+  // Claude native Read lane also produces) is kept for every refusal whose cause is NOT a credential target (a system pseudo root). A
+  // credential target is the deliberate exception: the adapter prints the typed GUARD-READ-CREDENTIAL-TARGET text, asserted below.
   const key = join(homedir(), ".ssh", "id_rsa");
-  const claude = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: key } }, root, {});
-  assert.equal(claude.exitCode, 2);
+  const claudeSystem = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: "/etc/hostname" } }, root, {});
+  assert.equal(claudeSystem.exitCode, 2);
+  const system = decide(root, native("view_file", { AbsolutePath: "/etc/hostname" }));
+  assert.equal(system.denied, true, system.text);
+  assert.ok(system.text.includes(claudeSystem.stderr.trim()), `${system.text}\nvs Claude: ${claudeSystem.stderr}`);
   for (const [name, args] of [
     ["view_file", { AbsolutePath: key }],
     ["list_dir", { DirectoryPath: join(homedir(), ".ssh") }],
   ]) {
     const d = decide(root, native(name, args));
     assert.equal(d.denied, true, name);
-    assert.ok(d.text.includes(claude.stderr.trim()), `${name}: ${d.text}\nvs Claude: ${claude.stderr}`);
+    assert.match(d.text, CRED, `${name}: ${d.text}`);
+    assert.match(d.text, /non-credential file/u, `${name}: the typed refusal states its repair\n${d.text}`);
   }
 }));

@@ -275,32 +275,100 @@ test("M4 Antigravity row: in-root native read tools are allowed by the real adap
   }
 }));
 
-// The three cases below assert the item's acceptance where the runner rows are NOT yet satisfied. They are `todo`: they
-// run and report, they do not fail the suite, and each flips to a plain pass once its fix site lands (see the item).
+// The cases below assert the item's acceptance for the credential-read and denial-text clauses (M5, M6, M7). They were `todo`
+// while their fix sites were open; each is a plain pass now (see the item).
 test("M5 a native view_file of a credential file is denied on Antigravity (A1: credential roots stay denied; D87 gated the native read tools, ea69fe398)", {
   timeout: 300000,
 }, () => withRunnerFixture((path) => {
   const decision = runnerDecision("antigravity", { antigravity: { toolCall: { name: "view_file", args: { AbsolutePath: join(path, "vault", "id_rsa") } } } }, path);
   assert.equal(decision.denied, true, "a credential file was admitted by the native read tool");
   assert.deepEqual(denialProblems(decision.text), [], decision.text);
+  assert.match(decision.text, /GUARD-READ-CREDENTIAL-TARGET/u, "the native lane names the credential target with the typed code (K96)");
 }));
 
 test("M6 a denial surfaced on Codex does not tell the agent to use native Read, Glob or Grep tools (A2: a truthful, actionable denial; runner-neutral note, operator patch 38)", {
   timeout: 300000,
 }, () => withRunnerFixture((path) => {
-  const decision = runnerDecision("codex", shellCall("cat vault/id_rsa", path), path);
+  // QG-04 restatement, bounded (K96, PO decision 2026-10-23, rows 6/16, M7): this case asserted GUARD-READ-COMMAND-UNSUPPORTED on
+  // `cat vault/id_rsa`, a credential read, which now carries GUARD-READ-CREDENTIAL-TARGET (asserted in M7b). The criterion under test --
+  // the Codex-surfaced UNSUPPORTED note names no native Read, Glob or Grep tool -- is unchanged and keeps its UNSUPPORTED assertion on a
+  // command that really is refused for its own option; the credential denial is held to the same wording rule.
+  const decision = runnerDecision("codex", shellCall("rg -n --column apply docs/2026-09-21-a.md", path), path);
   assert.equal(decision.denied, true, decision.text);
   assert.match(decision.text, /GUARD-READ-COMMAND-UNSUPPORTED/u, decision.text);
   assert.doesNotMatch(decision.text, /use the Read, Glob or Grep tools/u, "Codex refuses Read, Glob and Grep as unsupported tool names");
+  const credential = runnerDecision("codex", shellCall("cat vault/id_rsa", path), path);
+  assert.doesNotMatch(credential.text, /use the Read, Glob or Grep tools/u, credential.text);
 }));
 
-test("M7 (todo: a credential target is labelled as a spelling problem) a denied credential read never says the refusal is about flags or spelling and not about a path (A2)", {
-  todo: "decision needed: a distinct typed code for an in-root credential read target; fix site lib/guard/evaluate.mjs (protected)",
+test("M7 a denied credential read never says the refusal is about flags or spelling and not about a path (A2; PO decision 2026-10-23 rows 6/16: own typed code, K96)", {
   timeout: 300000,
 }, () => withRunnerFixture((path) => {
   const decision = runnerDecision("claude", shellCall("cat vault/id_rsa", path), path);
   assert.equal(decision.denied, true, decision.text);
   assert.doesNotMatch(decision.text, /refuses the command's own flags or spelling, not a path/u, decision.text);
+}));
+
+// K96 (PO decision 2026-10-23, rows 6/16, M7): an in-root credential read has its OWN typed code. It names the PATH as the cause and
+// gives a repair a human or agent can actually run; it never tells the agent to change flags or spelling.
+const CREDENTIAL_CODE = /GUARD-READ-CREDENTIAL-TARGET/u;
+
+function assertCredentialTargetDenial(decision, label) {
+  assert.equal(decision.denied, true, `${label}\n${decision.text}`);
+  assert.match(decision.text, CREDENTIAL_CODE, `${label}\n${decision.text}`);
+  assert.deepEqual(denialProblems(decision.text), [], `${label}\n${decision.text}`);
+  assert.match(decision.text, /about the path/u, `${label}: names the path as the cause\n${decision.text}`);
+  assert.match(decision.text, /non-credential file/u, `${label}: states the repair (a human puts the content in a non-credential file)\n${decision.text}`);
+  assert.doesNotMatch(decision.text, /GUARD-READ-COMMAND-UNSUPPORTED|flags or spelling|Re-spell/u, `${label}: must not blame flags or spelling\n${decision.text}`);
+}
+
+test("M7b an in-root credential read on every shell runner carries GUARD-READ-CREDENTIAL-TARGET, names the path as the cause and gives a repair", { timeout: 300000 }, () => withRunnerFixture((path) => {
+  for (const runner of RUNNERS) {
+    for (const command of ["cat vault/id_rsa", "head -n 3 vault/id_rsa", "tail vault/id_rsa"]) {
+      assertCredentialTargetDenial(runnerDecision(runner, shellCall(command, path), path), `${runner}: ${command}`);
+    }
+  }
+}));
+
+test("M7c the claude lane's credential refusal also offers the override route text of the other human-liftable refusals, and says plainly when none is offered", { timeout: 300000 }, () => withRunnerFixture((path) => {
+  const decision = runnerDecision("claude", shellCall("cat vault/id_rsa", path), path);
+  assert.match(decision.text, /Human override available for this exact command|No human override route is offered for this exact command/u, decision.text);
+}));
+
+test("M7d negative control: refusals that are not about a credential keep their codes (a flag the grammar does not know, an unsupported recursive grep, a missing file)", { timeout: 300000 }, () => withRunnerFixture((path) => {
+  for (const runner of RUNNERS) {
+    for (const command of ["rg -n --column apply docs/2026-09-21-a.md", "grep -R apply ."]) {
+      const decision = runnerDecision(runner, shellCall(command, path), path);
+      assert.equal(decision.denied, true, `${runner}: ${command}`);
+      assert.match(decision.text, /GUARD-READ-COMMAND-UNSUPPORTED/u, `${runner}: ${command}\n${decision.text}`);
+      assert.doesNotMatch(decision.text, CREDENTIAL_CODE, `${runner}: ${command} is not a credential read\n${decision.text}`);
+    }
+  }
+  const missing = runnerDecision("claude", { claude: { tool_name: "Read", tool_input: { file_path: join(path, "docs", "missing.md") } } }, path);
+  assert.equal(missing.denied, true, missing.text);
+  assert.match(missing.text, /GUARD-READ-TARGET-MISSING/u, missing.text);
+  assert.doesNotMatch(missing.text, CREDENTIAL_CODE, missing.text);
+}));
+
+test("M5b every Antigravity native read tool that takes a path is refused for a credential target with GUARD-READ-CREDENTIAL-TARGET and its repair; a non-credential path stays allowed (PO decision 2026-10-23, rows 6/16, M5)", { timeout: 300000 }, () => withRunnerFixture((path) => {
+  const secret = join(path, "vault", "id_rsa");
+  const doc = join(path, "docs", "2026-09-21-a.md");
+  for (const [name, args] of [
+    ["view_file", { AbsolutePath: secret }],
+    ["view_file", { AbsolutePath: "vault/id_rsa" }],
+    ["grep_search", { SearchPath: secret, Query: "x" }],
+    ["read_url_content", { Url: `file://${secret}` }],
+  ]) {
+    assertCredentialTargetDenial(runnerDecision("antigravity", { antigravity: { toolCall: { name, args } } }, path), `${name} ${JSON.stringify(args)}`);
+  }
+  for (const [name, args] of [
+    ["view_file", { AbsolutePath: doc }], ["grep_search", { SearchPath: doc, Query: "apply" }],
+  ]) {
+    const decision = runnerDecision("antigravity", { antigravity: { toolCall: { name, args } } }, path);
+    assert.equal(decision.denied, false, `${name}: a non-credential read stays allowed\n${decision.text}`);
+  }
+  const missing = runnerDecision("antigravity", { antigravity: { toolCall: { name: "view_file", args: { AbsolutePath: join(path, "docs", "missing.md") } } } }, path);
+  assert.doesNotMatch(missing.text, CREDENTIAL_CODE, `a missing non-credential file is not a credential refusal\n${missing.text}`);
 }));
 
 test("U3 (PO decision 2026-10-16: ADMIT) native Read of a user-supplied WSL UNC exact file is admitted; UNC credential roots and secret basenames stay denied (A1: WSL UNC paths)", {
