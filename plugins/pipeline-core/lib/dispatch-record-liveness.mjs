@@ -148,3 +148,123 @@ export function secondWriterAdmission({ root, ownTaskIds = [], isolated = false,
   const advisory = unjudged.length === 0 ? "" : `WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: open dispatch record(s) of this checkout whose owner cannot be judged alive or gone: ${unjudged.map(describe).join("; ")}. This dispatch is admitted (an unjudgeable owner never blocks); check them with: node ${LIVENESS_SCRIPT} --root ${root}\n`;
   return { refusal, advisory };
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// K93 / PO decision (K12 S2, row 25): the write-scope overlap of dispatches is refused WITHOUT a slice queue. Two sources of
+// parties are judged by their declared write scopes alone: the dispatches of ONE tool call (the parallel batch) and the
+// dispatches that may still be writing in this checkout (an open dispatch record whose owner is alive or unjudgeable; the same
+// readback as above). The overlap predicate is the pure `scopesOverlap` of slice-queue.mjs. The default is enforce; the explicit
+// switch PIPELINE_FANOUT_SCOPE_MODE=shadow admits with a warning. A scope that cannot be read warns only. Read-only by
+// construction (file reads, no lock), and neutral across runners and operating systems (no shell syntax in a message).
+export const SCOPE_OVERLAP_SWITCH = "PIPELINE_FANOUT_SCOPE_MODE";
+const SCOPE_SCAN_LIMIT = 500;
+const BRIEFING_MARKER = "<!-- pipeline-native-goldfish-host-commit:v";
+const shownPaths = (paths) => (paths.length <= 5 ? paths.join(", ") : `${paths.slice(0, 5).join(", ")} and ${paths.length - 5} more`);
+
+/** `enforce` unless the environment names `shadow` explicitly; any other value enforces. */
+export const scopeOverlapMode = (env = process.env) => (env?.[SCOPE_OVERLAP_SWITCH] === "shadow" ? "shadow" : "enforce");
+
+// The briefing parsers (`parseNativeGoldfishBriefing`, `parseDispatchSlice`) are injected by the caller, not imported: this module
+// is reached from the import cycle through project-onboarding-v3 (via scripts/dispatch-briefing.mjs), and importing them here changes
+// the initialisation order (a temporal-dead-zone fault in project-onboarding-ready-gate, observed while building K93). For the same
+// reason hooks/guard-dispatch.mjs does not import this module: it spawns scripts/dispatch-record-liveness.mjs (K104).
+/** The allowed paths of every generated briefing directly under scratch/, by dispatch id (read-only, bounded, never throws). */
+function briefedWriteScopes(root, parseBriefing) {
+  const scopes = new Map();
+  try {
+    const dir = realpathSync(join(root, "scratch"));
+    if (dir !== join(realpathSync(root), "scratch")) return scopes;
+    for (const name of readdirSync(dir).filter((entry) => entry.endsWith(".md")).sort().slice(0, SCOPE_SCAN_LIMIT)) {
+      try {
+        const info = lstatSync(join(dir, name));
+        if (!info.isFile() || info.isSymbolicLink() || info.size > READ_LIMIT) continue;
+        const text = readFileSync(join(dir, name), "utf8");
+        const parsed = text.includes(BRIEFING_MARKER) ? parseBriefing(text) : null;
+        if (parsed?.ok && !scopes.has(parsed.binding.dispatchId)) scopes.set(parsed.binding.dispatchId, [...parsed.binding.allowedPaths]);
+      } catch { /* a file that is not a briefing is not a source of scopes */ }
+    }
+  } catch { /* no scratch directory */ }
+  return scopes;
+}
+
+/**
+ * D76: the dispatches that may still be writing in this checkout, each with its write scope when it can be read. A dispatch
+ * is running while its record (evidence/dispatch-record-<id>.json) is open and its owner is not provably gone (alive, or
+ * unjudgeable, which is the usual Claude case). Its scope is the governed queue row's write scope, else the allowed paths of
+ * its generated briefing under scratch/; `writeScope` is null when neither exists. A checkout whose records cannot be read
+ * has no running dispatch to judge. Shared by this guard and scripts/dispatch-briefing.mjs (one reading of "running").
+ * `queueRowFn(root, id)` (the governed queue row of an id, or null) is injected by the caller: this module must not import the
+ * governed-queue module (an import cycle through guard-dispatch would initialise modules in a different order).
+ */
+export function readRunningDispatches(root, { readFn = readDispatchRecordLiveness, queueRowFn = () => null, parseBriefing = () => null } = {}) {
+  let records;
+  try { records = readFn(root).records.filter((entry) => entry.verdict !== "gone"); } catch { return []; }
+  if (records.length === 0) return [];
+  const briefed = briefedWriteScopes(root, parseBriefing);
+  return records.map((entry) => {
+    let row = null;
+    try { row = queueRowFn(root, entry.taskId); } catch { row = null; }
+    return { dispatchId: entry.taskId, verdict: entry.verdict, record: entry.record, writeScope: row?.writeScope ?? briefed.get(entry.taskId) ?? null };
+  });
+}
+
+/**
+ * Judges the write scopes of `dispatches` ([{ prompt }], the Goldfish dispatches of one call) against each other and against
+ * `running` (readRunningDispatches). `declare(prompt)` returns `{ id, scope }` (a path list, "none", or null); `overlaps(a, b)` is `scopesOverlap` of slice-queue.mjs (injected, like `declare`, to keep this module free of imports that join the guard's import cycle). `isolated` (the call runs in its own worktree) judges nothing. Returns strings, empty
+ * when there is nothing to say: `refusal` (enforce, an overlap), `warning` (shadow overlap, and unreadable scopes). Never throws.
+ */
+export function scopeOverlapAdmission({ dispatches = [], running = [], mode = "enforce", isolated = false, declare = () => ({ id: null, scope: null }), overlaps } = {}) {
+  if (isolated) return { refusal: "", warning: "" };
+  try {
+    const parties = [];
+    dispatches.forEach((dispatch, index) => {
+      const declared = declare(dispatch?.prompt);
+      if (declared.scope === "none") return; // read-only: nothing to overwrite
+      parties.push({ id: declared.id, name: declared.id ?? `dispatch #${index + 1} of this call`, where: "this call", scope: Array.isArray(declared.scope) ? declared.scope : null });
+    });
+    if (parties.length === 0) return { refusal: "", warning: "" };
+    const own = new Set(parties.map((party) => party.id).filter(Boolean));
+    const others = running.filter((entry) => !own.has(entry.dispatchId)).map((entry) => ({
+      id: entry.dispatchId, name: plain(entry.dispatchId), running: true, where: `open dispatch record ${plain(entry.record ?? "")}, owner ${plain(entry.verdict ?? "unknown")}`,
+      scope: Array.isArray(entry.writeScope) && entry.writeScope.length > 0 ? entry.writeScope : null,
+    }));
+    const conflicts = [];
+    const unreadable = [];
+    const note = (party) => { if (!unreadable.includes(party)) unreadable.push(party); };
+    parties.forEach((first, index) => {
+      for (const second of [...parties.slice(index + 1), ...others]) {
+        if (first.scope === null || second.scope === null) { if (first.scope === null) note(first); if (second.scope === null) note(second); continue; }
+        const paths = [];
+        for (const mine of first.scope) for (const theirs of second.scope) {
+          const shown = mine === theirs ? mine : `${mine} (against ${theirs})`;
+          if (!paths.includes(shown) && overlaps([mine], [theirs])) paths.push(shown);
+        }
+        if (paths.length > 0) conflicts.push({ first: second.running ? second : first, second: second.running ? first : second, paths });
+      }
+    });
+    let text = "";
+    if (conflicts.length > 0) {
+      const lead = conflicts[0];
+      const switchText = mode === "shadow"
+        ? `Mode: shadow (set explicitly through ${SCOPE_OVERLAP_SWITCH}=shadow); this call is admitted. Unset ${SCOPE_OVERLAP_SWITCH} to enforce.`
+        : `Mode: enforce (the default). To admit such an overlap with a warning instead, set the environment variable ${SCOPE_OVERLAP_SWITCH}=shadow for the hook.`;
+      text = [
+        `GUARD-DISPATCH-SCOPE-OVERLAP: dispatches would write the same paths in one checkout, and two dispatches writing the same paths overwrite each other:`,
+        ...conflicts.map((c) => `  - ${c.first.name} (${c.first.where}) and ${c.second.name} (${c.second.where}) both write: ${shownPaths(c.paths)}`),
+        `Repair, one of:`,
+        `  1. Sequence them: send ${lead.second.name} in a later call, after ${lead.first.name} has finished (a terminal dispatch record).`,
+        `  2. Narrow one allowed-path list (the "Write scope:" line, or the --path list of the generated briefing) of ${lead.first.name} or ${lead.second.name} until the two lists no longer share a path.`,
+        `  3. Where the runner offers isolation, run ${lead.second.name} in its own worktree: set isolation: "worktree" on that dispatch call (a call with that setting is not checked here; it writes in another checkout).`,
+        ...(conflicts.some((c) => c.first.running) ? [`  4. If a running dispatch above is abandoned, finalize its dispatch record with a terminal outcome through the sanctioned dispatch-record writer (scripts/dispatch-record-write.mjs).`] : []),
+        switchText,
+      ].join("\n");
+    }
+    const unknown = unreadable.length === 0 ? "" : `GUARD-DISPATCH-SCOPE-UNKNOWN: the write scope of ${unreadable.map((party) => party.name).join(", ")} could not be read (no "Write scope:" line, generated briefing or governed queue row), so this call was not checked against ${unreadable.length === 1 ? "it" : "them"}; confirm the scopes are disjoint before dispatching.`;
+    return {
+      refusal: mode === "enforce" && text !== "" ? `BLOCKED (guard-dispatch, plugin pipeline-core): ${text}\n` : "",
+      warning: [mode === "enforce" ? "" : text, unknown].filter(Boolean).map((line) => `WARNING (guard-dispatch): ${line}\n`).join(""),
+    };
+  } catch (error) {
+    return { refusal: "", warning: `WARNING (guard-dispatch): GUARD-DISPATCH-SCOPE-UNJUDGED: the write-scope overlap check could not run (${plain(error?.message)}); this call is admitted without it.\n` };
+  }
+}

@@ -26,7 +26,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -536,4 +536,89 @@ test("hook: no config exits 0 and never touches the ledger", { skip: enrollmentS
   const result = spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env, encoding: "utf8", cwd: hookRepo });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(existsSync(ledgerPath(c)), false);
+});
+
+// ---- K93 (PO decision, K12 S2 row 25): write-scope overlap is refused WITHOUT a slice queue ------
+// One tool call carrying several Goldfish dispatches (the parallel batch) and the open dispatch records of the checkout are
+// judged by the declared write scopes alone: no PIPELINE_FANOUT_CONFIG, no queue. The default is enforce; the explicit
+// switch PIPELINE_FANOUT_SCOPE_MODE=shadow admits with a warning. Each case uses its own enrolled repository, because an open
+// dispatch record of one case must not be seen by another.
+const goldfishTemplate = () => {
+  const raw = readFileSync(fileURLToPath(new URL("../../../templates/prompts/goldfish-task.md", import.meta.url)), "utf8");
+  const marker = "COPY EVERYTHING BELOW THIS LINE\n-->";
+  return raw.slice(raw.indexOf(marker) + marker.length)
+    .replace(/\{\{MODEL_ID\}\}/g, "claude-sonnet-5").replace(/\{\{EFFORT\}\}/g, "medium")
+    .replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium").replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "≤24 tool uses")
+    .replace(/\{\{[^{}]*\}\}/g, "FILLED");
+};
+const scoped = (id, scope) => `${goldfishTemplate()}\n${id === null ? "" : `Slice: ${id}\n`}${scope === null ? "" : `Write scope: ${scope}\n`}`;
+function scopeRepo(name) {
+  const repo = join(root, name);
+  mkdirSync(join(repo, ".claude"), { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: repo });
+  recordConsentGiven({ rootDir: repo });
+  // Enrolled but NOT item governed (the shape guard-dispatch.test.mjs uses for its productive Goldfish cases).
+  writeFileSync(join(repo, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(repo, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
+  return repo;
+}
+function runBatch(repo, prompts, { env = {}, toolInput = {} } = {}) {
+  const Subagents = prompts.map((Prompt) => ({ TypeName: "pipeline-core:goldfish-implementor", Prompt }));
+  const payload = { tool_name: "invoke_subagent", tool_use_id: "toolu_k93", session_id: SESSION, cwd: repo, tool_input: { Subagents, ...toolInput } };
+  const hookEnv = { ...process.env, CLAUDE_PROJECT_DIR: repo, ...env };
+  delete hookEnv.PIPELINE_FANOUT_CONFIG;
+  if (env.PIPELINE_FANOUT_SCOPE_MODE === undefined) delete hookEnv.PIPELINE_FANOUT_SCOPE_MODE;
+  return spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env: hookEnv, encoding: "utf8", cwd: repo });
+}
+
+test("K93 hook: two dispatches of one call with overlapping write scopes are refused by default, without a queue, naming both, the paths and the repair", { skip: enrollmentSkip ?? false }, () => {
+  const repo = scopeRepo("k93-enforce");
+  const result = runBatch(repo, [scoped("K93-ALPHA", "src/shared/a.mjs, src/shared/b.mjs, src/own/x.mjs"), scoped("K93-BETA", "src/shared/")]);
+  assert.equal(result.status, 2, result.stderr);
+  for (const needle of ["GUARD-DISPATCH-SCOPE-OVERLAP", "K93-ALPHA", "K93-BETA", "src/shared/a.mjs", "src/shared/b.mjs", "isolation: \"worktree\"", "PIPELINE_FANOUT_SCOPE_MODE=shadow"]) {
+    assert.ok(result.stderr.includes(needle), `stderr must name ${needle}: ${result.stderr.slice(0, 900)}`);
+  }
+  assert.doesNotMatch(result.stderr, /src\/own\/x\.mjs/u, "a path outside the overlap is not named");
+  assert.match(result.stderr, /Narrow|narrow/u);
+  assert.match(result.stderr, /after .*finished|sequence/iu);
+});
+
+test("K93 hook: more than five overlapping paths name the first five and then a count", { skip: enrollmentSkip ?? false }, () => {
+  const repo = scopeRepo("k93-many");
+  const files = Array.from({ length: 8 }, (_, i) => `src/m/f${i}.mjs`);
+  const result = runBatch(repo, [scoped("K93-M1", files.join(", ")), scoped("K93-M2", "src/m/")]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.ok(result.stderr.includes("src/m/f4.mjs") && !result.stderr.includes("src/m/f5.mjs"), result.stderr.slice(0, 900));
+  assert.match(result.stderr, /and 3 more/u);
+});
+
+test("K93 hook: the explicit shadow switch admits the same overlap with a warning that names the paths", { skip: enrollmentSkip ?? false }, () => {
+  const repo = scopeRepo("k93-shadow");
+  const result = runBatch(repo, [scoped("K93-ALPHA", "src/shared/a.mjs"), scoped("K93-BETA", "src/shared/")], { env: { PIPELINE_FANOUT_SCOPE_MODE: "shadow" } });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /WARNING \(guard-dispatch\): GUARD-DISPATCH-SCOPE-OVERLAP/u);
+  assert.ok(result.stderr.includes("src/shared/a.mjs"));
+});
+
+test("K93 hook: disjoint write scopes, and an isolated call, are admitted without a scope finding", { skip: enrollmentSkip ?? false }, () => {
+  const disjoint = runBatch(scopeRepo("k93-disjoint"), [scoped("K93-ALPHA", "src/a/"), scoped("K93-BETA", "src/b/")]);
+  assert.equal(disjoint.status, 0, disjoint.stderr);
+  assert.doesNotMatch(disjoint.stderr, /GUARD-DISPATCH-SCOPE/u);
+  const isolated = runBatch(scopeRepo("k93-isolated"), [scoped("K93-ALPHA", "src/s/"), scoped("K93-BETA", "src/s/")], { toolInput: { isolation: "worktree" } });
+  assert.equal(isolated.status, 0, isolated.stderr);
+  assert.doesNotMatch(isolated.stderr, /GUARD-DISPATCH-SCOPE/u);
+});
+
+test("K93 hook: a scope that cannot be read warns only, in a batch and against an open record", { skip: enrollmentSkip ?? false }, () => {
+  const batch = runBatch(scopeRepo("k93-unknown-batch"), [scoped("K93-ALPHA", "src/a/"), scoped("K93-BETA", null)]);
+  assert.equal(batch.status, 0, batch.stderr);
+  assert.match(batch.stderr, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
+  assert.ok(batch.stderr.includes("K93-BETA"));
+  const repo = scopeRepo("k93-unknown-record");
+  mkdirSync(join(repo, "evidence"), { recursive: true });
+  writeFileSync(join(repo, "evidence", "dispatch-record-K93-OPEN.json"), JSON.stringify({ taskId: "K93-OPEN", outcome: "in-progress" }));
+  const record = runBatch(repo, [scoped("K93-ALPHA", "src/a/")]);
+  assert.equal(record.status, 0, record.stderr);
+  assert.match(record.stderr, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
+  assert.ok(record.stderr.includes("K93-OPEN"));
 });

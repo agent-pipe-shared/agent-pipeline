@@ -688,6 +688,19 @@ export function recordFanoutEvents(plan, events, now) {
   return recorded;
 }
 
+// K93/K104: the id and write scope one dispatch prompt declares (a generated briefing's allowed paths, else the `Slice:` and
+// `Write scope:` lines; scope is a path list, "none" or null). The overlap judgement itself runs in the spawned
+// scripts/dispatch-record-liveness.mjs --scope-overlap (a spawn, not an import: this hook sits in an import cycle through
+// project-onboarding-v3, and a static import of dispatch-record-liveness.mjs here changed its initialisation order, K104).
+export function dispatchWriteScope(prompt) {
+  try {
+    const bound = parseNativeGoldfishBriefing(prompt);
+    if (bound.ok && bound.binding.allowedPaths?.length > 0) return { id: bound.binding.dispatchId, scope: [...bound.binding.allowedPaths] };
+    const named = parseDispatchSlice(prompt);
+    return { id: named.sliceId, scope: named.writeScope };
+  } catch { return { id: null, scope: null }; }
+}
+
 // Gate the entire hook body on being the process entrypoint (matching
 // guard-dispatch-budget.mjs's shape). Importing this module for `extractWorkflowDispatches`
 // must never itself read stdin, parse it, or call `process.exit` -- see `../lib/entrypoint.mjs`'s
@@ -813,8 +826,15 @@ if (isDirectInvocation(import.meta.url)) {
     }
   }
   const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
-  const second = blocked.length === 0 && productive.length > 0 && toolInput.isolation !== "worktree" && !/isolation\s*:\s*['"`]worktree/u.test(String(toolInput.script ?? "")) ? spawnSync(process.execPath, [LIVENESS_SCRIPT, "--root", routeRoot, "--second-writer", productive.map(({ dispatch }) => parseDispatchSlice(dispatch.prompt).sliceId).filter(Boolean).join(",") || "-"], { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 30000 }) : null;
+  const isolatedCall = toolInput.isolation === "worktree" || /isolation\s*:\s*['"`]worktree/u.test(String(toolInput.script ?? ""));
+  const second = blocked.length === 0 && productive.length > 0 && !isolatedCall ? spawnSync(process.execPath, [LIVENESS_SCRIPT, "--root", routeRoot, "--second-writer", productive.map(({ dispatch }) => parseDispatchSlice(dispatch.prompt).sliceId).filter(Boolean).join(",") || "-"], { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 30000 }) : null;
   if (second) { process.stderr.write(second.stderr || (second.status === 0 ? "" : "WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: the second-writer check could not run; this dispatch is admitted without it (ALF-K39, D110).\n")); if (second.status === 2) process.exit(2); }
+  // K93: write scopes of one call and of the open dispatch records must be disjoint, queue or not (enforce by default).
+  if (blocked.length === 0 && productive.length > 0 && !isolatedCall) {
+    const scopes = spawnSync(process.execPath, [LIVENESS_SCRIPT, "--root", routeRoot, "--scope-overlap", "stdin"], { encoding: "utf8", input: JSON.stringify(productive.map(({ dispatch }) => dispatchWriteScope(dispatch.prompt))), stdio: ["pipe", "ignore", "pipe"], timeout: 30000 });
+    process.stderr.write(scopes.stderr || (scopes.status === 0 ? "" : "WARNING (guard-dispatch): GUARD-DISPATCH-SCOPE-UNJUDGED: the write-scope overlap check could not run; this call is admitted without it.\n"));
+    if (scopes.status === 2) process.exit(2);
+  }
   // D78: a governed Goldfish briefing should be the unedited generator output. QG-06 warn state: reason transition
   // to generated briefings, owner PO, expires with 0.7.1 (PO 2026-10-21); then this becomes the refusal.
   for (const { dispatch } of productive) {
