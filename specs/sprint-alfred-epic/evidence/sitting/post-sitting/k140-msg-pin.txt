@@ -1,0 +1,15 @@
+test(reader): pin the historical-course list in the bounded terminal binding suite
+
+Add five v2 cases to pipeline.bounded-reader-terminal-binding (PO decision
+2026-10-23, batch 13, "Older-course reports"), using a v2 fixture that copies
+the real bytes of the eight historical reports so the list cannot drift from
+the committed evidence: the four historical rounds plus the current course's
+two rounds pass; a justified third round passes and an unjustified or
+misplaced one still fails; an unlisted fifth round id (also added then
+deleted) fails with the existing text; a fourth round of the current course
+fails by record bound and by committed evidence; a historical report with
+other bytes, a deleted one, a rewritten-and-restored one, and the same files
+under another feature fail. No existing assertion is changed.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

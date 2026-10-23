@@ -1,0 +1,128 @@
+diff --git a/plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs b/plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs
+index dd03c2e8c..528aeb112 100644
+--- a/plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs
+@@ -395,3 +395,123 @@ test("unresolved, partial and unknown dispositions stay non-passing beside a val
+     if (status === "open") assert.equal(red.status, "passed");
+   }
+ });
++
++// ---- K140-READER-COURSE-SCOPE: the typed historical-course list (PO decision 2026-10-23, batch 13, "Older-course reports") ----
++// The v2 round-set rule ("no unlisted fourth or renamed committed round") applies to the CURRENT course only. The four
++// older rounds of the same feature (reports in the same phase directories, bytes unchanged) are a closed, digest-bound,
++// feature-bound list the checker recognises and skips. The oracle here is the committed evidence itself: the fixtures copy
++// the real report bytes, so a list that drifts from them cannot pass.
++const HISTORICAL_FEATURE = "sprint-alfred-epic";
++const HISTORICAL_IDS = ["round-20260923a", "round-20260924a", "round-20260927a", "round-20260927b"];
++const HISTORICAL_EVIDENCE = join(REPO, "specs", HISTORICAL_FEATURE, "evidence", "reader-review");
++function fixtureV2({ count = 2, historical = true, featureId = HISTORICAL_FEATURE, escalation = true } = {}) {
++  const root = mkdtempSync(join(BASE, "v2-")); fixtureRoots.push(root);
++  const git = containedGit(root), prefix = `specs/${featureId}/evidence/reader-review/`;
++  const write = (path, bytes) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), bytes); };
++  const json = (path, value) => write(path, JSON.stringify(value) + "\n");
++  const read = (path) => readFileSync(join(root, path));
++  const commit = (message) => { git(["add", "-A"]); git(["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", message]); return git(["rev-parse", "HEAD"]); };
++  write("harness/scripts/check-doc-reader-binding.mjs", `export const READER_REVIEW_PATHS = Object.freeze(${JSON.stringify(READER_REVIEW_PATHS, null, 2)});\n`);
++  for (const path of READER_REVIEW_PATHS) write(path, `# ${path}\nSynthetic document fixture.\n`);
++  for (const path of READER_REVIEW_INPUT_PATHS) write(path, path.endsWith(".json") ? "{}\n" : "# Synthetic protocol\n");
++  const ownerSource = prefix + "course-decision-fixture.md";
++  write(ownerSource, "# Synthetic owner decision\nTwo paired rounds; a justified third only; never a fourth.\n");
++  git.init(); commit("Synthetic initial documentation");
++  const historicalPaths = [];
++  if (historical) {
++    for (const id of HISTORICAL_IDS) for (const phase of ["phase-one", "phase-two"]) {
++      const path = `${prefix}${phase}/${id}.md`; write(path, readFileSync(join(HISTORICAL_EVIDENCE, phase, `${id}.md`))); historicalPaths.push(path);
++    }
++    commit("Synthetic historical-course reports");
++  }
++  const snap = (historicalSnapshot = false) => {
++    const c = git(["rev-parse", "HEAD"]);
++    const s = (historicalSnapshot ? snapshotHistoricalReaderDocumentation : snapshotReaderDocumentation)({ root, candidate: c, featureId });
++    return { commit: c, tree: git(["rev-parse", `${c}^{tree}`]), coverage: s.coverage, inputs: s.inputs, docsetSha256: s.docsetSha256 };
++  };
++  const rounds = [], correctionBatches = []; let final, escalationRef = null;
++  for (let i = 0; i < count; i++) {
++    if (i === 2 && escalation) {
++      const escalationPath = prefix + "course-escalation-fixture.md";
++      write(escalationPath, "# Synthetic third-round justification\nA surrounding regression needs one complete paired escalation.\n");
++      escalationRef = { afterRound: 2, reason: "A surrounding regression needs one complete paired escalation.", source: { path: escalationPath, sha256: hash(read(escalationPath)) } };
++      commit("Synthetic prelaunch escalation justification");
++    }
++    const round = { id: `round-2026102${3}${"abc"[i]}`, mode: i === 1 ? "corrections-only" : "complete", reviewed: snap(true) };
++    for (const [field, phase] of [["phaseOne", "phase-one"], ["phaseTwo", "phase-two"]]) {
++      const path = `${prefix}${phase}/${round.id}.md`, bytes = Buffer.from(`# Synthetic ${phase}\nF1: correct the public fixture paragraph.\n`);
++      write(path, bytes); round[field] = { path, sha256: hash(bytes), publication: { kind: "raw", rawSha256: hash(bytes) } };
++    }
++    commit(`Synthetic paired reports ${i + 1}`);
++    write("README.md", `# README\nSynthetic correction ${i + 1}.\n`);
++    const resolutionCommit = commit(`Synthetic correction ${i + 1}`); correctionBatches.push({ afterRound: i + 1, commits: [resolutionCommit] });
++    if (i === count - 1) final = snap();
++    const path = `${prefix}disposition/${round.id}.json`;
++    json(path, { schema: "pipeline.doc-reader-terminal-disposition.v1", round: round.id, status: "resolved", findings: [{ id: "F1", class: "fileline", status: "resolved", resolutionCommit }] });
++    round.disposition = { path, sha256: hash(read(path)) }; commit(`Synthetic disposition ${i + 1}`); rounds.push(round);
++  }
++  const ownerPath = prefix + "owner-decision.json";
++  json(ownerPath, { schema: "pipeline.doc-reader-terminal-owner-decision.v2", courseId: "fixture-course", authority: "documentation-owner", by: "Synthetic fixture owner",
++    decision: "authorize-terminal-correction", maxRounds: 3, maxCorrectionBatches: 3, prohibitFourthReview: true, lastReviewedCommit: rounds.at(-1).reviewed.commit,
++    acceptedFindingIds: [], source: { path: ownerSource, sha256: hash(read(ownerSource)) } });
++  const record = { schema: "pipeline.doc-reader-terminal-record.v2", courseId: "fixture-course", rounds, correctionBatches, ownerDecision: { path: ownerPath, sha256: hash(read(ownerPath)) },
++    final, policyTransition: null, escalation: count >= 3 ? escalationRef : null };
++  const recordPath = prefix + "record.json"; json(recordPath, record); commit("Synthetic terminal binding");
++  return { root, git, write, read, commit, record, recordPath, prefix, featureId, historicalPaths, json,
++    refresh: () => { json(recordPath, record); return commit("Synthetic binding mutation"); },
++    check: () => checkReaderBinding({ root, candidate: git(["rev-parse", "HEAD"]), featureId }) };
++}
++const passedV2 = (fx) => { const r = fx.check(); assert.equal(r.status, "passed", joined(r)); assert.equal(r.reviewedCommit, fx.record.rounds.at(-1).reviewed.commit); return r; };
++const failedV2 = (fx, pattern) => { const r = fx.check(); assert.equal(r.status, "failed", joined(r)); assert.match(joined(r), pattern); return r; };
++
++test("v2: the four historical-course reports plus the current course's two rounds pass the round-set rule", () => {
++  const fx = fixtureV2(); assert.equal(fx.historicalPaths.length, 8);
++  const reports = fx.git(["ls-tree", "-r", "--name-only", "HEAD", "--", `${fx.prefix}phase-one/`, `${fx.prefix}phase-two/`]).split("\n");
++  assert.equal(reports.length, 12); // 8 historical + 2 x 2 current
++  passedV2(fx);
++});
++
++test("v2: a justified third round of the current course passes beside the historical list, and a missing or misplaced justification still fails", () => {
++  passedV2(fixtureV2({ count: 3 }));
++  failedV2(fixtureV2({ count: 3, escalation: false }), /third-round escalation/);
++  const late = fixtureV2({ count: 3 }); late.record.escalation.afterRound = 1; late.refresh();
++  failedV2(late, /third-round escalation reason or position/);
++});
++
++test("v2: a fifth unlisted round id still fails with the existing text, and deleting it cannot erase it", () => {
++  {
++    const fx = fixtureV2({ count: 3 }); passedV2(fx);
++    fx.write(`${fx.prefix}phase-one/round-20261023d.md`, "# Synthetic unwanted extra review\n"); fx.commit("Synthetic extra report");
++    failedV2(fx, /unlisted fourth or renamed committed round/);
++    rmSync(join(fx.root, `${fx.prefix}phase-one/round-20261023d.md`)); fx.commit("Delete synthetic extra report");
++    failedV2(fx, /unlisted fourth or renamed committed round/);
++  }
++  // a historical-looking id that is not on the list is not recognised
++  const fx = fixtureV2(); passedV2(fx);
++  fx.write(`${fx.prefix}phase-two/round-20260928a.md`, "# Synthetic unlisted older round\n"); fx.commit("Synthetic unlisted older report");
++  failedV2(fx, /unlisted fourth or renamed committed round/);
++});
++
++test("v2: a fourth round of the current course is refused as before, by record bound and by committed evidence", () => {
++  const four = fixtureV2({ count: 3 }); passedV2(four);
++  for (const path of ["phase-one/round-20261023d.md", "phase-two/round-20261023d.md", "disposition/round-20261023d.json"]) four.write(four.prefix + path, "Synthetic forbidden fourth evidence\n");
++  four.commit("Synthetic fourth evidence"); failedV2(four, /unlisted fourth or renamed committed round/);
++  const bound = fixtureV2({ count: 3 }); bound.record.rounds.push(structuredClone(bound.record.rounds[2])); bound.record.correctionBatches.push({ afterRound: 4, commits: bound.record.correctionBatches[2].commits });
++  bound.refresh(); failedV2(bound, /bounded 2\+1 course/);
++  for (const path of ["phase-one/round-20261023d.md", "phase-two/round-20261023d.md", "disposition/round-20261023d.json"]) rmSync(join(four.root, four.prefix + path));
++  four.commit("Synthetic deleted fourth evidence"); failedV2(four, /unlisted fourth or renamed committed round/); // deleting it cannot erase it
++});
++
++test("v2: a historical report whose bytes differ from the list, or that is missing, rewritten-and-restored, or filed under another feature, fails", () => {
++  const changed = fixtureV2(); const target = changed.historicalPaths[0];
++  changed.write(target, Buffer.concat([changed.read(target), Buffer.from("\nSynthetic edit\n")])); changed.commit("Synthetic historical edit");
++  failedV2(changed, /historical-course report digest mismatch/);
++  const missing = fixtureV2(); rmSync(join(missing.root, missing.historicalPaths[3])); missing.commit("Synthetic historical deletion");
++  failedV2(missing, /round-20260924a\.md is missing or not a regular blob/);
++  const restored = fixtureV2(); const original = restored.read(restored.historicalPaths[5]);
++  restored.write(restored.historicalPaths[5], "# Synthetic overwrite\n"); restored.commit("Synthetic historical overwrite");
++  restored.write(restored.historicalPaths[5], original); restored.commit("Synthetic historical restoration");
++  failedV2(restored, /historical-course report immutable history/);
++  const foreign = fixtureV2({ featureId: "reader-terminal-fixture" }); // the list is bound to its own feature
++  failedV2(foreign, /unlisted fourth or renamed committed round/);
++});

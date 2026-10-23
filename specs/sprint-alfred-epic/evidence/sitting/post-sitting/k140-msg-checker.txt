@@ -1,0 +1,21 @@
+feat(reader): recognise the historical course's four rounds in the terminal v2 round-set rule
+
+The v2 terminal check refused every committed round it did not expect, so the
+four rounds of the older course of sprint-alfred-epic (reports for 20260923a,
+20260924a, 20260927a, 20260927b in the shared phase-one/phase-two directories)
+made any new v2 record fail with "unlisted fourth or renamed committed round"
+(K137 blocker 1). PO decision 2026-10-23, batch 13 ("Older-course reports"):
+the rule applies to the current course only.
+
+Add HISTORICAL_READER_COURSE, a closed, feature-bound list naming exactly
+those four round ids with the sha256 of each phase-one and phase-two report.
+For a v2 course of that feature the verifier requires each of the eight
+reports at the candidate with the listed digest and a single committed
+publication, then adds them to the expected round set. Any other round, a
+fourth round of the current course, a renamed or deleted current-course
+report and a changed, deleted or rewritten-and-restored historical report are
+refused as before; the third-round escalation rule is untouched. v1 records
+and every other feature are unchanged. The older reports are not touched.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
