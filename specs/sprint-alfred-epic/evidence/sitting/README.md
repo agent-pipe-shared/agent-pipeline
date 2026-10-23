@@ -11,7 +11,7 @@ This folder holds everything the operator needs for the bundled sitting: the ord
 
 ## Order
 
-- Steps 01 to 34, 36 to 39, 39b, 40 to 46, 46b and 47 of `runbook.md`, in the order printed. Step 35 (C28, the Critic preimage re-pin) is NOT part of this sitting: the PO decided it happens right before the stamp, after the Critic batch.
+- Steps 01 to 34, 36 to 39, 39b, 40 to 46, 46b, 47, 48a and 48b of `runbook.md`, in the order printed (48a/48b: MP-04 readback of K139, cut against the post-sitting state; they touch no Reader input and end with a mirror check). Step 35 (C28, the Critic preimage re-pin) is NOT part of this sitting: the PO decided it happens right before the stamp, after the Critic batch.
 - The last rehearsal (`notes/k133-results.md`, `notes/k133-runbook-corrections.md`) replayed all of it on a fresh clone of main; its corrections are merged into `runbook.md` (39b inventory surface of the K120 pin, 46b final ratchet, step 45 paths, step 47 generated mirrors, `--no-verify` on every PRO commit). Step 47 generates the mirrors with `scripts/sync-reader-inputs.mjs`; never apply a static mirrors diff.
 - Step 47 (Reader-input mirrors) is the last source-affecting step. After it nothing may edit the capability inventory or the governance input; if it does, run `node scripts/sync-reader-inputs.mjs --check` and re-sync.
 
@@ -28,7 +28,7 @@ Two lines in `CLAUDE.md` (an agent may not edit it). PO decision of 2026-10-23, 
 2. Restate the four stale `sites` counts of `check-verify-case-completion.test` (QG-04, PO decision batch 12) and the registration fixture list.
 3. Serial count pass: `node scripts/sitting-count-pass.mjs --list specs/sprint-alfred-epic/plans/count-pass-suites.json --out <evidence.md>`, then the delivery remeasure with the reader prompt that carries the batch-10 rulings.
 4. Reader course (PO decision batch 13, PO list row 52): first the protected checker diff limiting the v2 check to the current course (to be built, operator commit with pin), then the committed escalation justification, a third complete two-stage round on the final state, the final correction batch and the terminal v2 record. The owner decision uses `by: APS` and accepts the findings listed in `plans/po-decisions-2026-10-23-tiles.md` (batches 12 and 13); the inventory and governance commits of this sitting are read in round three.
-5. Only on the PO's call: dev build stamp and install, Full Verify, Critic batch, the C28 re-pin, push.
+5. Only on the PO's call, in the order of PO decision batch 14: dev build stamp and install by the PO, then the Critic batch, then Full Verify, then the final stamp and install (the C28 re-pin directly before the final stamp, after the Critic corrections), push last.
 
 ## Host runs that stay open (not part of this sitting)
 

@@ -1,0 +1,14 @@
+feat(preflight): read back whether the global subagent-model variable is set
+
+Adds observeSubagentModelEnv() to the bootstrap preflight and carries its
+result beside the typed envelope as subagentModelEnv: {status: "unset" | "set"},
+for the Elephant only. It tests the presence of exactly one named variable
+(CLAUDE_CODE_SUBAGENT_MODEL, MP-04) with Object.hasOwn: the value, any prefix
+of it and any other variable are never read, echoed or enumerated, and the
+pinned key set and payload budget of the envelope are untouched. This replaces
+the one-off node probe the Elephant bootstrap needed because printenv, echo
+expansion and /proc/self/environ are refused by the guard union (PO decision
+2026-10-23, batch 7 row 8).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

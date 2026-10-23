@@ -1,0 +1,18 @@
+feat(preflight): pin and document the sanctioned MP-04 set/unset readback
+
+Pins the preflight readback of CLAUDE_CODE_SUBAGENT_MODEL (PO decision
+2026-10-23, batch 7 row 8): subagentModelEnv.status is "unset" when the
+variable is absent and "set" for any present value, the value or a prefix of
+it never appears in the serialized output, no other variable is consulted or
+enumerated, and a Goldfish or Critic preflight line does not carry the field.
+The five cases extend the already registered preflight suite; no new test file.
+The pipeline-start skill names the field where the MP-04 confirmation is made.
+The line-bound ratchet of the preflight script and its suite is raised to the
+measured size (K139-ratchet.diff), as the check requires for a grown file.
+
+The cases are green only with the matching protected change to
+scripts/pipeline-start-preflight.mjs applied; they document its contract.
+Commit this together with, or directly before, the protected commit.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

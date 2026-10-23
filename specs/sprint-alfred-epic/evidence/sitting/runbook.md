@@ -432,3 +432,27 @@ node scripts/sync-reader-inputs.mjs --check
 git add -- plugins/pipeline-core/reader-inputs plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs harness/scripts/check-consumer-safe-paths.mjs
 git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/47-reader-input-mirrors-protected.txt -- plugins/pipeline-core/reader-inputs plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs harness/scripts/check-consumer-safe-paths.mjs
 ```
+
+## 48a UN K139 pin cases, skill sentence and ratchet (after step 47; cut against the post-sitting state)
+The five new cases are red until step 48b lands; commit 48a directly before 48b. The skill sentence and the preflight suite extension are unprotected; the ratchet raises the line bound of the preflight script and its suite.
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k139-mp04-unprotected.diff
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k139-ratchet.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k139-mp04-unprotected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k139-ratchet.diff
+git add -- plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs plugins/pipeline-core/skills/pipeline-start/SKILL.md architecture/boundary-policy.json
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/48a-mp04-readback-pin.txt -- plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs plugins/pipeline-core/skills/pipeline-start/SKILL.md architecture/boundary-policy.json
+```
+
+## 48b PRO K139 subagent-model readback in the preflight (kernel path)
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k139-mp04-protected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k139-mp04-protected.diff
+git add -- plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/48b-mp04-readback-protected.txt -- plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+node plugins/pipeline-core/scripts/architecture-boundary-check.mjs --root .
+# expected: 0 over-line-bound findings, unowned-path findings unchanged (exit 1 stays)
+node scripts/sync-reader-inputs.mjs --check
+# expected: PASS (if it reports drift, the preflight change reached a Reader-input source: stop and report)
+```
+Measured on the post-sitting state: preflight suite 87 pass before, 92 pass / 0 fail after; doc contracts valid; consumer-safe-paths 9/9; inventory check green. Notes: `notes/k139-mp04-readback.md`.
