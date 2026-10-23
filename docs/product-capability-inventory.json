@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "85049e2157c0e987e12c5d3e1fe5dc629c793584",
-    "tree": "07dade02dbd6de0ea3ab54ed75f77d8032d50380"
+    "commit": "8052bdc5467ea23ce65ccedf10165c9ff319794b",
+    "tree": "d9e79bbdaa553178fb4182874c656b1dd68ac7d9"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -760,6 +760,7 @@
         "verify-phase:harness/scripts/verify.mjs:pin-goldfish-bugfix-module-conflicts-with-qg-04-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-goldfish-test-briefs-lack-targeted-and-quick-command-routes-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-governance-scope-rejects-readonly-host-git-control-tests",
+        "verify-phase:harness/scripts/verify.mjs:pin-governed-check-child-ignores-inherited-node-test-context-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-adr-references-keep-navigation-current-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-approval-policy-applies-after-intake-transition-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-design-course-cost-and-proportionality-tests",
