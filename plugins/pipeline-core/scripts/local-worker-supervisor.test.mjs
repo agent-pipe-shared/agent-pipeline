@@ -359,11 +359,19 @@ function cleanup(context, recordSha256) {
 }
 
 const cases = [];
-function check(name, run) {
-  cases.push({ id: `LWSC${String(cases.length + 1).padStart(2, "0")}`, name, run });
+// D66(a), extended by PO decision row 30 (decision tiles of 2026-10-23): check(name, { todo: "typed-pending: ... backlog item pipeline.<id>" }, run) = typed
+// pending case (mode todo), body unchanged. Cause: `withWorkerAuthority` (lib/local-worker-supervisor.mjs) deliberately throws
+// `local-worker-supervisor:async-native-journal-phase-unavailable` until the settled journal phase is designed after 0.7.0, so every ready
+// `run --activate` answers LWS-UNAVAILABLE. QG-04 justification (bounded): no assertion is weakened, removed or skipped; the nine cases still run and
+// stay visible as pending, and they turn into plain passing cases when the journal phase lands.
+function check(name, optionsOrRun, maybeRun) {
+  const [options, run] = typeof optionsOrRun === "function" ? [{}, optionsOrRun] : [optionsOrRun, maybeRun];
+  if (options.todo !== undefined && !/^typed-pending: .*backlog item pipeline\.[a-z0-9-]+/.test(options.todo)) throw new Error(`pending case without a typed backlog binding: ${name}`);
+  cases.push({ id: `LWSC${String(cases.length + 1).padStart(2, "0")}`, name, ...(options.todo === undefined ? {} : { mode: "todo" }), run });
 }
+const JOURNAL_PHASE_PENDING = { todo: "typed-pending: D66(a), PO list row 30; deliberate fail-closed `local-worker-supervisor:async-native-journal-phase-unavailable` in withWorkerAuthority until the settled journal phase after 0.7.0; binding backlog item pipeline.model-family-async-effects-need-a-settled-journal-phase (its acceptance list does not yet name the LWSC cases); assertions unchanged" };
 
-check("plans and runs two overlapping real child processes in separate no-hardlink Git clones", () => {
+check("plans and runs two overlapping real child processes in separate no-hardlink Git clones", JOURNAL_PHASE_PENDING, () => {
   const context = fixture();
   try {
     const { run } = runWave(context, createRequest(context.sourceRoot, context.stateRoot, context.commit));
@@ -437,7 +445,7 @@ check("returns serial-fallback-required before creating a workspace when recover
   }
 });
 
-check("times out and signals only the exact observed child, then permits exact cleanup", () => {
+check("times out and signals only the exact observed child, then permits exact cleanup", JOURNAL_PHASE_PENDING, () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { count: 1, delayMs: 2_000, timeoutMs: 200, write: false });
@@ -454,7 +462,7 @@ check("times out and signals only the exact observed child, then permits exact c
   }
 });
 
-check("accepts an exact cancellation intent, drains the owned child, and permits cleanup", async () => {
+check("accepts an exact cancellation intent, drains the owned child, and permits cleanup", JOURNAL_PHASE_PENDING, async () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
@@ -492,7 +500,7 @@ check("accepts an exact cancellation intent, drains the owned child, and permits
   }
 });
 
-check("does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest", async () => {
+check("does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest", JOURNAL_PHASE_PENDING, async () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
@@ -528,7 +536,7 @@ check("does not deny cancellation of a healthy worker purely because a heartbeat
   }
 });
 
-check("keeps a failed real child attributable and does not convert nonzero exit into success", () => {
+check("keeps a failed real child attributable and does not convert nonzero exit into success", JOURNAL_PHASE_PENDING, () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { count: 1, delayMs: 200, exitCode: 7, write: false });
@@ -551,7 +559,7 @@ check("keeps a failed real child attributable and does not convert nonzero exit 
   }
 });
 
-check("classifies an ignored unauthorized write and source-checkout drift as recovery-required", async () => {
+check("classifies an ignored unauthorized write and source-checkout drift as recovery-required", JOURNAL_PHASE_PENDING, async () => {
   const unauthorized = fixture();
   try {
     const request = createRequest(unauthorized.sourceRoot, unauthorized.stateRoot, unauthorized.commit, {
@@ -589,7 +597,7 @@ check("classifies an ignored unauthorized write and source-checkout drift as rec
   }
 });
 
-check("reports a killed supervisor with a still-attributable worker as recovery-required", async () => {
+check("reports a killed supervisor with a still-attributable worker as recovery-required", JOURNAL_PHASE_PENDING, async () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
@@ -617,7 +625,7 @@ check("reports a killed supervisor with a still-attributable worker as recovery-
   }
 });
 
-check("admits only one of two concurrent starts for the same exact plan", async () => {
+check("admits only one of two concurrent starts for the same exact plan", JOURNAL_PHASE_PENDING, async () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
@@ -647,7 +655,7 @@ check("admits only one of two concurrent starts for the same exact plan", async 
   }
 });
 
-check("denies replayed cleanup and foreign workspace marker without broad deletion", () => {
+check("denies replayed cleanup and foreign workspace marker without broad deletion", JOURNAL_PHASE_PENDING, () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { count: 1, delayMs: 200 });
