@@ -25,7 +25,7 @@
       "id": "K1D",
       "title": "K1 rest awaiting PO decision: binding owning release after retirement (A), leftover authority journal (B), orphan release registry member (E), Codex governed dispatch owner (GDW01)",
       "status": "in-progress",
-      "next": "A and E5b delivered; E discard-feature finish call held as C20; binding suite case 'neutral coordinator-close release...' is a real gap in the private closed-feature release (PO list row 27, Option 1 needs the PO's extension of D73 E); B probe, D74 repair hint and GDW01 not started"
+      "next": "A and E5b delivered; E discard-feature finish call held as C20; binding suite case 'neutral coordinator-close release...' is a real gap in the private closed-feature release (PO list row 27; Option 1 is built and held as C26 and needs the PO's extension of D73 E); B probe, D74 repair hint and GDW01 not started"
     },
     {
       "id": "K1h",
