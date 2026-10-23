@@ -60,3 +60,23 @@ protected patches still go through the bundled sitting.
 | 11 | parallel-work-in-one-checkout-is-unsafe | AGY isolated-worktree preparation | Stays out of the item's acceptance (D63) | Accepted for 0.7.0 on Claude and Codex; AGY worktree is a 0.7.x follow-up |
 | 11 | git-stash-list-classified-as-working-tree-write | Deferral of 2026-10-16 | Lifted | The row counts for 0.7.0; C23 turns the 3 todo cases real (pin 88/88) |
 | 9 | K13 AC-197 D-I, AC-147 | Remaining guard-lifecycle-ready reds; declared-skill read catalogue | No decision needed: guard-lifecycle-ready counts 392 / 389 pass / 0 fail / 3 skipped at HEAD (the 26 reds of 2026-10-19 are gone), AC-147 was deferred past 0.7.0 by the PO on 2026-10-16 | Ledger text corrected; AC-224 liveness readback is covered by `38acd203a` (generator) and K93 (guard) |
+| 12 | 42 | S4 project identity for this repository | Typed source-checkout exemption (S4 stays R1 for consumer projects) | K127 builds the exemption (identity from the two tracked identity files, never the directory name), replaces the K112 hold patches and enters the bundle |
+| 12 | 41 | Fallback record on the review receipt | Build an optional closed `fallback` field | K128: protected/unprotected package; the open clause of `role-route-preflight-with-self-dispatch-fallback` becomes a real pin |
+| 12 | 37 | `implementation-without-dispatch-escapes-review-coverage` item text | Reconstruct 1:1 from the pin header (permission for exactly this file) | K126, marked "reconstructed" |
+| 12 | 35 | D77 versus batch 9 for AC-249 | Batch 9 stands (supersedes D77 for AC-249) | One release-note sentence names the unchecked private-suffix wording |
+| 12 | 43 | Reader findings 15, 71, 76, 78 | The documentation owner accepts all four | Entered in the terminal owner decision after the sitting |
+| 12 | 43 | Reader findings 57/41: governance class of usage/overview/migration | Adjust the governance input | K125 prepares the diff; applied in the final correction batch together with the sitting's inventory commit |
+| 12 | 43 | Reader finding 60: Advisor-consent default | The consumer documents say the Driver asks and nothing is exported without recorded consent | No default is stated; the divergent `setup.mjs` wording is a finding for the Critic batch |
+| 12 | 43 | Reader finding 64: unbacked inventory anchor | Create the capability in the inventory | K125 prepares the diff for the inventory commit of the sitting |
+| 12 | 43 | Reader findings 11/50/52: German completion report | Stays in the reader set with its banner; accepted; the language point goes to the Critic batch | No protocol or path-set change |
+| 12 | 43 | Reader findings 3/30: `docs/po-human-approval.md` is maintainer-classified | Commands stay inline; links to it are labelled maintainer background | Applied in SETUP and usage |
+| 12 | 43 | Reader finding 8: global-install description | Document the global route | K129 writes it from installer facts only; unverifiable claims are left out |
+| 12 | 43 | Reader finding 9: GEMINI.md | Keep the actionable minimum, define Agy | No pointer-only entry file |
+| 12 | 43 | Reader finding 19: what "approved release" means | Say plainly that before the tag there is no Antigravity route | Applied in SETUP step 0 |
+| 12 | 43 | Reader finding 34: inventory-pinned FLOW paragraphs | Stay unchanged, accepted | Entered in the terminal owner decision |
+| 12 | 43 | Reader finding 49: where an approved policy pack comes from | The PO cannot name the source without detailed analysis | No documentation claim is made; accepted gap, owner-needed analysis, named in the Critic batch |
+| 12 | 36/40 | Value of `by` in the terminal owner decision | "In diesem repo immer APS" (standing value for this repository, supplied by the PO) | Used as `by` when the terminal v2 owner decision is written after the sitting |
+| 12 | 38 | Windows credential-target refusal and the shared show lane | Native-host canary list, accepted as is | Release note names the host limit |
+| 12 | 39 | Four stale VCR01 `sites` counts and the registration fixture | Restate after the sitting | QG-04 restatement once the bundle state is final |
+| 12 | K120 | `NODE_TEST_CONTEXT` inheritance makes governed delivery checks pass falsely | Add the fix as a further bundle step | K120 protected diff plus pin registration; NGHS 38/38 instead of 36/38 |
+| 12 | Reader course | Third round | Not run; the course closes with correction batch 2 | Terminal v2 record after the sitting; batch 2 counts as editorially corrected, not freshly read |

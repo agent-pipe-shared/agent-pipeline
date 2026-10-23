@@ -209,7 +209,8 @@ runnable repair in its own text. To use the signature route instead, set
 
 An agent cannot widen the approval strength by editing `pipeline.user.yaml`:
 the gate-strength guard denies that edit, and a human releases that one change
-with a signed one-time override ([signing an intent digest](po-human-approval.md#signing-a-bare-intent-digest)).
+with a signed one-time override that uses the same key as the approval steps above
+(background for maintainers: [signing an intent digest](po-human-approval.md#signing-a-bare-intent-digest)).
 
 ## Private review export
 
