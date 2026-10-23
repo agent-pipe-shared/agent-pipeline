@@ -1,7 +1,20 @@
 // SPDX-License-Identifier: SUL-1.0
 // Regression pin: pipeline.greenfield-design-course-cost-and-proportionality (AC-191).
 // Successor policy pinned (one review, at most one delta, on-demand Advisor, no readiness, one final decision).
-// The telemetry case is deliberately RED: no source records phase wall time, tool time and human wait separately.
+//
+// RESTATED TO THE DECIDED PREMISE (QG-04, K86-PIN-RESTATEMENTS, 2026-10-23; no assertion changed). PO decision D125
+// (2026-10-22): ADR-0085 (one review, one signature) supersedes the Advisor-plus-independent-readiness design course for
+// this item, so the item's original acceptance is judged against the single-review route; the one-final-PO-gate and
+// no-intermediate-proof parts are unchanged. Acceptance map (item, shortened by D125 and D25/D121):
+//   A1 order: agent submits mechanically, one review, one final decision, retired routes not recovery  -> case "order"
+//   A2 cheap deterministic checks before model review, no guessed arithmetic                            -> case "deterministic checks"
+//   A3 reuse an unchanged evidence tuple, bind the final package to all current sources                 -> case "evidence reuse"
+//   A4 bounded low-risk course, one final gate, a third review round refused                            -> case "bounded course"
+//   A5 phase wall time / tool time / human wait: LEFT this item's acceptance by D25 (2026-10-18) and is postponed for 0.7.0
+//      by D121 (2026-10-22); tracked in backlog/items/2026-10-16-design-course-telemetry-is-deferred.md. The telemetry case
+//      below stays as that item's deferred pin: it is not a failure of this item and not counted against it.
+// NOT PROVEN HERE (stays open, needs an installed runner, not agent work): a fresh small-project run that reaches
+// implementation with one final PO gate, judged against ADR-0085.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -75,7 +88,7 @@ test("bounded course with one final gate: one review receipt builds the single a
   assert.deepEqual([third.ok, third.code], [false, "DRR-ROUND-EXCEEDED"]);
 });
 
-test("telemetry (deferred): phase wall time, tool time and human wait are recorded separately", { skip: "deferred by PO 2026-10-16 #2 (outside 0.7.0); owner: Coordinator; follow-up: backlog/items/2026-10-16-design-course-telemetry-is-deferred.md" }, () => {
+test("telemetry (deferred): phase wall time, tool time and human wait are recorded separately", { skip: "deferred by PO 2026-10-16 #2 and decisions D25/D121 (outside 0.7.0, no new schema before the test candidate); owner: Coordinator; follow-up: backlog/items/2026-10-16-design-course-telemetry-is-deferred.md" }, () => {
   const audit = readFileSync(here("../runner-own-session-audit.mjs"), "utf8");
   const onboarding = readFileSync(here("../project-onboarding-v3.mjs"), "utf8");
   assert.doesNotMatch(audit, /phaseWallTime:\s*'unavailable'/u, "phaseWallTime is a hard-coded 'unavailable'");
