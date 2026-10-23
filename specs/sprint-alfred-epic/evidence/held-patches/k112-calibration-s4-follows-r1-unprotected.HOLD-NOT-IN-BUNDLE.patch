@@ -1,0 +1,206 @@
+diff --git a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+index 7bbea26c1..e2f7ad632 100644
+--- a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
++++ b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+@@ -557,7 +557,7 @@ const observe4 = (root) => ({
+ test("PARWORK-M4a: the real producer CLI makes Critic evidence for an older commit and leaves a dirty checkout, its worktree list and the session-authority registry untouched", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, PO decision K7)" : false, timeout: 300000 }, () => {
+   const root = join(FIXTURE, "m4-root");
+   mkdirSync(join(root, ".claude"), { recursive: true });
+-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m4", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
++  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "m4-root", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
+   writeFileSync(join(root, "README.md"), "# Fixture\n");
+   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+   prepareConsumerVerify({ rootDir: root });
+@@ -612,7 +612,7 @@ function waitFor5(path, label) {
+ test("PARWORK-M5a: the real producer CLI and the repair inspect run while another process holds the registry boundary; afterwards no lock, no retired-lock directory remain, the registry reads and the session descriptors are unchanged", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, ALF-K13)" : false, timeout: 300000 }, async () => {
+   const root = join(FIXTURE, "m5-root");
+   mkdirSync(join(root, ".claude"), { recursive: true });
+-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m5", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
++  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "m5-root", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
+   writeFileSync(join(root, "README.md"), "# Fixture\n");
+   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+   prepareConsumerVerify({ rootDir: root });
+diff --git a/plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs b/plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs
+index 7037bf9af..7b17120d3 100644
+--- a/plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs
++++ b/plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs
+@@ -3,11 +3,15 @@
+  * Pin: pipeline.project-calibration-retains-new-project-placeholder (AC-232).
+  *
+  * No backlog item and no public original exist; the acceptance pinned here is
+- * the Elephant-fixed reconstruction S1-S8 (pending PO release):
++ * the reconstruction S1-S8, RELEASED by the PO (2026-10-23, batch 11), with S4
++ * following the PO's released wording R1 (AC-232: an aliased identity is refused):
+  *   S1 initial   placeholder "new-project" w/o metadata -> root-derived, physical root name
+  *   S2 resume    root-derived metadata resolves; differing stored name -> PCI-NAME-MISMATCH
+  *   S3 substituted root -> PCI-ROOT-MISMATCH
+- *   S4 alias     non-placeholder w/o metadata -> configured-alias; metadata alias accepted
++ *   S4 alias     a non-placeholder name that is not the root-derived name is refused
++ *                PCI-ALIAS-REFUSED, with or without metadata (follows R1); the message
++ *                names the stored name, the root name and the repair; a name equal to
++ *                the root name is no alias and resolves
+  *   S5 missing   no calibration -> PCI-CALIBRATION-MISSING; no project -> PCI-PROJECT-MISSING
+  *   S6 invalid   INVALID / PROJECT-INVALID / METADATA-INVALID / CALIBRATION-DRIFT
+  *   S7 onboarding writes a root-derived identity, never the placeholder
+@@ -114,23 +118,64 @@ test('S3 a calibration copied from another root is refused PCI-ROOT-MISMATCH', (
+   assert.equal(read(copy).code, 'PCI-ROOT-MISMATCH');
+ });
+ 
+-test('S4 a non-placeholder project without metadata resolves configured-alias', () => {
++// QG-04 restatement (bounded): PO decision 2026-10-23 (batch 11), "S4 FOLLOWS R1".
++// The two S4 cases below previously asserted that an aliased identity (a
++// non-placeholder stored name that is not the root-derived name) RESOLVES as
++// configured-alias, with or without metadata. R1 (AC-232, released 2026-10-16)
++// says the opposite: "If the identity is ... aliased ... the system shall refuse
++// to treat the calibration as bound to the project and shall report why". The
++// intent of S4 is unchanged: the alias question has a defined, tested outcome.
++// Only the outcome flips from "accepted" to "refused PCI-ALIAS-REFUSED"; the
++// refusal message names the stored name, the root-derived name and the repair.
++// Scope: only these two cases; nothing else in S1-S3, S5-S8 is touched.
++const ALIAS_REFUSED = (r, stored, rootName) => {
++  assert.equal(r.status, 'unavailable');
++  assert.equal(r.code, 'PCI-ALIAS-REFUSED');
++  assert.equal(r.kind, null);
++  assert.equal(r.project, null);
++  assert.ok(r.message.includes(`"${stored}"`), 'message names the stored name');
++  assert.ok(r.message.includes(`"${rootName}"`), 'message names the root-derived name');
++  assert.match(r.message, /regenerate the project identity or set "project" to the root name/u);
++};
++
++test('S4 a non-placeholder project without metadata that is not the root name is refused PCI-ALIAS-REFUSED', () => {
+   const root = fixture('dir-name');
+   calib(root, { project: 'my-alias' });
++  ALIAS_REFUSED(read(root), 'my-alias', 'dir-name');
++});
++
++test('S4 metadata kind configured-alias whose name is not the root name is refused PCI-ALIAS-REFUSED', () => {
++  const root = fixture('dir-name2');
++  calib(root, { project: 'my-alias', projectIdentity: meta(root, 'configured-alias') });
++  ALIAS_REFUSED(read(root), 'my-alias', 'dir-name2');
++});
++
++test('S4 a stored name equal to the root name is no alias and resolves without metadata', () => {
++  const root = fixture('same-as-root');
++  calib(root, { project: 'same-as-root' });
+   const r = read(root);
+   assert.equal(r.status, 'resolved');
+-  assert.equal(r.kind, 'configured-alias');
+-  assert.equal(r.project, 'my-alias');
++  assert.equal(r.kind, 'root-derived');
++  assert.equal(r.project, 'same-as-root');
+   assert.deepEqual(r.configuredValue, { status: 'selected', reason: null });
+ });
+ 
+-test('S4 metadata kind configured-alias is accepted', () => {
+-  const root = fixture('dir-name2');
+-  calib(root, { project: 'my-alias', projectIdentity: meta(root, 'configured-alias') });
++test('S4 metadata kind configured-alias whose name equals the root name resolves', () => {
++  const root = fixture('same-as-root2');
++  calib(root, { project: 'same-as-root2', projectIdentity: meta(root, 'configured-alias') });
+   const r = read(root);
+   assert.equal(r.status, 'resolved');
+   assert.equal(r.kind, 'configured-alias');
+-  assert.equal(r.project, 'my-alias');
++  assert.equal(r.project, 'same-as-root2');
++});
++
++test('S4 the alias refusal reaches the consumer fail-closed with the repair in its message', () => {
++  const root = fixture('consumer-dir');
++  calib(root, { project: 'my-alias', verify: null });
++  assert.throws(() => readConsumerVerifyConfiguration(root), (error) =>
++    error.message.startsWith('VEP-PROJECT-IDENTITY: PCI-ALIAS-REFUSED')
++    && error.message.includes('"my-alias"') && error.message.includes('"consumer-dir"')
++    && /regenerate the project identity or set "project" to the root name/u.test(error.message));
+ });
+ 
+ test('S5 no calibration file is refused PCI-CALIBRATION-MISSING', () => {
+@@ -182,8 +227,12 @@ test('S6 neutral and legacy calibration present and not byte-equal is refused PC
+   assert.equal(read(root).code, 'PCI-CALIBRATION-DRIFT');
+ });
+ 
++// QG-04 fixture restatement (bounded): PO decision 2026-10-23 "S4 follows R1". The fixture
++// stored the alias "alpha" under a differently named root and relied on alias acceptance
++// only incidentally; the case's intent (byte-equal tiers do not drift) is unchanged, so
++// the fixture root is now named like its stored project.
+ test('S6 byte-equal neutral and legacy calibrations do not drift', () => {
+-  const root = fixture();
++  const root = fixture('alpha');
+   calib(root, { project: 'alpha' }, NEUTRAL);
+   calib(root, { project: 'alpha' }, LEGACY);
+   assert.equal(read(root).status, 'resolved');
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index 28153d438..d4b2936b6 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -68,7 +68,7 @@
+ import { randomBytes, createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
++import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ 
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
+@@ -279,9 +279,16 @@ function mkdirPrivate(base, path) {
+   }
+ }
+ 
++/**
++ * The temporary named-commit worktree directory carries the NAME OF THE CHECKOUT ROOT: the project
++ * calibration identity is root-derived and an aliased identity is refused (AC-232 / R1, PO decision
++ * 2026-10-23), so a worktree directory named differently from the project would refuse its own commit.
++ */
++function commitWorktreePath(root, container) { return join(container, basename(resolve(root))); }
++
+ /** Remove a temporary named-commit worktree. Never throws; reports whether it is really gone. */
+ function removeCommitWorktree(root, container) {
+-  try { git(root, ["worktree", "remove", "--force", join(container, "checkout")], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* the filesystem removal below still runs */ }
++  try { git(root, ["worktree", "remove", "--force", commitWorktreePath(root, container)], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* the filesystem removal below still runs */ }
+   try { rmSync(container, { recursive: true, force: true }); } catch { /* reported through the return value */ }
+   try { git(root, ["worktree", "prune"], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* a stale admin record is pruned by the next worktree command */ }
+   return !existsSync(container);
+@@ -321,9 +328,9 @@ async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
+   try {
+     mkdirPrivate(common, hooks);
+     // An empty hooks directory: a post-checkout hook of the shared repository must not run for this plumbing.
+-    try { git(root, ["-c", `core.hooksPath=${hooks}`, "worktree", "add", "--detach", "--quiet", join(container, "checkout"), sha], COMMIT_WORKTREE_TIMEOUT_MS); }
++    try { git(root, ["-c", `core.hooksPath=${hooks}`, "worktree", "add", "--detach", "--quiet", commitWorktreePath(root, container), sha], COMMIT_WORKTREE_TIMEOUT_MS); }
+     catch { fail("VEP-COMMIT-WORKTREE", `Could not create the temporary worktree for commit ${sha}.`); }
+-    const produced = await produceVerifyEvidence({ ...options, rootDir: join(container, "checkout"), commit: null });
++    const produced = await produceVerifyEvidence({ ...options, rootDir: commitWorktreePath(root, container), commit: null });
+     // The run above wrote into the temporary worktree; publish the evidence into the requested path of the checkout.
+     writeEvidence(root, target, produced.evidence);
+     result = { ...produced, outPath: target };
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index 6ce40a438..b7e099eff 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
+ import { spawn, spawnSync } from "node:child_process";
+ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { basename, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import test from "node:test";
+ 
+@@ -35,7 +35,9 @@ function git(root, args) { return run("git", ["-C", root, ...args]).trim(); }
+ function fixture(verifyCommand) {
+   const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
+   mkdirSync(join(root, ".claude"), { recursive: true });
+-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "fixture-project", verify: verifyCommand }, null, 2)}\n`);
++  // Fixture restatement (QG-04, bounded; PO decision 2026-10-23 "S4 follows R1", AC-232): an aliased
++  // identity is now refused, so the fixture project is named like its root. No assertion changed.
++  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root), verify: verifyCommand }, null, 2)}\n`);
+   writeFileSync(join(root, "README.md"), "# Fixture\n");
+   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+   prepareConsumerVerify({ rootDir: root });
+@@ -422,7 +424,7 @@ test("a calibration naming no verify command cannot produce success at any bound
+   const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
+   try {
+     mkdirSync(join(root, ".claude"), { recursive: true });
+-    writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "no-verify" }, null, 2)}\n`);
++    writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root) }, null, 2)}\n`);
+     writeFileSync(join(root, "README.md"), "# Baseline-only fixture\n");
+     prepareConsumerVerify({ rootDir: root });
+     git(root, ["init", "-q"]);
