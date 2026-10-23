@@ -1,7 +1,8 @@
 # Audit bundles
 
 An Audit Bundle is a create-only, offline-verifiable copy of the validated
-artifacts of one completed Feature Package. Its manifest binds the exact
+artifacts of one completed Feature Package (see the
+[Terms](README.md#terms-used-across-these-documents)). Its manifest binds the exact
 candidate commit/tree, every copied byte digest, and the resolved organization
 policy digest. It is evidence, not governance authority and not a release or
 compliance claim.
@@ -12,11 +13,13 @@ JSON and confirm its compatibility with the selected Core version using the
 an explicit governance input, not a file the Audit Bundle command creates or
 an authority substitute. If there is no approved pack, stop rather than
 inventing one. Then use the local CLI to emit a reviewable plan, build from
-that plan, and verify an existing bundle:
+that plan, and verify an existing bundle. `<plugin-root>` is the installed
+plugin directory (the command convention in the [documentation map](README.md));
+`<feature-id>` is the Feature Package's folder name under `specs/`:
 
 ```bash
 node <plugin-root>/scripts/audit-bundle.mjs plan \
-  --repo "$PWD" --manifest specs/<feature>/lifecycle.json \
+  --repo "$PWD" --manifest specs/<feature-id>/lifecycle.json \
   --bundle-id <bundle-id> --core-version <core-version> \
   --pack-file <policy-pack.json>
 ```
