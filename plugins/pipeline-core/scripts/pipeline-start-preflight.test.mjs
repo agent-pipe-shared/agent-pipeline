@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -21,6 +21,9 @@ import {
   STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA, resolveActiveRunner, resolveCodexAttestationSourceForPreflight,
   resolvePluginManifestVersion, observeCodexRegistryContentBinding, observeAgyStartHintField,
 } from "./pipeline-start-preflight.mjs";
+// K139-MP04-READBACK: namespace import so a missing export fails ONE case with a typed message
+// instead of making the whole file fail to link.
+import * as preflightModule from "./pipeline-start-preflight.mjs";
 import { formatOnboardingRerunCommand } from "./project-onboarding-v3.mjs";
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
 import { inspectEffectiveArchitectureDecisions } from "../lib/architecture-effective-decisions.mjs";
@@ -2373,3 +2376,81 @@ test("AM-W-T2: a governed-but-not-loaded agy workspace surfaces the agy hint in 
 test("AM-W-T2: a governed-and-loaded or an ungoverned agy workspace adds no agy hint to the preflight output", async () => { const run = (hint) => observeAgyStartHintField({ observeHint: async () => hint, cwd: "/fixture/workspace", configRoot: "/fixture/config", loadedPluginRoot: "/fixture/plugin" });
   assert.equal(await run({ governed: true, loaded: { status: "current" } }), null); assert.equal(await run({ governed: false, loaded: { status: "stale" } }), null);
   assert.equal(await observeAgyStartHintField({ observeHint: async () => { throw new Error("agy unavailable"); }, cwd: "/fixture/workspace", configRoot: "/fixture/config", loadedPluginRoot: "/fixture/plugin" }), null); });
+
+// K139-MP04-READBACK (PO decision 2026-10-23, batch 7 row 8): the Elephant preflight line carries a
+// sanctioned set/unset readback of CLAUDE_CODE_SUBAGENT_MODEL (MP-04). Presence only: the value, and
+// any prefix of it, never reaches the output; no other variable is read.
+const MP04_VARIABLE = "CLAUDE_CODE_SUBAGENT_MODEL";
+const MP04_VALUE_SENTINEL = "k139-sentinel-model-value-7f3a91";
+const MP04_UNRELATED_VARIABLE = "K139_UNRELATED_SENTINEL_VARIABLE";
+const MP04_UNRELATED_SENTINEL = "k139-sentinel-unrelated-value-c2d845";
+
+function observeSubagentModelEnvOrFail() {
+  assert.equal(typeof preflightModule.observeSubagentModelEnv, "function", "observeSubagentModelEnv must be exported");
+  return preflightModule.observeSubagentModelEnv;
+}
+
+function runPreflightProcess(extraEnv, extraArgs = []) {
+  const cwd = mkdtempSync(join(tmpdir(), "k139-mp04-"));
+  try {
+    const env = { PATH: process.env.PATH ?? "", HOME: cwd, ...extraEnv };
+    const run = spawnSync(process.execPath, [fileURLToPath(new URL("./pipeline-start-preflight.mjs", import.meta.url)), ...extraArgs], { cwd, env, encoding: "utf8", timeout: 120000 });
+    const stdoutLines = run.stdout.split("\n").filter((line) => line !== "");
+    assert.equal(stdoutLines.length, 1, "the preflight writes exactly one compact stdout line");
+    return { stdout: run.stdout, stderr: run.stderr, line: JSON.parse(stdoutLines[0]) };
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+test("K139 MP-04 readback: an absent variable reads unset, any present value reads set, and the status is the only field", () => {
+  const observe = observeSubagentModelEnvOrFail();
+  assert.deepEqual(observe({ env: {} }), { status: "unset" });
+  assert.deepEqual(observe({ env: { [MP04_VARIABLE]: MP04_VALUE_SENTINEL } }), { status: "set" });
+  assert.deepEqual(observe({ env: { [MP04_VARIABLE]: "" } }), { status: "set" });
+  assert.deepEqual(observe({ env: { [MP04_UNRELATED_VARIABLE]: MP04_UNRELATED_SENTINEL } }), { status: "unset" });
+  assert.equal(JSON.stringify(observe({ env: { [MP04_VARIABLE]: MP04_VALUE_SENTINEL } })).includes(MP04_VALUE_SENTINEL), false);
+});
+
+test("K139 MP-04 readback: only the one named variable is touched, no enumeration and no unrelated read", () => {
+  const observe = observeSubagentModelEnvOrFail();
+  for (const present of [true, false]) {
+    const touched = [];
+    const target = present ? { [MP04_VARIABLE]: MP04_VALUE_SENTINEL, [MP04_UNRELATED_VARIABLE]: MP04_UNRELATED_SENTINEL } : { [MP04_UNRELATED_VARIABLE]: MP04_UNRELATED_SENTINEL };
+    const env = new Proxy(target, {
+      get(object, key, receiver) { touched.push(["get", String(key)]); return Reflect.get(object, key, receiver); },
+      has(object, key) { touched.push(["has", String(key)]); return Reflect.has(object, key); },
+      ownKeys(object) { touched.push(["ownKeys", ""]); return Reflect.ownKeys(object); },
+      getOwnPropertyDescriptor(object, key) { touched.push(["getOwnPropertyDescriptor", String(key)]); return Reflect.getOwnPropertyDescriptor(object, key); },
+    });
+    const result = observe({ env });
+    assert.deepEqual(result, { status: present ? "set" : "unset" });
+    assert.ok(touched.length > 0, "the named variable is actually consulted");
+    assert.equal(touched.some(([trap]) => trap === "ownKeys"), false, "the environment is never enumerated");
+    assert.deepEqual(touched.filter(([, key]) => key !== "" && key !== MP04_VARIABLE), [], "no variable other than the named one is consulted");
+  }
+});
+
+test("K139 MP-04 readback: the real preflight line carries subagentModelEnv unset, and never the value or an unrelated variable", () => {
+  const { stdout, stderr, line } = runPreflightProcess({ [MP04_UNRELATED_VARIABLE]: MP04_UNRELATED_SENTINEL });
+  assert.deepEqual(line.subagentModelEnv, { status: "unset" });
+  for (const text of [stdout, stderr]) assert.equal(text.includes(MP04_UNRELATED_SENTINEL), false);
+});
+
+test("K139 MP-04 readback: with the variable set the real preflight line reads set and the serialized output never contains the value or a prefix of it", () => {
+  const { stdout, stderr, line } = runPreflightProcess({ [MP04_VARIABLE]: MP04_VALUE_SENTINEL, [MP04_UNRELATED_VARIABLE]: MP04_UNRELATED_SENTINEL });
+  assert.deepEqual(line.subagentModelEnv, { status: "set" });
+  for (const text of [stdout, stderr]) {
+    assert.equal(text.includes(MP04_VALUE_SENTINEL), false);
+    assert.equal(text.includes(MP04_VALUE_SENTINEL.slice(0, 8)), false);
+    assert.equal(text.includes(MP04_UNRELATED_SENTINEL), false);
+  }
+});
+
+test("K139 MP-04 readback: the readback is the Elephant's duty, a Goldfish or Critic preflight line does not carry it", () => {
+  for (const role of ["goldfish", "critic"]) {
+    const { line } = runPreflightProcess({ [MP04_VARIABLE]: MP04_VALUE_SENTINEL }, ["--role", role]);
+    assert.equal(Object.hasOwn(line, "subagentModelEnv"), false, role);
+  }
+  assert.deepEqual(runPreflightProcess({ [MP04_VARIABLE]: MP04_VALUE_SENTINEL }, ["--role", "elephant"]).line.subagentModelEnv, { status: "set" });
+});

@@ -169,6 +169,8 @@ recommendation.
    confirmation on non-ready, unavailable, stale, malformed or drifted state.
    The ready envelope carries `modelRoleBootstrap` (`unavailable` is legal,
    absent is not); the session consumes it before the confirmation.
+   For the Elephant, the MP-04 check (`CLAUDE_CODE_SUBAGENT_MODEL` unset) is read from the
+   preflight line's `subagentModelEnv.status` (`unset` or `set`, never the value); `set` blocks the confirmation.
    The four required confirmation facts are: `runtime.status`, `profile/model`
    and `role`, `calibration/handover`, and `Verify availability`; each is
    digest-bound to the machine readback and printed before continuation. If
