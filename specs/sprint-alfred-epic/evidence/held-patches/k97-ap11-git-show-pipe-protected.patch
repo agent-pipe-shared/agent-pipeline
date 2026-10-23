@@ -1,0 +1,56 @@
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index bda7845b8..4ac8d4fe7 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -416,8 +416,25 @@ export function isBoundedSingleRg(argv, root, additionalRoots = []) {
+ // Pinned by lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs (AP10 admitted shapes, AP11 fail-closed shapes).
+ function isContainedGitShowObject(argv, root) {
+   const args = argv[0] === "--no-pager" ? argv.slice(1) : argv;
+-  if (args.length !== 2 || args[0] !== "show") return false;
+-  return isContainedGitObjectSpec(args[1], root);
++  if (args[0] !== "show") return false;
++  const spec = gitShowObjectOperand(args.slice(1));
++  return spec !== null && isContainedGitObjectSpec(spec, root);
++}
++
++// K97 (PO tile decision, row 15 of 2026-10-23, "Widen the grammar"): the operands after `show` are exactly ONE `<rev>:<path>` object
++// operand plus, optionally, ONE `--format=` / `--format=<fmt>` token (before or after the object) and ONE trailing `--`. <fmt> is a
++// plain token of letters, digits and `% . , : _ -` (a pretty-format placeholder string; no space, quote, `$`, backtick, `;` or
++// parenthesis). The format only shapes the output of the object read and names no path or write target. Returns the object operand,
++// or null when the operands are anything else (a second option, a repeated format, a `--` that is not last, an extra operand).
++// Shared with lib/guard/shell-grammar.mjs (areGitObjectSpecOperandsContained) so both lanes read the same shape.
++const GIT_SHOW_FORMAT_TOKEN = /^--format=[A-Za-z0-9%._,:-]*$/u;
++export function gitShowObjectOperand(operands) {
++  if (!Array.isArray(operands)) return null;
++  const rest = operands[operands.length - 1] === "--" ? operands.slice(0, -1) : [...operands];
++  const formats = rest.filter((token) => GIT_SHOW_FORMAT_TOKEN.test(token));
++  if (formats.length > 1) return null;
++  const objects = rest.filter((token) => !GIT_SHOW_FORMAT_TOKEN.test(token));
++  return objects.length === 1 ? objects[0] : null;
+ }
+ 
+ // The `<object>` half of the lane above, exported so the generic git-to-head pipeline (lib/guard/shell-grammar.mjs,
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index eca986aab..0eb3b6d06 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -9,7 +9,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { isAllowedPassiveReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
+ // Expose the policy-owned binding; shell decisions continue through the same policy function.
+ export { PASSIVE_READ_CREDENTIAL_ROOTS };
+-import { isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
++import { gitShowObjectOperand, isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM } from "./constants.mjs";
+ import { MAX_AND_CHAIN_SEGMENTS } from "./grammar-denials.mjs";
+ import { commandPath, isProjectWritePath, isRealpathedWithinBoundary, pathInside, rawReadCandidatePath } from "./path-containment.mjs";
+@@ -424,7 +424,9 @@ function areGitObjectSpecOperandsContained(subcommand, subargs, root) {
+     if (GIT_VALUE_FLAGS.has(subargs[i]) && /^[0-9]+$/u.test(subargs[i + 1] ?? "")) { i += 1; continue; }
+     operands.push(subargs[i]);
+   }
+-  return operands.length === 1 && isContainedGitObjectSpec(operands[0], root);
++  // K97: one object operand plus at most one plain `--format=<fmt>` and one trailing `--` (the shape is defined once, in the grammar module).
++  const spec = gitShowObjectOperand(operands);
++  return spec !== null && isContainedGitObjectSpec(spec, root);
+ }
+ 
+ function areGitPipelineOperandsContained(subargs, root, extraRoots) {

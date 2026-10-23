@@ -1,0 +1,70 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index ddff33cd9..424586d3b 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -26,7 +26,9 @@ const GENERATOR_MARKER_LINE = /^<!-- pipeline-briefing-generator:v1 sha256=([a-f
+ const GENERATOR_MARKER_ANY = /<!-- pipeline-briefing-generator:/gu;
+ 
+ const REQUIRED_STRINGS = Object.freeze(["id", "item", "agentType", "modelId", "check", "title", "ac", "goal"]);
+-const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale"]);
++const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec", "criterion", "budgetRationale", "reconNote"]);
++// D75 (A): where a recon note may live; the same rule validates the package field and the generator's --recon-note flag.
++export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
+ const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
+ const OPTIONAL_LISTS = Object.freeze(["newFiles", "forbidden", "stops"]);
+ const KNOWN_KEYS = new Set([...REQUIRED_STRINGS, ...OPTIONAL_STRINGS, ...REQUIRED_LISTS, ...OPTIONAL_LISTS, "estimatedToolCalls"]);
+@@ -46,6 +48,14 @@ const refuse = (code, message) => { throw new BriefingPackageRefusal(code, messa
+ const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
+ const nonEmpty = (value) => typeof value === "string" && value.trim() !== "";
+ 
++/** A recon note reference: a repository-relative file path under scratch/ or specs/ (no .., ., .git or backslash segments). */
++export function isReconNotePath(value) {
++  return typeof value === "string" && value.length > 0 && value.length <= 240
++    && !/[\\\0\r\n]/u.test(value) && !value.startsWith("/") && !/^[A-Za-z]:/u.test(value)
++    && RECON_NOTE_PREFIXES.some((prefix) => value.startsWith(prefix) && value.length > prefix.length)
++    && value.split("/").every((part) => part !== "" && part !== "." && part !== ".." && part !== ".git");
++}
++
+ /** Closed schema: unknown keys, missing fields and wrongly typed fields are refusals, never ignored. */
+ export function validateBriefingPackage(pkg) {
+   if (pkg === null || typeof pkg !== "object" || Array.isArray(pkg)) {
+@@ -64,6 +74,9 @@ export function validateBriefingPackage(pkg) {
+   for (const key of OPTIONAL_STRINGS) {
+     if (pkg[key] !== undefined && !nonEmpty(pkg[key])) refuse("DBG-PACKAGE-FIELD-TYPE", `package field "${key}" must be a non-empty string when present; repair: fill it or remove it`);
+   }
++  if (pkg.reconNote !== undefined && !isReconNotePath(pkg.reconNote)) {
++    refuse("DBG-PACKAGE-FIELD-TYPE", `package field "reconNote" must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")}; repair: write the recon note there and name its path, or remove the field`);
++  }
+   for (const key of [...REQUIRED_LISTS, ...OPTIONAL_LISTS]) {
+     const value = pkg[key];
+     if (value === undefined && OPTIONAL_LISTS.includes(key)) continue;
+@@ -102,7 +115,7 @@ export function budgetDecision(pkg, budget, deepBudget = null) {
+ /** Every path the package names: the write scope, the binding check and each file named in a targeted command. */
+ export function namedPackagePaths(pkg) {
+   const fromTargeted = pkg.targeted.flatMap((command) => [...command.matchAll(NAMED_PATH)].map((match) => match[1]));
+-  return [...new Set([...pkg.paths, pkg.check, ...fromTargeted])];
++  return [...new Set([...pkg.paths, pkg.check, ...fromTargeted, ...(pkg.reconNote === undefined ? [] : [pkg.reconNote])])];
+ }
+ 
+ /** A named path must exist unless the package declares it new; a wrong briefed path costs a whole dispatch. */
+@@ -142,6 +155,11 @@ export function resolveBriefingCalibration(root, deps = {}) {
+ 
+ const bullets = (list) => list.map((entry) => `- ${entry}`).join("\n");
+ 
++/** D75 (A): the recon note as one more context file; nothing at all unless the package carries the field. */
++function reconContextLine(pkg) {
++  return pkg.reconNote === undefined ? "" : `\n- \`${pkg.reconNote}\` — recon note: read it first; it corrects the premise of the earlier attempt that was stopped as wrong-premise.`;
++}
++
+ /** The skeleton's architecture context lines for field 2 (empty when no module owns a scope path). */
+ function architectureLines(skeleton) {
+   const after = skeleton.split("### 2. Context files\n\n")[1] ?? "";
+@@ -218,7 +236,7 @@ ${pkg.goal}
+ 
+ ### 2. Context files
+ 
+-${arch === "" ? "" : `${arch}\n`}${bullets(pkg.context)}
++${arch === "" ? "" : `${arch}\n`}${bullets(pkg.context)}${reconContextLine(pkg)}
+ 
+ ### 3. DoD checks
+ 
