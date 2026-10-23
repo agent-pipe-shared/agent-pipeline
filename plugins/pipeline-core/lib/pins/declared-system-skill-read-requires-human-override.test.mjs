@@ -22,17 +22,25 @@
 //   4. Precondition (case "baseline"): an undeclared credential read under the fake home must be REFUSED before any other
 //      case counts. Without step 3 the fake credentials are an ordinary host-visible path and a read is admitted (vacuous).
 //
-// FINDINGS (measured on this source, honest per point):
-//   * Outside-root, host-visible, non-credential files (any SKILL.md under the fake home, traversal and tilde spellings,
-//     lookalikes) are ADMITTED today by the generic isAllowedPassiveReadTarget rule (userVisibleHostPath), with no catalog
-//     binding at all. A1 therefore holds today by accident of the generic rule, not by a declared-skill authority.
-//   * The "unlisted/lookalike/traversal stays refused" half of A2 cannot hold without a host-catalog authority, and A3/A4
-//     need the authenticated host catalog producer. That producer is Codex-held and unavailable: NATIVE HOLD
-//     (owner Coordinator). Refusal-preserving points (credentials, transcript/skill-tree directory listings, session
-//     read roots) are real GREEN assertions.
+// RESTATED TO THE D96 PREMISE (QG-04; K86-PIN-RESTATEMENTS, 2026-10-23). PO decision D96 (2026-10-22): reading outside the
+// repository is generally allowed except credentials, runner-neutral, built in commit 5b3990a37 (passive-read-policy.mjs).
+// PO decision D108 (2026-10-22): the runner session and skill collections (.codex/sessions, .codex/skills, .claude/projects)
+// keep one private exception, recursive directory searches over them stay refused, "single files there read like any other
+// file outside". This pin used to hold A2 (unlisted/transcript/traversal refused), A3 and A4 behind a NATIVE HOLD skip
+// because they presumed a host-catalog authority as the ONLY route to the read; D96 removed that premise, so each case now
+// proves the ORIGINAL claim under the decided premise (the credential and directory-search intent of A2 stays asserted):
+//   * A1: a declared SKILL.md is read by its own physical name with no override and no catalog binding (generic rule).
+//   * A2: credentials, credential traversals, directory listings and RECURSIVE searches over the skill and session trees,
+//     and an alias that escapes into the skill tree stay refused; a single unlisted/lookalike/transcript file is a plain
+//     outside file and is now admitted (D96/D108), asserted as admitted so the premise change is visible.
+//   * A3: no catalog-bound read authority exists (sessionReadScopeRoots binds no skill path), so a replaced file identity
+//     cannot leave a stale authority behind and the read decision is made per call on the physical file.
+//   * A4: the route is real guard code, not a static skill allowlist or a synthetic catalog (source scan).
+// NOT PROVEN BY THIS PIN (stays with the item, deferred past 0.7.0, D57 Q3 / D63): the installed Codex host readback of the
+// actual route and the authenticated host-catalog identity half. No case here claims them.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -42,7 +50,6 @@ import { sessionReadScopeRoots } from "../guard/read-scope.mjs";
 // Host fact: fixtures live under the repository scratch/, never the OS temp dir.
 const SCRATCH_ROOT = fileURLToPath(new URL("../../../../scratch/", import.meta.url));
 const WIN = process.platform === "win32";
-const NATIVE_HOLD = "native hold: host-catalog producer unavailable (Codex-held); owner Coordinator";
 const fwd = (p) => p.replaceAll("\\", "/");
 const bash = (command) => ({ tool_name: "Bash", tool_input: { command } });
 const readTool = (file_path) => ({ tool_name: "Read", tool_input: { file_path } });
@@ -131,28 +138,46 @@ test("A2a credentials, transcript directory and the skill tree directory beside 
   refusedBoth(join(f.home, ".codex", "skills", ".system"), f.project);
 }));
 
-test("A2a-unlisted an undeclared sibling SKILL.md and a skill-looking lookalike path are refused (catalog binding)", {
-  skip: NATIVE_HOLD + "; today any host-visible non-credential file is admitted without catalog binding",
-}, () => withFixture((f) => {
+test("A2a-unlisted an undeclared sibling SKILL.md and a skill-looking lookalike path are plain outside files: admitted by their physical name (D96/D108), while a recursive search over the skill tree stays refused", () => withFixture((f) => {
+  // QG-04 restatement, bounded to D96 + D108 (PO 2026-10-22, built in 5b3990a37): the former "refused (catalog binding)" assertion
+  // presumed a host-catalog authority as the only route; D96 makes any non-credential single file outside the repository readable.
+  // The intent of the original claim (nothing beyond the named file is swept in) is kept by the recursive-search refusal below.
   const lookalike = join(f.base, "elsewhere", ".codex", "skills", ".system", "skill-creator", "SKILL.md");
   mkdirSync(join(lookalike, ".."), { recursive: true });
   writeFileSync(lookalike, "# not declared\n");
-  refusedBoth(f.other, f.project);
-  refusedBoth(lookalike, f.project);
+  for (const target of [f.other, lookalike]) {
+    for (const input of [bash(`cat ${fwd(target)}`), readTool(target)]) {
+      const r = verdict(input, f.project);
+      assert.equal(r.exitCode, 0, `${JSON.stringify(input)}\n${r.text}`);
+    }
+  }
+  const search = verdict(bash(`rg -n skill ${fwd(join(f.home, ".codex", "skills"))}`), f.project);
+  assert.equal(search.exitCode, 2, `recursive search over the skill tree (D108)\n${search.text}`);
+  assert.match(search.text, /GUARD-READ/u, "refused by the read boundary, not by an unrelated grammar rule");
 }));
 
-test("A2a-transcript a transcript file under the fake home is refused (catalog binding)", {
-  skip: NATIVE_HOLD + "; the transcript file is only protected as a directory listing today",
-}, () => withFixture((f) => {
-  refusedBoth(join(f.home, ".codex", "sessions", "rollout.jsonl"), f.project);
+test("A2a-transcript a transcript file under the fake home is a plain outside file (D96/D108) while a recursive search over the session tree stays refused", () => withFixture((f) => {
+  // QG-04 restatement, bounded to D108: "single files there read like any other file outside"; only recursive directory
+  // searches over .codex/sessions stay refused. The directory listing refusal is held by case A2a above.
+  const transcript = join(f.home, ".codex", "sessions", "rollout.jsonl");
+  for (const input of [bash(`cat ${fwd(transcript)}`), readTool(transcript)]) {
+    const r = verdict(input, f.project);
+    assert.equal(r.exitCode, 0, `${JSON.stringify(input)}\n${r.text}`);
+  }
+  const search = verdict(bash(`rg -n rollout ${fwd(join(f.home, ".codex", "sessions"))}`), f.project);
+  assert.equal(search.exitCode, 2, `recursive search over the session tree (D108)\n${search.text}`);
+  assert.match(search.text, /GUARD-READ/u, "refused by the read boundary, not by an unrelated grammar rule");
 }));
 
-test("A2b traversal and tilde spellings aimed at the skill tree are refused (catalog binding)", {
-  skip: NATIVE_HOLD + "; traversal/tilde spellings resolve to the same admitted host-visible file today",
-}, () => withFixture((f) => {
-  const traversal = "../home/.codex/skills/.system/skill-creator/SKILL.md";
-  const tilde = "~/.codex/skills/.system/skill-creator/SKILL.md";
-  for (const spelling of [traversal, tilde]) {
+test("A2b traversal and tilde spellings aimed at the skill tree reach the same physical declared file (admitted, D96); the same spellings aimed at credentials stay refused", () => withFixture((f) => {
+  // QG-04 restatement, bounded to D96: the spellings resolve to the declared file itself, which is readable by its own name.
+  // The refusal intent is kept on the credential file beside it, in the same two spellings, through both tools.
+  const skillSpellings = ["../home/.codex/skills/.system/skill-creator/SKILL.md", "~/.codex/skills/.system/skill-creator/SKILL.md"];
+  for (const spelling of skillSpellings) {
+    assert.equal(verdict(bash(`cat ${spelling}`), f.project).exitCode, 0, `cat ${spelling}`);
+    assert.equal(verdict(readTool(spelling), f.project).exitCode, 0, `Read ${spelling}`);
+  }
+  for (const spelling of ["../home/.ssh/id_rsa", "~/.ssh/id_rsa", "../home/.codex/auth.json", "~/.codex/auth.json"]) {
     assert.equal(verdict(bash(`cat ${spelling}`), f.project).exitCode, 2, `cat ${spelling}`);
     assert.equal(verdict(readTool(spelling), f.project).exitCode, 2, `Read ${spelling}`);
   }
@@ -173,20 +198,27 @@ test("A2c a symlink alias inside the project pointing at the skill tree stays re
   assert.equal(verdict(readTool(target), f.project).exitCode, 2);
 }));
 
-test("A3 a replaced or drifting catalog/file identity invalidates the read authority", {
-  skip: NATIVE_HOLD + "; no catalog-bound authority seam exists in sessionReadScopeRoots (A3 held)",
-}, () => withFixture((f) => {
+test("A3 no catalog-bound read authority exists to go stale: a skill catalog handed to the session read roots binds nothing, and a replaced or removed declared file is judged per call on the physical file (D96)", () => withFixture((f) => {
+  // QG-04 restatement, bounded to D96: the original claim (a drifting catalog/file identity must not leave a standing read
+  // authority) is met by there being no standing authority at all. The authenticated host-catalog identity half stays
+  // with the deferred Codex-host work (D57 Q3 / D63) and is not claimed here.
   const catalog = { skills: [{ name: "skill-creator", path: f.skill }] };
   const input = { tool_input: {}, skill_catalog: catalog, hostSkillCatalog: catalog };
-  const before = sessionReadScopeRoots(input);
-  assert.ok(before.some((r) => r.endsWith("SKILL.md")), "declared skill file is bound into the read authorities");
+  assert.deepEqual(sessionReadScopeRoots(input), [], "a skill catalog does not widen the session read roots");
   writeFileSync(f.skill, "# replaced content\n");
-  const after = sessionReadScopeRoots(input);
-  assert.ok(!after.some((r) => r.endsWith("SKILL.md")), "a replaced file identity invalidates the authority");
+  assert.deepEqual(sessionReadScopeRoots(input), [], "a replaced file identity leaves no authority behind");
+  assert.equal(verdict(readTool(f.skill), f.project).exitCode, 0, "the replaced declared file is still read by its own name");
+  rmSync(f.skill);
+  const gone = verdict(readTool(f.skill), f.project);
+  assert.doesNotMatch(gone.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, "a removed file is not refused as outside the root");
 }));
 
-test("A4 the actual host-catalog route exists in the read boundary source, not only a static allowlist", {
-  skip: NATIVE_HOLD + "; the authenticated host catalog entry/custody route is unavailable (A4 held)",
-}, () => {
-  assert.fail("held: requires the authenticated host catalog producer");
+test("A4 the admission route is real guard code, not a static skill allowlist or a synthetic catalog: neither read-boundary module names a skill, a SKILL.md or a catalog", () => {
+  // QG-04 restatement, bounded to D96: with no catalog route to prove, the checkable half of "a static allowlist or synthetic
+  // catalog alone is insufficient" is that the boundary carries none. The installed-host readback of the actual route is NOT
+  // proven here; it stays native-host and deferred past 0.7.0 (item triage 2026-10-17, D57 Q3 / D63).
+  for (const rel of ["../guard/read-scope.mjs", "../passive-read-policy.mjs"]) {
+    const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
+    assert.doesNotMatch(src, /SKILL\.md|skill-creator|skill_catalog|hostSkillCatalog/iu, `${rel} must not carry a skill allowlist or catalog`);
+  }
 });
