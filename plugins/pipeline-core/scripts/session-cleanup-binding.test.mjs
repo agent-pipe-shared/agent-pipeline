@@ -42,6 +42,7 @@ import {
   validateGovernanceRecoveryRetry,
 } from "../lib/governance-recovery-reconciliation-action.mjs";
 import { validateContinuityState } from "../lib/continuity-state.mjs";
+import { inspectSessionAuthorityRegistryRead } from "../lib/session-authority-registry.mjs";
 import {
   createLegacyLayoutFixture,
   gitRun,
@@ -57,6 +58,7 @@ import {
   createDetachedWorktree,
   listActiveSessionDescriptors,
   inspectSessionOwnerRuntime,
+  inspectSignedDescriptorCustodyRepository,
   loadSessionDescriptor,
   registerTemporaryIntent,
   retireSessionDescriptor,
@@ -1338,6 +1340,95 @@ test("neutral coordinator-close release is private, byte-stable, and replayable"
       "--plan-sha256", conflictingReceiptPlan.planSha256,
       "--activate",
     ]).output.mutated, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// K80 (extends D73 E5b to the private closed release): the registry member of the retired session is released BEFORE the
+// binding is deleted. A crash right after the unlink (the member already released, the binding gone) is recovered by
+// rerunning apply-recovery, and the next bound start finds a healed registry.
+test("private closed release: a crash after the member release and the binding unlink is replayed and a bound start succeeds", () => {
+  const root = neutralFixture("private-release-crash-after-member");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-private-crash"]);
+    const statePath = join(root, "project", "pipeline-state.json");
+    const active = JSON.parse(readFileSync(statePath, "utf8"));
+    mkdirSync(join(root, "specs"), { recursive: true });
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    const resultBytes = "private crash result\n";
+    const evidenceBytes = "private crash evidence\n";
+    writeFileSync(join(root, "specs", "private-crash-result.md"), resultBytes);
+    writeFileSync(join(root, "evidence", "private-crash-close.md"), evidenceBytes);
+    active.continuity.authority.result = {
+      path: "specs/private-crash-result.md",
+      sha256: createHash("sha256").update(resultBytes).digest("hex"),
+    };
+    active.continuity.queueHead = { ...active.continuity.queueHead, nextAction: "close", dispatch: null };
+    writeFileSync(statePath, `${JSON.stringify(active, null, 2)}\n`);
+    gitRun(root, ["config", "user.email", "fixture@example.invalid"]);
+    gitRun(root, ["config", "user.name", "Fixture"]);
+    gitRun(root, ["add", "project/pipeline-state.json", "specs/private-crash-result.md", "evidence/private-crash-close.md"]);
+    gitRun(root, ["commit", "-q", "-m", "fixture: private crash close preimage"]);
+    const descriptor = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    });
+    assert.equal(cleanupSession(root, descriptor, { allowAbsent: true }).ok, true);
+    retireSessionDescriptor(root, descriptor);
+    const closed = {
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: "2026-07-31T12:00:00.000Z",
+      closedFeatures: [{
+        id: active.activeFeature.id,
+        planPath: active.activeFeature.planPath,
+        phaseAtClose: active.activeFeature.phase,
+        closedAt: "2026-07-31T12:00:00.000Z",
+        closedBy: "close-coordinator",
+        forCommit: gitRun(root, ["rev-parse", "HEAD"]),
+        continuityClose: {
+          schema: "pipeline.continuity-close.v0", featureId: active.activeFeature.id,
+          expectedRevision: active.continuity.revision,
+          result: structuredClone(active.continuity.authority.result),
+          closeEvidence: {
+            path: "evidence/private-crash-close.md",
+            sha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+          },
+        },
+        coordinatorClose: {
+          schema: "pipeline.close-coordinator-reference.v1",
+          lifecycleId: "private-crash-release",
+          stateSha256: "a".repeat(64), revision: 2, phase: "feature-close-prepared",
+        },
+      }],
+    };
+    writeFileSync(statePath, `${JSON.stringify(closed, null, 2)}\n`);
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "release-closed-feature");
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    const repository = inspectSignedDescriptorCustodyRepository(root);
+    // The first start left its registry member armed and the binding present.
+    assert.equal(existsSync(bindingPath), true);
+
+    assert.throws(
+      () => applySessionCleanupRecovery({
+        rootDir: root,
+        expectedPlanSha256: plan.planSha256,
+        activate: true,
+        deps: { afterPrivateReleaseBindingUnlink() { throw new Error("simulated crash after binding unlink"); } },
+      }),
+      (error) => error?.code === "SESSION-CLEANUP-PRIVATE-RELEASE-WRITE" && error.committed === true,
+    );
+    assert.equal(existsSync(bindingPath), false);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+    const replay = invoke(["apply-recovery", "--repo", root, "--plan-sha256", plan.planSha256, "--activate"]).output;
+    assert.equal(replay.mutated, false);
+    writeFileSync(statePath, `${JSON.stringify(active, null, 2)}\n`);
+    const next = invoke(["start", "--repo", root, "--session", "session-after-private-crash"]);
+    assert.equal(next.output.code, "WT-SESSION-STARTED");
+    assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), { status: "readable" });
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "bound");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
