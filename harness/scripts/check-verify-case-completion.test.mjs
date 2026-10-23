@@ -125,6 +125,12 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // `node-test-single` (a regex literal containing a backtick hides its node:test calls from the mask), so it is registered
   // `legacy-process-only` and counted here (+1 classified, registry 357). It is also excluded from the R5 set below (registered after R5).
   // No existing row, assertion or digest is removed or weakened.
+  // Added 2026-10-23 (QG-04, own hunk; K118-SUITE-REGISTRATION-STEP): commit-message-policy-administrative-refusal-tests,
+  // gitleaks-scratch-clones-exclusion-tests, onboarding-init-machine-plane-reason-tests and
+  // pipeline-state-approve-push-chat-catalogue-repair-tests are Verify registrations of the decision round (K98, K103) that were never
+  // given a completion-registry row; the conservative classifier reports each `node-test-single`, so each is registered
+  // `legacy-process-only` and counted here (+4 classified, registry 361), and excluded from the R5 set below (registered after R5).
+  // No existing row, assertion or digest is removed or weakened.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",33],
@@ -141,6 +147,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["claude-task-output-read-scope-tests","plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs","top-level-assertions",20],
     ["claude-task-output-scope-posttool-tests","plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs","top-level-assertions",9],
     ["clone-hook-readiness-rollback-tests","plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs","top-level-assertions",86],
+    ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",60],
     ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",158],
     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",18],
@@ -164,6 +171,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["git-null-device-sites-tests","plugins/pipeline-core/lib/git-null-device-sites.test.mjs","top-level-assertions",14],
     ["git-stash-readonly-tests","plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs","top-level-assertions",7],
     ["gitleaks-repair-ignore-cli-tests","plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs","top-level-assertions",2],
+    ["gitleaks-scratch-clones-exclusion-tests","plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs","node-test-single",5],
     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
     ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",140],
@@ -178,11 +186,13 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",52],
     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],
     ["onboarding-greenfield-walk-tests","plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs","top-level-assertions",16],
+    ["onboarding-init-machine-plane-reason-tests","plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs","node-test-single",4],
     ["passive-read-credential-follow-tests","plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs","top-level-assertions",23],
     ["phoenix-authority-revision-installed-package-tests","plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs","top-level-assertions",10],
     ["pin-denial-names-a-diagnosis-it-refuses-tests","plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs","top-level-assertions",43],
     ["pin-devplan-lane-admits-the-producer-materialize-step-tests","plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs","top-level-assertions",9],
     ["pin-installed-design-trailer-example-is-rejected-by-git-guard-tests","plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs","node-test-single",60],
+    ["pipeline-state-approve-push-chat-catalogue-repair-tests","plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs","node-test-single",13],
     ["plan-reopen-current-action-tests","harness/scripts/plan-reopen-current-action.test.mjs","top-level-assertions",27],
     ["project-onboarding-foreign-residue-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs","top-level-assertions",13],
     ["project-onboarding-foreign-residue-unit-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs","top-level-assertions",15],
@@ -220,7 +230,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length);
   assert.equal(classified.length, result.vulnerableCount,
     "all classified Verify registrations must have a completion-registry row");
-  assert.equal(result.registryCount, 357);
+  assert.equal(result.registryCount, 361);
   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
@@ -233,6 +243,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "architecture-prospective-materialization-tests",
     "bootstrap-acknowledgement-mode-tests",
     "clone-hook-readiness-rollback-tests",
+    "commit-message-policy-administrative-refusal-tests",
     "critic-course-admission-tests",
     "critic-dispatch-preflight-tests",
     "critic-generic-batch-tests",
@@ -251,6 +262,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "git-null-device-sites-tests",
     "git-stash-readonly-tests",
     "gitleaks-repair-ignore-cli-tests",
+    "gitleaks-scratch-clones-exclusion-tests",
     "governance-scope-win32-acl-tests",
     "guard-devplan-design-approval-v7-tests",
     "guard-dispatch-budget-checkpoint-tests",
@@ -263,12 +275,14 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "native-goldfish-host-state-fanout-tests",
     "native-platform-process-observer-tests",
     "onboarding-greenfield-walk-tests",
+    "onboarding-init-machine-plane-reason-tests",
     "passive-read-credential-follow-tests",
     "phoenix-authority-revision-installed-package-tests",
     "pin-denial-names-a-diagnosis-it-refuses-tests",
     "pin-devplan-lane-admits-the-producer-materialize-step-tests",
     "pin-installed-design-trailer-example-is-rejected-by-git-guard-tests",
     "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
+    "pipeline-state-approve-push-chat-catalogue-repair-tests",
     "plan-reopen-current-action-tests",
     "project-onboarding-foreign-residue-tests",
     "project-onboarding-foreign-residue-unit-tests",

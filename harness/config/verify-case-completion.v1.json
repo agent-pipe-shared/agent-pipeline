@@ -317,6 +317,12 @@
       "disposition": "required"
     },
     {
+      "name": "commit-message-policy-administrative-refusal-tests",
+      "path": "plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
       "name": "commit-message-policy-tests",
       "path": "plugins/pipeline-core/lib/commit-message-policy.test.mjs",
       "disposition": "required"
@@ -698,6 +704,12 @@
       "name": "gitleaks-repair-ignore-cli-tests",
       "path": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs",
       "disposition": "required"
+    },
+    {
+      "name": "gitleaks-scratch-clones-exclusion-tests",
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
       "name": "goldfish-antigravity-host-tests",
@@ -1212,6 +1224,12 @@
       "disposition": "required"
     },
     {
+      "name": "onboarding-init-machine-plane-reason-tests",
+      "path": "plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
       "name": "p3b-runner-conformance-tests",
       "path": "plugins/pipeline-core/lib/p3b-runner-conformance.test.mjs",
       "disposition": "legacy-process-only",
@@ -1285,6 +1303,12 @@
     {
       "name": "pipeline-state-approve-announce-tests",
       "path": "plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "pipeline-state-approve-push-chat-catalogue-repair-tests",
+      "path": "plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },

@@ -3766,6 +3766,48 @@
       "file": "scripts/run-parallel.test.mjs",
       "invariantPinned": "The parallel candidate runner runs the exact committed HEAD of a clean source, refuses a source with an uncommitted new case unless told to leave it out, and survives a rewritten history in its reused worker clone",
       "nonOverlapNote": "Unique test suite for scripts/run-parallel.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
+    },
+    {
+      "name": "commit-message-policy-administrative-refusal-tests",
+      "file": "plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs",
+      "invariantPinned": "The commit-message policy refusal for an administrative commit names Dispatch: stage-0 (elephant) as the admitted trailer form (K98 row 7/7)",
+      "nonOverlapNote": "Unique case: the administrative-trailer refusal text of the commit-message policy"
+    },
+    {
+      "name": "dispatch-scope-overlap-tests",
+      "file": "plugins/pipeline-core/lib/dispatch-scope-overlap.test.mjs",
+      "invariantPinned": "A dispatch batch or a running dispatch whose declared write scope overlaps another is refused in enforce mode and admitted with a warning in shadow mode, a read-only dispatch overlaps nothing, and the hook keeps no import cycle with the dispatch-record liveness reader (K104)",
+      "nonOverlapNote": "Unique cases: the write-scope overlap check, its enforce/shadow mode and the running-dispatch reader"
+    },
+    {
+      "name": "onboarding-init-machine-plane-reason-tests",
+      "file": "plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs",
+      "invariantPinned": "The machine-plane refusal of onboarding-init names the unusable home directory and the repair (K98 row 1/2)",
+      "nonOverlapNote": "Unique case: the machine-plane refusal reason text of onboarding-init"
+    },
+    {
+      "name": "pipeline-state-approve-push-chat-catalogue-repair-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs",
+      "invariantPinned": "A chat-mode approve-push with a catalogue is refused with a typed reason and a runnable repair instead of a pointer to an inspect that finds nothing (K103 D1)",
+      "nonOverlapNote": "Unique case: the chat-mode catalogue refusal and its repair in pipeline-state approve-push"
+    },
+    {
+      "name": "clone-hook-readiness-refresh-tests",
+      "file": "plugins/pipeline-core/scripts/clone-hook-readiness.refresh.test.mjs",
+      "invariantPinned": "Applying the clone hook readiness installs a missing hook and refreshes a stale one in the same run, a failed refresh is a typed non-ready result, and nothing stale means no refresh call (K103)",
+      "nonOverlapNote": "Unique cases: the hook refresh half of clone-hook-readiness apply"
+    },
+    {
+      "name": "commit-pipeline-owned-tests",
+      "file": "plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs",
+      "invariantPinned": "The push-approval record refusal names the fold and the admitted trailer form, and a refusal for any other foreign file keeps the plain reason (K98 row 7/7)",
+      "nonOverlapNote": "Unique cases: the pipeline-owned commit refusal reasons for foreign files"
+    },
+    {
+      "name": "gitleaks-scratch-clones-exclusion-tests",
+      "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs",
+      "invariantPinned": "The gitleaks scan source excludes scratch/clones and nothing else (K98 row 13)",
+      "nonOverlapNote": "Unique cases: the scratch/clones exclusion of the gitleaks adapter scan source"
     }
   ]
 }
