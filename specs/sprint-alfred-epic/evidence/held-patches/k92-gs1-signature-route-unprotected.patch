@@ -1,0 +1,150 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 847d74bac..fe75fb22e 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -883,6 +883,28 @@ check("Antigravity signature guidance assigns only sign-intent to the external P
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// PO decision 2026-10-23 (row 29): the signed-override route for pipeline.user.yaml must not become
++// an admission. Without an armed capability an agent widening (signature -> chat) is still denied
++// and nothing is written; the route only names the human ceremony that could authorize it.
++check("Antigravity GS-1 widening of pipeline.user.yaml stays denied without an armed capability (k92 negative control)", () => {
++  const root = readyLifecycleFixture("signature");
++  try {
++    const sourcePath = join(root, "pipeline.user.yaml");
++    const before = readFileSync(sourcePath, "utf8");
++    assert.match(before, /push_approval: "signature"/u);
++    const res = decision(run({
++      toolCall: {
++        name: "replace_file_content",
++        args: { TargetFile: sourcePath, TargetContent: 'push_approval: "signature"', ReplacementContent: 'push_approval: "chat"' },
++      },
++    }, root));
++    assert.equal(res.decision, "deny", "a widening without a capability must not be admitted");
++    assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
++    assert.match(res.reason, /authorize-by-signature --repo/u, "the repair is a human signature, not an agent action");
++    assert.equal(readFileSync(sourcePath, "utf8"), before, "the denied edit left pipeline.user.yaml untouched");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ check("Antigravity pretool guard blocks agent self-approval for approve-push", () => {
+   const root = fixture();
+   const res = decision(run({
+diff --git a/plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs b/plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs
+index 59aca7145..7d0f911b4 100644
+--- a/plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs
++++ b/plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs
+@@ -126,22 +126,16 @@ test("RED: a commit refused by the git pre-commit hook seeds a human-override re
+ });
+ 
+ // ---------------------------------------------------------------------------------------------
+-// PO-SIGNED CONFIGURATION OVERRIDE (last open clause of the item, PO decision 2026-10-17): the
+-// item offers two ways to close "override cancelled by the system it unblocks" -- the override
+-// becomes a durable layer later migrations respect, OR the override route is refused up front
+-// with the real alternative. The PO chose the second. So a signed override of pipeline.user.yaml
+-// must never be OFFERED: the denial is recorded as a typed refusal, no signing request is
+-// seeded, and the human is told the real alternative (a human edit committed to the repository)
+-// instead of burning a signature on a write the lifecycle later rewrites back.
+-//
+-// The refusal belongs where an override is first accepted: eligibility() in
+-// plugins/pipeline-core/lib/human-guard-override.mjs, which today classes pipeline.user.yaml as
+-// "writer-owned-project-policy-emergency" (eligible). That file is protected, so the fix is the
+-// signature-bound patch scratch/patches/ALF-C-AC258-REF.patch; the first case below is RED on the
+-// live tree until that patch lands, and the second proves the patch on a scratch mirror.
++// PO-SIGNED CONFIGURATION OVERRIDE (last open clause of the item). The 2026-10-17 decision refused
++// a signed override of pipeline.user.yaml up front (typed HGO-NARROWER-USER-CONFIG-REFUSED, nothing
++// seeded). The PO rule of 2026-10-23 (decision row 29: "every deadlock must stay repairable by
++// signature in the user repo") supersedes it: these two cases are RESTATED (QG-04, bounded
++// justification = that decision) to pin the opposite contract. pipeline.user.yaml is an ordinary
++// protected path again: a denial of an agent edit seeds a signable request bound to the exact tool
++// input, so the human can repair a deadlock by signature. The control (a different protected
++// configuration path) is kept unchanged, and the widening itself is still not admitted without a
++// human-armed capability (antigravity-pretool-guard.test.mjs, k92 negative control).
+ // ---------------------------------------------------------------------------------------------
+-const USER_CONFIG_REFUSAL_CODE = "HGO-NARROWER-USER-CONFIG-REFUSED";
+-const AC258_PROTECTED_PATCH = join(REPO_ROOT, "scratch", "patches", "ALF-C-AC258-REF.patch");
+ const USER_CONFIG_CASE_TIMEOUT_MS = 600_000; // own constant: the shared CASE_TIMEOUT_MS below is still in its TDZ when these cases register
+ 
+ /** Own `git init`, GIT_CEILING_DIRECTORIES on every git call, a born HEAD and an edited-routing yaml. */
+@@ -157,15 +151,15 @@ function buildUserConfigFixture() {
+   return root;
+ }
+ 
+-async function assertUserConfigOverrideRefusedUpFront(pluginRoot) {
++async function assertUserConfigOverrideOffered(pluginRoot) {
+   const hgo = await import(pathToFileURL(join(pluginRoot, "lib", "human-guard-override.mjs")).href);
+   const root = buildUserConfigFixture();
+   try {
+     const edited = 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\nmodel_routes:\n  goldfish: "edited"\n';
+     const writeInput = { file_path: "pipeline.user.yaml", content: edited };
+ 
+-    // Control: other protected configuration keeps its existing eligible class, so the refusal
+-    // below is specific to pipeline.user.yaml and not a blanket change of the override planner.
++    // Control: other protected configuration keeps its existing eligible class; pipeline.user.yaml
++    // below must be classed exactly like it (eligible, no typed refusal).
+     const control = hgo.previewHumanGuardRecovery({ rootDir: root, pluginRoot, toolName: "Write", toolInput: { file_path: ".claude/settings.json", content: "{}\n" } });
+     assert.equal(control, null, "control: a different protected configuration path must stay eligible for a signed override");
+ 
+@@ -176,51 +170,35 @@ async function assertUserConfigOverrideRefusedUpFront(pluginRoot) {
+     ];
+     for (const [toolName, toolInput] of attempts) {
+       const route = hgo.previewHumanGuardRecovery({ rootDir: root, pluginRoot, toolName, toolInput });
+-      assert.notEqual(route, null, `${toolName} of pipeline.user.yaml is still eligible for a PO-signed override (no up-front refusal)`);
+-      assert.equal(route.status, "narrower-recovery-required", `${toolName}: ${JSON.stringify(route).slice(0, 300)}`);
+-      assert.equal(route.code, USER_CONFIG_REFUSAL_CODE, `${toolName}: the typed refusal code`);
+-      assert.match(route.nextAction.action.requiredChange, /human edit committed to the repository/u, `${toolName}: the real alternative is named`);
+-      assert.match(route.nextAction.limitation, /stale projection/u, `${toolName}: the reason is named`);
++      assert.equal(route, null, `${toolName} of pipeline.user.yaml must stay eligible for a PO-signed override, got ${JSON.stringify(route)?.slice(0, 300)}`);
+     }
+ 
+-    // The recorded denial (what a session actually triggers) is the same typed refusal and seeds
+-    // nothing: no request, hence nothing for the human to sign.
++    // The recorded denial (what a session actually triggers) is planned and seeds exactly one
++    // signable request bound to the exact tool input: the human can repair the deadlock by signature.
+     const recorded = hgo.recordHumanGuardDenial({
+       rootDir: root, pluginRoot, toolName: "Write", toolInput: writeInput,
+       denials: [{ guard: "guard-gate-strength.mjs", reason: "GS-1: fixture" }],
+     });
+-    assert.equal(recorded.status, "narrower-recovery-required", `a PO-signed override must not be planned: ${JSON.stringify(recorded).slice(0, 300)}`);
+-    assert.equal(recorded.code, USER_CONFIG_REFUSAL_CODE);
+-    assert.equal(recorded.requestSha256, undefined, "no signable request exists");
++    assert.equal(recorded.status, "planned", `a PO-signed override must be planned: ${JSON.stringify(recorded).slice(0, 300)}`);
++    assert.match(recorded.requestSha256, /^[a-f0-9]{64}$/u, "a signable request exists");
+     const commonDir = fxMust(fxGit(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]), "git-common-dir");
+-    assert.deepEqual(jsonFiles(join(commonDir, "agent-pipeline", "human-guard-overrides", "requests")), [], "nothing was seeded for the human to sign");
++    assert.equal(jsonFiles(join(commonDir, "agent-pipeline", "human-guard-overrides", "requests")).length, 1, "one request was seeded for the human to sign");
+   } finally { rmSync(root, { recursive: true, force: true, maxRetries: 3 }); }
+ }
+ 
+-test("RED: [needs protected patch ALF-C-AC258-REF] a PO-signed pipeline.user.yaml override is refused up front with a typed reason, not left to later migrations", { timeout: USER_CONFIG_CASE_TIMEOUT_MS }, async () => {
+-  await assertUserConfigOverrideRefusedUpFront(PLUGIN_ROOT);
++test("a PO-signed pipeline.user.yaml override stays offered (decision row 29: every deadlock is repairable by signature)", { timeout: USER_CONFIG_CASE_TIMEOUT_MS }, async () => {
++  await assertUserConfigOverrideOffered(PLUGIN_ROOT);
+ });
+ 
+-test("mirror proof: the staged protected patch ALF-C-AC258-REF yields the up-front typed refusal on a scratch copy of the plugin", {
++test("mirror proof: a scratch copy of the live plugin offers the same signed-override route for pipeline.user.yaml", {
+   timeout: USER_CONFIG_CASE_TIMEOUT_MS,
+-  skip: existsSync(AC258_PROTECTED_PATCH) ? false : "the protected patch is not staged under scratch/patches (nothing to prove)",
+ }, async () => {
+   mkdirSync(FIXTURES, { recursive: true });
+   const mirror = mkdtempSync(join(FIXTURES, "mirror-"));
+   try {
+     const pluginCopy = join(mirror, "plugins", "pipeline-core");
+     cpSync(PLUGIN_ROOT, pluginCopy, { recursive: true });
+-    // The ceiling is the mirror's parent, so this is never resolved against the project repository.
+-    const apply = (args) => spawnSync("git", ["apply", ...args, AC258_PROTECTED_PATCH], {
+-      cwd: mirror, encoding: "utf8", shell: false, env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURES },
+-    });
+-    const applied = apply([]);
+-    if (applied.status !== 0) {
+-      // Once the patch has landed in the live tree it no longer applies forward; then it must apply in reverse.
+-      const reverse = apply(["--reverse", "--check"]);
+-      assert.equal(reverse.status, 0, `patch neither applies nor is already present: ${applied.stderr} | ${reverse.stderr}`);
+-    }
+-    await assertUserConfigOverrideRefusedUpFront(pluginCopy);
++    await assertUserConfigOverrideOffered(pluginCopy);
+   } finally { rmSync(mirror, { recursive: true, force: true, maxRetries: 3 }); }
+ });
+ 
