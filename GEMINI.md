@@ -19,12 +19,12 @@ establish it: confirm that Antigravity's own command tool can resolve and run
 treat hook readiness as unknown; correct the host environment and fully restart
 Antigravity before relying on its hooks. Do not use an unattended permission
 bypass to obtain the readback. The per-platform pre-launch check is in the
-[Agy procedure](SETUP.md#antigravity-agy-workspace-local-binding).
+[Antigravity (Agy) procedure](SETUP.md#antigravity-agy-workspace-local-binding),
+where "Agy" is defined.
 
 ### Antigravity Installation (Workspace-Local)
 
-Antigravity uses a workspace registration rather than a global plugin install
-command. From the project root:
+Antigravity registers the plugin per workspace. From the project root:
 
 1. Follow the [Agy installation and upgrade procedure](SETUP.md#antigravity-agy-workspace-local-binding)
    to obtain an approved plugin directory from the official GitHub repository
@@ -55,6 +55,5 @@ hold a stale copy that shadows the registered plugin. Keep a single source and
 refresh with `node ".../plugins/pipeline-core/install-agy.mjs" --refresh`: it
 prints the plan and asks first (`--yes` only together with `--refresh`).
 Then restart Agy and read the session lock; `agy plugin list` and
-`plugins.json` are not proof of what is loaded. A global install is inert
-outside opted-in repositories, except the destructive-git protection. The
+`plugins.json` are not proof of what is loaded. The
 full procedure is in the [Agy section of SETUP](SETUP.md#antigravity-agy-workspace-local-binding).
