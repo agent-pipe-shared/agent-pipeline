@@ -245,3 +245,9 @@ Text sweep K54-BACKLOG-TEXT-SWEEP-1. Superseded sentences above, kept as history
 - Not changed: the acceptance needs a real Codex/WSL Feature greenfield run on an installed candidate with host export
   approval (host session). The Triage block of this item is empty and is left empty: no recorded decision in the
   repository settles it as a whole.
+
+## Triage 2026-10-23 (PO decision)
+
+Keep open. Acceptance is a real Codex/WSL Feature greenfield run on an installed candidate with host export approval (the PO's Greenfield test); no further agent work is owed before that run.
+
+Source: PO decision tiles of 2026-10-23, batch 10 (`specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md`, row 16 triage).

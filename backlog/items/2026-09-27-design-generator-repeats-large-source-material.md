@@ -159,3 +159,9 @@ Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history
   binding" header contradiction (not re-checked in this sweep).
 - Triage: the block under "## Triage" is a bare heading and no repository decision with an id settles this item, so it is
   left as is. No status change is made here.
+
+## Triage 2026-10-23 (PO decision)
+
+The generated-banner part is built (ceremony C18, `onboarding-continuity.mjs` staging banner) and its pin turns green when C18 lands. The cross-call compaction of `pendingAsks` (it needs a persisted shown-digest, a design decision) moves to 0.7.x and is split into its own backlog item when the PO opens it (agents do not create items). The real-host output-budget turn with the 14 KB input stays an open acceptance run (owner native-host).
+
+Source: PO decision tiles of 2026-10-23, batch 10 (`specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md`, row 16 triage).

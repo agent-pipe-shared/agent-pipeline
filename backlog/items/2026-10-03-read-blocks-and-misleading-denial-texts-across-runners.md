@@ -98,3 +98,9 @@ superseded:
   (no `todo` marker; it asserts the Codex denial carries `GUARD-READ-COMMAND-UNSUPPORTED` and does not contain "use the
   Read, Glob or Grep tools"). M7 is unchanged by this entry and is still open as written; the Triage block above stays
   empty because this sweep located no decision that settles the item as a whole.
+
+## Triage 2026-10-23 (PO decision)
+
+Close as built, except the host clause. M7 (own typed code `GUARD-READ-CREDENTIAL-TARGET` with the path named as the cause and a repair) and M5 (the Antigravity native read tools and the Claude native Read/Grep/Glob lane run the credential check) are built in the held patches of the 2026-10-23 decision round (ceremony rows C32). The WSL UNC exact-file case U3 stays a typed Linux-host skip and is an open acceptance run (owner native-host).
+
+Source: PO decision tiles of 2026-10-23, batch 10 (`specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md`, row 16 triage).
