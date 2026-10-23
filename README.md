@@ -5,28 +5,38 @@ reviewable, traceable, and measurable. It turns a change into a bounded task,
 machine evidence, independent review, and a durable record that a team can
 inspect later.
 
+**The problem.** Teams with audit obligations often need more than a chat
+transcript or a claim that a test passed. They need a repeatable delivery
+record: who made a decision, what was checked against which candidate commit,
+what was refused, and what remained outside the evidence. Agent-Pipeline supplies that
+shared method without making it a compliance certification or a claim about
+every host's enforcement.
+
 **At a glance, Agent-Pipeline helps you to:**
 
 - **Specify what can be checked:** turn an idea into a scoped brief and, when its
-  stakes warrant it, a PRD or spec with EARS-style acceptance criteria linked
-  to tests and review.
+  stakes warrant it, a PRD or spec with
+  [EARS-style](docs/README.md#terms-used-across-these-documents) acceptance
+  criteria linked to tests and review.
 - **Preserve architecture across sessions:** assess the impact of a change,
   record significant choices in ADRs and, in the forthcoming `0.7.0`
-  line, use an OKF-based, machine-readable map and architecture-fitness checks
-  where the project has adopted them.
+  line, use an [OKF-based](docs/README.md#terms-used-across-these-documents),
+  machine-readable map and architecture-fitness checks where the project has
+  adopted them.
 - **Keep agent work bounded:** split implementation into fresh-context tasks
   with explicit scope, handovers, and role/model effort matched to the work.
 - **Verify the actual candidate:** apply configured project policies and
   Git/write guardrails, then run tests and security checks against the exact
-  candidate. Depending on the project's setup, these cover secret detection,
+  candidate commit. Depending on the project's setup, these cover secret detection,
   dependency vulnerability scanning, static analysis, and license checks;
   optional SBOM and provenance checks make supply-chain inputs inspectable.
 - **Separate review from authority:** obtain independent Critic findings,
-  while people retain plan acceptance, go/no-go, and approval of consequential
-  external actions.
-- **Leave an inspectable trail:** retain candidate-bound receipts, decision
-  records, and offline audit bundles; missing or unavailable checks stay
-  visible rather than becoming an implied pass.
+  while people retain plan acceptance, final acceptance where calibration or
+  stakes require it, and approval of consequential external actions.
+- **Leave an inspectable trail:** retain receipts bound to the candidate commit,
+  decision records, and optional offline audit bundles of a
+  [Feature Package](docs/README.md#terms-used-across-these-documents); missing
+  or unavailable checks stay visible rather than becoming an implied pass.
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
@@ -36,16 +46,9 @@ inspect later.
 > optional reference.
 >
 > **Documentation line `0.7.0`:** until it is released, keep the approved
-> GitHub-distributed version you already use; a maintainer's local candidate is
-> not an installation source. Release status: [overview](docs/overview.md).
-
-## The problem
-
-Teams with audit obligations often need more than a chat transcript or a claim
-that a test passed. They need a repeatable delivery record: who made a decision,
-what was checked against which candidate, what was refused, and what remained
-outside the evidence. Agent-Pipeline supplies that shared method without making
-it a compliance certification or a claim about every host's enforcement.
+> GitHub-distributed version you already use; a maintainer's local release
+> candidate is not an installation source. Release status:
+> [overview](docs/overview.md).
 
 ## What you get
 
@@ -54,11 +57,12 @@ Four deliberately separated roles carry the model:
 <!-- capability:human-accountability-roles -->
 <a id="capability-human-accountability-roles"></a>
 
-- **Product Owner (you)** — the human gate. Sets direction, reviews outcomes, holds
-  final sign-off.
+- **Product Owner (PO, you)** — the human gate. Sets direction, reviews outcomes and,
+  where calibration or stakes require it, gives final acceptance of the delivered
+  candidate commit.
 - **Elephant** — the role name of the Coordinator: the long-lived main session that
   dispatches work. Turns your intent into a spec, breaks it into small tasks,
-  dispatches them, and prepares a go/no-go recommendation for the Product Owner.
+  dispatches them, and prepares a recommendation for the PO.
 - **Goldfish** — a fresh-context implementor subagent. Owns one complete, independently
   checkable acceptance criterion or backlog outcome: analysis, test cases, code,
   targeted checks and fixes stay in the same context. Reports actual evidence.
@@ -83,10 +87,17 @@ Around those roles:
   command, and its exit code — never a model-formulated claim that something
   "should work."
 
-> **What you can inspect:** a candidate-bound Verify receipt, security-scan
-> status, review and approval records where the project requires them, and a
-> validated Feature Package or offline Audit Bundle. These artifacts support an
-> audit trail; they do not certify compliance or replace an auditor. Start with
+<!-- capability:architecture-adoption-and-fitness -->
+<a id="capability-architecture-adoption-and-fitness"></a>
+
+- **Architecture adoption** — the architecture capability of the forthcoming
+  `0.7.0` line is described, with its adoption route for an existing repository,
+  in [Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
+
+> **What you can inspect:** beyond the receipts and bundles above, the
+> security-scan status and the review and approval records where the project
+> requires them. These artifacts support an audit trail; they do not certify
+> compliance or replace an auditor. Start with
 > [audit and evidence](docs/audit-and-evidence.md).
 
 > **Measurement boundary:** [measurement guidance](docs/cost-and-measurement.md)
@@ -97,7 +108,7 @@ Around those roles:
 
 ```mermaid
 flowchart LR
-    PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(Coordinator)"]
+    PO["PO<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(Coordinator)"]
     Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
     Goldfish -->|"evidence"| Gates["Targeted checks<br/>(tests, security, lint)"]
     Gates -.->|"fail"| Goldfish
@@ -105,17 +116,10 @@ flowchart LR
     Critic -->|"findings"| Elephant
     Critic -->|"reviewed candidate"| FullVerify["Full Verify<br/>(release qualification)"]
     FullVerify -->|"candidate evidence"| Elephant
-    Elephant -->|"go/no-go recommendation"| PO
+    Elephant -->|"recommendation"| PO
 ```
 
-<a id="capability-architecture-adoption-and-fitness"></a>
-<!-- capability:architecture-adoption-and-fitness -->
-
-The architecture capability of the forthcoming `0.7.0` line is described, with
-its adoption route for an existing repository, in
-[Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
-
-**The front door: optional design pre-stage.** There is deliberately no
+**Optional design pre-stage.** There is deliberately no
 mandatory step before the pipeline: idea → optional design brainstorming with
 any chat AI → requirements export → feeds the pipeline. You can always skip it;
 the guide, prompt and export template are under
@@ -133,8 +137,7 @@ choices shape that work:
   0 / 1 / 2 in [Pipeline Flow](PIPELINE_FLOW.md#2-decide-the-amount-of-design-and-review)
 - **Governance mode per rule set** — advisory / enforcing / off
 - **Work profile per topic** — epic / feature / mini (model and effort per
-  phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
-  bootstrap and consultation is on demand)
+  phase and runner are set in `pipeline.user.yaml`)
 
 **Risk is assessed separately.** Security, architecture, guardrail, irreversible,
 costly or externally visible impact can require stronger independent review
@@ -165,7 +168,7 @@ For the normative contract, read [`docs/operating-model.md`](docs/operating-mode
 ### Maintainer and runtime reference
 
 Source maintainers can find checkout commands and the V3 authority sequence in
-[Maintain a shared pipeline source](SETUP.md). Supported runner integrations
+[Maintain a shared pipeline source](SETUP.md#b-maintain-a-shared-pipeline-source-occasional). Supported runner integrations
 can enforce configured guards, while the methodology remains portable; see
 [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for current boundaries
 and setup requirements.
