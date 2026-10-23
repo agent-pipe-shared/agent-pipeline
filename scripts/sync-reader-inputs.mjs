@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: SUL-1.0
+// Purpose: keep the hash-pinned plugin mirrors of the three Reader inputs equal to their canonical sources, and keep the pins that guard them consistent.
+// Usage:   node scripts/sync-reader-inputs.mjs [<root>] [--check]     (<root> defaults to "."; a clone path such as scratch/clones/<name> works too)
+//          --check  writes nothing; exits 1 and names every drift. Default mode rewrites the mirrors, the manifest and the two pins.
+//          Run it AFTER the last commit that changes a source, then commit its output (the pin file is a kernel path, the operator commits it).
+// Inputs:  <root>/docs/product-capability-inventory.json, <root>/governance/observation-doc-governance.json, <root>/harness/reader-review-protocol.md,
+//          <root>/plugins/pipeline-core/skills/reader-review/SKILL.md (read only, its hash is the manifest's policySha256).
+// Outputs: <root>/plugins/pipeline-core/reader-inputs/{product-capability-inventory.json,observation-doc-governance.json,reader-review-protocol.md,manifest.json}
+//          and, in <root>/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs, the `inputHashes` constant and the manifest hash in installedInputs().
+//          NOT read-only (except with --check). The policySha256 constant is only compared, never rewritten: a changed SKILL.md is a decision, not a sync.
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+if (args.includes("-h") || args.includes("--help")) { console.log("usage: node scripts/sync-reader-inputs.mjs [<root>] [--check]   (--check writes nothing; default mode rewrites the Reader-input mirrors, the manifest and their pins)"); process.exit(0); }
+const check = args.includes("--check");
+const root = args.find((a) => !a.startsWith("--")) ?? ".";
+const plugin = "plugins/pipeline-core";
+const lib = `${plugin}/lib/doc-reader-documentation-snapshot.mjs`;
+const sha = (b) => createHash("sha256").update(b).digest("hex");
+const read = (p) => readFileSync(`${root}/${p}`);
+const readOr = (p) => { try { return read(p); } catch { return null; } };
+// key -> canonical source path (same keys and order as `inputPaths` in the snapshot module)
+const inputs = [
+  ["capabilityInventorySha256", "docs/product-capability-inventory.json"],
+  ["governanceSha256", "governance/observation-doc-governance.json"],
+  ["readerProtocolSha256", "harness/reader-review-protocol.md"],
+];
+const mirrorOf = (src) => `${plugin}/reader-inputs/${src.split("/").at(-1)}`;
+const drift = [];
+const writes = [];
+const hashes = {};
+const manifestInputs = {};
+for (const [key, src] of inputs) {
+  const bytes = read(src);
+  const mirror = mirrorOf(src);
+  hashes[key] = sha(bytes);
+  manifestInputs[key] = { canonicalSourcePath: src, pluginPath: mirror, sha256: hashes[key] };
+  const have = readOr(mirror);
+  if (have === null || !have.equals(bytes)) { drift.push(`mirror differs from source: ${mirror}`); writes.push([mirror, bytes]); }
+}
+// manifest: compact JSON with alphabetically sorted keys, one trailing newline (the committed form)
+const sorted = (o) => Array.isArray(o) ? o.map(sorted) : o && typeof o === "object" ? Object.fromEntries(Object.keys(o).sort().map((k) => [k, sorted(o[k])])) : o;
+const policySha256 = sha(read(`${plugin}/skills/reader-review/SKILL.md`));
+const manifestBytes = Buffer.from(JSON.stringify(sorted({ inputs: manifestInputs, policySha256, schema: "pipeline.doc-reader-input-bundle.v1" })) + "\n");
+const manifestPath = `${plugin}/reader-inputs/manifest.json`;
+const haveManifest = readOr(manifestPath);
+if (haveManifest === null || !haveManifest.equals(manifestBytes)) { drift.push(`manifest differs from the computed one: ${manifestPath}`); writes.push([manifestPath, manifestBytes]); }
+// pins in the snapshot module
+let libText = read(lib).toString("utf8");
+const setOnce = (re, replacement, what) => {
+  const hits = libText.match(new RegExp(re.source, `${re.flags}g`)) ?? [];
+  if (hits.length !== 1) { console.error(`cannot locate ${what} exactly once in ${lib} (found ${hits.length})`); process.exit(2); }
+  if (!libText.includes(replacement)) { drift.push(`pin out of date: ${what}`); libText = libText.replace(re, replacement); }
+};
+setOnce(/const inputHashes=Object\.freeze\(\{[^}]*\}\);/u, `const inputHashes=Object.freeze({${inputs.map(([k]) => `${k}:'${hashes[k]}'`).join(",")}});`, "inputHashes constant");
+setOnce(/requireFact\(hash\(manifestBytes\)==='[0-9a-f]{64}'\)/u, `requireFact(hash(manifestBytes)==='${sha(manifestBytes)}')`, "manifest hash in installedInputs()");
+const policyMatch = libText.match(/export const policySha256='([0-9a-f]{64})'/u);
+const policyDrift = !policyMatch || policyMatch[1] !== policySha256;
+writes.push([lib, Buffer.from(libText, "utf8")]);
+if (check) {
+  if (policyDrift) drift.push("policySha256 constant differs from the hash of skills/reader-review/SKILL.md (not rewritten by this script)");
+  if (drift.length) { console.error(`DRIFT (${drift.length}):\n- ${drift.join("\n- ")}`); process.exit(1); }
+  console.log("PASS: Reader-input mirrors, manifest and pins are consistent with their sources");
+  process.exit(0);
+}
+for (const [p, b] of writes) { const old = readOr(p); if (!old || !old.equals(b)) writeFileSync(`${root}/${p}`, b); }
+console.log(drift.length ? `synced ${drift.length} drift item(s):\n- ${drift.join("\n- ")}` : "nothing to sync");
+if (policyDrift) { console.error("policySha256 constant differs from the hash of skills/reader-review/SKILL.md: review that file separately, this script does not rewrite it"); process.exit(1); }
