@@ -5,7 +5,9 @@
 > Anwendungsteam installiert die freigegebene GitHub-Version und folgt
 > [SETUP](../SETUP.md) sowie [Usage](usage.md); es übernimmt keine hier
 > genannten Checkout-Pfade, Commit-Referenzen oder Self-Application-Aussagen
-> als eigene Projekt-Evidenz.
+> als eigene Projekt-Evidenz. Der Bericht ist auf Deutsch verfasst, gibt den
+> Stand vom 14. September 2026 wieder und steht nicht in der
+> [Dokumentationskarte](README.md).
 
 Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint Alfred** erbrachten technischen Leistungen, architektonischen Entscheidungen, Schemata, Guardrail-Verschärfungen, Modul-Karten und geschlossenen Backlog-Items gemäß dem **Operating Model §3.3** und der **Sprint Alfred Spezifikation** (`specs/sprint-alfred-epic/spec.md`).
 
@@ -17,9 +19,8 @@ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint 
 
 - **Sprint-Auftrag:** Inhaltlicher, methodischer und technischer Vollabschluss aller offenen Punkte des Sprint Alfred (`/goal Inhaltlicher Abschluss aller Alfred Items`) unter strenger Prüfung der Verdrahtung aller 3 Runner.
 - **Ergebnis:** 
-  - **100% aller 25 Sprint-Alfred Backlog-Items** inhaltlich gelöst, lokal verifiziert, mit vollständiger 4-Feld-Closure (`closedAt`, `closureRepository: "self"`, `closureCommit`, `closureEvidence`) dokumentiert und im Transitions-Ledger nach dem strengen **GG-22-Protokoll** abgeglichen (`check-backlog-state.mjs` grün).
-  - **Suite-Registrierung:** Separat wurden 529 Testdateien gegenüber 564 Registrierungs- beziehungsweise Opt-out-Einträgen geprüft; dies ist ein Zuordnungscheck und keine Vollausführung.
-  - **Begrenzter Audit-Lauf:** 88 ausgewählte Journal-Schritte im Work-Modus bestanden. Dies ist ausdrücklich kein Full-Workspace- oder Release-Verify.
+  - **Alle 25 Sprint-Alfred Backlog-Items** sind als geschlossen dokumentiert, mit vollständiger 4-Feld-Closure (`closedAt`, `closureRepository: "self"`, `closureCommit`, `closureEvidence`) und im Transitions-Ledger nach dem strengen **GG-22-Protokoll** abgeglichen (`check-backlog-state.mjs` gültig mit den bekannten, akzeptierten historischen Diagnosen). Das ist eine Aussage über die Backlog-Closure, nicht über die vollständige Erfüllung der Epic-Anforderungen: Track D ist nur teilweise implementiert (siehe unten).
+  - **Suite-Registrierung und Audit-Lauf:** Zahlen und Grenzen (Zuordnungscheck, begrenzter Work-Modus-Lauf, kein Full-Workspace- oder Release-Verify) stehen einmal im Absatz „Audit-Grenzen“ oben.
   - **Critic-Skip-Coverage:** Die Zählung von 15 evidenced, 9 skipped und 17 legacy ist der historische Closure-Baseline-Stand. Der aktuelle Backlog-Checker ist mit den bekannten, akzeptierten historischen Diagnosen gültig; daraus folgt keine gegenwartsbezogene „0 Findings“-Garantie.
   - **Track D (Agent-First Architecture Standard):** Teilweise implementiert. ADR-Kontinuität, Modul-Inventory, Concept Map Bundle und der Fitness-Evaluator sind vorhanden. Die produktive Push-Anbindung und die dauerhafte Checkpoint-Schuld für AC-18 fehlen noch; die Repository-Adoption ist aufgeschoben.
   - **Mechanische Governance & Schutzlinien (Tracks A & B):** Plan-Authority-Sealing, dynamischer Schutz geschlossener Evidenzen, attendiertes PO-Acknowledge-Routing, deklarative Testsuite-Registrierung (`harness/verify-suites.json`), sanktionierte Design-Trailer (`Dispatch: design (elephant)`).
@@ -76,7 +77,7 @@ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint 
 | **WP-D1** | Architecture Decision Continuity (#99, AC-19, AC-20) | 1. 5-Achsen-Signifikanzrubrik zur deterministischen Bewertung von Architekturentscheidungen.<br>2. ADR-Skill (`architecture-decision`) mit 7 Kernfähigkeiten (Signifikanz, Drafting, Konfliktlösung, Human-Waivers) unter `plugins/pipeline-core/skills/architecture-decision/`.<br>3. Die begrenzte Zusammenfassung `project/architecture-decisions.compiled.json` existiert und wird durch den sanktionierten Compiler `architecture-baseline.mjs --compile-summary` aus dem ADR-Bestand erzeugt. | `schemas/pipeline.architecture-decision.v1.json`, `plugins/pipeline-core/scripts/architecture-baseline.mjs`, `plugins/pipeline-core/skills/architecture-decision/` |
 | **WP-D2** | Agent-First Standard & Concept Map (#104, AC-8, AC-22, AC-23) | 1. Standard-Profil `agent-first-profile.v1.json` mit 9 Property-Klassen und Status-Semantik.<br>2. OKF v0.1 Concept Map Bundle in `architecture/map/` mit `index.md` und Modul-Konzeptdateien.<br>3. 6-Schritte Re-Entry-Reading-Order in `AGENTS.md` verankert (AC-23).<br>4. `module-inventory.mjs` Lader und Pfad-Auflöser.<br>5. `architecture-remedy.mjs`: Remedy-Vergleichsgenerator mit Schutz gegen Tiny-Module-Gaming (AC-21, AC-22). | `schemas/pipeline.architecture-profile.v1.json`, `schemas/pipeline.module-inventory.v1.json`, `architecture/map/*`, `module-inventory.mjs`, `architecture-remedy.mjs` |
 | **WP-D3** | Fitness Enforcement (#106, AC-10, AC-18, AC-21) | 1. `architecture-fitness.mjs`: Evaluator für alle 10 Architektur-Klassen.<br>2. **Deterministic-Pass Rule (AC-10):** Prompt-Compliance liefert niemals `pass`.<br>3. **Map Currency (AC-18):** Candidate-/Push-Modus und Checkpoint-Schuld sind im Evaluator und in Fixtures angelegt; produktive Push-Anbindung, dauerhafte Schuld und Verbrauch an der nächsten Planungsgrenze sind noch offen.<br>4. **Ratchet Store:** `architecture/baseline.json` und `fitness-model.json`. | `schemas/pipeline.fitness-evidence.v1.json`, `schemas/pipeline.architecture-baseline.v1.json`, `architecture/fitness-model.json`, `architecture/baseline.json`, `architecture-fitness.mjs` |
-| **WP-D4** | Adoption Demand (#109, AC-9, AC-17) | 1. `architecture-adoption.mjs`: 4-Stufen-Adoptions-Vorschlag (Map first per Issue #109 §5).<br>2. **Disposition vor Autorität (AC-17):** Gating am Planungs-Boundary.<br>3. **Dogfood-Lauf (AC-9):** Ausführung im Repository und Speicherung des PO-beschlossenen Zustands `deferred` in `architecture/adoption-state.json`; Review am 2026-10-20. | `schemas/pipeline.adoption-state.v1.json`, `schemas/pipeline.adoption-proposal.v1.json`, `architecture/adoption-state.json`, `architecture-adoption.mjs` |
+| **WP-D4** | Adoption Demand (#109, AC-9, AC-17) | 1. `architecture-adoption.mjs`: 4-Stufen-Adoptions-Vorschlag (Map first per Issue #109 §5).<br>2. **Disposition vor Autorität (AC-17):** Gating am Planungs-Boundary.<br>3. **Dogfood-Lauf (AC-9):** Ausführung im Repository und Speicherung des PO-beschlossenen Zustands `deferred` in `architecture/adoption-state.json`; als Review-Termin ist 2026-10-20 vermerkt, ob dieser Review stattgefunden hat, belegt der Bericht nicht. | `schemas/pipeline.adoption-state.v1.json`, `schemas/pipeline.adoption-proposal.v1.json`, `architecture/adoption-state.json`, `architecture-adoption.mjs` |
 
 ---
 
@@ -84,7 +85,7 @@ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint 
 
 | Thema | Problem / Anforderung | Gelieferte Lösung & Verifikation | Relevante Dateien |
 |---|---|---|---|
-| **E1** | Post-Merge Suite Registration | Registrierung aller 529 Test-Dateien und 564 Verify-Suiten über deklaratives `harness/verify-suites.json` Parsing in `check-suite-registration.mjs`. | `plugins/pipeline-core/scripts/check-suite-registration.mjs`, `check-suite-registration.test.mjs` |
+| **E1** | Post-Merge Suite Registration | Zuordnungsprüfung in `check-suite-registration.mjs` über das deklarative `harness/verify-suites.json`: jede Testdatei ist registriert oder ausdrücklich begründet ausgenommen (Zahlen und Grenzen siehe „Audit-Grenzen“; keine Aussage über ausgeführte Suiten). | `plugins/pipeline-core/scripts/check-suite-registration.mjs`, `check-suite-registration.test.mjs` |
 | **E1** | Consumer Safe Paths & Kernel Closure | Aufnahme von `check-clone-provisioning.mjs` in Consumer-Safe-Paths und `NEVER_LIFTABLE_KERNEL_PATHS` in `guard-maintenance-window.mjs`. | `harness/scripts/check-consumer-safe-paths.mjs`, `guard-maintenance-window.mjs`, `guard-maintenance-window-threat-model.md` |
 | **E1** | Preflight Antigravity Hard Enforcement | Integration der `cloneProvisioning`-Prüfung in den Preflight-Kernel und Aktualisierung der Preflight-Assertions in `pipeline-start-preflight-antigravity-hard-enforcement.test.mjs`. | `pipeline-start-preflight-antigravity-hard-enforcement.test.mjs` |
 | **E1** | Fresh Repo Onboarding Turns | Terminierung des Anchor-Steps bei `output?.status === 'ready'` für Greenfield V4-Projekte; Bereinigung von Pre-Authority Draft-Bannern und Spec-SHA-Updates in `measure-fresh-repo-onboarding-turns.mjs` (8 Turns, 0 Repairs). | `plugins/pipeline-core/scripts/onboarding-init.mjs`, `measure-fresh-repo-onboarding-turns.mjs` |
@@ -101,9 +102,9 @@ Die Agent-Pipeline enthält Verdrahtung für drei Runner: **Claude Code**, **Ope
 
 | Dimension | Claude Code | OpenAI Codex | Google Antigravity (`agy`) |
 |---|---|---|---|
-| **Konfigurationsdatei** | `.claude/hooks/hooks.json` | `plugins/pipeline-core/hooks/codex-hooks.json` | `plugins/pipeline-core/hooks.json` (via `.agents/plugins.json`) |
+| **Konfigurationsdatei** | `plugins/pipeline-core/hooks/hooks.json` | `plugins/pipeline-core/hooks/codex-hooks.json` | `plugins/pipeline-core/hooks.json` (via `.agents/plugins.json`) |
 | **Hook-Dispatcher** | Direkte Kindprozesse pro Matcher | Zentraler Bridge: `codex-pretool-guard.mjs` | Zentraler Bridge: `antigravity-pretool-guard.mjs` |
-| **Interzeptions-Events** | `PreToolUse`, `SessionStart`, `Stop` | `PreToolUse`, `SessionStart`, `SubagentStart`, `SubagentStop` | `PreToolUse`, `PreInvocation`, `Stop` |
+| **Interzeptions-Events** | `PreToolUse`, `PostToolUse`, `SessionStart`, `Stop`, `SubagentStart`, `SubagentStop`, `UserPromptSubmit` (maßgeblich: [Enforcement registrations](enforcement.md)) | `PreToolUse`, `SessionStart`, `SubagentStart`, `SubagentStop` | `PreToolUse`, `PreInvocation`, `Stop` |
 | **Tool-Matching Shell** | `Bash\|PowerShell` | `Bash` | `run_command` (normalisiert auf `Bash`) |
 | **Tool-Matching Write** | `Edit\|Write\|NotebookEdit` | `apply_patch\|Edit\|Write` | `write_to_file`, `replace_file_content` (normalisiert auf `Write`/`Edit`) |
 | **Tool-Matching Dispatch**| `Task\|Agent\|Workflow` | `spawn_agent` | `invoke_subagent` (normalisiert auf `Task`) |
@@ -116,8 +117,8 @@ Die Agent-Pipeline enthält Verdrahtung für drei Runner: **Claude Code**, **Ope
 Die folgenden Befunde beschreiben implementierte Pfade und ihre fokussiert getesteten Vertragsannahmen. Ohne ausgeführte native Claude- und Antigravity-Hooks bleibt die tatsächliche Laufzeit-Durchsetzung dieser beiden Runner offen.
 
 1. **Antigravity Daemon Fail-Open-Pfad:**
-   - *Problem:* Der Antigravity CLI Daemon läuft im Hintergrund und sourct bei Desktop-/IDE-Starts nicht automatisch `.bashrc`. Wenn Node.js via `fnm`/`nvm` verwaltet wird, kann `node` im Daemon-$PATH fehlen, was zu stummem Ausfall von Hooks führen würde.
-   - *Lösung:* Bei CLI-Start aus demselben Terminal vor `agy` mit `command -v node` dessen Shell-PATH prüfen. Bei Desktop-/Service-Start stattdessen die Launcher-Umgebung inspizieren und in einer neuen Agy-Session über deren eigenes Command-Tool `node --version` bestätigen; ein fremder Shell-Check beweist den Host-PATH nicht. Die Host-Umgebung bei Bedarf korrekt konfigurieren und Agy danach vollständig neu starten. Kein globaler `sudo`-Symlink wird als Pipeline-Lösung empfohlen. Ein fehlender Nachweis bleibt eine nicht-bereite Agy-Umgebung; diese historische Code-/Contract-Aussage ist keine native Live-Durchsetzungszertifizierung.
+   - *Problem:* Bei Desktop-/IDE-Starts kann `node` im PATH des Antigravity-Hosts fehlen, was zu stummem Ausfall von Hooks führen würde.
+   - *Lösung:* Prüfung und Behebung (PATH des Hosts, Neustart) stehen einmal in [SETUP](../SETUP.md) im Antigravity-Abschnitt. Diese historische Code-/Contract-Aussage ist keine native Live-Durchsetzungszertifizierung.
 2. **Codex Multi-File `apply_patch`:**
    - *Problem:* Codex modifiziert Dateien häufig im Block über `apply_patch`. Ein naives Tool-Hooking würde nur den ersten Pfad prüfen oder das Unified-Diff-Format nicht verstehen.
    - *Lösung:* `guard-apply-patch.mjs` parst das Diff deterministisch, extrahiert alle Zielpfade und evaluiert jeden Pfad sequentiell gegen `guard-testpath.mjs`, `guard-devplan.mjs` und `guard-gate-strength.mjs` unter einem erweiterten 36s-Budget.
@@ -200,7 +201,7 @@ Die Dispatch-Records (`evidence/dispatch-record-ALF-*.json`) binden diese Eviden
 
 Der Bericht hält den dokumentierten Abschlussstand fest, aber keine Release-Aussage:
 - Die 25 Backlog-Items sind als geschlossen dokumentiert; der aktuelle Backlog-Checker ist mit bekannten, akzeptierten historischen Diagnosen gültig.
-- Der begrenzte Audit-Lauf bestand 88 selektierte Journal-Schritte; eine Full-Workspace- oder Release-Verifikation wurde hier nicht behauptet.
+- Der begrenzte Audit-Lauf ist keine Full-Workspace- oder Release-Verifikation (Zahlen und Grenzen siehe „Audit-Grenzen“).
 - Die Critic-Zählung (15 evidenced, 9 skipped, 17 legacy) bleibt historische Closure-Baseline, nicht eine gegenwartsbezogene Null-Fehler-Aussage.
 - Für Claude und Antigravity belegt der Audit Code-/Hook-Verdrahtung und fokussierte Vertragsprüfung, nicht native Live-Durchsetzung; lokal beobachtet wurde nur der Codex-Bootstrap.
 - Release, Push und PO-Abnahme bleiben außerhalb dieses Audit-Berichts.
