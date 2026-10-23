@@ -1,0 +1,12 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 99f3bc89a..c6d5edcc2 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -760,6 +760,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-goldfish-bugfix-module-conflicts-with-qg-04-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-goldfish-test-briefs-lack-targeted-and-quick-command-routes-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-governance-scope-rejects-readonly-host-git-control-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-governed-check-child-ignores-inherited-node-test-context-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-adr-references-keep-navigation-current-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-approval-policy-applies-after-intake-transition-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-greenfield-design-course-cost-and-proportionality-tests",

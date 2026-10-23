@@ -10,8 +10,8 @@ This folder holds everything the operator needs for the bundled sitting: the ord
 
 ## Order
 
-- Steps 01 to 34 and 36 to 47 of `runbook.md`, in order. Step 35 (C28, the Critic preimage re-pin) is NOT part of this sitting: the PO decided it happens right before the stamp, after the Critic batch.
-- Extra or corrected steps found by the last rehearsal (`K133-runbook-corrections.md`, merged into `runbook.md` by the Elephant before the sitting) take precedence over the older text.
+- Steps 01 to 34, 36 to 39, 39b, 40 to 46, 46b and 47 of `runbook.md`, in the order printed. Step 35 (C28, the Critic preimage re-pin) is NOT part of this sitting: the PO decided it happens right before the stamp, after the Critic batch.
+- The last rehearsal (`notes/k133-results.md`, `notes/k133-runbook-corrections.md`) replayed all of it on a fresh clone of main; its corrections are merged into `runbook.md` (39b inventory surface of the K120 pin, 46b final ratchet, step 45 paths, step 47 generated mirrors, `--no-verify` on every PRO commit). Step 47 generates the mirrors with `scripts/sync-reader-inputs.mjs`; never apply a static mirrors diff.
 - Step 47 (Reader-input mirrors) is the last source-affecting step. After it nothing may edit the capability inventory or the governance input; if it does, run `node scripts/sync-reader-inputs.mjs --check` and re-sync.
 
 ## By hand, not covered by the Reader

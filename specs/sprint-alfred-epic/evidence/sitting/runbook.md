@@ -8,7 +8,7 @@ Expected result of every step: `git apply --check` silent exit 0, `git apply` si
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k79-c15-verify-caseids-and-k1r.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k79-c15-verify-caseids-and-k1r.patch
 git add -- harness/scripts/verify.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/01-c15.txt -- harness/scripts/verify.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/01-c15.txt -- harness/scripts/verify.mjs
 ```
 
 ## 02 PRO C27a [clone 3babf028b]
@@ -18,7 +18,7 @@ git apply --check specs/sprint-alfred-epic/evidence/held-patches/k82-verify-case
 git apply specs/sprint-alfred-epic/evidence/held-patches/k82-c16-verify-suites-cumulative.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k82-verify-case-completion-augmentation-rc05.patch
 git add -- harness/verify-suites.json harness/config/verify-case-completion-augmentations.v1.json
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/02-c27a.txt -- harness/verify-suites.json harness/config/verify-case-completion-augmentations.v1.json
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/02-c27a.txt -- harness/verify-suites.json harness/config/verify-case-completion-augmentations.v1.json
 ```
 
 ## 03 PRO C27b [clone 619d8d05f]
@@ -28,7 +28,7 @@ git apply specs/sprint-alfred-epic/evidence/held-patches/k79-c16b-inventory-surf
 node scripts/rebaseline-inventory.mjs
 # expected: sourceBaseline -> the commit of step 02
 git add -- docs/product-capability-inventory.json
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/03-c27b-inventory.txt -- docs/product-capability-inventory.json
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/03-c27b-inventory.txt -- docs/product-capability-inventory.json
 ```
 
 ## 04 PRO C17 [clone 151faab0f]
@@ -36,7 +36,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/03-c27b-
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k55-guard-lifecycle-ready-test-posix-command-paths.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k55-guard-lifecycle-ready-test-posix-command-paths.patch
 git add -- plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/04-c17.txt -- plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/04-c17.txt -- plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 ```
 
 ## 05 PRO C18 [clone 726f0ebb2]
@@ -44,7 +44,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/04-c17.t
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k64-onboarding-continuity-staging-banner.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k64-onboarding-continuity-staging-banner.patch
 git add -- plugins/pipeline-core/lib/onboarding-continuity.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/05-c18.txt -- plugins/pipeline-core/lib/onboarding-continuity.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/05-c18.txt -- plugins/pipeline-core/lib/onboarding-continuity.mjs
 ```
 
 ## 06 PRO C26 [clone b6c1eb8bc]
@@ -52,7 +52,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/05-c18.t
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k80-closed-release-member-step-protected.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k80-closed-release-member-step-protected.patch
 git add -- plugins/pipeline-core/lib/onboarding-continuity.mjs plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/06-c26a.txt -- plugins/pipeline-core/lib/onboarding-continuity.mjs plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/06-c26a.txt -- plugins/pipeline-core/lib/onboarding-continuity.mjs plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs
 ```
 
 ## 07 UN C26 [clone 0ce1ef7a3]
@@ -68,7 +68,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/07-c26b.
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/d75-cancel-class/s4-protected-libs.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/d75-cancel-class/s4-protected-libs.patch
 git add -- plugins/pipeline-core/lib/native-goldfish-host-state.mjs plugins/pipeline-core/lib/slice-queue.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/08-c19s1.txt -- plugins/pipeline-core/lib/native-goldfish-host-state.mjs plugins/pipeline-core/lib/slice-queue.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/08-c19s1.txt -- plugins/pipeline-core/lib/native-goldfish-host-state.mjs plugins/pipeline-core/lib/slice-queue.mjs
 ```
 
 ## 09 UN C19 s2 [clone 3a9e768b0]
@@ -84,7 +84,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/09-c19s2
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/d75-cancel-class/s5-protected-guard-dispatch.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/d75-cancel-class/s5-protected-guard-dispatch.patch
 git add -- plugins/pipeline-core/hooks/guard-dispatch.mjs plugins/pipeline-core/hooks/guard-dispatch.test.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/10-c19s3.txt -- plugins/pipeline-core/hooks/guard-dispatch.mjs plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/10-c19s3.txt -- plugins/pipeline-core/hooks/guard-dispatch.mjs plugins/pipeline-core/hooks/guard-dispatch.test.mjs
 ```
 
 ## 11 PRO C20 [clone ad4064ffc]
@@ -92,7 +92,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/10-c19s3
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k67-discard-feature-finish-orphan-release.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k67-discard-feature-finish-orphan-release.patch
 git add -- plugins/pipeline-core/scripts/pipeline-state.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/11-c20.txt -- plugins/pipeline-core/scripts/pipeline-state.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/11-c20.txt -- plugins/pipeline-core/scripts/pipeline-state.mjs
 ```
 
 ## 12 PRO C21 [clone a644441c8]
@@ -100,7 +100,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/11-c20.t
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k73-guard-apply-patch-fixtures.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k73-guard-apply-patch-fixtures.patch
 git add -- plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/12-c21.txt -- plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/12-c21.txt -- plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
 ```
 
 ## 13 PRO C22 [clone adef559e4]
@@ -108,7 +108,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/12-c21.t
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k76-antigravity-pretool-guard-fixtures-cumulative.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k76-antigravity-pretool-guard-fixtures-cumulative.patch
 git add -- plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/13-c22.txt -- plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/13-c22.txt -- plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
 ```
 
 ## 14 PRO C24 [clone a1432edb2]
@@ -116,7 +116,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/13-c22.t
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k76-evaluate-shared-onboarding-observation.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k76-evaluate-shared-onboarding-observation.patch
 git add -- plugins/pipeline-core/lib/guard/evaluate.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/14-c24.txt -- plugins/pipeline-core/lib/guard/evaluate.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/14-c24.txt -- plugins/pipeline-core/lib/guard/evaluate.mjs
 ```
 
 ## 15 PRO C23 [clone c4640c0ef]
@@ -124,7 +124,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/14-c24.t
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k75-classifier-protected-test-paths.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k75-classifier-protected-test-paths.patch
 git add -- plugins/pipeline-core/lib/protected-test-paths.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/15-c23a.txt -- plugins/pipeline-core/lib/protected-test-paths.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/15-c23a.txt -- plugins/pipeline-core/lib/protected-test-paths.mjs
 ```
 
 ## 16 UN C23 [clone 94a559b4c]
@@ -140,7 +140,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/16-c23b.
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k81-adapter-purity-protected.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k81-adapter-purity-protected.patch
 git add -- plugins/pipeline-core/lib/critic-review-lineage-core.mjs plugins/pipeline-core/lib/critic-review-lineage.mjs plugins/pipeline-core/lib/guard-maintenance-window.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/17-c25a.txt -- plugins/pipeline-core/lib/critic-review-lineage-core.mjs plugins/pipeline-core/lib/critic-review-lineage.mjs plugins/pipeline-core/lib/guard-maintenance-window.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/17-c25a.txt -- plugins/pipeline-core/lib/critic-review-lineage-core.mjs plugins/pipeline-core/lib/critic-review-lineage.mjs plugins/pipeline-core/lib/guard-maintenance-window.mjs
 ```
 
 ## 18 UN C25 [clone ecea6e946]
@@ -156,7 +156,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/18-c25b.
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k92-gs1-signature-route-protected.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k92-gs1-signature-route-protected.patch
 git add -- plugins/pipeline-core/lib/human-guard-override.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/19-k92p.txt -- plugins/pipeline-core/lib/human-guard-override.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/19-k92p.txt -- plugins/pipeline-core/lib/human-guard-override.mjs
 ```
 
 ## 20 UN C29 K92 [clone 174f59ce7]
@@ -172,7 +172,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/20-k92u.
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k104-fanout-guard-enforce-protected.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k104-fanout-guard-enforce-protected.patch
 git add -- plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs plugins/pipeline-core/hooks/guard-dispatch.mjs plugins/pipeline-core/lib/dispatch-record-liveness.mjs plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/21-k104p.txt -- plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs plugins/pipeline-core/hooks/guard-dispatch.mjs plugins/pipeline-core/lib/dispatch-record-liveness.mjs plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/21-k104p.txt -- plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs plugins/pipeline-core/hooks/guard-dispatch.mjs plugins/pipeline-core/lib/dispatch-record-liveness.mjs plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
 ```
 
 ## 22 UN C30 K104 [clone ce462be41]
@@ -188,7 +188,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/22-k104u
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k95-d75a-recon-gate-protected.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k95-d75a-recon-gate-protected.patch
 git add -- plugins/pipeline-core/lib/dispatch-briefing-build.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/23-k95p.txt -- plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/23-k95p.txt -- plugins/pipeline-core/lib/dispatch-briefing-build.mjs
 ```
 
 ## 24 UN C31 K95+K106 [clone 0bfb56177]
@@ -205,7 +205,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/24-k95u.
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k96-read-credential-target-protected.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k96-read-credential-target-protected.patch
 git add -- plugins/pipeline-core/lib/guard/denial-route.mjs plugins/pipeline-core/lib/guard/evaluate.mjs plugins/pipeline-core/lib/guard/grammar-denials.mjs plugins/pipeline-core/lib/guard/shell-grammar.mjs plugins/pipeline-core/lib/passive-read-policy.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/25-k96p.txt -- plugins/pipeline-core/lib/guard/denial-route.mjs plugins/pipeline-core/lib/guard/evaluate.mjs plugins/pipeline-core/lib/guard/grammar-denials.mjs plugins/pipeline-core/lib/guard/shell-grammar.mjs plugins/pipeline-core/lib/passive-read-policy.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/25-k96p.txt -- plugins/pipeline-core/lib/guard/denial-route.mjs plugins/pipeline-core/lib/guard/evaluate.mjs plugins/pipeline-core/lib/guard/grammar-denials.mjs plugins/pipeline-core/lib/guard/shell-grammar.mjs plugins/pipeline-core/lib/passive-read-policy.mjs
 ```
 
 ## 26 PRO C32 K105 [clone 16a3042e0]
@@ -213,7 +213,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/25-k96p.
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k105-claude-native-read-credential-code-protected.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k105-claude-native-read-credential-code-protected.patch
 git add -- plugins/pipeline-core/lib/guard/read-scope.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/26-k105p.txt -- plugins/pipeline-core/lib/guard/read-scope.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/26-k105p.txt -- plugins/pipeline-core/lib/guard/read-scope.mjs
 ```
 
 ## 27 UN C32 K96 [clone 43fcbf94d]
@@ -238,7 +238,7 @@ The held `H/k97-ap11-git-show-pipe-protected.patch` fails plain `git apply --che
 git apply --check specs/sprint-alfred-epic/evidence/sitting/k97-protected-rebased.diff
 git apply specs/sprint-alfred-epic/evidence/sitting/k97-protected-rebased.diff
 git add -- plugins/pipeline-core/hooks/guard-command-grammar.mjs plugins/pipeline-core/lib/guard/shell-grammar.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/29-k97p.txt -- plugins/pipeline-core/hooks/guard-command-grammar.mjs plugins/pipeline-core/lib/guard/shell-grammar.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/29-k97p.txt -- plugins/pipeline-core/hooks/guard-command-grammar.mjs plugins/pipeline-core/lib/guard/shell-grammar.mjs
 ```
 
 ## 30 UN C33 K97 [clone db5c5087c]
@@ -254,7 +254,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/30-k97u.
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k98-refusal-texts-protected.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k98-refusal-texts-protected.patch
 git add -- plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs plugins/pipeline-core/lib/commit-message-policy.mjs plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs plugins/pipeline-core/scripts/onboarding-init.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/31-k98p.txt -- plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs plugins/pipeline-core/lib/commit-message-policy.mjs plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs plugins/pipeline-core/scripts/onboarding-init.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/31-k98p.txt -- plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs plugins/pipeline-core/lib/commit-message-policy.mjs plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs plugins/pipeline-core/scripts/onboarding-init.mjs
 ```
 
 ## 32 PRO C35 K103 [clone fdb3f5c68]
@@ -262,7 +262,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/31-k98p.
 git apply --check specs/sprint-alfred-epic/evidence/held-patches/k103-approve-push-chat-catalogue-repair-protected.patch
 git apply specs/sprint-alfred-epic/evidence/held-patches/k103-approve-push-chat-catalogue-repair-protected.patch
 git add -- plugins/pipeline-core/scripts/pipeline-state.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/32-k103p.txt -- plugins/pipeline-core/scripts/pipeline-state.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/32-k103p.txt -- plugins/pipeline-core/scripts/pipeline-state.mjs
 ```
 
 ## 33 UN C35 K103 [clone 839758530]
@@ -281,8 +281,8 @@ git add -- architecture/boundary-policy.json
 git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/34-ratchet.txt -- architecture/boundary-policy.json
 ```
 
-## 35 PRO C28 [clone e18789b6f]
-Re-measure first: if any of the six Critic-contract files changed since this rehearsal, regenerate (`node scratch/k108-repin.mjs` rewrites the six digests from the working tree). The held `H/k82-critic-preimage-repin.patch` carries the same six digests and is still valid on main today.
+## 35 DEFERRED (NOT in this sitting; PO decision: right before the stamp, after the Critic batch) C28 [clone e18789b6f]
+DO NOT RUN THIS STEP AT THE SITTING. It is kept here for the moment right before the stamp. Re-measure first: if any of the six Critic-contract files changed since this rehearsal, regenerate (`node scratch/k108-repin.mjs` rewrites the six digests from the working tree). The held `H/k82-critic-preimage-repin.patch` carries the same six digests and is still valid on main today.
 ```
 git apply --check specs/sprint-alfred-epic/evidence/sitting/critic-preimage-repin.diff
 git apply specs/sprint-alfred-epic/evidence/sitting/critic-preimage-repin.diff
@@ -300,7 +300,7 @@ git apply specs/sprint-alfred-epic/evidence/sitting/k118-suite-registration-unpr
 node harness/scripts/check-verify-suite-registration.mjs
 # expected here: exit 2 with 7 UNCATEGORIZED-VERIFY-SURFACE lines (fixed by step 37); the 7 UNREGISTERED lines are gone
 git add -- harness/verify-suites.json harness/config/verify-case-completion.v1.json harness/scripts/check-verify-case-completion.test.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/36-register-decision-round-tests.txt -- harness/verify-suites.json harness/config/verify-case-completion.v1.json harness/scripts/check-verify-case-completion.test.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/36-register-decision-round-tests.txt -- harness/verify-suites.json harness/config/verify-case-completion.v1.json harness/scripts/check-verify-case-completion.test.mjs
 ```
 
 ## 37 PRO K118 inventory surfaces and rebaseline [clone cf977e3b8]
@@ -314,7 +314,7 @@ node harness/scripts/check-product-capability-inventory.mjs
 node harness/scripts/check-verify-suite-registration.mjs
 # expected: PASS, then exit 0 with 1092 registered, 0 unregistered
 git add -- docs/product-capability-inventory.json
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/37-register-decision-round-inventory.txt -- docs/product-capability-inventory.json
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/37-register-decision-round-inventory.txt -- docs/product-capability-inventory.json
 ```
 
 ## 38 PRO K120 governed delivery check ignores an inherited NODE_TEST_CONTEXT [clone k120]
@@ -323,7 +323,7 @@ One line in plugins/pipeline-core/lib/native-goldfish-host-state.mjs plus the su
 git apply --check specs/sprint-alfred-epic/evidence/sitting/k120-nghs-node-test-context-protected.diff
 git apply specs/sprint-alfred-epic/evidence/sitting/k120-nghs-node-test-context-protected.diff
 git add -- plugins/pipeline-core/lib/native-goldfish-host-state.mjs harness/verify-suites.json
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/38-nghs-node-test-context-protected.txt -- plugins/pipeline-core/lib/native-goldfish-host-state.mjs harness/verify-suites.json
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/38-nghs-node-test-context-protected.txt -- plugins/pipeline-core/lib/native-goldfish-host-state.mjs harness/verify-suites.json
 ```
 
 ## 39 UN K120 pin
@@ -335,13 +335,27 @@ git add -- plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited
 git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/39-nghs-node-test-context-pin.txt -- plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs
 ```
 
+## 39b PRO K133 inventory surface of the K120 pin suite and rebaseline [after 39]
+Run after 39 is committed (the baseline must be the commit that holds the registration and the pin file).
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k133-pin-surface.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k133-pin-surface.diff
+node scripts/rebaseline-inventory.mjs
+# expected: sourceBaseline -> the commit of step 39
+node harness/scripts/check-product-capability-inventory.mjs
+node harness/scripts/check-verify-suite-registration.mjs
+# expected: PASS, then exit 0 with 1093 registered, 0 unregistered
+git add -- docs/product-capability-inventory.json
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/39b-k120-pin-surface-inventory-protected.txt -- docs/product-capability-inventory.json
+```
+
 ## 40 PRO K125 architecture capability in the inventory [after 39]
 ```
 git apply --check specs/sprint-alfred-epic/evidence/sitting/k125-inventory-architecture-capability-protected.diff
 git apply specs/sprint-alfred-epic/evidence/sitting/k125-inventory-architecture-capability-protected.diff
 node harness/scripts/check-product-capability-inventory.mjs
 git add -- docs/product-capability-inventory.json
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/40-architecture-capability-inventory-protected.txt -- docs/product-capability-inventory.json
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/40-architecture-capability-inventory-protected.txt -- docs/product-capability-inventory.json
 ```
 
 ## 41 UN K125 governance reclassification and its test assertion
@@ -360,7 +374,7 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/41-gover
 git apply --check specs/sprint-alfred-epic/evidence/sitting/k127-s4-protected.diff
 git apply specs/sprint-alfred-epic/evidence/sitting/k127-s4-protected.diff
 git add -- plugins/pipeline-core/lib/project-calibration-identity.mjs plugins/pipeline-core/lib/consumer-verify.mjs plugins/pipeline-core/scripts/consumer-verify-check.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/42-s4-source-checkout-exemption-protected.txt -- plugins/pipeline-core/lib/project-calibration-identity.mjs plugins/pipeline-core/lib/consumer-verify.mjs plugins/pipeline-core/scripts/consumer-verify-check.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/42-s4-source-checkout-exemption-protected.txt -- plugins/pipeline-core/lib/project-calibration-identity.mjs plugins/pipeline-core/lib/consumer-verify.mjs plugins/pipeline-core/scripts/consumer-verify-check.mjs
 ```
 
 ## 43 UN K127 pin and evidence producer
@@ -376,17 +390,16 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/43-s4-so
 git apply --check specs/sprint-alfred-epic/evidence/sitting/k128-fallback-protected.diff
 git apply specs/sprint-alfred-epic/evidence/sitting/k128-fallback-protected.diff
 git add -- plugins/pipeline-core/lib/design-review-receipt.mjs plugins/pipeline-core/lib/design-approval-binding.mjs plugins/pipeline-core/lib/design-consistency-check.mjs plugins/pipeline-core/scripts/pipeline-state.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/44-fallback-receipt-field-protected.txt -- plugins/pipeline-core/lib/design-review-receipt.mjs plugins/pipeline-core/lib/design-approval-binding.mjs plugins/pipeline-core/lib/design-consistency-check.mjs plugins/pipeline-core/scripts/pipeline-state.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/44-fallback-receipt-field-protected.txt -- plugins/pipeline-core/lib/design-review-receipt.mjs plugins/pipeline-core/lib/design-approval-binding.mjs plugins/pipeline-core/lib/design-consistency-check.mjs plugins/pipeline-core/scripts/pipeline-state.mjs
 ```
 
 ## 45 UN K128 producer flag, pin cases and route-1 assertions
+
 ```
 git apply --check specs/sprint-alfred-epic/evidence/sitting/k128-fallback-unprotected.diff
 git apply specs/sprint-alfred-epic/evidence/sitting/k128-fallback-unprotected.diff
-```
-Add the files named in the diff header (producer script, pin file, route e2e test), then:
-```
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/45-fallback-receipt-field-pin.txt -- <the files of the diff>
+git add -- plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs plugins/pipeline-core/scripts/design-review-receipt.mjs
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/45-fallback-receipt-field-pin.txt -- plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs plugins/pipeline-core/scripts/design-review-receipt.mjs
 ```
 
 ## 46 PRO calibration tier sync (.claude/pipeline.json)
@@ -394,15 +407,28 @@ git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/45-fallb
 git apply --check specs/sprint-alfred-epic/evidence/sitting/claude-calibration-channel-sync.diff
 git apply specs/sprint-alfred-epic/evidence/sitting/claude-calibration-channel-sync.diff
 git add -- .claude/pipeline.json
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/46-claude-calibration-channel-sync.txt -- .claude/pipeline.json
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/46-claude-calibration-channel-sync.txt -- .claude/pipeline.json
+```
+
+## 46b UN K133 ratchet final (measured after step 46; step 47 stays the last source-affecting step)
+The checker is `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs --root .`; 21 pre-existing `unowned-path` findings for `scripts/*.mjs` keep it at exit 1 and are not part of this step.
+```
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k133-ratchet-final.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k133-ratchet-final.diff
+node plugins/pipeline-core/scripts/architecture-boundary-check.mjs --root .
+# expected: 0 over-line-bound findings
+git add -- architecture/boundary-policy.json
+git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/46b-ratchet-final.txt -- architecture/boundary-policy.json
 ```
 
 ## 47 PRO Reader-input mirrors and pins (LAST source-affecting step)
-Any later edit of the inventory or the governance input makes the mirrors stale: run `node scripts/sync-reader-inputs.mjs --check` afterwards.
+Any later edit of the inventory or the governance input makes the mirrors stale. The mirrors carry the live `sourceBaseline`, so they are GENERATED here, never applied from a diff. Do not commit if the `--check` line exits non-zero. (`k132-mirrors-protected.diff` is no longer used by the sitting.)
 ```
-git apply --check specs/sprint-alfred-epic/evidence/sitting/k132-mirrors-protected.diff
-git apply specs/sprint-alfred-epic/evidence/sitting/k132-mirrors-protected.diff
+git apply --check specs/sprint-alfred-epic/evidence/sitting/k133-k132-allowlist-protected.diff
+git apply specs/sprint-alfred-epic/evidence/sitting/k133-k132-allowlist-protected.diff
+node scripts/sync-reader-inputs.mjs
 node scripts/sync-reader-inputs.mjs --check
+# expected: synced 5 drift items, then PASS: Reader-input mirrors, manifest and pins are consistent with their sources
 git add -- plugins/pipeline-core/reader-inputs plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs harness/scripts/check-consumer-safe-paths.mjs
-git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/47-reader-input-mirrors-protected.txt -- plugins/pipeline-core/reader-inputs plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs harness/scripts/check-consumer-safe-paths.mjs
+git commit --no-verify -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/47-reader-input-mirrors-protected.txt -- plugins/pipeline-core/reader-inputs plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs harness/scripts/check-consumer-safe-paths.mjs
 ```

@@ -1,0 +1,6 @@
+chore(inventory): add the surface of the NGHS node-test-context pin suite and rebaseline the source
+
+Step 38 registers the pin suite pin-governed-check-child-ignores-inherited-node-test-context-tests in harness/verify-suites.json; the suite-registration checker therefore reports it as an uncategorized verify surface. The surface line is added to the deterministic-verification capability and sourceBaseline moves to the commit that holds the registration and the pin file.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
