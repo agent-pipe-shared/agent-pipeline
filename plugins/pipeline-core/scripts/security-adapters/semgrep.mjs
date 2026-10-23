@@ -282,7 +282,8 @@ export async function run(options) {
     const started = performance.now();
     try {
       const result = delegate(...args);
-      try { diagnostics = observeSemgrepChild(result, performance.now() - started, args[2].timeout); } catch { /* exit-neutral */ }
+      // args[2].cwd is the scan root: it lets the finding projection relativise absolute report paths.
+      try { diagnostics = observeSemgrepChild(result, performance.now() - started, args[2].timeout, args[2].cwd); } catch { /* exit-neutral */ }
       return result;
     } catch (error) {
       try { diagnostics = observeSemgrepChild({ error }, performance.now() - started, args[2].timeout); } catch { /* exit-neutral */ }

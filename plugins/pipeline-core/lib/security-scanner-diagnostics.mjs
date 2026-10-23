@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Prepared G13 contract implementation. No filesystem mutation or authority.
+import { createHash } from "node:crypto";
+import { isAbsolute as pathIsAbsolute, posix as pathPosix, relative as pathRelative, win32 as pathWin32 } from "node:path";
 const MAX_OUTPUT = 1048576;
 const MAX_RECORD = 16384;
 const DIGEST = /^[a-f0-9]{64}(?![\s\S])/;
@@ -13,7 +15,64 @@ const object = v => v !== null && typeof v === "object" && !Array.isArray(v) && 
 const shape = (v, fields) => object(v) && Reflect.ownKeys(v).length === fields.length && fields.every(k => Object.hasOwn(v,k) && Object.hasOwn(Object.getOwnPropertyDescriptor(v,k),"value"));
 const safeCount = v => natural(v) ? v : null;
 
-export function observeSemgrepChild(result, elapsedMs, timeoutMs) {
+// Per-finding projection (AC-249, PO decision 2026-10-23): an OPTIONAL bounded array inside the
+// child-result shape. Each entry is exactly a rule id, a repo-relative location and an evidence
+// fingerprint (12-hex sha256 prefix plus byte length) of the matched text. The clear match, a
+// snippet, the finding message and any absolute path never enter this record. The bounds keep the
+// worst case (20 entries) inside MAX_RECORD, so a hostile identifier cannot cost the whole sidecar.
+const MAX_FINDINGS = 20;
+const MAX_RULE_ID = 128;
+const MAX_PATH = 256;
+const MAX_LINE = 2147483647;
+const RULE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}(?![\s\S])/;
+// Mirrors the schema pattern: forward-slash segments, no empty/./.. segment, no control character,
+// no backslash, no leading drive letter, no leading slash.
+const SEGMENT = "(?!\\.{1,2}(?:/|(?![\\s\\S])))[^\\\\/\\u0000-\\u001f\\u007f]+";
+const REL_PATH = new RegExp(`^(?![A-Za-z]:)${SEGMENT}(?:/${SEGMENT})*(?![\\s\\S])`);
+const FINGERPRINT = /^[a-f0-9]{12}(?![\s\S])/;
+const validFinding = f => shape(f, ["ruleId", "location", "evidenceFingerprint"])
+  && typeof f.ruleId === "string" && f.ruleId.length <= MAX_RULE_ID && RULE_ID.test(f.ruleId)
+  && shape(f.location, ["path", "line"]) && typeof f.location.path === "string" && f.location.path.length <= MAX_PATH && REL_PATH.test(f.location.path)
+  && Number.isSafeInteger(f.location.line) && f.location.line >= 1 && f.location.line <= MAX_LINE
+  && shape(f.evidenceFingerprint, ["sha256", "length"]) && typeof f.evidenceFingerprint.sha256 === "string" && FINGERPRINT.test(f.evidenceFingerprint.sha256)
+  && natural(f.evidenceFingerprint.length) && f.evidenceFingerprint.length <= MAX_OUTPUT;
+const typeName = type => typeof type === "string" ? type : Array.isArray(type) && typeof type[0] === "string" ? type[0] : null;
+const partialParsingWarning = e => object(e) && e.level === "warn" && typeName(e.type) === "PartialParsing";
+
+// Scan-root-relative path, or null. Absolute paths are accepted only when they sit under rootDir.
+function relativeFindingPath(file, rootDir) {
+  if (typeof file !== "string" || file.length === 0 || file.length > 4096) return null;
+  let relative = file;
+  if (pathIsAbsolute(file)) {
+    if (typeof rootDir !== "string" || !pathIsAbsolute(rootDir)) return null;
+    relative = pathRelative(rootDir, file);
+    if (relative.length === 0 || pathIsAbsolute(relative)) return null;
+  } else if (pathPosix.isAbsolute(file) || pathWin32.isAbsolute(file)) return null;
+  return process.platform === "win32" ? relative.replaceAll("\\", "/") : relative;
+}
+
+function projectFindings(parsed, rootDir) {
+  if (!Array.isArray(parsed?.results)) return [];
+  // Same completion rule as the adapter: only warn-level PartialParsing entries leave a completed scan.
+  if (parsed.errors !== undefined && !(Array.isArray(parsed.errors) && parsed.errors.every(partialParsingWarning))) return [];
+  const findings = [];
+  for (const r of parsed.results) {
+    if (findings.length >= MAX_FINDINGS) break;
+    const text = r?.extra?.lines;
+    const path = relativeFindingPath(r?.path, rootDir);
+    if (typeof r?.check_id !== "string" || typeof text !== "string" || path === null) continue;
+    const bytes = Buffer.from(text, "utf8");
+    const entry = {
+      ruleId: r.check_id,
+      location: { path, line: r?.start?.line },
+      evidenceFingerprint: { sha256: createHash("sha256").update(bytes).digest("hex").slice(0, 12), length: bytes.length },
+    };
+    if (validFinding(entry)) findings.push(entry);
+  }
+  return findings;
+}
+
+export function observeSemgrepChild(result, elapsedMs, timeoutMs, rootDir) {
   if (!natural(timeoutMs) || timeoutMs < 1) return { observation:"not-observed" };
   const stdout = typeof result?.stdout === "string" ? result.stdout : "";
   const stderr = typeof result?.stderr === "string" ? result.stderr : "";
@@ -23,9 +82,16 @@ export function observeSemgrepChild(result, elapsedMs, timeoutMs) {
     try { parsed = JSON.parse(stdout); complete = true; } catch { /* opaque */ }
   }
   const version = typeof parsed?.version === "string" && VERSION.test(parsed.version) ? parsed.version : null;
+  const exitCode = Number.isInteger(result?.status) && result.status >= -2147483648 && result.status <= 2147483647 ? result.status : null;
+  // Unavailable stays unavailable: findings only from a child that exited 0 without error or signal
+  // and returned complete JSON; a timeout, refusal, crash or over-budget output projects nothing.
+  let findings = [];
+  if (complete && exitCode === 0 && !result?.error && !result?.signal) {
+    try { findings = projectFindings(parsed, rootDir); } catch { findings = []; }
+  }
   return {
     observation:"child-result",
-    exitCode:Number.isInteger(result?.status) && result.status >= -2147483648 && result.status <= 2147483647 ? result.status : null,
+    exitCode,
     errorCode:result?.error ? CODES.has(result.error.code) ? result.error.code : "OTHER" : null,
     signal:result?.signal ? SIGNALS.has(result.signal) ? result.signal : "OTHER" : null,
     elapsedMs:Number.isFinite(elapsedMs) ? Math.min(Number.MAX_SAFE_INTEGER,Math.max(0,Math.round(elapsedMs))) : 0,
@@ -35,6 +101,7 @@ export function observeSemgrepChild(result, elapsedMs, timeoutMs) {
       interpretation:stdoutBytes > MAX_OUTPUT ? "over-diagnostic-budget" : complete ? "complete-json" : "not-complete-json",
       resultsCount:Array.isArray(parsed?.results) ? safeCount(parsed.results.length) : null,
       errorsCount:Array.isArray(parsed?.errors) ? safeCount(parsed.errors.length) : null},
+    ...(findings.length > 0 ? { findings } : {}),
   };
 }
 
@@ -59,11 +126,20 @@ export function validateScannerDiagnostics(record) {
       else if(typeof q.sha256 !== "string" || !DIGEST.test(q.sha256) || q.reason !== null || typeof q.unchanged !== "boolean") return false;
       const c=r.child;
       if (shape(c,["observation"]) && c.observation === "not-observed") continue;
-      if (!shape(c,["observation","exitCode","errorCode","signal","elapsedMs","timeoutMs","version","output"]) || c.observation !== "child-result" || !nullable(c.exitCode,v=>Number.isInteger(v)&&v>=-2147483648&&v<=2147483647) || !nullable(c.errorCode,v=>CODES.has(v)) || !nullable(c.signal,v=>SIGNALS.has(v)) || !natural(c.elapsedMs) || !natural(c.timeoutMs) || c.timeoutMs < 1) return false;
+      const childFields=["observation","exitCode","errorCode","signal","elapsedMs","timeoutMs","version","output"];
+      const hasFindings=object(c) && Reflect.ownKeys(c).includes("findings");
+      if (!shape(c,hasFindings ? [...childFields,"findings"] : childFields) || c.observation !== "child-result" || !nullable(c.exitCode,v=>Number.isInteger(v)&&v>=-2147483648&&v<=2147483647) || !nullable(c.errorCode,v=>CODES.has(v)) || !nullable(c.signal,v=>SIGNALS.has(v)) || !natural(c.elapsedMs) || !natural(c.timeoutMs) || c.timeoutMs < 1) return false;
       if(!shape(c.version,["value","source"]) || !["existing-json-output","unknown-or-withheld"].includes(c.version.source)) return false;
       if(c.version.source === "existing-json-output" ? typeof c.version.value !== "string" || !VERSION.test(c.version.value) : c.version.value !== null) return false;
       const o=c.output;
       if(!shape(o,["stdoutBytes","stderrBytes","interpretation","resultsCount","errorsCount"]) || !natural(o.stdoutBytes) || !natural(o.stderrBytes) || !["complete-json","not-complete-json","over-diagnostic-budget"].includes(o.interpretation) || !nullable(o.resultsCount,natural) || !nullable(o.errorsCount,natural)) return false;
+      if (hasFindings) {
+        const f=c.findings;
+        if (!Array.isArray(f) || f.length < 1 || f.length > MAX_FINDINGS || Reflect.ownKeys(f).length !== f.length+1) return false;
+        // Unavailable stays unavailable: only a completed, clean child may carry projected findings.
+        if (c.exitCode !== 0 || c.errorCode !== null || c.signal !== null || o.interpretation !== "complete-json" || o.resultsCount === null || f.length > o.resultsCount) return false;
+        for (let i=0;i<f.length;i++) if (!Object.hasOwn(Object.getOwnPropertyDescriptor(f,String(i))??{},"value") || !validFinding(f[i])) return false;
+      }
     }
     return Buffer.byteLength(JSON.stringify(record)) <= MAX_RECORD;
   } catch { return false; }

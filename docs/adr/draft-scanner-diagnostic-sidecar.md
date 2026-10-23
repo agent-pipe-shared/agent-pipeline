@@ -166,6 +166,25 @@ delivery/evidence, alongside the original approved artifact. This technical
 refinement does not silently weaken the approved shape or claim schema standards
 interoperability testing that has not occurred.
 
+## Additive per-finding projection (PO decision 2026-10-23, AC-249)
+
+The PO decided to add, additively and minimally, an OPTIONAL `findings` array to
+the existing `child-result` shape (at most 20 entries, at least 1 when present).
+Each entry has exactly `ruleId` (bounded safe-charset string), `location`
+(repo-relative `path` plus integer `line`; no absolute path, no `..` segment) and
+`evidenceFingerprint` (the first 12 hex characters of the sha256 of the matched
+text, plus its byte `length`). The clear match, a snippet and the finding message
+never enter the record; this narrows, by explicit decision, the "no raw-output
+hashes" wording of contract point 4 to a bounded prefix of a content digest. The
+array exists only for a child that exited 0 without error or signal and returned
+complete JSON, so a timed-out, refused, crashed or unparseable scan projects
+nothing and a `not-observed` child cannot carry one. Verdicts, deadlines, the 16KiB
+record bound and `additionalProperties: false` are unchanged; the strict-refinement
+schema SHA above is superseded by
+`56400c9c0a6a2df1f99ce6141751b0b3dc4b85b80f1d0a9422446d1adb747bb9`, and both
+schema copies stay byte-identical. Only the Semgrep child is projected; other
+adapters stay outside this sidecar's closed `tool` set.
+
 ## Formal acceptance procedure
 
 At actual trunk acceptance, allocate the next free flat ordinal under ADR-0069;

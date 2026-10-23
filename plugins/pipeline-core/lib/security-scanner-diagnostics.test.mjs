@@ -260,7 +260,153 @@ test('producer publication refusal preserves original evidence and verdict seman
  }finally{close(f.base);}
 },{skip:publisherSkip});
 
-if(completionCases.length!==24)throw new Error("G13 completion topology drift");
+// K101 / AC-249 (PO decision 2026-10-23, batch 9): additive, bounded per-finding projection
+// (rule id, repo-relative location, evidence fingerprint) inside the closed child-result shape.
+// Synthetic scanner output only; the clear match text must never reach the serialised record.
+const FAKE_TOKEN='ghp_FAKE0123456789abcdefTOKENsecretvalue99';
+const projRoot='/work/root';
+const semgrepResult=(id,path,line,lines)=>({check_id:id,path,start:{line,col:1,offset:0},end:{line,col:9,offset:8},extra:{message:'leak '+FAKE_TOKEN,severity:'ERROR',lines,metadata:{}}});
+const semgrepOut=(results,extra={})=>JSON.stringify({version:'1.170.0',results,errors:[],...extra});
+const projected=(results,extra,rootDir=projRoot)=>observeSemgrepChild({status:0,stdout:semgrepOut(results,extra),stderr:''},10,60000,rootDir);
+const prefix12=text=>createHash('sha256').update(text,'utf8').digest('hex').slice(0,12);
+const finding=(over={})=>({ruleId:'rules.hardcoded-token',location:{path:'src/a.js',line:3},evidenceFingerprint:{sha256:'0123456789ab',length:12},...over});
+const withFindings=findings=>{const c=child();c.output={...c.output,resultsCount:Array.isArray(findings)?Math.max(1,findings.length):1};c.findings=findings;return record(c);};
+const oneResult=()=>child({status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',1,'x')]),stderr:''});
+
+test('findings projection: rule id, repo-relative location and a 12-hex fingerprint with length, nothing else',()=>{
+  const lines='  token = "'+FAKE_TOKEN+'";';
+  const c=projected([semgrepResult('rules.hardcoded-token','src/a.js',3,lines),semgrepResult('rules.other_rule:v1',projRoot+'/lib/b.js',7,'x')]);
+  assert.deepEqual(c.findings,[
+    {ruleId:'rules.hardcoded-token',location:{path:'src/a.js',line:3},evidenceFingerprint:{sha256:prefix12(lines),length:Buffer.byteLength(lines)}},
+    {ruleId:'rules.other_rule:v1',location:{path:'lib/b.js',line:7},evidenceFingerprint:{sha256:prefix12('x'),length:1}},
+  ]);
+  assert.match(c.findings[0].evidenceFingerprint.sha256,/^[a-f0-9]{12}$/);
+  const r=record(c);assert.equal(validateScannerDiagnostics(r),true);
+  assert.deepEqual(parseScannerDiagnostics(JSON.stringify(r),evidence).record.scanners[0].child.findings,c.findings);
+  assert.equal('findings' in child(),false,'a scan without findings keeps the previous child shape byte for byte');
+  assert.equal('findings' in projected([]),false);
+});
+
+test('findings projection is bounded: at most 20 entries, over-long or unsafe identifiers are skipped, worst case stays inside the record budget',()=>{
+  const many=Array.from({length:25},(_, i)=>semgrepResult('rule.n'+i,'f'+i+'.js',i+1,'t'+i));
+  const c=projected(many);assert.equal(c.findings.length,20);assert.equal(c.output.resultsCount,25);assert.equal(c.findings[19].ruleId,'rule.n19');
+  const longId='a'.repeat(129),longPath='d'.repeat(254)+'.js';
+  const skipped=projected([semgrepResult(longId,'a.js',1,'x'),semgrepResult('rule.ok',longPath+'x','1'.length,'x'),semgrepResult('bad id with spaces','a.js',1,'x'),semgrepResult('rule.noline','a.js',0,'x'),semgrepResult('rule.fracline','a.js',1.5,'x'),semgrepResult('rule.nolines','a.js',1,undefined),semgrepResult('rule.kept','a.js',2,'x')]);
+  assert.deepEqual(skipped.findings.map(f=>f.ruleId),['rule.kept']);
+  const worst=Array.from({length:20},(_, i)=>semgrepResult('r'.repeat(127)+(i%10),'p'.repeat(250)+i+'.js',2147483647,'z'.repeat(5000)));
+  const w=projected(worst);assert.equal(w.findings.length,20);
+  const bytes=Buffer.byteLength(JSON.stringify(record(w)));assert.ok(bytes<=16384,'worst case record is '+bytes+' bytes');
+  assert.equal(validateScannerDiagnostics(withFindings(Array.from({length:20},()=>finding()))),true);
+  assert.throws(()=>withFindings(Array.from({length:21},()=>finding())),/diagnostic-record-invalid/,'21 entries exceed the cap');
+  assert.throws(()=>withFindings([]),/diagnostic-record-invalid/,'an empty array is not a projection');
+});
+
+test('findings entries are closed and typed; malformed entries are refused by validator, builder and decoder with the typed refusal',()=>{
+  assert.equal(validateScannerDiagnostics(withFindings([finding()])),true);
+  const bad=[
+    finding({ruleId:''}),finding({ruleId:'a'.repeat(129)}),finding({ruleId:'has space'}),finding({ruleId:'-leading'}),finding({ruleId:'rule\n'}),finding({ruleId:7}),
+    finding({location:{path:'src/a.js',line:0}}),finding({location:{path:'src/a.js',line:1.5}}),finding({location:{path:'src/a.js',line:2147483648}}),finding({location:{path:'src/a.js',line:'3'}}),
+    finding({location:{path:'src/a.js',line:3,column:1}}),finding({location:{path:'src/a.js'}}),finding({location:'src/a.js:3'}),
+    finding({evidenceFingerprint:{sha256:'0123456789a',length:1}}),finding({evidenceFingerprint:{sha256:'0123456789abc',length:1}}),finding({evidenceFingerprint:{sha256:'0123456789AB',length:1}}),
+    finding({evidenceFingerprint:{sha256:'0123456789ab',length:-1}}),finding({evidenceFingerprint:{sha256:'0123456789ab',length:1.5}}),finding({evidenceFingerprint:{sha256:'0123456789ab',length:1048577}}),
+    finding({evidenceFingerprint:{sha256:'0123456789ab'}}),finding({evidenceFingerprint:{sha256:'0123456789ab',length:1,match:FAKE_TOKEN}}),
+    {...finding(),snippet:FAKE_TOKEN},{ruleId:'a.b',location:{path:'a.js',line:1}},null,'rule',[]
+  ];
+  for(const entry of bad){
+    assert.throws(()=>withFindings([entry]),/diagnostic-record-invalid/,JSON.stringify(entry));
+  }
+  const good=JSON.stringify(withFindings([finding()]));
+  assert.equal(parseScannerDiagnostics(good.replace('"ruleId":"rules.hardcoded-token"','"ruleId":"rules.hardcoded-token","snippet":"x"'),evidence).code,'diagnostic-record-invalid');
+  assert.equal(parseScannerDiagnostics(good.replace('"ruleId":"rules.hardcoded-token"','"ruleId":"has space"'),evidence).code,'diagnostic-record-invalid');
+  const x=withFindings([finding()]);x.scanners[0].child.findings.extra='x';assert.equal(validateScannerDiagnostics(x),false);
+  const y=withFindings([finding()]);Object.defineProperty(y.scanners[0].child.findings[0].location,'path',{get(){throw Error('must not call getter')},enumerable:true});assert.equal(validateScannerDiagnostics(y),false);
+});
+
+test('findings location is repo-relative: absolute, drive, UNC, backslash and parent-directory paths are never projected nor admitted',()=>{
+  const refused=['/etc/passwd','C:\\x\\a.js','C:/x/a.js','\\\\server\\share\\a.js','a\\b.js','../a.js','a/../b.js','a/./b.js','a//b.js','a/b/','','a\u0000b.js','a\nb.js'];
+  const c=projected(refused.map((p,i)=>semgrepResult('rule.r'+i,p,1,'x')).concat([semgrepResult('rule.outside','/other/place/a.js',1,'x'),semgrepResult('rule.fine',projRoot+'/ok/a.js',1,'x')]));
+  assert.deepEqual(c.findings.map(f=>f.location.path),['ok/a.js']);
+  const noRoot=observeSemgrepChild({status:0,stdout:semgrepOut([semgrepResult('rule.abs',projRoot+'/ok/a.js',1,'x'),semgrepResult('rule.rel','ok/a.js',1,'x')]),stderr:''},10,60000);
+  assert.deepEqual(noRoot.findings.map(f=>f.ruleId),['rule.rel']);
+  for(const p of refused.concat(['/abs/a.js','x'.repeat(257)])){assert.throws(()=>withFindings([finding({location:{path:p,line:1}})]),/diagnostic-record-invalid/,JSON.stringify(p));}
+  assert.equal(validateScannerDiagnostics(withFindings([finding({location:{path:'a b/ä.js',line:1}})])),true);
+});
+
+test('the clear match text is never serialised: a fake secret-looking token reaches the record only as a 12-hex fingerprint and a length',()=>{
+  const lines='aws = "'+FAKE_TOKEN+'"';
+  const out=JSON.stringify({version:'1.170.0',results:[{...semgrepResult('rules.token','src/secret.js',4,lines),extra:{message:FAKE_TOKEN,severity:'ERROR',lines,metadata:{leak:FAKE_TOKEN},fingerprint:FAKE_TOKEN}}],errors:[]});
+  const c=observeSemgrepChild({status:0,stdout:out,stderr:FAKE_TOKEN},10,60000,projRoot);
+  const r=record(c);const bytes=JSON.stringify(r);
+  assert.equal(c.findings.length,1);
+  for(const needle of [FAKE_TOKEN,FAKE_TOKEN.slice(0,12),FAKE_TOKEN.slice(-12),lines,createHash('sha256').update(lines).digest('hex')])assert.equal(bytes.includes(needle),false,'record must not contain '+needle);
+  assert.equal(bytes.includes(prefix12(lines)),true);
+  assert.equal(parseScannerDiagnostics(bytes,evidence).ok,true);
+  const smuggled=structuredClone(r);smuggled.scanners[0].child.findings[0].evidenceFingerprint.sha256=createHash('sha256').update(lines).digest('hex');
+  assert.equal(validateScannerDiagnostics(smuggled),false,'a full digest is not a 12-hex prefix');
+});
+
+test('unavailable stays unavailable: no findings are projected, or admitted, when the scanner did not complete',async()=>{
+  const body=semgrepOut([semgrepResult('rules.token','a.js',1,'x')]);
+  const incomplete=[
+    {status:null,error:{code:'ETIMEDOUT',message:FAKE_TOKEN},signal:'SIGTERM',stdout:body,stderr:''},
+    {status:null,error:{code:'EPERM'},stdout:body,stderr:''},
+    {status:7,stdout:body,stderr:''},
+    {status:0,signal:'SIGKILL',stdout:body,stderr:''},
+    {status:0,stdout:'not json '+body,stderr:''},
+    {status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',1,'x')],{pad:'x'.repeat(1048576)}),stderr:''},
+    {status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',1,'x')],{errors:[{level:'error',type:'Timeout',path:'a.js'}]}),stderr:''},
+    {status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',1,'x')],{errors:[{level:'warn',type:'Timeout',path:'a.js'}]}),stderr:''},
+    {status:0,stdout:JSON.stringify({version:'1.170.0',errors:[]}),stderr:''},
+  ];
+  for(const result of incomplete){const c=observeSemgrepChild(result,10,60000,projRoot);assert.equal('findings' in c,false,JSON.stringify(c));}
+  assert.equal('findings' in observeSemgrepChild({status:0,stdout:body,stderr:''},10,0,projRoot),false);
+  assert.deepEqual(observeSemgrepChild({status:0,stdout:body,stderr:''},10,0,projRoot),{observation:'not-observed'});
+  // Degraded coverage (warn-level PartialParsing only) is still a completed scan, as in the adapter.
+  const partial=projected([semgrepResult('rules.token','a.js',1,'x')],{errors:[{level:'warn',type:['PartialParsing',[]],path:'b.js'}]});
+  assert.equal(partial.findings.length,1);
+  // The closed validator enforces the same gate, so a forged record cannot carry findings for an unavailable child.
+  const absent=record({observation:'not-observed'});absent.scanners[0].child.findings=[finding()];assert.equal(validateScannerDiagnostics(absent),false);
+  const base=oneResult();assert.equal(validateScannerDiagnostics(record(base)),true);
+  for(const patch of [{errorCode:'ETIMEDOUT'},{signal:'SIGTERM'},{exitCode:7},{exitCode:null},{output:{...base.output,interpretation:'not-complete-json'}},{output:{...base.output,interpretation:'over-diagnostic-budget'}},{output:{...base.output,resultsCount:null}},{output:{...base.output,resultsCount:0}}]){
+    assert.throws(()=>record({...base,...patch}),/diagnostic-record-invalid/,JSON.stringify(patch));
+  }
+  assert.throws(()=>record({...base,findings:[finding(),finding()]}),/diagnostic-record-invalid/,'more findings than the observed resultsCount');
+});
+
+test('verdict independence and schema: adapter verdict, findings and exit semantics are unchanged; both schema copies declare the optional bounded array',async()=>{
+  const {value}=await invoke({status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',3,'x '+FAKE_TOKEN)]),stderr:''});
+  assert.equal(value.status,'FINDINGS');assert.equal(value.classification,'findings');assert.equal(value.findings.length,1);assert.equal(value.findings[0].rule,'rules.token');assert.equal(value.findings[0].line,3);
+  assert.equal(value.diagnostics.findings.length,1);assert.equal(value.diagnostics.findings[0].ruleId,'rules.token');
+  assert.equal(JSON.stringify(record(value.diagnostics)).includes(FAKE_TOKEN),false);
+  const timedOut=(await invoke({status:null,error:{code:'ETIMEDOUT'},signal:'SIGTERM',stdout:semgrepOut([semgrepResult('rules.token','a.js',3,'x')]),stderr:''})).value;
+  assert.equal(timedOut.status,'ERROR');assert.equal('findings' in timedOut.diagnostics,false);
+  const clean=(await invoke({status:0,stdout:semgrepOut([]),stderr:''})).value;
+  assert.equal(clean.status,'PASS');assert.equal('findings' in clean.diagnostics,false);
+  for(const url of ['../../../schemas/pipeline.security-scanner-diagnostics.v1.json','../schemas/pipeline.security-scanner-diagnostics.v1.json']){
+    const schema=JSON.parse(readFileSync(new URL(url,import.meta.url),'utf8'));
+    const childResult=schema.properties.scanners.items.properties.child.oneOf[0];
+    assert.equal(childResult.additionalProperties,false);assert.equal(childResult.required.includes('findings'),false);
+    const f=childResult.properties.findings;assert.equal(f.type,'array');assert.equal(f.maxItems,20);assert.equal(f.items.additionalProperties,false);
+    assert.deepEqual(f.items.required,['ruleId','location','evidenceFingerprint']);
+    assert.equal(schema.additionalProperties,false);assert.deepEqual(schema.required,['schema','authority','evidencePayloadSha256','candidate','scanners']);
+  }
+});
+
+test('producer: a synthetic Semgrep finding with a fake token publishes rule id, location and fingerprint, and the sidecar bytes never contain the token',async()=>{
+ const f=producerFixture();try{
+  const lines='k = "'+FAKE_TOKEN+'"';
+  const result=await produce(f,{status:0,stdout:semgrepOut([semgrepResult('rules.token','src/a.js',4,lines)]),stderr:FAKE_TOKEN});
+  assert.equal(result.evidence.scanners[0].status,'FINDINGS');
+  const bytes=readFileSync(target(f.root));const parsed=parseScannerDiagnostics(bytes,result.evidence);assert.equal(parsed.ok,true);
+  assert.deepEqual(parsed.record.scanners[0].child.findings,[{ruleId:'rules.token',location:{path:'src/a.js',line:4},evidenceFingerprint:{sha256:prefix12(lines),length:Buffer.byteLength(lines)}}]);
+  assert.equal(bytes.toString('utf8').includes(FAKE_TOKEN),false);
+  const timed=await produce(f,{status:null,error:{code:'ETIMEDOUT'},signal:'SIGTERM',stdout:semgrepOut([semgrepResult('rules.token','src/a.js',4,lines)]),stderr:''});
+  assert.equal(timed.exitCode,2);assert.equal(timed.evidence.scanners[0].status,'ERROR');
+  const timedParsed=parseScannerDiagnostics(readFileSync(target(f.root)),timed.evidence);assert.equal(timedParsed.ok,true);assert.equal('findings' in timedParsed.record.scanners[0].child,false);
+ }finally{close(f.base);}
+},{skip:publisherSkip});
+
+if(completionCases.length!==32)throw new Error("G13 completion topology drift");
 const completionFd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined
   ? openCompletionDescriptor(devNull,"w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

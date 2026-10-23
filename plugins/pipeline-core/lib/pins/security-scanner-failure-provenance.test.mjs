@@ -177,6 +177,32 @@ test("P4 secrets and unrestricted child output are not persisted; unknown codes 
   assert.equal(parseScannerDiagnostics(" ".repeat(16385), evidence).ok, false);
 });
 
+// AC-249 (PO decision 2026-10-23): additive per-finding projection; the clear match never crosses the surface.
+test("P3/P4 per-finding projection carries rule id, repo-relative location and a fingerprint only, from a completed scan only, and never changes the verdict", async () => {
+  const TOKEN = "ghp_FAKE0123456789abcdefTOKENsecretvalue99";
+  const lines = `key = "${TOKEN}"`;
+  const body = JSON.stringify({ version: "1.170.0", errors: [], results: [{ check_id: "rules.hardcoded-token", path: "src/a.js", start: { line: 4, col: 1, offset: 0 }, end: { line: 4, col: 9, offset: 8 }, extra: { message: `leak ${TOKEN}`, severity: "ERROR", lines, metadata: {} } }] });
+  const completed = (await call(productionRun, { status: 0, stdout: body, stderr: TOKEN })).value;
+  assert.equal(tuple(completed), "FINDINGS/findings", "the verdict is the adapter's own, independent of the projection");
+  const projection = completed.diagnostics.findings;
+  assert.deepEqual(projection, [{ ruleId: "rules.hardcoded-token", location: { path: "src/a.js", line: 4 }, evidenceFingerprint: { sha256: createHash("sha256").update(lines).digest("hex").slice(0, 12), length: Buffer.byteLength(lines) } }]);
+  const record = buildScannerDiagnostics(evidence, [{ tool: "semgrep", executableSha256: hash, rules: observeLocalRules("/r", null), child: completed.diagnostics }]);
+  const serialised = JSON.stringify(record);
+  assert.equal(serialised.includes(TOKEN), false, "the clear match must not be serialised");
+  assert.equal(serialised.includes(createHash("sha256").update(lines).digest("hex")), false, "only a 12-hex prefix of the digest is retained");
+  assert.equal(parseScannerDiagnostics(Buffer.from(serialised), evidence).ok, true);
+  // Unavailable stays unavailable: a timed-out, refused, crashed or unparseable child projects nothing, and the cases stay distinct.
+  const timedOut = (await call(productionRun, { status: null, error: { code: "ETIMEDOUT" }, signal: "SIGTERM", stdout: body, stderr: "" })).value;
+  const refused = (await call(productionRun, Object.assign(new Error("x"), { code: "EPERM" }))).value;
+  const crashed = (await call(productionRun, { status: 7, stdout: body, stderr: "" })).value;
+  for (const r of [timedOut, refused, crashed]) { assert.equal(r.status, "ERROR"); assert.equal("findings" in r.diagnostics, false); }
+  assert.equal(new Set([tuple(completed), tuple(timedOut), tuple(refused), tuple(await missingCall(productionRun))]).size, 4);
+  // The closed schema still refuses a forged field next to the projection.
+  const forged = structuredClone(record);
+  forged.scanners[0].child.findings[0].snippet = TOKEN;
+  assert.equal(validateScannerDiagnostics(forged), false);
+});
+
 test("P2 diagnostics are verdict-independent: the record is diagnostic-only and any verdict field is refused", () => {
   const record = buildScannerDiagnostics(evidence, []);
   assert.equal(record.authority, "diagnostic-only");
