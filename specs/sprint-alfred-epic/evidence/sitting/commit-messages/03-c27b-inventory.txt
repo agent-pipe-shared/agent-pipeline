@@ -1,0 +1,6 @@
+chore(inventory): add the run-parallel surface and move the sourceBaseline after the verify-suites registration
+
+The surface line is applied after the verify-suites commit; scripts/rebaseline-inventory.mjs then moves sourceBaseline (docs/operating-tools.md order).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

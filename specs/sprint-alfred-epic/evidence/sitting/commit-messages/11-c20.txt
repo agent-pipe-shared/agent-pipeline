@@ -1,0 +1,6 @@
+fix(state): finish the orphan binding release after discard-feature's State lock (D73 E)
+
+discard-feature finishes the orphan binding release once its State lock is released (K67).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

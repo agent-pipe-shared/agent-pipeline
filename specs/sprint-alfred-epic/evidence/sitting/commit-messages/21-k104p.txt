@@ -1,0 +1,6 @@
+feat(guard-dispatch): refuse overlapping write scopes without a slice queue (enforce by default)
+
+Judgement runs in the spawned dispatch-record-liveness script because a static import of the liveness lib from the hook breaks the module initialisation order (TDZ in project-onboarding-ready-gate).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

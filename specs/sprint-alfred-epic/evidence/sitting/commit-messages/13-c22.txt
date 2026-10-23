@@ -1,0 +1,6 @@
+test(guard): give the Antigravity fixtures their architecture design block, tool-layer model and authority files
+
+Cumulative fixture repair of the Antigravity pretool guard test (K73 + K76; D84/MP-29).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

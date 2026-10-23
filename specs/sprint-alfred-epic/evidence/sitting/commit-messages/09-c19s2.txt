@@ -1,0 +1,6 @@
+feat(dispatch-briefing): cancel-class tests and CLI flags for the slice queue (D75 S4/S5)
+
+Unprotected tests and scripts of the D75 cancel-class increment; imports the S4 libs from the preceding commit.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

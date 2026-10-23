@@ -1,0 +1,6 @@
+fix(pipeline-core): keep pipeline.user.yaml repairable by signature (decision row 29)
+
+human-guard-override.mjs no longer refuses pipeline.user.yaml up front; the denial seeds a normal signable request. Widening stays refused by GS-1.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

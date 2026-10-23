@@ -1,0 +1,6 @@
+test(session-cleanup): pin crash recovery of the private closed release with an armed member
+
+Pins the member step added by the preceding protected commit (K80).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

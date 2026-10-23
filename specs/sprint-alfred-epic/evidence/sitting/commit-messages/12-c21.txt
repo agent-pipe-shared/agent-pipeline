@@ -1,0 +1,6 @@
+test(guard): follow the guard split anchor and the feature-profile bind stop in the apply-patch pins
+
+Restates the apply-patch fixtures to the guard split anchor and the feature-profile bind stop (K73, QG-04 restatement recorded in k73-k8-three-reds.notes.md).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

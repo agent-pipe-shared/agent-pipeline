@@ -1,0 +1,6 @@
+fix(interruption): import the pure lineage validators in the source adapter
+
+The source adapter imports the pure validators from the new core module (K81).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

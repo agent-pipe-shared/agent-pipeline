@@ -1,0 +1,6 @@
+feat(guard): admit git show <rev>:<path> with --format= and a trailing -- in the bounded head pipeline
+
+Widens the git-show object lane per the PO tile decision (row 15, 2026-10-23): one optional plain --format=<fmt> and one trailing -- before the single head sink.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

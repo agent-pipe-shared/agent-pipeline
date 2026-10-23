@@ -1,0 +1,6 @@
+fix(continuity): run the registry member step for the private closed cleanup release
+
+A closed cleanup release with an armed registry member now runs the member step (K80); the unprotected crash-recovery pin follows.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

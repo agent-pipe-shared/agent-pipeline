@@ -1,0 +1,6 @@
+fix(guard): classify stash chains, perl/ruby -i.bak and git apply --check --reverse
+
+protected-test-paths.mjs classifier fixes (K75); unprotected pins follow.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

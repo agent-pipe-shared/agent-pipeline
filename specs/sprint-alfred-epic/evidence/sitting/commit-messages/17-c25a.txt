@@ -1,0 +1,6 @@
+refactor(critic): split the pure lineage validators into their own module
+
+New critic-review-lineage-core.mjs with its NEVER_LIFTABLE_KERNEL_PATHS line and threat-model entry (GMWKC01/03, K81).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

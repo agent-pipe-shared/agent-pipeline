@@ -1,0 +1,6 @@
+fix(onboarding): print the staging banner in the continuity output
+
+The staging banner line is added to onboarding-continuity.mjs (K64); the design-generator pin banner red disappears with it.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

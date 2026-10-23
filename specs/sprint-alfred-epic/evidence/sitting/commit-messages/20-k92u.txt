@@ -1,0 +1,6 @@
+test(pipeline-core): restate the AC-258 user-config pin to the signed route and add a widening negative control
+
+QG-04 restatement bounded by decision row 29; the skip of the mirror proof is gone.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

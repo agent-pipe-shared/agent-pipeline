@@ -1,0 +1,6 @@
+test(verify): register the run-parallel suite and complete the case-id lists and the antigravity refresh augmentation
+
+NGHR06, UC02C008-020, MFH005 and K3C007-009 are added after each suite ran green alone; run-parallel-tests is registered; RC05C014 and RC05C015 complete the antigravity refresh host augmentation (inline policy untouched, so the previous-policy digest stays valid).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

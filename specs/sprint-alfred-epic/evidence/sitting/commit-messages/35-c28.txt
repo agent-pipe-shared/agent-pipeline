@@ -1,0 +1,6 @@
+chore(critic): re-pin the isolated Critic protected preimage
+
+Re-pin to the current Critic-contract bytes after the review of the commit ranges above.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

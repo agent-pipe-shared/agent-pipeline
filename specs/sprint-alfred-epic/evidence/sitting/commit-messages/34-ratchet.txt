@@ -1,0 +1,6 @@
+chore(architecture): raise the line ratchets of the files the sitting bundle grew
+
+Each maxLines is set to the measured line count of the bundle state, no headroom (k108-notes.md ratchet table).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

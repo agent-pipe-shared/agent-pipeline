@@ -1,0 +1,6 @@
+feat(guard): name a credential target with GUARD-READ-CREDENTIAL-TARGET on the Claude native Read, Grep and Glob lane
+
+read-scope.mjs asks the K96 classifier before the generic refusal.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

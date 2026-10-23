@@ -1,0 +1,6 @@
+test(pins): pin the admitted and refused git show forms of the bounded head pipeline
+
+Advertised-git-to-head pin and claude-windows pin AP16; cases only added (QG-04).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

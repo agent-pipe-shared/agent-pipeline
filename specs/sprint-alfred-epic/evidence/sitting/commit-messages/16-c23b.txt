@@ -1,0 +1,6 @@
+test(pins): pin the stash chain, in-place edit and apply --check --reverse classifications
+
+Pins for the classifier change of the preceding protected commit (K75).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

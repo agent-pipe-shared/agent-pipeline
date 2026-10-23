@@ -1,0 +1,6 @@
+feat(guard): refuse credential read targets with GUARD-READ-CREDENTIAL-TARGET and a repair
+
+Typed code, classifier isCredentialReadTarget and the shell-lane branch (M7).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

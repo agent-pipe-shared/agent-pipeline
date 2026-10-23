@@ -1,0 +1,6 @@
+fix(refusals): name cause and signature-route repair in the chat-mode approve-push refusal with a catalogue
+
+PO decision 2026-10-23 (tiles batch 7 rows 1, 2; D74). Message-only; code, exit and zero-mutation unchanged.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

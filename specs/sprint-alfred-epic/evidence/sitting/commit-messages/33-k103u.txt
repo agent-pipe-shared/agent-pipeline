@@ -1,0 +1,6 @@
+test(refusals): pin the cause and the signature-route repair of the chat-mode approve-push refusal
+
+New pipeline-state-approve-push-chat-catalogue-repair.test.mjs, green with the preceding protected commit (PO tiles batch 7 rows 1, 2). The hook-refresh part of K103 is already on main (57c12ecc0).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

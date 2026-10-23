@@ -1,0 +1,6 @@
+fix(agy): print the typed credential-target refusal on native read tools
+
+Adapter, its tests and the read-blocks pin (QG-04 restatements bounded by PO decision 2026-10-23 rows 6/16).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

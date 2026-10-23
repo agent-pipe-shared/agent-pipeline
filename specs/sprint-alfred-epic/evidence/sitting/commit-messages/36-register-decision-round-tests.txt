@@ -1,0 +1,8 @@
+chore(verify): register the test files of the decision round
+
+Seven *.test.mjs suites had no Verify registration (check-verify-suite-registration exit 2, 7 UNREGISTERED): commit-message-policy-administrative-refusal, dispatch-scope-overlap, onboarding-init-machine-plane-reason, pipeline-state-approve-push-chat-catalogue-repair (new with the bundle) and clone-hook-readiness.refresh, commit-pipeline-owned, gitleaks-scratch-clones-exclusion (already unregistered on main). Add one verify-suites.json entry each (registered 1085 -> 1092; each file measured green alone).
+
+Four of them are classified vulnerable by the case-completion checker (node-test-single), so each gets a legacy-process-only row in the completion registry and is counted in the VCR01 pin (QG-04, own hunk: +4 classified rows, registry 357 -> 361, the four names also excluded from the R5 identity set; no existing row, assertion or digest is removed or weakened). The inventory surfaces and the source baseline follow in the next commit.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

@@ -1,0 +1,6 @@
+test(verify): register the added cases of five suites and diagnose the address root around the Verify run
+
+CMP040, TPC019-TPC021, MRSR06-MRSR08, WPS014-WPS016 and CMI023 are added to the inline case-id lists (Full Verify case-drift, C15); K1R diagnostics call repairAddressRootQuietly before and after runVerifyJournal (D71/D72).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

@@ -1,0 +1,6 @@
+feat(dispatch-briefing): require a recon note after a wrong-premise cancel and end the duty at delivery (D75 A)
+
+Combined K95 + K106 diff: DBG-RECON-REQUIRED, --recon-note, end of the duty once a slice of the item was delivered.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

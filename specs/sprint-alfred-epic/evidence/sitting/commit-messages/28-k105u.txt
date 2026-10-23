@@ -1,0 +1,6 @@
+test(pins): pin the typed credential refusal on the Claude native read lane; restate P5 to the typed code
+
+QG-04: P5 asserts the typed code, justification in the file (PO decision 2026-10-23).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

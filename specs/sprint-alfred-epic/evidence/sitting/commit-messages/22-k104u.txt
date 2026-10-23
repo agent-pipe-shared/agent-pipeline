@@ -1,0 +1,6 @@
+test(dispatch-scope-overlap): pin the scope-overlap admission and the hook import cycle
+
+Shares the running-dispatch reader in dispatch-briefing.mjs and pins the hook import cycle (K104).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

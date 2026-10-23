@@ -1,0 +1,6 @@
+fix(guard): share one onboarding observation between the dev-plan shell lane and the lifecycle gate
+
+A memoizing wrapper is built before the shell lanes (RC04C001); decisions unchanged (K76).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

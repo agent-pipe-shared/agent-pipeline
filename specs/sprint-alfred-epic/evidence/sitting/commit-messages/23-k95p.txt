@@ -1,0 +1,6 @@
+feat(dispatch-briefing): accept the reconNote package field and list it as a context file (D75 A)
+
+dispatch-briefing-build.mjs gains the optional reconNote package field (K95).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

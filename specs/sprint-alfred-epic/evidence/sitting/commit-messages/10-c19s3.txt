@@ -1,0 +1,6 @@
+feat(guard-dispatch): name the cancel class in the kept-queue-row warning (D75 S5)
+
+guard-dispatch.mjs and its test print the cancel class of a kept queue row (D75 S5).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

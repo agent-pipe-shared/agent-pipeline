@@ -1,0 +1,6 @@
+test(guard-lifecycle-ready): spell fixture paths in Bash command strings with forward slashes
+
+Fixture paths inside Bash command strings use forward slashes so the POSIX command-path cases hold on every host (K55).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

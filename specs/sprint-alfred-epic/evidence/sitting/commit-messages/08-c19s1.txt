@@ -1,0 +1,6 @@
+feat(slice-queue): classify a slice cancel by reason class (D75 S4)
+
+CANCEL_CLASSES and CANCEL_CLASS_HELP in slice-queue.mjs, the class carried through native-goldfish-host-state.mjs (D75 S4).
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

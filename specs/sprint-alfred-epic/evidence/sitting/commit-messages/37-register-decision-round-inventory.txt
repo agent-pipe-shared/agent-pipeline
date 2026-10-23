@@ -1,0 +1,6 @@
+chore(inventory): add the seven decision-round test surfaces and rebaseline the source
+
+The seven verify-phase surfaces of the newly registered test files are added to the deterministic-verification capability, and sourceBaseline moves to the commit that holds the registrations.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)
