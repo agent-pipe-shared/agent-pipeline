@@ -883,6 +883,28 @@ check("Antigravity signature guidance assigns only sign-intent to the external P
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// PO decision 2026-10-23 (row 29): the signed-override route for pipeline.user.yaml must not become
+// an admission. Without an armed capability an agent widening (signature -> chat) is still denied
+// and nothing is written; the route only names the human ceremony that could authorize it.
+check("Antigravity GS-1 widening of pipeline.user.yaml stays denied without an armed capability (k92 negative control)", () => {
+  const root = readyLifecycleFixture("signature");
+  try {
+    const sourcePath = join(root, "pipeline.user.yaml");
+    const before = readFileSync(sourcePath, "utf8");
+    assert.match(before, /push_approval: "signature"/u);
+    const res = decision(run({
+      toolCall: {
+        name: "replace_file_content",
+        args: { TargetFile: sourcePath, TargetContent: 'push_approval: "signature"', ReplacementContent: 'push_approval: "chat"' },
+      },
+    }, root));
+    assert.equal(res.decision, "deny", "a widening without a capability must not be admitted");
+    assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
+    assert.match(res.reason, /authorize-by-signature --repo/u, "the repair is a human signature, not an agent action");
+    assert.equal(readFileSync(sourcePath, "utf8"), before, "the denied edit left pipeline.user.yaml untouched");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 check("Antigravity pretool guard blocks agent self-approval for approve-push", () => {
   const root = fixture();
   const res = decision(run({
