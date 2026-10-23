@@ -84,7 +84,7 @@ import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, parseD
 import { recordDispatchBriefingRoute } from "../lib/dispatch-briefing-route-record.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
-import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
+import { CANCEL_CLASS_HELP, CANCEL_CLASSES, loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
 import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
@@ -99,6 +99,12 @@ const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", i
 const sessionAuthorityRepair = (code, root) => typeof code === "string" && code.startsWith("SDC-")
   ? `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} inspect --root ${root} names the cause and the command that clears it`
   : null;
+// D75: the warning for a queue row a refused dispatch prepared and could not roll back. The release it names is a cancel,
+// and a cancel now carries its class, so the text gives the argument and one teaching line per class (exported for its test).
+export function queueRowKeptWarning({ sliceId, code } = {}) {
+  const classes = CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ");
+  return `WARNING (guard-dispatch): the queue row this refused dispatch prepared for ${sliceId} is kept (${code}); if it is not dispatched again, release it with: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>" --class <${CANCEL_CLASSES.join("|")}>. Pick the class that says why it ends: ${classes}.\n`;
+}
 // Repository admission precedes hook input hardening and all governed effects.
 if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
 
@@ -833,7 +839,7 @@ if (isDirectInvocation(import.meta.url)) {
           // Nothing refuses once the native pending state is written (Critic F4); a non-zero exit after it is a crash,
           // and then row and state stay together, released by one cancel.
           const rolled=nativePendingPrepared?{status:"refused",code:"native-pending-prepared"}:rollbackGovernedItemQueue(written);
-          if(rolled.status==="refused")process.stderr.write(`WARNING (guard-dispatch): the queue row this refused dispatch prepared for ${sliceId} is kept (${rolled.code}); if it is not dispatched again, release it with: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>".\n`);
+          if(rolled.status==="refused")process.stderr.write(queueRowKeptWarning({sliceId,code:rolled.code}));
         });
       }
     }

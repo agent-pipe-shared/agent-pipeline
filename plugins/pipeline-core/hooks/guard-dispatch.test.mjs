@@ -1025,7 +1025,30 @@ manualCheck("GD65 the registration fact is one exported function: the real hooks
   }
 });
 
-assert.equal(cases.length, 66, "the complete dispatch guard corpus must register before execution");
+// D75 S5 -- the warning a kept queue row prints names its release as a cancel WITH the class argument and teaches every class.
+// Subprocess import for the same reason as GD16: this file never imports the hook module at its own module scope.
+manualCheck("GD66 the kept-queue-row warning names the cancel with --class and one teaching line per class (D75 S5)", () => {
+  const dir = realpathSync(mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-kept-row-")));
+  try {
+    const runnerPath = join(dir, "kept-row-check.mjs");
+    writeFileSync(runnerPath, [
+      "const mod = await import(process.argv[2]);",
+      "const { CANCEL_CLASSES, CANCEL_CLASS_HELP } = await import(process.argv[3]);",
+      "process.stdout.write(JSON.stringify({ text: mod.queueRowKeptWarning({ sliceId: 'ITEM-AC-9', code: 'native-pending-prepared' }), classes: CANCEL_CLASSES, help: CANCEL_CLASS_HELP }));",
+    ].join("\n"));
+    const res = spawnSync(process.execPath, [runnerPath, pathToFileURL(GUARD).href, pathToFileURL(join(dirname(GUARD), "..", "lib", "slice-queue.mjs")).href], { input: "", encoding: "utf8", timeout: 10000 });
+    assert.equal(res.status, 0, `runner exit ${res.status} -- ${(res.stderr ?? "").trim().slice(0, 300)}`);
+    const { text, classes, help } = JSON.parse(res.stdout);
+    assert.ok(text.startsWith("WARNING (guard-dispatch): the queue row this refused dispatch prepared for ITEM-AC-9 is kept (native-pending-prepared);"), text);
+    assert.match(text, /slice-queue\.mjs cancel ITEM-AC-9 --started --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>\./u, text);
+    for (const name of classes) assert.ok(text.includes(`${name} = ${help[name]}`), `${name} is taught: ${text}`);
+    assert.ok(text.endsWith("\n"), "one stderr line");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+assert.equal(cases.length, 67, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
