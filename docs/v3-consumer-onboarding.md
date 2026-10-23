@@ -11,69 +11,23 @@ projection plan.
 
 - Resolve `<plugin-root>` to the installed directory of the approved
   GitHub-distributed Public Core; do not use a maintainer checkout.
-- Supply one real consumer project root. Legacy migration additionally requires
-  its existing `pipeline.user.yaml`.
+- Supply one real consumer project root, written `<project-root>` below.
+  Legacy migration additionally requires its existing `pipeline.user.yaml`.
 - For legacy migration, keep the project writable only for the final, explicit
   activation. `inspect` and `plan` are read-only.
-- Critic export is always limited to the configured allowlist: the bounded
-  candidate packet, listed providers, and listed assurance classes. The fresh
-  default records repository-scoped Advisor-export consent as `approved`, so a
-  matching consultation does not ask again for every export. A different data
-  class, provider, or packet boundary is not covered and remains blocked until
-  it is explicitly configured. Do not perform a consultation merely to
-  activate or bootstrap; Advisor capability preflight is model-free and
-  consultation is on demand. A migration preview is not an approval, push, or
-  release authorization.
 
 ## After installation consent, bind the runner integration
 
 In an ungoverned folder, ask for and receive explicit installation consent
-before installing, invoking `pipeline-start`, or writing project files. For an
-already-governed project, continue with its configured update path. Bind the
-approved GitHub-distributed plugin for the runner that will govern the
-consumer project. The commands differ by runner; run them from the project
-root, then follow that runner's restart or reload requirement below and start
-a new session in that root.
-After consent, invoke `/pipeline-core:pipeline-start` as the first Pipeline action. Its
-preflight supplies the exact onboarding action for the observed project state.
-
-### Claude Code
-
-Add the official GitHub marketplace and install the plugin at project scope:
-
-```sh
-claude plugin marketplace add agent-pipe-shared/agent-pipeline --scope project
-claude plugin install pipeline-core@agent-pipeline --scope project
-```
-
-Confirm the binding with `claude plugin list --json`. The first binding needs
-a full Claude Code restart before `/pipeline-core:pipeline-start`; a plugin
-reload within the old process is not that first restart. The project scope
-keeps the binding with the governed project.
-
-### Codex
-
-Use Codex's own Git marketplace and plugin commands:
-
-```sh
-codex plugin marketplace add https://github.com/agent-pipe-shared/agent-pipeline.git --ref main
-codex plugin marketplace upgrade agent-pipeline
-codex plugin add pipeline-core@agent-pipeline
-codex plugin list --marketplace agent-pipeline --json
-```
-
-The final command must show exactly one installed and enabled
-`pipeline-core@agent-pipeline`. Fully end the Codex host process, start a new
-thread in the project root, and invoke `/pipeline-core:pipeline-start`.
-Codex's binding does not use Claude's `--scope project` commands.
-
-### Antigravity (Agy)
-
-Use the one maintained [Agy workspace-local installation and upgrade
-procedure](../SETUP.md#antigravity-agy-workspace-local-binding). It covers
-the approved GitHub distribution, exact path readback, restart, and stale
-registration recovery. Do not repeat the Codex lifecycle V4 steps below for
-Antigravity; follow the installed Agy Driver's returned classification action.
+before installing, invoking `pipeline-start`, or writing project files. The
+install, update, and restart commands for Claude Code, Codex, and Antigravity
+(Agy) are maintained in one place,
+[SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host);
+this guide does not repeat them. After binding and the restart, invoke
+`/pipeline-core:pipeline-start` as the first Pipeline action: its preflight
+supplies the exact onboarding action for the observed project state. Do not
+repeat the Codex lifecycle V4 steps below for Antigravity; follow the installed
+Agy Driver's returned classification action.
 
 ## Fresh Codex lifecycle V4
 
@@ -100,8 +54,8 @@ cache version heuristically.
 
 | Runner | Linux and macOS | Windows | Update/readback requirement |
 | --- | --- | --- | --- |
-| Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | After installing or updating, fully end the Codex host process, then start a new thread in the project root and inspect `/hooks`. A fresh thread or reload inside the old process does not prove its cached skill snapshot changed; accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
-| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Run `claude plugin marketplace update agent-pipeline`, then `claude plugin update pipeline-core@agent-pipeline --scope project`, then `/reload-plugins`. Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
+| Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | Install, update, and restart as in [SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host). Accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
+| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Update as in [SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host). Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
 
 The lifecycle planner returns an executable plus an argv array. Agents must
 render that exact action for the current shell when an operator has to execute
@@ -110,7 +64,7 @@ Windows. The digest and individual argv elements must not be reconstructed,
 split, or translated.
 
 ```sh
-node <plugin-root>/scripts/project-onboarding-v3.mjs inspect --root /absolute/consumer/root --intent onboarding
+node <plugin-root>/scripts/project-onboarding-v3.mjs inspect --root <project-root> --intent onboarding
 ```
 
 The normal progress sequence is ordered and fail-closed:
@@ -132,7 +86,7 @@ over existing project files.
 | `intake-required` | Follow the returned consent/capture action to record the project brief and required local identity fields. | The private intake checkpoint contains consent and the captured material input; it is not yet a generated specification. |
 | `intake-design-questions-required` | Answer the one bundled question round, correct wrong answers before generation when needed, then run the returned read-only generation plan and its digest-bound apply. | The complete input is durable and staging generation is bound to its digest. |
 | `bootstrap-binding-required` | Review the generated PRD/Spec, add the requested acknowledgement, then run the returned bind plan/apply. | The generated package becomes the initial project authority only after its own validation and binding readback. |
-| `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan. | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
+| `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan (see the [kickoff apply contract](#kickoff-apply-contract), at the end of this guide). | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
 | `host-repository-init-required` | For a Codex host-managed root with valid continuity, follow the exact host-repository-init plan and confirmed action described below. It can follow either the fresh binding path or the earlier kickoff route; it is not a second kickoff. | The host initializes local Git without a commit. A fresh readback is still required, and dispatch remains blocked until the first commit. |
 | `continuity-damaged` | Run the exact read-only `plan-repair`. A supported bounded repair requires a separate digest-bound confirmation; an unsupported result stops with no next action. | Only the recognized active-turn resume mismatch or an established PO-bound pre-continuity state is repairable. Kickoff history is never rewritten. |
 | `ready` | No onboarding mutation. Continue through the intent-appropriate bootstrap/session/dispatch gate. | Repository capability, current source/runtime/readback, continuity, and every capability required by that intent passed together. |
@@ -141,11 +95,11 @@ For the first two write stages, execute the complete `argv` returned by the
 plan rather than reconstructing flags:
 
 ```sh
-node <plugin-root>/scripts/project-onboarding-v3.mjs plan --root /absolute/consumer/root
-node <plugin-root>/scripts/project-onboarding-v3.mjs apply-portable-seed --root /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
+node <plugin-root>/scripts/project-onboarding-v3.mjs plan --root <project-root>
+node <plugin-root>/scripts/project-onboarding-v3.mjs apply-portable-seed --root <project-root> --plan-sha256 <digest-from-plan> --activate
 
-node <plugin-root>/scripts/project-onboarding-v3.mjs plan-runtime --root /absolute/consumer/root
-node <plugin-root>/scripts/project-onboarding-v3.mjs initialize-runtime --root /absolute/consumer/root --plan-sha256 <digest-from-plan-runtime> --activate
+node <plugin-root>/scripts/project-onboarding-v3.mjs plan-runtime --root <project-root>
+node <plugin-root>/scripts/project-onboarding-v3.mjs initialize-runtime --root <project-root> --plan-sha256 <digest-from-plan-runtime> --activate
 ```
 
 Every plan is read-only. Every apply requires explicit activation, authenticates
@@ -160,35 +114,13 @@ without deleting or hand-editing the checkpoint. Re-submit the complete answer
 array through the separately named command:
 
 ```sh
-node <plugin-root>/scripts/project-onboarding-v3.mjs intake-design-questions-replace --root /absolute/consumer/root --answers-json '<complete JSON array>' --activate
+node <plugin-root>/scripts/project-onboarding-v3.mjs intake-design-questions-replace --root <project-root> --answers-json '<complete JSON array>' --activate
 ```
 
 The ordinary `intake-design-questions-apply` remains idempotent and refuses
 changed content. Replacement increments the checkpoint revision and is refused
 after staging has been generated or bound; later corrections use the normal
 specification-amendment path.
-
-### Kickoff apply contract
-
-Supply the validated goal to `kickoff plan` as one argv element. The command
-trims and validates 1–8192 bytes of NUL-free UTF-8 text and remains read-only:
-
-```sh
-node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff plan --root /absolute/consumer/root --goal '<project goal>'
-```
-
-The returned plan contains the exact digest-bound apply `argv`:
-
-```sh
-node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff apply --root /absolute/consumer/root --goal '<same validated project goal>' --plan-sha256 <digest-from-kickoff-plan> --activate
-```
-
-Execute the returned argument array without splitting or reinterpreting the
-goal. Apply validates the goal again, deterministically reconstructs the same
-closed plan, verifies the supplied plan SHA-256, and binds both goal and plan
-before writing. It never recovers a goal from a digest and uses no cache,
-environment variable, or file payload fallback. A matching completed replay is
-byte-null; a changed goal, digest, calibration, preimage, or target fails closed.
 
 ### Host-managed Codex handoff
 
@@ -223,6 +155,77 @@ publish, merge, close an Issue, or create a release. Those actions remain
 separate, explicitly accepted gates after same-candidate verification and the
 operator's live onboarding acceptance.
 
+Advisor and Critic export consent is not an onboarding precondition; see
+[private review export](usage.md#private-review-export). Whether the Advisor may
+receive repository data depends on the recorded `advisor_export.consent`
+(`approved` or `declined`), which the onboarding Driver asks for explicitly;
+this guide does not state a default for a missing field. Do not run a
+consultation merely to activate or bootstrap.
+
+## Legacy consumer with no projections
+
+This is the consumer procedure for a legacy root, run from the installed
+plugin. The same CLI run inside a pipeline source checkout is the maintainer
+form described in
+[SETUP section B](../SETUP.md#activate-or-upgrade-the-v3-authority).
+
+First inspect and preview the exact migration:
+
+```sh
+node <plugin-root>/scripts/runner-profile-migration-v3.mjs inspect --root <project-root>
+node <plugin-root>/scripts/runner-profile-migration-v3.mjs plan --root <project-root>
+```
+
+For an accepted V0/V1/V2 source, the plan deterministically lists the
+generated runtime targets plus `pipeline.user.yaml`. It creates no bytes. The
+final source is written last in one recoverable transaction so a stale or
+interrupted operation cannot present a converted source with old projections.
+
+Only after reviewing the emitted target list and hashes, activate it:
+
+```sh
+node <plugin-root>/scripts/runner-profile-migration-v3.mjs apply --root <project-root> --activate
+```
+
+Before the first write the command emits a sanitized pre-write preview to
+standard error. It contains every target path, data class, owner mode, before
+and after digest, but no private bytes or absolute project coordinate. The
+write is rejected unless `--activate` is present. On completion, rerunning
+`plan` is a no-op; interruption recovery remains preview-first and
+transaction-bound.
+
+## Recovery and exceptional migrations
+
+If inspection returns a typed failure, stop the normal onboarding sequence.
+Use only the named, preview-first recovery action. The separate
+[onboarding recovery reference](onboarding-recovery.md) covers Slim Overlay
+authority updates, neutral authority migration, and externally archived
+worktree recovery; these are not routine steps after `ready`.
+
+### Kickoff apply contract
+
+This belongs to the earlier compatibility route (the `kickoff-required` row
+above), not to the V4 path. Supply the validated goal to `kickoff plan` as one
+argv element. The command trims and validates 1–8192 bytes of NUL-free UTF-8
+text and remains read-only:
+
+```sh
+node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff plan --root <project-root> --goal '<project goal>'
+```
+
+The returned plan contains the exact digest-bound apply `argv`:
+
+```sh
+node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff apply --root <project-root> --goal '<same validated project goal>' --plan-sha256 <digest-from-kickoff-plan> --activate
+```
+
+Execute the returned argument array without splitting or reinterpreting the
+goal. Apply validates the goal again, deterministically reconstructs the same
+closed plan, verifies the supplied plan SHA-256, and binds both goal and plan
+before writing. It never recovers a goal from a digest and uses no cache,
+environment variable, or file payload fallback. A matching completed replay is
+byte-null; a changed goal, digest, calibration, preimage, or target fails closed.
+
 ## Claude Code permission readback reference
 
 Claude Code's own command permission layer is separate from Pipeline guards.
@@ -251,38 +254,3 @@ run the returned command unchanged and require the next inspection to read back
 `current`. A host-managed Codex project does not use this project-owned Claude
 permission layer, so its result explicitly reports `not-applicable` with empty
 lanes and entries.
-
-## Legacy consumer with no projections
-
-First inspect and preview the exact migration:
-
-```sh
-node <plugin-root>/scripts/runner-profile-migration-v3.mjs inspect --root /absolute/consumer/root
-node <plugin-root>/scripts/runner-profile-migration-v3.mjs plan --root /absolute/consumer/root
-```
-
-For an accepted V0/V1/V2 source, the plan deterministically lists the
-generated runtime targets plus `pipeline.user.yaml`. It creates no bytes. The
-final source is written last in one recoverable transaction so a stale or
-interrupted operation cannot present a converted source with old projections.
-
-Only after reviewing the emitted target list and hashes, activate it:
-
-```sh
-node <plugin-root>/scripts/runner-profile-migration-v3.mjs apply --root /absolute/consumer/root --activate
-```
-
-Before the first write the command emits a sanitized pre-write preview to
-standard error. It contains every target path, data class, owner mode, before
-and after digest, but no private bytes or absolute project coordinate. The
-write is rejected unless `--activate` is present. On completion, rerunning
-`plan` is a no-op; interruption recovery remains preview-first and
-transaction-bound.
-
-## Recovery and exceptional migrations
-
-If inspection returns a typed failure, stop the normal onboarding sequence.
-Use only the named, preview-first recovery action. The separate
-[onboarding recovery reference](onboarding-recovery.md) covers Slim Overlay
-authority updates, neutral authority migration, and externally archived
-worktree recovery; these are not routine steps after `ready`.
