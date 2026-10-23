@@ -775,3 +775,170 @@ test("D76 the default reader finds a running dispatch from its open record and i
   writeFileSync(record, JSON.stringify({ taskId: "ALF-RUN", outcome: "succeeded" }));
   assert.equal(runDispatchBriefing(argvOf(fx), deps).ok, true, "a terminal record is not a running dispatch");
 });
+
+// --- D75 (A): a re-dispatch after a wrong-premise stop needs a recon reference ---
+
+const SLICE_ITEM = "pipeline.sample-slug";
+const RECON_REL = "scratch/recon-ALF-T1.md";
+const cancelledRow = (cancelClass, over = {}) => ({
+  id: "ALF-T0", state: "cancelled", cancelClass, writeScope: [PATH_A, CHECK], delivery: { itemId: SLICE_ITEM }, ...over,
+});
+const withRows = (fx, rows, over = {}) => depsOf(fx, { queueRows: () => rows, ...over });
+const putFile = (fx, rel, text) => {
+  mkdirSync(dirname(join(fx.root, rel)), { recursive: true });
+  writeFileSync(join(fx.root, rel), text);
+};
+
+test("D75 A a re-dispatch of a slice whose earlier attempt was cancelled wrong-premise is refused DBG-RECON-REQUIRED without a recon note, naming the slice, the attempt and the repair", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise")]));
+  assert.equal(result.ok, false, JSON.stringify(result).slice(0, 300));
+  assert.equal(result.code, "DBG-RECON-REQUIRED", result.message);
+  assert.ok(result.message.includes("ALF-T1"), "names the slice being re-dispatched");
+  assert.ok(result.message.includes("ALF-T0"), "names the earlier cancelled attempt");
+  assert.ok(result.message.includes("wrong-premise"), "names the stop class");
+  assert.match(result.message, /repair: write a recon note/u);
+  assert.ok(result.message.includes("reconNote"), "names the package field");
+  assert.match(result.message, /regenerate/u);
+  assert.equal(result.skeleton, undefined);
+});
+
+test("D75 A an existing, non-empty recon note admits the re-dispatch and changes nothing else in the binding", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  putFile(fx, RECON_REL, "Earlier attempt assumed X; the code shows Y.\n");
+  const plain = runDispatchBriefing(argvOf(fx), depsOf(fx));
+  const noted = runDispatchBriefing(argvOf(fx, {}, ["--recon-note", RECON_REL]), withRows(fx, [cancelledRow("wrong-premise")]));
+  assert.equal(noted.ok, true, JSON.stringify(noted).slice(0, 300));
+  assert.equal(noted.skeleton, plain.skeleton, "the binding output carries nothing new");
+  assert.deepEqual(noted.warnings, plain.warnings);
+});
+
+test("D75 A a recon note that does not exist, is empty or sits outside scratch/ and specs/ is refused", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const rows = [cancelledRow("wrong-premise")];
+  const missing = runDispatchBriefing(argvOf(fx, {}, ["--recon-note", RECON_REL]), withRows(fx, rows));
+  assert.equal(missing.code, "DBG-RECON-REQUIRED", JSON.stringify(missing).slice(0, 300));
+  assert.ok(missing.message.includes(RECON_REL), "names the unusable path");
+  assert.match(missing.message, /repair: /u);
+  putFile(fx, RECON_REL, "  \n");
+  const blank = runDispatchBriefing(argvOf(fx, {}, ["--recon-note", RECON_REL]), withRows(fx, rows));
+  assert.equal(blank.code, "DBG-RECON-REQUIRED", JSON.stringify(blank).slice(0, 300));
+  putFile(fx, "docs/recon.md", "A real note in the wrong place.\n");
+  const elsewhere = runDispatchBriefing(argvOf(fx, {}, ["--recon-note", "docs/recon.md"]), withRows(fx, rows));
+  assert.equal(elsewhere.code, "DBG-PATH-INVALID", JSON.stringify(elsewhere).slice(0, 300));
+  assert.ok(elsewhere.message.includes("scratch/") && elsewhere.message.includes("specs/"));
+});
+
+test("D75 A the other cancel classes, an unclassified cancel, another item and a live row do not require a recon note", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  for (const cancelClass of ["budget", "review-defect", "integrated-elsewhere", "superseded", "unclassified"]) {
+    assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow(cancelClass)])).ok, true, cancelClass);
+  }
+  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise", { delivery: { itemId: "other.item" } })])).ok, true, "another item's stop");
+  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise", { state: "ready", cancelClass: null })])).ok, true, "a row that is not cancelled");
+});
+
+test("D75 A a repository without a slice queue is unchanged, with the injected reader and with the default reader", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [])).ok, true, "empty queue");
+  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, null)).ok, true, "unreadable queue");
+  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx)).ok, true, "default reader on a fixture without a governed queue");
+});
+
+test("D75 A the package field reconNote is optional and closed: a string path under scratch/ or specs/ that exists", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { validateBriefingPackage } = await buildLib();
+  const base = packageFixture().pkg;
+  assert.doesNotThrow(() => validateBriefingPackage(base), "absent is valid");
+  assert.doesNotThrow(() => validateBriefingPackage({ ...base, reconNote: RECON_REL }));
+  for (const bad of [42, "", "docs/recon.md", "/etc/passwd", "scratch/../x.md", "scratch\\recon.md"]) {
+    assert.throws(() => validateBriefingPackage({ ...base, reconNote: bad }), (error) => error.code === "DBG-PACKAGE-FIELD-TYPE" && /reconNote/u.test(error.message) && /repair: /u.test(error.message), JSON.stringify(bad));
+  }
+  const absent = packageFixture({ reconNote: RECON_REL });
+  const refused = runDispatchBriefing(absent.argv, depsOf(absent.fx));
+  assert.equal(refused.code, "DBG-PACKAGE-PATH-MISSING", JSON.stringify(refused).slice(0, 300));
+  assert.ok(refused.message.includes(RECON_REL));
+});
+
+test("D75 A build: a wrong-premise earlier attempt makes the package field mandatory, and the recon note is then listed as a context file", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { verifyGeneratedBriefing } = await buildLib();
+  const rows = [cancelledRow("wrong-premise")];
+  const bare = packageFixture();
+  const refused = runDispatchBriefing(bare.argv, withRows(bare.fx, rows));
+  assert.equal(refused.code, "DBG-RECON-REQUIRED", JSON.stringify(refused).slice(0, 300));
+  assert.match(refused.message, /"reconNote"/u);
+  const noted = packageFixture({ reconNote: RECON_REL });
+  putFile(noted.fx, RECON_REL, "Earlier attempt assumed X; the code shows Y.\n");
+  const result = runDispatchBriefing(noted.argv, withRows(noted.fx, rows));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  const context = result.text.split("### 2. Context files")[1].split("### 3. DoD checks")[0];
+  assert.ok(context.includes(RECON_REL), "the recon note is a context file");
+  assert.match(context, /recon note/u);
+  assert.deepEqual(verifyGeneratedBriefing(result.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+  const plain = packageFixture();
+  const plainText = runDispatchBriefing(plain.argv, depsOf(plain.fx)).text;
+  assert.doesNotMatch(plainText, /recon/iu, "a briefing without the field renders nothing new");
+});
+
+// --- K106 (D75 A amendment): the recon-note duty ends once a delivery of the SAME item exists ---
+// Delivery is not a stored queue state (SLICE_STATES has no delivered/merged/closed value); the lib derives it:
+// readyAndLive marks a slice "done" when its id is integrated (commit evidence or a native integration record, read by
+// observeGovernedItemIntegrationReadiness). The generator therefore takes the integrated ids as one injectable reader.
+
+const successorRow = (over = {}) => ({ id: "ALF-T2", state: "ready", writeScope: [PATH_A, CHECK], delivery: { itemId: SLICE_ITEM }, ...over });
+const integrated = (...ids) => ({ integratedSliceIds: () => ids });
+
+test("K106 a wrong-premise cancel plus a delivered successor row of the SAME item no longer requires a recon note, in either row order", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const plain = runDispatchBriefing(argvOf(fx), depsOf(fx));
+  for (const rows of [[cancelledRow("wrong-premise"), successorRow()], [successorRow(), cancelledRow("wrong-premise")]]) {
+    const result = runDispatchBriefing(argvOf(fx), withRows(fx, rows, integrated("ALF-T2")));
+    assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+    assert.equal(result.skeleton, plain.skeleton, "the binding output carries nothing new");
+  }
+  const packaged = packageFixture();
+  const built = runDispatchBriefing(packaged.argv, withRows(packaged.fx, [cancelledRow("wrong-premise"), successorRow()], integrated("ALF-T2")));
+  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 300));
+});
+
+test("K106 a successor row that is merely ready, held, deferred or blocked (not integrated) keeps the duty", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  for (const state of ["ready", "hold-po", "deferred", "blocked-external"]) {
+    const result = runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise"), successorRow({ state })], integrated()));
+    assert.equal(result.code, "DBG-RECON-REQUIRED", `${state}: ${JSON.stringify(result).slice(0, 200)}`);
+  }
+  assert.match(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise")])).message, /ends once a slice of item pipeline\.sample-slug has been delivered/u, "the refusal says when the duty ends");
+});
+
+test("K106 a delivered row of a DIFFERENT item, an integrated id with no row, or an unreadable integration reader keeps the duty", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const rows = [cancelledRow("wrong-premise"), successorRow({ delivery: { itemId: "other.item" } })];
+  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, rows, integrated("ALF-T2"))).code, "DBG-RECON-REQUIRED", "other item");
+  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise")], integrated("ALF-T9"))).code, "DBG-RECON-REQUIRED", "no such row");
+  const same = [cancelledRow("wrong-premise"), successorRow()];
+  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, same, { integratedSliceIds: () => null })).code, "DBG-RECON-REQUIRED", "unreadable (null)");
+  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, same, { integratedSliceIds: () => { throw new Error("git fault"); } })).code, "DBG-RECON-REQUIRED", "unreadable (throws)");
+  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise")], integrated("ALF-T0"))).code, "DBG-RECON-REQUIRED", "the wrong-premise row itself is not the delivery");
+});
+
+test("K106 pin: the queue lib has no stored delivered state and the derived delivery vocabulary is exactly done; a new state forces a decision here", async () => {
+  const { SLICE_STATES, readyAndLive } = await import("../lib/slice-queue.mjs");
+  assert.deepEqual([...SLICE_STATES], ["ready", "hold-po", "blocked-external", "deferred", "cancelled"], "a new stored state must be classified as delivered or not for the recon-note duty (K106)");
+  const raw = {
+    schema: "pipeline.slice-queue.v1", feature: "unit", defaults: { commitMode: "diff-only", tier: "implementor" }, monoliths: [],
+    slices: ["A", "B"].map((id) => ({ id, title: id, state: "ready", dependsOn: [], writeScope: [`lib/${id}.mjs`], tier: "implementor", commitMode: "diff-only", loadClass: "light", briefing: { ref: `specs/unit/briefings/${id}.md` } })),
+  };
+  const result = readyAndLive({ queue: raw, terminalIds: ["A"], now: Date.parse("2026-10-05T12:00:00.000Z") }, { platform: "linux" });
+  assert.deepEqual(Object.keys(result.counts), ["ready", "live", "done", "held", "blocked", "cancelled"], "a new derived status must be classified as delivered or not for the recon-note duty (K106)");
+  assert.equal(result.slices.find((entry) => entry.id === "A").status, "done", "done is the one completed-delivery status");
+  assert.notEqual(result.slices.find((entry) => entry.id === "B").status, "done");
+});

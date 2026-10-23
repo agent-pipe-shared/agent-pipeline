@@ -29,6 +29,11 @@
  * checkout (open dispatch record, owner not provably gone); an overlap is DBG-SCOPE-OVERLAP, naming the dispatch,
  * the overlapping paths and the repair. The overlap predicate is the pure `scopesOverlap` of lib/slice-queue.mjs.
  *
+ * PO decision D75 (A): a briefing for an item whose earlier attempt the governed queue cancelled as wrong-premise is
+ * refused DBG-RECON-REQUIRED unless it carries a recon note (package field `reconNote`, flag `--recon-note`), a
+ * non-empty file under scratch/ or specs/; the refusal names the slice, the earlier attempt and the repair. K106: the
+ * duty ends once any slice of the same item is delivered (integrated, the lib's only completed-delivery status).
+ *
  * The generator calls no model and runs no mutating git command. `binding` writes no file and
  * leaves the judgment fields (goal, context, DoD, forbidden, stop) as template placeholders;
  * `build` (PO decision D78) fills them from a closed package through
@@ -49,8 +54,10 @@ import { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } from "
 import {
   BRIEFING_BUILD_SCHEMA,
   BriefingPackageRefusal,
+  RECON_NOTE_PREFIXES,
   assertPackagePathsExist,
   budgetDecision,
+  isReconNotePath,
   renderGoldfishBriefing,
   resolveBriefingCalibration,
   skeletonToolBudget,
@@ -61,7 +68,7 @@ import { dispatchBudgetLineForRole, parseDispatchSlice } from "../lib/dispatch-p
 import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
 import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
-import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+import { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
 import { readRunningDispatches } from "../lib/dispatch-record-liveness.mjs";
 import { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } from "../lib/slice-queue.mjs";
@@ -80,7 +87,7 @@ const AGENT_TYPES = Object.freeze(["goldfish-implementor", "goldfish-mechanic", 
 const ACCEPTED_CRITERION_STATUSES = Object.freeze(["explicit-actual-independent-pass", "no-explicit-criterion"]);
 const SINGLE_FLAGS = Object.freeze({
   "--root": "root", "--dispatch-id": "dispatchId", "--item": "item", "--agent-type": "agentType",
-  "--model-id": "modelId", "--check": "check", "--spec": "spec", "--criterion": "criterion",
+  "--model-id": "modelId", "--check": "check", "--spec": "spec", "--criterion": "criterion", "--recon-note": "reconNote",
 });
 const REPEATED_FLAGS = Object.freeze({ "--path": "paths" });
 const REQUIRED_FLAGS = Object.freeze(["--dispatch-id", "--item", "--agent-type", "--model-id", "--check"]);
@@ -167,6 +174,36 @@ function defaultQueueRow(root, sliceId) {
 }
 
 const defaultRunningDispatches = (root) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing });
+
+/** Every slice row of the governed queue (read-only); an empty list outside an approved item course or when it cannot be read. */
+function defaultQueueRows(root) {
+  try {
+    const governed = resolveGovernedItemQueue({ root });
+    return governed.status === "required" ? governed.normalized.slices : [];
+  } catch { return []; }
+}
+
+/**
+ * K106: ids of the governed queue slices the lib treats as a completed delivery. The queue stores no delivered state
+ * (SLICE_STATES is ready|hold-po|blocked-external|deferred|cancelled); readyAndLive derives status "done" from the
+ * integrated ids this observation returns (native integration record or orchestrator commit evidence). A refused
+ * observation, a fault or a repository without an item course yields no delivery (the safe direction: the duty stays).
+ */
+function defaultIntegratedSliceIds(root) {
+  try {
+    const observed = observeGovernedItemIntegrationReadiness({ root });
+    return observed.status === "observed" ? [...observed.integrated] : [];
+  } catch { return []; }
+}
+
+/** K106: is any row of this item, other than the wrong-premise attempts themselves, an integrated (delivered) slice? Never throws. */
+function hasDeliveredSliceOfItem(rows, itemId, wrongPremiseIds, readIntegrated, root) {
+  let ids;
+  try { ids = readIntegrated(root); } catch { return false; }
+  if (!Array.isArray(ids) && !(ids instanceof Set)) return false;
+  const delivered = new Set(ids);
+  return rows.some((entry) => entry?.delivery?.itemId === itemId && delivered.has(entry.id) && !wrongPremiseIds.includes(entry.id));
+}
 
 /** K12: the session-authority registry lock as a reader sees it (never taken), or null when it cannot be observed. */
 function defaultRegistryLock(root) {
@@ -409,6 +446,9 @@ export function generateDispatchBinding(options, deps = {}) {
   for (const path of [check, ...options.paths]) {
     if (!validRepoPath(path)) refuse("DBG-PATH-INVALID", `path ${JSON.stringify(path)} must be repository-relative without .., ., .git or backslash segments`);
   }
+  if (options.reconNote !== undefined && !isReconNotePath(options.reconNote)) {
+    refuse("DBG-PATH-INVALID", `recon note ${JSON.stringify(options.reconNote)} must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")} without .., ., .git or backslash segments`);
+  }
   if (!/\.test\.(?:mjs|cjs|js)$/u.test(check)) refuse("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file`);
   const allowedPaths = [...new Set([check, ...options.paths])].sort();
 
@@ -485,6 +525,23 @@ export function generateDispatchBinding(options, deps = {}) {
     if (JSON.stringify(scope) !== JSON.stringify(allowedPaths)) {
       const checks = scope.filter((path) => /\.test\.(?:mjs|cjs|js)$/u.test(path));
       refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
+    }
+  }
+
+  // D75 (A): a briefing for an item whose earlier attempt the governed queue cancelled as wrong-premise repeats that stop
+  // unless it carries a recon note that corrects the premise. Other classes, other items and a repository without a queue
+  // are not touched, and nothing in the output changes unless a note is given.
+  const queueRows = (deps.queueRows ?? defaultQueueRows)(root) ?? [];
+  const wrongPremise = queueRows
+    .filter((entry) => entry?.state === "cancelled" && entry.cancelClass === "wrong-premise" && entry.delivery?.itemId === itemId && entry.id !== dispatchId)
+    .map((entry) => entry.id).sort();  // K106: the duty ends once a slice of the SAME item was delivered (integrated: the lib's only completed-delivery status).
+  // The integration read runs only when a wrong-premise cancel exists; any fault leaves the duty in force.
+  const dutyEnded = wrongPremise.length > 0 && hasDeliveredSliceOfItem(queueRows, itemId, wrongPremise, deps.integratedSliceIds ?? defaultIntegratedSliceIds, root);
+  if (wrongPremise.length > 0 && !dutyEnded) {
+    const readNote = options.reconNote === undefined ? null : readRepoFile(root, options.reconNote);
+    if (readNote === null || readNote.toString("utf8").trim() === "") {
+      const fault = options.reconNote === undefined ? "none was given" : `${options.reconNote} is not a non-empty regular file under --root`;
+      refuse("DBG-RECON-REQUIRED", `slice ${dispatchId} re-dispatches item ${itemId}, whose earlier attempt ${wrongPremise.join(", ")} the governed queue cancelled as wrong-premise (${CANCEL_CLASS_HELP["wrong-premise"]}); a new briefing built on the same premise repeats that stop, so it must carry a recon note and ${fault}. repair: write a recon note (what the earlier attempt assumed, what the code or Spec actually shows, the corrected premise) under ${RECON_NOTE_PREFIXES.join(" or ")}, add it to the briefing package as "reconNote": "<repository-relative path>" (for the binding command: --recon-note <path>), and regenerate the briefing. This duty ends once a slice of item ${itemId} has been delivered (integrated into the candidate): after that no recon note is needed for this item`);
     }
   }
 
@@ -700,7 +757,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   const calibration = resolveBriefingCalibration(root, deps.calibration);
   const bind = (agentType) => generateDispatchBinding({
     root, dispatchId: pkg.id, item: pkg.item, agentType, modelId: pkg.modelId,
-    check: pkg.check, paths: [...pkg.paths], spec: pkg.spec, criterion: pkg.criterion,
+    check: pkg.check, paths: [...pkg.paths], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote,
   }, deps);
   // Test-first budget (PO 2026-10-21): an estimate above the tier cap moves the dispatch to the deep tier.
   let generated = bind(pkg.agentType);

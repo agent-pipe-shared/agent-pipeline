@@ -149,6 +149,16 @@ that overlaps a running dispatch (`DBG-SCOPE-OVERLAP`), naming that dispatch,
 the overlapping paths and the repair (narrow the scope, wait for the other
 dispatch, finalize an abandoned record, or use a worktree).
 
+**Recon before a re-dispatch after a wrong-premise stop (PO decision D75 (A)).**
+When the governed slice queue holds a slice cancelled with `--class wrong-premise`
+for the same item, the briefing generator refuses a new briefing for that item
+(`DBG-RECON-REQUIRED`) until the package carries `reconNote`, the path of a
+non-empty recon note under `scratch/` or `specs/`; the note is then listed as a
+context file. Write the note, add the field, regenerate. The duty ends once a
+slice of the same item has been delivered (integrated into the candidate, the
+queue lib's only completed-delivery status): from then on no recon note is
+required for that item, whatever the order of the cancelled and delivered rows.
+
 ## Tool-call budget — the ~50-call termination cliff
 
 `guardrails/token-budget.md` (TB-06, Claude compatibility projection)
