@@ -8,7 +8,7 @@
 - Detailed state, queue, mechanics and standing rules: `specs/sprint-alfred-epic/plans/handover-codex-switch-2026-10-24.md`. Read `CLAUDE.md` in
   full first (Codex does not load it). Findings register: `specs/sprint-alfred-epic/plans/greenfield-findings-2026-10-23.md` (G1 to G16, V1 to V4).
 - Since the sitting: Full Verify run once (red 51 of 1095, classified), fixes K140 to K150 part A imported on `feat/sprint-alfred` (implementation
-  complete; independent Critic read, a fresh Full Verify and PO acceptance pending); the installed build is the Codex hotfix stamp `bd9ee06`,
+  complete; independent Critic read, a fresh Full Verify and PO acceptance pending); new dev stamp `556247e05` (`0.7.0+<runner>.20261024080351.b00899b`, includes K143 to K153; the PO installs it),
   later commits are not stamped. The two human-operator commits are done (K152 part 3 `e9e866fec`, K153 `c80bd9e97`); the tree is clean.
 - Queued, not started (order in the handover section 5): K146 dispatch enforcement with a fix-wave route, K152 parts 1 and 2, K150 part B,
   CCH136/137 fix, K156 calibration deadlock, K154 critic gate, K155 docs; then Full Verify, Reader third round, Critic batch, C28 re-pin, final
