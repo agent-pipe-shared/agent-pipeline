@@ -19,7 +19,7 @@ Purpose: the PO works two days with Codex as the Elephant in this repository bec
 ## 2. Repository state at the cut
 
 - Branch `feat/sprint-alfred`, HEAD at the time of writing `4c23b0dea` plus the commit of this handover. Not pushed since `57aa08996` (see `docs/state.md`).
-- Uncommitted at the cut: `plugins/pipeline-core/lib/guard/command-catalogue.mjs` and `constants.mjs` (modified) plus the staged new pin `plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs`: K152 part 3, waiting for the human-operator commit, exact command in section 6. Do not touch these three files until the PO has committed.
+- The working tree is clean. The two human-operator commits the Elephant may not make were done by the PO at the cut: K152 part 3 `e9e866fec` (guard-hook paths `lib/guard/*`) and K153 `c80bd9e97` (`hooks/guard-push.test.mjs`, TP-5). The command texts below in section 6 are kept as the pattern for the next protected commit.
 - Open PO list: `plans/po-list-afk-2026-10-22.md` rows 1 to 59 (rows 52 to 59 are from this window; row 59 records the dispatch-route finding below).
 - Decision batches 13 to 17: `plans/po-decisions-2026-10-23-tiles.md`. Sitting index: `plans/sitting-preparation-index-2026-10-23.md`.
 - Findings register of the Greenfield runs and the Full Verify: `plans/greenfield-findings-2026-10-23.md` (G1 to G16, V1 to V4, K143 to K149 results). It is the working list; update it as results land.
