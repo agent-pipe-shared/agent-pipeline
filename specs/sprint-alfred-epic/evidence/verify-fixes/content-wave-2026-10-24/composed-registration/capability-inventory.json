@@ -1,0 +1,24 @@
+command: node harness/scripts/check-product-capability-inventory.mjs
+label: composed-capability-inventory
+exitCode: 1
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+
+--- stderr ---
+FAIL: capabilities[2].surfaceIds must be a sorted, duplicate-free string array
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:g23-read-help-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:mid-session-hook-refresh-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:pin-antigravity-design-phase-scripts-refused-in-draft-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:pipeline-state-calibration-recovery-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:po-human-approval-signing-handoff-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:publication-guard-candidate-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:publication-review-requirement-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:security-remote-identity-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:windows-authority-readiness-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:g23-quoted-pipeline-reads-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:architecture-close-disposition-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:public-handover-duty-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:g29-public-handover-admission-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[19] references missing surface verify-phase:harness/scripts/verify.mjs:audit-pack-command-admission-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)

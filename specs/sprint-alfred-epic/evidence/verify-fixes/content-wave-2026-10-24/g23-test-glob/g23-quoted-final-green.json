@@ -1,0 +1,63 @@
+command: node --test plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs plugins/pipeline-core/lib/guard/g23-read-help.test.mjs plugins/pipeline-core/lib/guard/read-option-operands.test.mjs plugins/pipeline-core/hooks/guard-command-grammar.test.mjs plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: G23-quoted-final-targeted-GREEN
+exitCode: 0
+head: dbaa242bbff4403980a58f8394a0bfada3b00b12
+tree: f1e3b69346f560d2de1223d35a36d85a21e9362c
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.195802ms)
+✔ a clean fixture passes (0.708707ms)
+✔ an allowlisted occurrence passes (0.274171ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.269632ms)
+✔ multiple prefix hits on one line each produce a finding (0.161857ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.228454ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (4.940477ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (162.385057ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (12.169479ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ G23Q001 original quoted test-file narrowing is admitted through parser and actual guard (804.193506ms)
+✔ G23Q002 quoted operators remain inert regex data in the stdin sink (1483.299821ms)
+✔ G23Q003 unsupported filters, executable flags and shell effects stay refused (1143.759215ms)
+✔ G23Q004 external directories, symlink escape and credential operands stay refused (1067.990818ms)
+✔ G23Q005 missing target diagnosis stays distinct from grammar and credential refusals (274.741522ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ G23C001 G23 bounded repeated rg globs preserve hidden and credential exclusions (33.812491ms)
+✔ G23C002 G23 exact source-owned PO help is a pure CLI route (598.252868ms)
+✔ G23C003 G23 missing local targets are distinct from unknown grammar and protected paths (17.078501ms)
+✔ GSC01 the module files of lib/guard are exactly the modules of the split map (1.981113ms)
+✔ GSC02 module imports point only at lower layers, never at the facade, and the graph has no cycle (3.378869ms)
+✔ GSC03 the facade's export surface is exactly the pinned 40-name table (name and typeof) (53.048465ms)
+✔ GSC04 once the facade is wired to lib/guard it is a thin facade of at most 500 lines (0.68392ms)
+✔ GSC05 every lib/guard module is a never-liftable kernel path (0.543253ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ ROPT001 rg --ignore-file separated retains outside option-file diagnostic (3.487545ms)
+✔ ROPT002 rg --ignore-file equal retains outside option-file diagnostic (0.43159ms)
+✔ ROPT003 grep --exclude-from separated retains outside option-file diagnostic (0.495692ms)
+✔ ROPT004 grep --exclude-from equal retains outside option-file diagnostic (0.350396ms)
+✔ ROPT005 rg --ignore-file separated in-root file control (0.530789ms)
+✔ ROPT006 rg --ignore-file equal in-root file control (0.262238ms)
+✔ ROPT007 grep --exclude-from separated in-root file control (0.318255ms)
+✔ ROPT008 grep --exclude-from equal in-root file control (0.226079ms)
+✔ ROPT009 rg supported pattern-file outside control (35.006244ms)
+✔ ROPT010 grep supported pattern-file outside control (0.56323ms)
+✔ ROPT011 rg non-file option value remains text (0.340907ms)
+✔ ROPT012 grep non-file option value remains text (0.155085ms)
+✔ ROPT013 explicit end-of-options retains outside positional target (0.251789ms)
+✔ ROPT014 option-file syntax stays argv data and never becomes executable (0.230478ms)
+✔ ROPT015 malformed quoting remains rejected (0.279401ms)
+✔ ROPT016 missing option-file value remains unsupported (0.278529ms)
+✔ ROPT017 command substitution remains rejected without execution (0.16846ms)
+✔ ROPT018 output redirect remains refused without execution (0.318094ms)
+✔ ROPT019 ordinary outside positional target remains labelled (0.207274ms)
+✔ ROPT020 ordinary exact in-root diagnostic remains admitted (31.678177ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 42
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5160.856642
+
+--- stderr ---

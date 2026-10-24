@@ -1,0 +1,40 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs plugins/pipeline-core/scripts/pipeline-state-result-close.test.mjs
+label: composed-g21-source-result
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+Error: Result bootstrap apply inputs are stale or conflicting; zero mutation.
+✔ legacy MAC journal recovers the exact pre-fence postimage and yields the signed package preview (80.753314ms)
+✔ legacy journal repairs Result-before-State and replays each interrupted repair phase (305.326291ms)
+✔ legacy journal refuses forged proof, altered historical prefix and PRD drift without writing (150.201563ms)
+✔ retired legacy journal exposes one exact signed repair preview and then the existing package reconcile (229.693966ms)
+✔ signed legacy repair replays after interruption without consuming another approval (137.804612ms)
+✔ signed legacy preview refuses source drift and forged repair replay without new writes (302.35462ms)
+✔ win32: a POSIX-insecure private result-bootstrap directory is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (121.062264ms)
+✔ win32: an insecure DACL assessment on the private result-bootstrap directory still fails closed (83.313978ms)
+✔ AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence (85.288153ms)
+✔ registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview (200.807393ms)
+✔ registered bootstrap interruption and replay retain a single provable reconciliation plan (330.779574ms)
+✔ registered package authority drift refuses bootstrap before Result, State or manifest mutation (48.010786ms)
+✔ AC-047-147: journal and Result-before-State interruptions resume once and exact replay is zero-mutation (442.249769ms)
+✔ AC-047-143/148: active work, nonnull authority, State/document drift, absent/fenced and unsafe Result targets fail closed (537.235723ms)
+✔ AC-047-149: bootstrap requires a current implementing Plan lifecycle before any Result or State mutation (250.298506ms)
+✔ controlled METHOD: catalogue-present Source companion closes exact Result bootstrap effects (36200.960913ms)
+✔ read-only plan returns one complete digest-bound confirmed apply action (66.202534ms)
+✔ confirmed apply changes only the bounded continuity fields and exact replay is zero-write (139.141465ms)
+✔ Result-close finalizes an exact Result previously bound by bootstrap (95.500236ms)
+✔ apply rejects missing activation, stale State and Result byte drift (259.001217ms)
+✔ plan rejects duplicate/malformed input, retries and conflicting Result authority (135.680466ms)
+✔ physical Result must be a stable regular single-link file (92.70319ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39875.655709
+
+--- stderr ---

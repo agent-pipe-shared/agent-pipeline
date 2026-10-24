@@ -1,0 +1,46 @@
+command: node --test plugins/pipeline-core/lib/test-private-tmp.test.mjs plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs
+label: private-tmp-controlled-targeted
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+﹣ AC-231 P1/P2: the injected assess seam drives PRIVATE_TMP_ROOT_NOT_SECURE and the harden seam is consulted on the fresh root (1.101984ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+﹣ AC-231 P2: a refused call memoizes nothing; a later secure call succeeds and is then memoized (0.118936ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+﹣ AC-231 P1: with no options, or with non-function seams, the real adapter is used and a genuinely secure root results (0.150296ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+✔ AC-231 P1: the optional seam parameter does not change the exported signature shape (privateTempRoot callable with zero arguments) (0.2843ms)
+﹣ AC-231 P2: the scenario passes against an unmutated scratch mirror (0.096633ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+﹣ AC-231 P2 RED: removing the NOT_SECURE refusal in a scratch mirror makes the scenario fail (0.149754ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+﹣ AC-231 P2 RED: dropping the root cleanup before the throw is also caught (0.128524ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+✔ AC-231 host-limitation: POSIX branch does not consult the seams (chmod 0700 path) (39.996677ms)
+✔ AC-231 controlled production: actual refusal, cleanup and retry/memoization (41.497678ms)
+✔ AC-231 controlled mirror: unchanged helper satisfies the same examiner (35.560128ms)
+✔ AC-231 controlled mutation: removing refusal is rejected by the same examiner (38.744723ms)
+✔ AC-231 controlled mutation: removing cleanup is rejected by the same examiner (42.905583ms)
+✔ privateTempRoot returns an absolute directory that exists (3.850885ms)
+✔ privateTempRoot is memoized: two calls in one process return the same path (0.209347ms)
+✔ privateTempRoot has no ancestor .git directory (0.387326ms)
+✔ privateMkdtemp returns a fresh directory inside the root whose basename starts with the prefix (0.44758ms)
+✔ privateMkdtemp honours a different prefix (0.290441ms)
+✔ privateMkdtemp returns a different directory on every call (0.304909ms)
+﹣ win32: a privateMkdtemp child passes the existing private-state assurance (0.141078ms) # win32 DACL semantics
+﹣ win32: the root carries no access entry for a principal other than the current user (0.149744ms) # win32 DACL semantics
+✔ POSIX: the root's mode is 0o700 (0.272588ms)
+✔ the module does not import or change the assurance's evaluation function (0.326541ms)
+✔ B-S1-T2: the private temp root and its children are removed when a process that used them exits normally (37.004586ms)
+✔ B-S1-T2: PRIVATE_TMP_ROOT_INSIDE_REPOSITORY is refused and leaves no root behind (.git directory in an ancestor of the temp directory) (39.448465ms)
+✔ B-S1-T2: PRIVATE_TMP_ROOT_INSIDE_REPOSITORY is refused and leaves no root behind (.git file in an ancestor of the temp directory) (39.240574ms)
+﹣ TEMP-SEAM-T: PRIVATE_TMP_ROOT_NOT_SECURE is refused through the assess seam and a failed call memoizes no root (0.087345ms) # the harden/assess seams are consulted on win32 only
+✔ B-S1-T2: PRIVATE_TMP_PREFIX_INVALID refuses an empty or non-string prefix and creates nothing (0.454534ms)
+✔ B-S1-T2: PRIVATE_TMP_PREFIX_ESCAPES_ROOT refuses a prefix that resolves outside the root and creates nothing (3.018685ms)
+✔ TEMP-SEAM-CONTROLLED: child-only win32 view refuses insecure roots before cleanup and retries without memoization (39.286426ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 9
+ℹ todo 0
+ℹ duration_ms 274.074189
+
+--- stderr ---

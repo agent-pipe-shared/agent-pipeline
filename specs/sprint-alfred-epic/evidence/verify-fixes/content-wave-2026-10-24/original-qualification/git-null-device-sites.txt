@@ -1,0 +1,27 @@
+command: node --test plugins/pipeline-core/lib/git-null-device-sites.test.mjs
+label: ORIGINAL-075-GND
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ GND001 calibration-verify-commit-transition.mjs: no win32 "NUL" literal as a git env or -c value (1.655415ms)
+✔ GND002 calibration-verify-commit-transition.mjs: git null-device values come from GIT_NULL_DEVICE (0.379872ms)
+✔ GND003 critic-verify-lifecycle.mjs: no win32 "NUL" literal as a git env or -c value (0.298357ms)
+✔ GND004 critic-verify-lifecycle.mjs: git null-device values come from GIT_NULL_DEVICE (0.127743ms)
+✔ GND005 shared constant is /dev/null (0.161186ms)
+✔ GND006 critic-verify-lifecycle courseGitBytes hands the stub git the GIT_NULL_DEVICE env values (0.343884ms)
+✔ GND007 real git accepts GIT_CONFIG_GLOBAL=GIT_NULL_DEVICE (exit 0) (3.178078ms)
+✔ GND008 real git runs through courseGitBytes with the constant (2.482316ms)
+✔ GND009 real git status accepts core.excludesFile=GIT_NULL_DEVICE in a temp repository (exit 0) (7.874991ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 340.871511
+
+--- stderr ---

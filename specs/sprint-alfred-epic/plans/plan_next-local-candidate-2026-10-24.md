@@ -16,17 +16,44 @@ measurement below is historical. No native/acceptance credit is inferred.
 **Latest integration:** K156 and cohort recording are operator-committed
 `0fb6fe6d9`; G19/G21 are operator-committed `daaf074b1`. Controlled G21 Source
 and Result/consumer qualification passed25/25; earlier composed79/79 and
-close/kernel9/9 remain. G17v4 is STOP/NOT MAIN-READY: a settlement-gap negative
-accepts an unowned Git-admin write, and the ephemeral custody seal has no proved
-cross-process CLI route. Do not import its patch. G25/G27 and G26/G29 helper
-proposals remain partial/inert pending coherent lifecycle integration.
+close/kernel9/9 remain. The protected-commit diagnostic committed normally as
+`1b7fc4f04`, preserving authorization and signature requirements. G23's quoted
+test-module glob correction, the eighteen-path P1 lifecycle composition and
+seven-path recording overlay are now applied but uncommitted. New required
+completion receipts passed16/16 and composed G21 Source/Result passed22/22.
+The State fixture now has authored criterion sources and a genuine fixture
+HEAD while preserving all21 assertions: State3/3, composed K15619/19 and
+consumer9/9 pass. The private-temp additions supply a controlled logical
+refusal/mutation witness (20 pass,9 native skips), preserving production and
+all original examiners. The coherent27-path source/registration package is
+staged; the normal active-hook commit was actually refused for registration,
+command catalogue and State writer. Exact operator paths/message are prepared
+and delivered; human commit readback is pending. Rebaseline the capability
+inventory after that real source/registration commit.
+
+G17 remains STOP/NOT MAIN-READY: the earlier settlement-gap negative accepted an
+unowned Git-admin write; unfinished publisher instrumentation and a rejected
+host-integration proposal do not clear it. Automatic approval review rejected
+changes to receipt/protected-mutation validation; neither rejected host edit
+executed. G8 also has a genuine missing independent-review producer at the
+active consumer. Do not import either unqualified proposal or relabel controlled
+observations as independent authority. Exact focused captures, proposals and
+limits are retained in the [content-wave packet](../evidence/verify-fixes/content-wave-2026-10-24/README.md).
+
+The PO deferred Greenfield tests until morning. No complete terminal package
+was outstanding at the final offer. Continue disjoint source fixes and focused
+qualification; collect concrete operator/signature needs. Fresh qualification
+proposes75 for calibration, role-route and GND, but those proposals are not yet
+counted in the official matrix. A test-only private-temp owner is addressing the
+logical refusal witness; another reader is checking genuine native-only stage
+holds against the existing PO rubric. Neither manufactures native acceptance.
 
 This is the continuation of the approved three-runner fix wave. It changes no
 PRD, Spec, original acceptance criterion, approval posture or review budget.
 The currently installed intermediate build is stamp `f2aee4ec2`, version
 `0.7.0+codex.20261024154452.355dba9`; fresh installed readback is ready.
 
-## Current completion matrix boundary
+## Historical completion matrix boundary
 
 The current formal 174-item measurement is the validated
 [2026-10-24 snapshot](../evidence/delivery-remeasure-2026-10-24/README.md),
@@ -39,7 +66,10 @@ changes apply the already recorded PO batch-10 native-only rubric; the native
 work stays open. Later G19/G22 commits and uncommitted K156/metadata are excluded
 from this frozen measurement and tracked separately in the live slice table.
 
-## Parallel slice reservations
+## Earlier parallel slice reservations
+
+This table preserves the earlier preparation cut. The latest integration above
+and current canonical matrix supersede its active/waiting descriptions.
 
 | Slice | Current outcome | Exclusive write reservation | Next integration condition |
 |---|---|---|---|

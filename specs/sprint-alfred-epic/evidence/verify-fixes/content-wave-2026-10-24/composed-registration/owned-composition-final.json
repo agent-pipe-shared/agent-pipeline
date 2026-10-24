@@ -1,0 +1,10 @@
+command: node scratch/check-owned-composition.mjs
+label: owned-composition-exact-source-comparator
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+{"schema":"pipeline.composed-registration-proof.v1","originalSuiteRowsPreserved":462,"originalCompletionEntriesPreserved":371,"addedSuites":[{"name":"g23-quoted-pipeline-reads-tests","file":"plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","policySha256":"ff37fbe85b8829922f05c0a5bbe058a978e453ec32fd6eba70aa1ad0c94018cb"},{"name":"architecture-close-disposition-tests","file":"plugins/pipeline-core/lib/architecture-close-disposition.test.mjs","policySha256":"bd00ca0ddca564433acd6b0b24a806b0fa76ef1f0b5feaa8b28bb8c5b08da6c1"},{"name":"public-handover-duty-tests","file":"plugins/pipeline-core/lib/public-handover-duty.test.mjs","policySha256":"07950603a5b00c3fd299ab9b54742a41fd66dd97dfbf740bed2f2f82140424b5"},{"name":"g29-public-handover-admission-tests","file":"plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs","policySha256":"1462d1e771d3b7aa480a4f0b259a512135447ff68e518997713aebd4be76dafd"}],"assertionBodiesAndOrderPreserved":true,"existingAugmentationsPreservedExceptDauMonotoneExtension":true,"worktreeSurfaceDiscoveryAndUniqueAssignment":true,"committedCapabilityBaselineQualified":false}
+
+--- stderr ---

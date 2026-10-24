@@ -1,0 +1,67 @@
+{
+  "schema": "pipeline.composed-registration-delivery.v1",
+  "candidateBase": "1b7fc4f0424c617c19039903ba4f88aece3116f2",
+  "changes": [
+    {
+      "path": "harness/verify-suites.json",
+      "preimageSha256": "2c159cb4218ec6e24565bfd29278561b20f5254b275a0ab3fe8674bf471382a8",
+      "postimageSha256": "f3213d8c2e899f7203ef1caa3852f07fed925c5a0a599f317bfcf968e0469cb1"
+    },
+    {
+      "path": "harness/config/verify-case-completion.v1.json",
+      "preimageSha256": "1d751b2c282f4f244c5fefc779edca7015efd891b3769ff3266807410e750279",
+      "postimageSha256": "032b7124e0460b1b2241e038b5e2c3fce46bfd17d93986f167ac5149a6ca706f"
+    },
+    {
+      "path": "harness/config/verify-case-completion-augmentations.v1.json",
+      "preimageSha256": "53f2509d62d4093a39aefe5624bf454c932a639cab1ac8b40f6c686a0e102435",
+      "postimageSha256": "e4a7b2bc04c286d10a26f95266ef95a56057466b326c2d74528724205aa026f4"
+    },
+    {
+      "path": "docs/product-capability-inventory.json",
+      "preimageSha256": "3b02668072d4840ecbd630a4d8b68f872dfad3dc4c0fa025a11db83306f28eb4",
+      "postimageSha256": "bbcfa619afebc18f27e0a3abb5ecf06edddb65af79cacf88d6b6b6aa4059f9f8"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
+      "preimageSha256": "b0f156ee812fa652df3772987404a75fe490f6cc6d008951af55b8c4734bf7b1",
+      "postimageSha256": "ce61166437ef41489e788a154ffa0326209a7fc4b11fe822cfe4b43fb18eb375"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
+      "preimageSha256": "c39390c01be1393dd51e37f864089595926074c91fc6010513aaa23e43e5299b",
+      "postimageSha256": "c0e8e506b15961ce82d694dccbd646ae0e1a0011f7d4c4f51a05d3c88d00f646"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
+      "preimageSha256": "ef51e64bc6337714282f84bddb836a80b6825fd7f650cb44bae6f8e6d0112864",
+      "postimageSha256": "f52aaa6e0ea71dc04acbdd75cc0a6da44d070104e881a7d7cf18732413622fb4"
+    }
+  ],
+  "overlaySha256": "8781517c06c5a3457ede2f180007bf6c8db88c46846649d811a608fdd69ce215",
+  "artifacts": [
+    "registration.json",
+    "completion-registry.json",
+    "four-completion.json",
+    "completion-receipts.json",
+    "augmented-completion.json",
+    "augmented-completion-receipts.json",
+    "overlay-check.json",
+    "append-history.json",
+    "kernel-consumer-policy.json",
+    "capability-inventory.json",
+    "owned-composition-final.json",
+    "composition-proof.json",
+    "g21-source-result.json",
+    "k156-composed.json",
+    "resource-headroom.json"
+  ],
+  "commits": [],
+  "targetedDelivery": "blocked",
+  "blocked": [
+    "K156 original State consistency fixture has unborn HEAD; source assertion/test repair outside metadata-wrapper scope",
+    "Capability inventory committed sourceBaseline is stale; worktree discovery and unique assignment separately pass"
+  ],
+  "sourceReadOnly": true,
+  "nativeAttestation": false
+}

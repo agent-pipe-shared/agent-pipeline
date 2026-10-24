@@ -1,0 +1,63 @@
+{
+  "schema": "pipeline.fixture-only-delivery.v1",
+  "base": "1b7fc4f0424c617c19039903ba4f88aece3116f2",
+  "ownedPaths": [
+    "plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs"
+  ],
+  "preimageSha256": "8ffc67ea4b6d821b76ecab18f5c326b5b5b2b460c04a86621f836ee791da328c",
+  "postimageSha256": "7bd8bf9bcb0876050302ccf184ad7e54667e3f8300231f89557560644a83d64b",
+  "patchSha256": "dfe8d8d5d44f2ca84b0070fec6f050195ccd39fabaf23352e77d964643c4cf73",
+  "originalAssertionsPreserved": true,
+  "assertionCount": 21,
+  "commits": [],
+  "inertProposal": true,
+  "importedPathsExcluded": true,
+  "checks": [
+    {
+      "artifact": "scratch/agent-out/p1-state-marker-fixture/state-original-red.json",
+      "command": "node --test plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs",
+      "exitCode": 1,
+      "tests": "3",
+      "passed": "2",
+      "failed": "1"
+    },
+    {
+      "artifact": "scratch/agent-out/p1-state-marker-fixture/state-green.json",
+      "command": "node --test plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs",
+      "exitCode": 0,
+      "tests": "3",
+      "passed": "3",
+      "failed": "0"
+    },
+    {
+      "artifact": "scratch/agent-out/p1-state-marker-fixture/k156-composed-green.json",
+      "command": "node --test plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs",
+      "exitCode": 0,
+      "tests": "19",
+      "passed": "19",
+      "failed": "0"
+    },
+    {
+      "artifact": "scratch/agent-out/p1-state-marker-fixture/consumer-safe-paths.json",
+      "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+      "exitCode": 0,
+      "tests": "9",
+      "passed": "9",
+      "failed": "0"
+    },
+    {
+      "artifact": "scratch/agent-out/p1-state-marker-fixture/resource-headroom.json",
+      "command": "node plugins/pipeline-core/scripts/report-resource-headroom.mjs --input scratch/agent-out/p1-state-marker-fixture/resource-observations.json",
+      "exitCode": 0
+    }
+  ],
+  "refusal": "Inline Node export refused by guard-push as ambiguous hidden push; no push attempted. Export moved into owned scratch helper.",
+  "resourceHeadroom": "unknown",
+  "nativeAuthority": "not claimed",
+  "pending": [
+    "parent integration",
+    "Full Verify/Security",
+    "independent batch review",
+    "PO acceptance"
+  ]
+}

@@ -1,0 +1,461 @@
+{
+  "schema": "pipeline.fix-wave-artifact-custody.v1",
+  "date": "2026-10-24",
+  "copyMode": "Exact raw capture/JSON/patch bytes. Markdown-only local repository prefix projection is individually recorded with both digests. No signed data is rewritten.",
+  "status": "Retained focused evidence; source integration and blockers are stated in README. No final Verify, Critic, native or PO acceptance.",
+  "artifacts": [
+    {
+      "source": "scratch/commit-signature-diagnostic-clone/scratch/agent-out/commit-signature-diagnostic/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/commit-diagnostic/report.md",
+      "bytes": 3946,
+      "sha256": "b299035b38f2bddfb02b306736d46fb239d2bb039eda4eb06e4ea8c1805e9298"
+    },
+    {
+      "source": "scratch/commit-signature-diagnostic-clone/scratch/agent-out/commit-signature-diagnostic/staged.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/commit-diagnostic/staged.patch",
+      "bytes": 7345,
+      "sha256": "291a1176d98bdda782a2ddf98dcb92c22e6a2c3fa812ed29a81d7fe345f35878"
+    },
+    {
+      "source": "scratch/commit-signature-diagnostic-clone/scratch/agent-out/commit-signature-diagnostic/staged-v2.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/commit-diagnostic/staged-v2.patch",
+      "bytes": 7462,
+      "sha256": "de3ce8df269cac59fe125fb3025318b1c091c9b13bb7dd4fceef2f0c38443e7e"
+    },
+    {
+      "source": "scratch/commit-signature-diagnostic-clone/scratch/commit-signature-original-red.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/commit-diagnostic/commit-signature-original-red.json",
+      "bytes": 3483,
+      "sha256": "5217379553403212906c6dc84572d7175273478654293adc7a48abddf79cb6da"
+    },
+    {
+      "source": "scratch/commit-signature-diagnostic-clone/scratch/commit-signature-final-green.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/commit-diagnostic/commit-signature-final-green.json",
+      "bytes": 911,
+      "sha256": "23c446e23f453a3101e7b04aed4f08e3a40b3df2f5733a9fc6478e09c4908223"
+    },
+    {
+      "source": "scratch/clones/g23-quoted-pipeline-reads/scratch/agent-out/g23-quoted-pipeline-reads/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g23-test-glob/report.md",
+      "bytes": 3705,
+      "sha256": "2615d5dd4c97bda794e91ff771b382f75601029ee266fd825226bc7734f36fb2"
+    },
+    {
+      "source": "scratch/clones/g23-quoted-pipeline-reads/scratch/agent-out/g23-quoted-pipeline-reads/owned.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g23-test-glob/owned.patch",
+      "bytes": 7204,
+      "sha256": "a07e27991c9d83cd69eb35dfbad3d1872f4d68989ae0d742cf8911e25d51ee58"
+    },
+    {
+      "source": "scratch/clones/g23-quoted-pipeline-reads/scratch/agent-out/g23-quoted-pipeline-reads/base.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g23-test-glob/base.txt",
+      "bytes": 41,
+      "sha256": "8d858d0bfcb24cd648bfd87bbfb8fd5c4171c2b806c5e7055efbba25a9886ee5"
+    },
+    {
+      "source": "scratch/clones/g23-quoted-pipeline-reads/scratch/agent-out/g23-quoted-pipeline-reads/g23-quoted-original-red.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g23-test-glob/g23-quoted-original-red.json",
+      "bytes": 3470,
+      "sha256": "03c9f98817a068edb16664d5258f4db8ff87e71f832e06844503bd3cdda0f5c3"
+    },
+    {
+      "source": "scratch/clones/g23-quoted-pipeline-reads/scratch/agent-out/g23-quoted-pipeline-reads/g23-quoted-audited-original-red.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g23-test-glob/g23-quoted-audited-original-red.json",
+      "bytes": 4477,
+      "sha256": "d6bd8d42545ecf31a289ba77f902d6c8a0312342dbe4fc51066c80616934b6cc"
+    },
+    {
+      "source": "scratch/clones/g23-quoted-pipeline-reads/scratch/agent-out/g23-quoted-pipeline-reads/g23-quoted-final-green.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g23-test-glob/g23-quoted-final-green.json",
+      "bytes": 4568,
+      "sha256": "89e55bf69ba5a4719c80d5a4545055ddb06714a879d4b6304d79adaaaf66d7b5"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/agent-out/p1-lifecycle-composition/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/report.md",
+      "bytes": 5633,
+      "sha256": "f3bc97a5ba730ee28cbdab465460121b8844d1546b6a4c7d044e40e7d29b3593"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/agent-out/p1-lifecycle-composition/report-v2.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/report-v2.md",
+      "bytes": 3489,
+      "sha256": "e8d86a55ec9609d40f1b073da49e9a78b1cdc1a34f48fd6be34073b0bb174645",
+      "sourceBytes": 3510,
+      "sourceSha256": "fd7d68a5a0d5a53ce898efbfebc82df0a1d69cb43228f49801f2fdaed09ab0ae",
+      "transformation": "Markdown-only local repository prefix replaced with <repo>/ and remaining local home prefix with <home>/; exact original retained privately. Raw captures and patches unchanged."
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/agent-out/p1-lifecycle-composition/report-v3.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/report-v3.md",
+      "bytes": 6719,
+      "sha256": "8dfcb63fdd7ff7dc470e0f1528862c8d09e7382d712b69c0b2eda04e9e4ad278"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/agent-out/p1-lifecycle-composition/complete-v3.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/complete-v3.patch",
+      "bytes": 69715,
+      "sha256": "b01853eec332b928d27dd6acf320e86a6f790c87bb507de2420c616e0a3c044c"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/agent-out/p1-lifecycle-composition/delivery-v3.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/delivery-v3.json",
+      "bytes": 4706,
+      "sha256": "da0b1f39e9ca79d39cdfbffacbfa9e77783125475b2dda40ad29d48680f30c9d"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/agent-out/p1-lifecycle-composition/verification-v3.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/verification-v3.json",
+      "bytes": 1423,
+      "sha256": "e41e444d6683df74f91bcd72c62a83bd381f043a16858a9d8999faddb88d65cb"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/p1-finalization-callsite.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-callsite.json",
+      "bytes": 54858,
+      "sha256": "483d27bc502ea0ef7735b790bac3ab412e948d03be7b79ef592d1cebf34e0e5a"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/p1-finalization-g27-red.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-g27-red.json",
+      "bytes": 4374,
+      "sha256": "b3a752e994e2fda7c651834ed8441c9443b221d093db00bf804c3b313896b888"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/p1-finalization-g27-green.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-g27-green.json",
+      "bytes": 2263,
+      "sha256": "2bb9c08ace5771180ce5a6e52e6af736cb998f2f30bf48e6ec87b7e4d31497af"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/p1-finalization-guard.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-guard.json",
+      "bytes": 585,
+      "sha256": "aea7752b4db9340090d6b772250ecbed110bc2d15587953b02c1ae5dc05b137f"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/p1-finalization-closure-consumer.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-closure-consumer.json",
+      "bytes": 6670,
+      "sha256": "4daa8049acd833bf1dd02b4b6cda104e1e9dce3e2ee7bb72857d654492ad375a"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/p1-authored-parent-ipc.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-authored-parent-ipc.json",
+      "bytes": 6291,
+      "sha256": "93e4bec816f29b7c4227c1281253b70e11124e9da7441494f775cac97da028d5"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/p1-authored-parent-ipc-result.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-authored-parent-ipc-result.json",
+      "bytes": 2797,
+      "sha256": "6f2a6ac6b150d053dd5f065be0735236c2ba43ec6594cd3fb9718dc71a93ae74"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/p1-finalization-onboarding-focused.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-onboarding-focused.json",
+      "bytes": 1302,
+      "sha256": "c5adb943982af2ba53bfd4a973bc8ec4e4e93632b0c96277e6b36f990b96b0d1"
+    },
+    {
+      "source": "scratch/clones/p1-lifecycle-composition/scratch/p1-resource-headroom.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-resource-headroom.json",
+      "bytes": 591,
+      "sha256": "4158ce39188b1d573906ee597d03d3fd3605569a0110e5d6f8782a7c5b3a5be6"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/report.md",
+      "bytes": 6007,
+      "sha256": "5e48df82a0a979891bf41bf1038b383f97357e8d6a80cddf7559d50c64f7bb29"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/delivery.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/delivery.json",
+      "bytes": 2948,
+      "sha256": "d24d1be8fbd6e8f767b1137afee1bf6c8bc432d4074a928f7fe5ed41a1be2dda"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/owned-overlay.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/owned-overlay.patch",
+      "bytes": 11554,
+      "sha256": "8781517c06c5a3457ede2f180007bf6c8db88c46846649d811a608fdd69ce215"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/registration.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/registration.json",
+      "bytes": 341,
+      "sha256": "8d5294c1c5d316933da4bc095a1b57d6d902da0594d8fd89351889fe84940369"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/completion-registry.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/completion-registry.json",
+      "bytes": 338,
+      "sha256": "aa0c0b853578aa04f1fd8f5dc281b3336eec27880bd1a452aaaf112dc3290b31"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/four-completion.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/four-completion.json",
+      "bytes": 3454,
+      "sha256": "d10686d54ef3c269d20798d6dfcacc9384dfadc40822f2e283cc673dda39c7cf"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/completion-receipts.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/completion-receipts.json",
+      "bytes": 2923,
+      "sha256": "d49127275f8c80388607caed27db4e7ad158e2eb65864452d6ff8a8c570cbe3d"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/augmented-completion.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/augmented-completion.json",
+      "bytes": 880,
+      "sha256": "d8a2aa28397c6e76351b3d501abc5f398f3713f0df5f25a893fa45d3ae2aec22"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/augmented-completion-receipts.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/augmented-completion-receipts.json",
+      "bytes": 710,
+      "sha256": "e843cc66aa6fa84ac810dfcbcc82d3c33268c2a86b0784c5787dfa917b5baaf4"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/overlay-check.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/overlay-check.json",
+      "bytes": 314,
+      "sha256": "3214b734bbaf07fb3c102bc5e81954ba280db2a3551aecaf0ec96409fd269929"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/append-history.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/append-history.json",
+      "bytes": 319,
+      "sha256": "56a4b9aee132c5a29ee93bdf596359f4b2adcf3833a18d78e259298f4e20adf6"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/kernel-consumer-policy.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/kernel-consumer-policy.json",
+      "bytes": 3680,
+      "sha256": "b5ef84644393668c39d6e720b2b464dd0e1ceaf6ff22b98a2c2a068b58772098"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/capability-inventory.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/capability-inventory.json",
+      "bytes": 3827,
+      "sha256": "8fb08b188ab473cb5221f3cb8a94e8ac1b5c1c2e9da6948ea6ce94bb19fde808"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/owned-composition-final.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/owned-composition-final.json",
+      "bytes": 1391,
+      "sha256": "38c1c6dfcafb1337a79aa20e3aa2a6df8e0838241aad7138289efd359383938f"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/composition-proof.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/composition-proof.json",
+      "bytes": 1315,
+      "sha256": "3d24ead3a7623a49a336f3ea2e97a1ae8f6b81fa8993924aaaa4d8790ce1655a"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/g21-source-result.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/g21-source-result.json",
+      "bytes": 3007,
+      "sha256": "971d959d166c58f5420d685f0eb93f67bf14e2ffa7a8edbfeb6c85977c4a7a22"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/k156-composed.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/k156-composed.json",
+      "bytes": 22434,
+      "sha256": "f94ddfbc8d4e094f1e2e654db9f702ef811e5c82d7326932df669bd6024abb37"
+    },
+    {
+      "source": "scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/resource-headroom.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-registration/resource-headroom.json",
+      "bytes": 627,
+      "sha256": "70b8735fde911ce28d3597811f4e73badcb2abd6e5232b056876619913729772"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/report.md",
+      "bytes": 5933,
+      "sha256": "500b9c6a898daa3d625e4a444917b62639182996cb34c3aba959f9910c019824"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/proposals.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/proposals.json",
+      "bytes": 2060,
+      "sha256": "173a8d8f693b4186f2e4e6fe312d8b93d4b62d4a98578bb92685f8299546b8a1"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/git-null-device-sites.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/git-null-device-sites.txt",
+      "bytes": 1350,
+      "sha256": "10ee3d76e0fa51d8b5af6b5c721a7ceb08dcfd27c0dc93d90f7daf65e65db5d7"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/node-null-pin.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/node-null-pin.txt",
+      "bytes": 1537,
+      "sha256": "c502d3b3af8e7edf7fbaa53ed24c16ce752c9d0c5f3002f696d9f71ca9b6fcbd"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/calibration.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/calibration.txt",
+      "bytes": 4490,
+      "sha256": "cd4bdd349efe0c379a4979c837539914cf838f66ee10533977ea9bc89c76b456"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/role-route.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/role-route.txt",
+      "bytes": 3913,
+      "sha256": "2246ff23af2fd48ae0151ace386fc722f967a60d98204e89a41e269cd06116f0"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/read-matrix.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/read-matrix.txt",
+      "bytes": 4146,
+      "sha256": "c06e174bcd9a4b31c0a6d8bcd6dbcd6854e6905a165d96543bfd181fa3dd80ee"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/private-temp.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/private-temp.txt",
+      "bytes": 2197,
+      "sha256": "be1f7270194874626e22a4b071399d85a3e420f20cd6767a19e06b47eba433ca"
+    },
+    {
+      "source": "scratch/agent-out/g8-design-review-provenance/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g8-producer-gap/report.md",
+      "bytes": 5042,
+      "sha256": "47c054b8efca22690dea3a257140b71fb30a365661f521aa11629d737ef5c951"
+    },
+    {
+      "source": "scratch/agent-out/g8-design-review-provenance/source-proof-audit.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g8-producer-gap/source-proof-audit.json",
+      "bytes": 5280,
+      "sha256": "9f843ad3af96538ef2252b155ed5693a41efa8be059988a75605eda5a86cfe58"
+    },
+    {
+      "source": "scratch/clones/g17-source-settlement-correction/scratch/agent-out/g17-source-writer-finalization/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g17-blocked/report.md",
+      "bytes": 4748,
+      "sha256": "00fc1343740c862737ad69c6e1ccfa60f91febc2850fd061a51d27417fb377dc"
+    },
+    {
+      "source": "scratch/clones/g17-source-settlement-correction/scratch/agent-out/g17-source-writer-finalization/checks.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/g17-blocked/checks.json",
+      "bytes": 1569,
+      "sha256": "e4381df42ceb56368de5a1fdcad83e54d1ce9267f75c25251d6e4342ec3e9fc5"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/report-r71a.md",
+      "bytes": 8826,
+      "sha256": "adc0f2ed9072b068d276d8e71abec9d814f08bc40d6770906a9403864495e3ad"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/proposals.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/proposals-r71a.json",
+      "bytes": 2503,
+      "sha256": "a2ec451882464d46490f5a2a52ccc7d732c358b0241891077501a0778d730ad1"
+    },
+    {
+      "source": "scratch/clones/original-075-requalification/scratch/agent-out/original-075-requalification/gnd-r71a-ratchets.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/gnd-r71a-ratchets.txt",
+      "bytes": 1071,
+      "sha256": "54bccf3fa6525d3323db5ca41a995ce7d1b99c9f972c5a9fba26e9687643bca1"
+    },
+    {
+      "source": "scratch/clones/p1-state-marker-fixture/scratch/agent-out/p1-state-marker-fixture/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/state-marker-fixture/report.md",
+      "bytes": 4159,
+      "sha256": "9b82f5a624542d954fd16fbcaeb3757edeb1f542dcc5e4128ade8083bcb2fd3f"
+    },
+    {
+      "source": "scratch/clones/p1-state-marker-fixture/scratch/agent-out/p1-state-marker-fixture/delivery.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/state-marker-fixture/delivery.json",
+      "bytes": 2497,
+      "sha256": "0b36dfaf596556573c06e2b3805ed12e90aa524ac781d501158d6ac82d3618da"
+    },
+    {
+      "source": "scratch/clones/p1-state-marker-fixture/scratch/agent-out/p1-state-marker-fixture/owned.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/state-marker-fixture/owned.patch",
+      "bytes": 3051,
+      "sha256": "dfe8d8d5d44f2ca84b0070fec6f050195ccd39fabaf23352e77d964643c4cf73"
+    },
+    {
+      "source": "scratch/clones/p1-state-marker-fixture/scratch/agent-out/p1-state-marker-fixture/state-original-red.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/state-marker-fixture/state-original-red.json",
+      "bytes": 1950,
+      "sha256": "a8e966d5fbf2ba0b3ffa20faea06437efcfc1ae38ef6202e843963cb78a87d17"
+    },
+    {
+      "source": "scratch/clones/p1-state-marker-fixture/scratch/agent-out/p1-state-marker-fixture/state-green.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/state-marker-fixture/state-green.json",
+      "bytes": 2088,
+      "sha256": "a8f89a989e0c34a8fac66e8aa1079c834e285118989840ce9d847f40f8643886"
+    },
+    {
+      "source": "scratch/clones/p1-state-marker-fixture/scratch/agent-out/p1-state-marker-fixture/k156-composed-green.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/state-marker-fixture/k156-composed-green.json",
+      "bytes": 22593,
+      "sha256": "95f3ed053a39d6df9c92d733442da833b327f7d1c7a028ef307e6fdf7d97be3c"
+    },
+    {
+      "source": "scratch/clones/p1-state-marker-fixture/scratch/agent-out/p1-state-marker-fixture/consumer-safe-paths.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/state-marker-fixture/consumer-safe-paths.json",
+      "bytes": 1124,
+      "sha256": "420deb30618411d54586b976ed6e6bc0724eff067198e3f98607b97ab12f6f5c"
+    },
+    {
+      "source": "scratch/clones/p1-state-marker-fixture/scratch/agent-out/p1-state-marker-fixture/resource-headroom.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/state-marker-fixture/resource-headroom.json",
+      "bytes": 629,
+      "sha256": "62c433a963032b189007d99dea7b02b0e102f46a68f06fe282a4c447c3158afa"
+    },
+    {
+      "source": "scratch/clones/private-tmp-controlled-refusal/scratch/agent-out/private-tmp-controlled-refusal/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/report.md",
+      "bytes": 5239,
+      "sha256": "191f5619d1d0be20208dac5c4493390d674a7a3c1585c0ef6198eb9a1dc9adcf"
+    },
+    {
+      "source": "scratch/clones/private-tmp-controlled-refusal/scratch/agent-out/private-tmp-controlled-refusal/owned.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/owned.patch",
+      "bytes": 6842,
+      "sha256": "296574e872178687b115c31523d8276afc852c7a967dafc7477dd60ff826524f"
+    },
+    {
+      "source": "scratch/clones/private-tmp-controlled-refusal/scratch/agent-out/private-tmp-controlled-refusal/baseline.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/baseline.txt",
+      "bytes": 3945,
+      "sha256": "295717411266d2349be172dc3e852a49c8cab90c9255eea23a4467364ba2c49c"
+    },
+    {
+      "source": "scratch/clones/private-tmp-controlled-refusal/scratch/agent-out/private-tmp-controlled-refusal/targeted.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/targeted.txt",
+      "bytes": 4460,
+      "sha256": "40424406553dacfe9638bc3a502718ab4b05839198b03d9c3f4d90119b8a4434"
+    },
+    {
+      "source": "scratch/clones/private-tmp-controlled-refusal/scratch/agent-out/private-tmp-controlled-refusal/consumer-safe.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/consumer-safe.txt",
+      "bytes": 1121,
+      "sha256": "482a6801b1ec7c30090fbe67f7320700a72cc48eab3fcce9e6b22116f604d99f"
+    },
+    {
+      "source": "scratch/clones/private-tmp-controlled-refusal/scratch/agent-out/private-tmp-controlled-refusal/export.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/export.txt",
+      "bytes": 822,
+      "sha256": "ac1a515af896a3b613c21dceb4e6c59f9b3174203bbe76323d0ab8f3c8d14802"
+    },
+    {
+      "source": "scratch/clones/private-tmp-controlled-refusal/scratch/agent-out/private-tmp-controlled-refusal/resource-headroom.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/resource-headroom.txt",
+      "bytes": 633,
+      "sha256": "830173279efb2223fe384a7758ad866547ad15ce2785d0e93f3ee3bf277afd4d"
+    },
+    {
+      "source": "scratch/p1-composed-postimages.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/composed-postimages.json",
+      "bytes": 5382,
+      "sha256": "cff15e3bfa3a47f4a5f8a57d4f622f0af8170535ce5be132dcdb264d4397ee2d"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+command: node scratch/agent-out/private-tmp-controlled-refusal/export.mjs
+label: private-tmp-exact-export
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+{
+  "scope": [
+    "plugins/pipeline-core/lib/test-private-tmp.test.mjs",
+    "plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs"
+  ],
+  "appendOnly": true,
+  "productionUnchanged": true,
+  "patchSha256": "296574e872178687b115c31523d8276afc852c7a967dafc7477dd60ff826524f",
+  "patchBytes": 6842,
+  "candidate": "1b7fc4f0424c617c19039903ba4f88aece3116f2",
+  "status": " M plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs\n M plugins/pipeline-core/lib/test-private-tmp.test.mjs\n"
+}
+
+--- stderr ---

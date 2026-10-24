@@ -1,0 +1,48 @@
+command: node --test plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs
+label: ORIGINAL-075-ROLE
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+✔ point 1: native, fallback-self-dispatch and unavailable are all reported per role with RRP-* codes (9.771625ms)
+✔ point 1: fallback-self-dispatch is legal only for the claude advisor (1.549754ms)
+✔ point 2a: a failed route is prepared as a canonical self-dispatch fallback (preparation only) (52.233856ms)
+✔ point 3: the fallback is not self-review (fresh context, read-only for Critic/Advisor, intake still required) (110.636537ms)
+✔ point 4a: runCanonicalRoleFallback surfaces exitCode, stdout and stderr of a failed producer (63.096955ms)
+✔ point 2b: a returned read-only critic or advisor fallback is admitted with its honest labels unchanged (60.634165ms)
+✔ point 2b: a Goldfish producer is refused, even from a genuinely returned fallback (62.631981ms)
+✔ point 2b: the implementor never reviews itself (producer equal to authorRole, prefixed or bare) (90.414943ms)
+✔ point 2b: a failed, unlaunched or malformed result is refused (183.822665ms)
+✔ point 2b: only the honest fallback labels are admitted (no native claim, no accepted evidence) (190.232904ms)
+✔ point 2b: the dispatched action must be a fresh-context, read-only native subagent (125.560836ms)
+✔ point 4b: a producer failure with unparseable stdout surfaces its stderr text, not only a byte count (2.15795ms)
+✔ point 4b: a producer failure with parseable stdout surfaces its stderr text too (0.719908ms)
+✔ point 4b: the surfaced stderr is bounded to 4096 bytes with a truncation marker and keeps the true byte count (0.702915ms)
+✔ point 4b: the surfaced stderr carries no absolute home or drive paths (0.72072ms)
+✔ point 5: a failed fallback opens one recovery state bound to dispatchId, role and candidate (78.353199ms)
+✔ point 5: a further failed attempt is appended; attempt 1 and the task identity stay byte-identical (84.189747ms)
+✔ point 5: a renamed or re-bound task cannot continue another task's recovery state (157.082068ms)
+✔ point 5: the write is atomic and compare-and-swap (stale count, injected write failure, attempt bound) (73.87416ms)
+✔ point 5: a returned fallback resolves the state; a resolved state accepts nothing more (98.306993ms)
+✔ point 5: a state that was edited, truncated or is unreadable is refused, never trusted (33.825238ms)
+✔ point 5: only a real fallback result is an attempt; surfaced stderr is bounded and path-free (66.536974ms)
+✔ point 6: the declaration string the briefing names is exactly the one the preflight emits (0.546899ms)
+✔ point 6: the obligations document (canonical and vendored) states the host-boundary-from-first-call rule (0.593397ms)
+✔ point 6: the Goldfish task template (canonical and vendored) carries the matching line inside the targeted-checks field (0.403287ms)
+✔ point 7a: a receipt that carries the typed fallback is accepted, round-trips and is surfaced by the summary (1.777938ms)
+✔ point 7b: a receipt without the field is unchanged (no key, same summary shape, still valid) (0.352379ms)
+✔ point 7c: a malformed or extended fallback is refused on creation and on parse; unknown keys stay refused (1.233483ms)
+✔ point 7d: the approval binding that present-plan builds names the fallback of the receipt, and is unchanged without it (1.831038ms)
+✔ point 7e: the receipt producer writes the fallback when the typed fallback occurred, and refuses it without a requested route (5.80096ms)
+✔ point 7f: present-plan states the fallback so a single-review route is not presented as an independent review (3.094268ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1939.836468
+
+--- stderr ---

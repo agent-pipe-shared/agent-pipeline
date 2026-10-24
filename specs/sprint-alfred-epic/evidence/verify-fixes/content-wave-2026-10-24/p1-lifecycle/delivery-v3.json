@@ -1,0 +1,65 @@
+{
+  "base": {
+    "commit": "daaf074b17b79f471e67651494bc59957e7c85f9",
+    "tree": "1f657f09600dd281c2dc0e6023477ffc819a40ea"
+  },
+  "patchPath": "scratch/agent-out/p1-lifecycle-composition/complete-v3.patch",
+  "patchSha256": "b01853eec332b928d27dd6acf320e86a6f790c87bb507de2420c616e0a3c044c",
+  "changedPaths": [
+    "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
+    "plugins/pipeline-core/lib/architecture-design.mjs",
+    "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+    "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+    "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+    "plugins/pipeline-core/lib/design-authoring.mjs",
+    "plugins/pipeline-core/lib/design-authoring.test.mjs",
+    "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+    "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
+    "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+    "plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs",
+    "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+    "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+    "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
+    "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+    "plugins/pipeline-core/scripts/pipeline-state.mjs",
+    "plugins/pipeline-core/scripts/pipeline-state.test.mjs",
+    "plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md"
+  ],
+  "pathCount": 18,
+  "changedFileSha256": {
+    "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs": "b0f156ee812fa652df3772987404a75fe490f6cc6d008951af55b8c4734bf7b1",
+    "plugins/pipeline-core/lib/architecture-design.mjs": "a61cc58f8312d378eebefcbc3c95ff72aa80edaa527e4f25e9a44487d7ba222f",
+    "plugins/pipeline-core/lib/architecture-entry-readiness.mjs": "2c6958984a831f73b1c36d95f9e456db57c02da8e469cf8d0f3b6099bd982361",
+    "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs": "a04e761e561dc77a7d53df2dd584ac7e55d273429dec5a0ce061e61275bfa7ac",
+    "plugins/pipeline-core/lib/critic-accepted-contract.mjs": "eaa621671b5b20353f743b760ab4c07f22ac0bf8c160372f1e7fc80986606ec9",
+    "plugins/pipeline-core/lib/design-authoring.mjs": "99f6aa068508d12921fed235347a03971740c1d4c0b06c1d2d2f97df18c3ba0a",
+    "plugins/pipeline-core/lib/design-authoring.test.mjs": "e897c4ccda9e8e0f52cffce8a164940d233dafb9eeba9170b45a9941698f312f",
+    "plugins/pipeline-core/lib/guard/command-catalogue.mjs": "586ed58246f39a76b452dd573dad6605d0248dd48362b44a9f4cda8c381920e4",
+    "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs": "ef51e64bc6337714282f84bddb836a80b6825fd7f650cb44bae6f8e6d0112864",
+    "plugins/pipeline-core/lib/onboarding-continuity.mjs": "c5a5f4896193deefceec24c7e916e5bee5131f19d293b1f9dbecd819a2ec6a72",
+    "plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs": "6c97a8a9eb4522fc61bd6558c9b999c80412cbff2b91b1b13d0a4838e25360cf",
+    "plugins/pipeline-core/lib/project-onboarding-v3.mjs": "bc5cadfd2abd256d6e112bc900b6ac360efccdccd4a1d744781cb0cafec07f80",
+    "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs": "325ca8f424c75d07f8e3b6e31040821642e092371e8bd9fc99b3bdf60dd9467b",
+    "plugins/pipeline-core/lib/public-handover-duty.test.mjs": "c39390c01be1393dd51e37f864089595926074c91fc6010513aaa23e43e5299b",
+    "plugins/pipeline-core/lib/rigor-lifecycle.mjs": "297d0039d3e8e1bfbb6f54ef32ba8f86fd715b2fb0fafcda5951fd49e3f8362a",
+    "plugins/pipeline-core/scripts/pipeline-state.mjs": "f62566171e5f9de659bddfccf71d816e1456c7520fa9b4f7c4a82f090b1f03d1",
+    "plugins/pipeline-core/scripts/pipeline-state.test.mjs": "62a19a61c796b50e950a599f9260f959496758f6423b80b8cb5a087baf3d9042",
+    "plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md": "c5fa0b1f7602e6a29a8e6caa8d6ed333aa5eaff59016098da98aff3d1ca9f5bb"
+  },
+  "newFiles": [
+    "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
+    "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
+    "plugins/pipeline-core/lib/public-handover-duty.test.mjs"
+  ],
+  "inventoryDelta": {
+    "newTests": [
+      "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
+      "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
+      "plugins/pipeline-core/lib/public-handover-duty.test.mjs"
+    ],
+    "changedExistingTest": "plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs",
+    "constants": "in scope; unchanged"
+  },
+  "committed": false,
+  "nativeQualification": false
+}

@@ -1,0 +1,46 @@
+command: node --test plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+label: p1-state-marker-original-red
+exitCode: 1
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+Feature "atomic-feature" set. Plan path: specs/atomic-feature/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Error: submit-plan refused (PLAN-SUBMIT-HEAD-UNAVAILABLE); restore and validate the authored source before submission. Zero State mutation.
+✔ checkStatePhaseConsistency reports the design-vs-implementation drift class as blocked (15.964157ms)
+✔ checkStatePhaseConsistency reports consistent when the marker agrees with the machine phase (11.843143ms)
+✖ the marker stays atomic with a real design -> implementation transition (212.366195ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 608.022514
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs:191:1
+✖ the marker stays atomic with a real design -> implementation transition (212.366195ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs:216:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

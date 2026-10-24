@@ -1,0 +1,25 @@
+[
+  {
+    "name": "design-authoring-tests",
+    "command": [
+      "node",
+      "plugins/pipeline-core/lib/design-authoring.test.mjs"
+    ],
+    "exit": 0,
+    "receipt": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "0b9ece815efea289604d2393a0c3b81e0eac738aff597946eb7536cd62800ced",
+      "caseSetSha256": "c55d175b3dfdcb16322d64f8979ada962c06178006e65a05f629fa3eddb68d4f",
+      "dispositionsSha256": "1fdb0f66830b50af8fb46ac4ae0568e61c613b4d485005f002201feb0320800d",
+      "declaredCount": 4,
+      "disposedCount": 4,
+      "counts": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    }
+  }
+]

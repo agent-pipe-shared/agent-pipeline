@@ -1,0 +1,19 @@
+command: node --test plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs
+label: p1-finalization-guard
+exitCode: 0
+head: daaf074b17b79f471e67651494bc59957e7c85f9
+tree: 1f657f09600dd281c2dc0e6023477ffc819a40ea
+dirty: true
+--- stdout ---
+✔ public handover publication admits exact relative and absolute script forms (3.823544ms)
+✔ the actual lifecycle guard admits the explicit public action in a ready governed project (76.929709ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 446.726503
+
+--- stderr ---

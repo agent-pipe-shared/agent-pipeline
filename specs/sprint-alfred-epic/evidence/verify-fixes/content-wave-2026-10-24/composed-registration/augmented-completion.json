@@ -1,0 +1,22 @@
+command: node scratch/qualify-completion.mjs design-authoring-tests
+label: augmented-dau-completion
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+✔ DAU001 authoring skeleton uses the actual architecture contract and remains visibly draft (3.187616ms)
+✔ DAU002 compact readback retains executable recovery and digests without copying design contents (0.34195ms)
+✔ DAU003 generated criterion uses the accepted parser shape while draft and legacy ids remain unapproved (6.550936ms)
+✔ DAU004 staging authoring distinguishes generated placeholders from reviewed source (0.701854ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22.941294
+Actual inherited completion descriptors qualified: 1 suites, 4 passing cases.
+
+--- stderr ---

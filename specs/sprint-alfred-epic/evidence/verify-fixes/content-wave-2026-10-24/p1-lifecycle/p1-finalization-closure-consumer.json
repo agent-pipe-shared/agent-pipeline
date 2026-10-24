@@ -1,0 +1,78 @@
+command: node --test harness/scripts/check-consumer-safe-paths.test.mjs plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs plugins/pipeline-core/lib/design-authoring.test.mjs plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+label: p1-finalization-closure-consumer
+exitCode: 0
+head: daaf074b17b79f471e67651494bc59957e7c85f9
+tree: 1f657f09600dd281c2dc0e6023477ffc819a40ea
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.209928ms)
+✔ a clean fixture passes (0.798016ms)
+✔ an allowlisted occurrence passes (0.28454ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.273189ms)
+✔ multiple prefix hits on one line each produce a finding (0.160725ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.192907ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.531174ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (163.039289ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (12.261375ms)
+✔ missing physical map blocks before any readiness claim and offers only the read-only proposal (6.535627ms)
+✔ malformed physical map blocks even with an authorized adoption disposition (1.988077ms)
+✔ approved design materialization action wins before an invalid scaffold-map diagnostic (1.306862ms)
+✔ missing design block preserves its exact PRD action before scaffold-map validation (1.343613ms)
+✔ incomplete greenfield design keeps the PRD authoring action instead of estate adoption (1.096473ms)
+✔ a materialized map without a project-owned AGENTS pointer has an actionable typed refusal (19.083064ms)
+✔ a PO-deferred adoption reports complete fitness observations without enforcing them (182.809525ms)
+✔ a PO-deferred adoption still enforces fitness for a net-new path and names it (111.707296ms)
+✔ checkpoint map debt blocks the next planning boundary even during adoption deferral (64.689ms)
+✔ a descendant map repair consumes checkpoint debt only after class-7 passes (192.180015ms)
+✔ unreadable checkpoint debt fails closed with a typed repair route (61.175223ms)
+✔ approved greenfield design defers missing physical surfaces without fabricating fitness pass (119.006183ms)
+✔ calibration-unavailable class 10 is preserved as report-only while other classes decide entry (68.944098ms)
+✔ malformed or incomplete fitness outcomes fail closed (102.404593ms)
+✔ real signed approved-scoped adoption reaches the physical readiness gate (1707.543466ms)
+✔ symlinked physical fitness artifacts fail closed (13.929203ms)
+✔ unresolved adoption authority remains blocked even when the physical bundle is current (110.279013ms)
+✔ planning decisions are projected only for owned task modules (1.833624ms)
+✔ a deferred architecture decision remains visible without changing lifecycle readiness (131.975383ms)
+✔ an unavailable optional decision clock remains diagnostic (0.213085ms)
+✔ pending allowance: a missing planned verification entry point that readiness lists as pending is allowed (0.625919ms)
+✔ pending allowance: missing, empty and stale-empty declared surfaces across classes 2 and 6 are allowed when all pending (0.263891ms)
+✔ pending allowance: no pending-class finding at all is allowed when readiness already approved the deferral (0.152279ms)
+✔ pending allowance: the returned pending list is a copy, and no input is mutated (0.18445ms)
+✔ pending allowance: readiness that is not ready, not a design package, or not deferred is denied with its own code (0.301462ms)
+✔ pending allowance: an empty pending set denies even when the evaluator reports a missing entry point (0.118756ms)
+✔ pending allowance: a finding of any other class denies, including classes whose id and property do not agree (0.208516ms)
+✔ pending allowance: only the two known report-only unavailable shapes are tolerated; any other non-pass outcome denies (0.241008ms)
+✔ pending allowance: a violation target outside the pending set denies, including the zero-entry-point sentinel (0.230268ms)
+✔ pending allowance: a defect that is not absence (unreadable surface) denies even on a pending target (0.116942ms)
+✔ pending allowance: a navigation-currency finding is never allowed, because its violation names no stale contract (0.240307ms)
+✔ pending allowance: malformed input is denied as malformed and never throws (0.443693ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ DAU001 authoring skeleton uses the actual architecture contract and remains visibly draft (3.280763ms)
+✔ DAU002 compact readback retains executable recovery and digests without copying design contents (0.261968ms)
+✔ DAU003 generated criterion uses the accepted parser shape while draft and legacy ids remain unapproved (6.51151ms)
+✔ DAU004 staging authoring distinguishes generated placeholders from reviewed source (0.562408ms)
+PASS GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports
+PASS GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)
+PASS GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)
+PASS GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)
+PASS GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry
+PASS GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise
+PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)
+PASS GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher
+PASS GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents
+PASS GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots
+PASS GMWKC10 every FIXTURE_STRING_IMPORTS exemption names a target that does NOT exist on disk
+
+guard-maintenance-window-kernel-closure: 11 passed, 0 failed
+✔ plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs (838.197998ms)
+ℹ tests 46
+ℹ suites 0
+ℹ pass 46
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3285.001587
+
+--- stderr ---

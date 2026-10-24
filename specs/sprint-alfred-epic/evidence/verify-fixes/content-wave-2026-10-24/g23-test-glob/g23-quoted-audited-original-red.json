@@ -1,0 +1,63 @@
+command: node --test plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
+label: G23-quoted-audited-original-RED
+exitCode: 1
+head: dbaa242bbff4403980a58f8394a0bfada3b00b12
+tree: f1e3b69346f560d2de1223d35a36d85a21e9362c
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✖ G23Q001 original quoted test-file narrowing is admitted through parser and actual guard (103.62857ms)
+✔ G23Q002 quoted operators remain inert regex data in the stdin sink (1539.693292ms)
+✔ G23Q003 unsupported filters, executable flags and shell effects stay refused (1079.408932ms)
+✔ G23Q004 external directories, symlink escape and credential operands stay refused (1102.320392ms)
+✔ G23Q005 missing target diagnosis stays distinct from grammar and credential refusals (88.854648ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4284.743429
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ G23Q001 original quoted test-file narrowing is admitted through parser and actual guard (103.62857ms)
+  AssertionError [ERR_ASSERTION]: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-OPERATOR-UNAPPROVED: The command contains an unapproved shell operator.
+  Rejected element: the operator "|".
+  Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.
+  Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.
+  If typed retryActions are present, run only those exact read-only actions as separate tool calls.
+  The complete admitted grammar, with bounds and exact spellings:
+  - one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").
+  - bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").
+  - bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").
+  - bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").
+  - bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").
+  - up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}
+  
+  No human override route is offered for this exact command; the guard attempted to plan one.
+  Reason: planning the route failed with code=HGO-ROOT.
+  
+  
+  2 !== 0
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs:43:12
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs:31:9)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs:35:95)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

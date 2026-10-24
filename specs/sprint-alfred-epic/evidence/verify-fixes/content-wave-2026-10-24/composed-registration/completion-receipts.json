@@ -1,0 +1,94 @@
+[
+  {
+    "name": "g23-quoted-pipeline-reads-tests",
+    "command": [
+      "node",
+      "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs"
+    ],
+    "exit": 0,
+    "receipt": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "ff37fbe85b8829922f05c0a5bbe058a978e453ec32fd6eba70aa1ad0c94018cb",
+      "caseSetSha256": "82ec0dadc553634c0cbba6c459ea850dbd7cf2f26bdaa20058f2e2797edc49ce",
+      "dispositionsSha256": "90ca57695783e9af660d7e274d5b4189ae7ff76a31a244b100f7ca08346ac0e6",
+      "declaredCount": 5,
+      "disposedCount": 5,
+      "counts": {
+        "pass": 5,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    }
+  },
+  {
+    "name": "architecture-close-disposition-tests",
+    "command": [
+      "node",
+      "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs"
+    ],
+    "exit": 0,
+    "receipt": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "bd00ca0ddca564433acd6b0b24a806b0fa76ef1f0b5feaa8b28bb8c5b08da6c1",
+      "caseSetSha256": "a2c19813a6e634d0bb948a96ca1587c54c6e29bb2ff0ca8c24a8246bfd030458",
+      "dispositionsSha256": "05e6e205889b3fcd5fd685d7d7363c6e98a2942d49d99350fab941ba572197f8",
+      "declaredCount": 3,
+      "disposedCount": 3,
+      "counts": {
+        "pass": 3,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    }
+  },
+  {
+    "name": "public-handover-duty-tests",
+    "command": [
+      "node",
+      "plugins/pipeline-core/lib/public-handover-duty.test.mjs"
+    ],
+    "exit": 0,
+    "receipt": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "07950603a5b00c3fd299ab9b54742a41fd66dd97dfbf740bed2f2f82140424b5",
+      "caseSetSha256": "c57707f41468b42162398adcd758fb1bdb391aaf7ca7b4b2188015aed03c32d2",
+      "dispositionsSha256": "fffd947e78783e3c6bb6743adbfc45231b44881556645c2916e3e87a01534920",
+      "declaredCount": 6,
+      "disposedCount": 6,
+      "counts": {
+        "pass": 6,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    }
+  },
+  {
+    "name": "g29-public-handover-admission-tests",
+    "command": [
+      "node",
+      "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs"
+    ],
+    "exit": 0,
+    "receipt": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "1462d1e771d3b7aa480a4f0b259a512135447ff68e518997713aebd4be76dafd",
+      "caseSetSha256": "f2eb49408f27509beef22e6724411b1bab3b7922213788ea5f9e942f9bc62df3",
+      "dispositionsSha256": "afc586ae9b3988617c9fe8c93e1386565bc510e164b7fb6267b5ae609e324562",
+      "declaredCount": 2,
+      "disposedCount": 2,
+      "counts": {
+        "pass": 2,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    }
+  }
+]

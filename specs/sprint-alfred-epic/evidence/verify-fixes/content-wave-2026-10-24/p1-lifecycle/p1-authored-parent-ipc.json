@@ -1,0 +1,69 @@
+command: node scratch/p1-authored-parent-ipc.mjs
+label: p1-authored-parent-ipc
+exitCode: 0
+head: daaf074b17b79f471e67651494bc59957e7c85f9
+tree: 1f657f09600dd281c2dc0e6023477ffc819a40ea
+dirty: true
+--- stdout ---
+ORIGINAL184 CALLBACK START shard=0 index=6 pid=943769 mono_ns=104115226001822
+PASS  a real orphaned descriptor is repaired automatically through the top-level bootstrap inspection, never as a selection question
+ORIGINAL184 CALLBACK END shard=0 index=6 pid=943769 mono_ns=104118398173387 elapsed_ms=3172.172 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=18 pid=943769 mono_ns=104118398259030
+PASS  coherent current documents with stale persisted authority require the same neutral decision for all intents
+ORIGINAL184 CALLBACK END shard=0 index=18 pid=943769 mono_ns=104122229615050 elapsed_ms=3831.356 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=30 pid=943769 mono_ns=104122229693609
+PASS  a V3 source enabling only Claude admits a Claude Code session instead of hard-failing as Codex-disabled
+ORIGINAL184 CALLBACK END shard=0 index=30 pid=943769 mono_ns=104124576546045 elapsed_ms=2346.852 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=42 pid=943769 mono_ns=104124576637809
+PASS  an ordinary inspect surfaces every pending ask whose condition is still true, not only the apply-portable-seed call
+ORIGINAL184 CALLBACK END shard=0 index=42 pid=943769 mono_ns=104127434119976 elapsed_ms=2857.482 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=54 pid=943769 mono_ns=104127434195339
+PASS  matrix source/runtime progress actions are exact, diagnostic-bound, and copy-safe
+ORIGINAL184 CALLBACK END shard=0 index=54 pid=943769 mono_ns=104130186894470 elapsed_ms=2752.699 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=66 pid=943769 mono_ns=104130186977698
+PASS  runtime target preflight maps every reversible probe permission failure without residue EPERM/create
+ORIGINAL184 CALLBACK END shard=0 index=66 pid=943769 mono_ns=104132409592223 elapsed_ms=2222.615 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=78 pid=943769 mono_ns=104132409660262
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/rename
+ORIGINAL184 CALLBACK END shard=0 index=78 pid=943769 mono_ns=104132966355324 elapsed_ms=556.695 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=90 pid=943769 mono_ns=104132966441418
+Plan submitted by "coordinator" on 2026-08-01T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/promo-lang/prd_promo-lang.md(a2c4fd71aa83...)+specs/promo-lang/spec.md(a4861276d932...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+PASS  promoting a PRD whose language differs from kickoff's own answer reaches a consistent authority at promotion, not several steps later at submit-plan
+ORIGINAL184 CALLBACK END shard=0 index=90 pid=943769 mono_ns=104139277796548 elapsed_ms=6311.355 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=102 pid=943769 mono_ns=104139277884355
+PASS  onboarding materializes project/critical-human-proof.json declaring push, for both global human approval modes
+ORIGINAL184 CALLBACK END shard=0 index=102 pid=943769 mono_ns=104155775962225 elapsed_ms=16498.078 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=114 pid=943769 mono_ns=104155777894597
+PASS  a claude-onboarded root reaches a real kickoff plan instead of runtime-attestation-required
+ORIGINAL184 CALLBACK END shard=0 index=114 pid=943769 mono_ns=104157583757036 elapsed_ms=1805.862 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=126 pid=943769 mono_ns=104157583878597
+PASS  kickoff promotion CLI requires a design-input path
+ORIGINAL184 CALLBACK END shard=0 index=126 pid=943769 mono_ns=104157585643280 elapsed_ms=1.765 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=138 pid=943769 mono_ns=104157585703404
+PASS  adoption preserves directory and linked-worktree Git metadata and blocks user-owned reserved paths
+ORIGINAL184 CALLBACK END shard=0 index=138 pid=943769 mono_ns=104161591832322 elapsed_ms=4006.129 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=150 pid=943769 mono_ns=104161591882958
+PASS  manifest repair never claims ready when post-publication durability is unavailable
+ORIGINAL184 CALLBACK END shard=0 index=150 pid=943769 mono_ns=104163901044227 elapsed_ms=2309.161 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=162 pid=943769 mono_ns=104163901104031
+PASS  owned runtime drift and invalid V3 sources stay in closed lifecycle classifications
+ORIGINAL184 CALLBACK END shard=0 index=162 pid=943769 mono_ns=104166339352594 elapsed_ms=2438.249 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=174 pid=943769 mono_ns=104166339425612
+PASS  H3 manifest repair fails closed on physical-root symlink
+ORIGINAL184 CALLBACK END shard=0 index=174 pid=943769 mono_ns=104168721277269 elapsed_ms=2381.852 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=186 pid=943769 mono_ns=104168721340860
+PASS  partial authority apply creates only absent owned targets and preserves user projections
+ORIGINAL184 CALLBACK END shard=0 index=186 pid=943769 mono_ns=104168785853241 elapsed_ms=64.512 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=198 pid=943769 mono_ns=104168785904228
+PASS  bootstrap-binding-required routes a hand-authored staging PRD through its policy-selected acknowledgement and then binds
+ORIGINAL184 CALLBACK END shard=0 index=198 pid=943769 mono_ns=104186531013474 elapsed_ms=17745.109 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=210 pid=943769 mono_ns=104186531072466
+PASS  NVA-B-UNLINK-1 V3 manifest repair does not claim rolled-back while a throwing temporary unlink leaves the target published
+ORIGINAL184 CALLBACK END shard=0 index=210 pid=943769 mono_ns=104188955241575 elapsed_ms=2424.169 outcome=pass
+B8 producer/guard command classes in shard: 1
+
+project-onboarding-v3 chunk 2/2 shard 1/6: 18 passed, 0 failed
+{"target":{"name":"bootstrap-binding-required routes a hand-authored staging PRD through its policy-selected acknowledgement and then binds","index":198,"id":"POV-9a3d108daa8941ec","disposition":"pass"},"childPassed":18,"childTotal":18,"childExit":0,"wholeSuite":"not-run"}
+
+--- stderr ---

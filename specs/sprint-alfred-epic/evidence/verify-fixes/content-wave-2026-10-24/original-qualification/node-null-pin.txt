@@ -1,0 +1,31 @@
+command: node --test plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs
+label: ORIGINAL-075-NODE-NULL
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+✔ A1: no "NUL" literal is a Node open target in any repository JS source (390.615446ms)
+✔ A1: a native run of this pin left no real NUL file in the repository root (0.244595ms)
+✔ RED mirror: scanner flags openSync (0.182908ms)
+✔ RED mirror: scanner flags openSyncSingleQuote (0.092907ms)
+✔ RED mirror: scanner flags writeFileSync (0.129886ms)
+✔ RED mirror: scanner flags createWriteStream (0.080593ms)
+✔ RED mirror: scanner flags callSplitAcrossLines (0.121852ms)
+✔ RED mirror: scanner flags boundConstant (0.34702ms)
+✔ RED tree: a scratch mirror tree holding an offender makes the tree scan fail (1.999508ms)
+✔ A2: GIT_CONFIG_GLOBAL set to the NUL spelling is allowed (read by git, not opened by Node) (0.282938ms)
+✔ A2: the allowance does not shelter an actual open of NUL beside a git env key (0.204148ms)
+✔ acceptance 2: the git null-device rule has live enforcers beside this scanner (shared constant, ratchets, real git) (0.339274ms)
+✔ allowances: comments and non-open string uses are not offences (0.362058ms)
+✔ os.devNull as an open target creates no NUL file in the working directory (25.763862ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 484.767545
+
+--- stderr ---

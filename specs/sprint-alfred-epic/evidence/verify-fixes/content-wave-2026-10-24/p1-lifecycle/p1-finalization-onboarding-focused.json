@@ -1,0 +1,19 @@
+command: node scratch/p1-onboarding-focused.mjs
+label: p1-finalization-onboarding-focused
+exitCode: 0
+head: daaf074b17b79f471e67651494bc59957e7c85f9
+tree: 1f657f09600dd281c2dc0e6023477ffc819a40ea
+dirty: true
+--- stdout ---
+ORIGINAL184 CALLBACK START shard=null index=193 pid=949915 mono_ns=104241226199382
+PASS  v4Inspection routes a genuinely fresh repository through the full intake coordinator lifecycle (intake-required -> intake-design-questions-required -> bootstrap-binding-required)
+ORIGINAL184 CALLBACK END shard=null index=193 pid=949915 mono_ns=104248100274157 elapsed_ms=6874.075 outcome=pass
+ORIGINAL184 CALLBACK START shard=null index=198 pid=949915 mono_ns=104248100361684
+PASS  bootstrap-binding-required routes a hand-authored staging PRD through its policy-selected acknowledgement and then binds
+ORIGINAL184 CALLBACK END shard=null index=198 pid=949915 mono_ns=104265479533738 elapsed_ms=17379.172 outcome=pass
+ORIGINAL184 CALLBACK START shard=null index=199 pid=949915 mono_ns=104265479612317
+PASS  chat acknowledgement consumes the one in-chat PO decision without a second terminal confirmation
+ORIGINAL184 CALLBACK END shard=null index=199 pid=949915 mono_ns=104269383134942 elapsed_ms=3903.523 outcome=pass
+P1 controlled authoring/binding exported callbacks: 3/3
+
+--- stderr ---

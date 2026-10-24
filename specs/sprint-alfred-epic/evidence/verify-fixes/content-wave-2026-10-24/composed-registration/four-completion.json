@@ -1,0 +1,73 @@
+command: node scratch/qualify-completion.mjs
+label: composed-four-completion
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+✔ G23Q001 original quoted test-file narrowing is admitted through parser and actual guard (794.850471ms)
+✔ G23Q002 quoted operators remain inert regex data in the stdin sink (1511.166916ms)
+✔ G23Q003 unsupported filters, executable flags and shell effects stay refused (1199.919692ms)
+✔ G23Q004 external directories, symlink escape and credential operands stay refused (1092.083871ms)
+✔ G23Q005 missing target diagnosis stays distinct from grammar and credential refusals (272.653207ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4877.09735
+Feature "close-producer" closed by "Synthetic fixture operator" (commit —, 2026-10-24T01:00:00.000Z). activeFeature removed, planApproved=false.
+✔ ACD001 pre-close producer retains each nonpass property and close consumer qualifies exact source (18.347147ms)
+✔ ACD002 missing evaluator evidence stays unavailable with all ten open properties (8.1431ms)
+✔ ACD003 actual State close producer persists the nonblocking unavailable fitness disposition (113.3887ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 153.13406
+✔ PHD001 missing structured public state is unavailable with an explicit agent update action (5.072797ms)
+✔ PHD002 an explicit update follows feature and phase while preserving other handover prose (6.979299ms)
+✔ PHD003 marker-like prose outside Next action remains byte-for-byte intact (3.796683ms)
+✔ PHD004 a matching marker in Notes cannot make an unmarked Next action current (3.311521ms)
+✔ PHD005 State inspection offers the explicit public update and the consumer preserves State (136.070161ms)
+✔ PHD006 an explicit public update refuses physical aliases without changing their target (3.292014ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 171.37784
+✔ G29P001 public handover publication admits exact relative and absolute script forms (4.074691ms)
+✔ G29P002 the actual lifecycle guard admits the explicit public action in a ready governed project (80.875029ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 90.488974
+Actual inherited completion descriptors qualified: 4 suites, 16 passing cases.
+
+--- stderr ---
+Warning: current commit (git rev-parse HEAD) could not be determined: fixture unborn HEAD.
+close-feature proceeds anyway -- forCommit is recorded as null.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'

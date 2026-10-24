@@ -1,0 +1,31 @@
+command: node --test plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+label: p1-finalization-g27
+exitCode: 0
+head: daaf074b17b79f471e67651494bc59957e7c85f9
+tree: 1f657f09600dd281c2dc0e6023477ffc819a40ea
+dirty: true
+--- stdout ---
+✔ D64 criterion parser: the supported shapes locate their rows (control for the refusals below) (3.665153ms)
+✔ D64 criterion parser: the four-column table of the greenfield run locates no criterion (0.156648ms)
+✔ D64 criterion parser: a leading-zero id is not a criterion id and its row is not located (0.163611ms)
+✔ D64 criterion parser (RED mirror): the located-row check is meaningful, a shape the parser supports is distinguishable from the unsupported one (0.227331ms)
+✔ D64 review chain: the spent-round count follows the chain, not the file names; a third round is refused under any name (2.116511ms)
+✔ D64 review chain (RED mirror): a producer given a predecessor derives round 2 from the chain, the caller cannot label it 'initial' (0.653481ms)
+✔ D64 submit-plan: unsupported criteria refuse before State mutation; legacy present-plan retains the same defense (268.124854ms)
+✔ D64 present-plan (RED mirror): the refusal is scoped; a supported Spec and a Spec with no criterion rows are not refused by it (580.861953ms)
+✔ D64 governed submission: mixed unsupported rows refuse without mutation and legacy present-plan still defends them (204.52259ms)
+✔ D64 criterion inspection: the located and the unsupported rows come from the parser's own scan (0.836318ms)
+✔ D64 review chain: a sanitized report binds the original and the published digest and a delta after a formal correction needs no budget exception (2.430057ms)
+✔ D64 review chain (RED mirror): a pair whose original equals the published digest, or is no digest, is refused with a typed code (0.456487ms)
+✔ D64 review chain: present-plan checks the pair in the receipt it is handed and refuses a forged one (271.188489ms)
+✔ D64 review chain: the producer derives the pair from an original report file and refuses the same bytes for both (146.846113ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1808.220364
+
+--- stderr ---

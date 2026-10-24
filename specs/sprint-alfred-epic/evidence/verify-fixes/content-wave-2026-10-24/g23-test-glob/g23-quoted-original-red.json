@@ -1,0 +1,71 @@
+command: node --test plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
+label: G23-quoted-original-RED
+exitCode: 1
+head: dbaa242bbff4403980a58f8394a0bfada3b00b12
+tree: f1e3b69346f560d2de1223d35a36d85a21e9362c
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✖ G23Q001 original quoted test-file narrowing is admitted through parser and actual guard (7.028002ms)
+✔ G23Q002 quoted operators remain inert regex data in the stdin sink (1507.88221ms)
+✔ G23Q003 unsupported filters, executable flags and shell effects stay refused (1045.439071ms)
+✖ G23Q004 external directories, symlink escape and credential operands stay refused (69.899158ms)
+✔ G23Q005 missing target diagnosis stays distinct from grammar and credential refusals (88.122163ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 3
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3071.691599
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ G23Q001 original quoted test-file narrowing is admitted through parser and actual guard (7.028002ms)
+  AssertionError [ERR_ASSERTION]: rg --files 'plugins/pipeline-core' -g '*.test.mjs' | rg '(domain-owner|authority-registry|managed|journal)'
+  
+  false !== true
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs:40:12
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs:29:9)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs:33:95)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ G23Q004 external directories, symlink escape and credential operands stay refused (69.899158ms)
+  AssertionError [ERR_ASSERTION]: rg --files '<repo-root>/scratch/g23-quoted-Ag467y/outside' | rg '(owner|journal)'
+  
+  true !== false
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs:73:12
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs:29:9)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs:70:89)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

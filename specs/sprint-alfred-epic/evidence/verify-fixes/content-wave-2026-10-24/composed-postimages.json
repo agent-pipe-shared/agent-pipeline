@@ -1,0 +1,141 @@
+{
+  "base": "1b7fc4f0424c617c19039903ba4f88aece3116f2",
+  "paths": [
+    {
+      "path": "docs/product-capability-inventory.json",
+      "bytes": 180318,
+      "sha256": "bbcfa619afebc18f27e0a3abb5ecf06edddb65af79cacf88d6b6b6aa4059f9f8"
+    },
+    {
+      "path": "harness/config/verify-case-completion-augmentations.v1.json",
+      "bytes": 35570,
+      "sha256": "e4a7b2bc04c286d10a26f95266ef95a56057466b326c2d74528724205aa026f4"
+    },
+    {
+      "path": "harness/config/verify-case-completion.v1.json",
+      "bytes": 85222,
+      "sha256": "032b7124e0460b1b2241e038b5e2c3fce46bfd17d93986f167ac5149a6ca706f"
+    },
+    {
+      "path": "harness/verify-suites.json",
+      "bytes": 240448,
+      "sha256": "f3213d8c2e899f7203ef1caa3852f07fed925c5a0a599f317bfcf968e0469cb1"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "bytes": 30845,
+      "sha256": "ed7b04a3219c19674f9524f97571fad8fcc2d38244ce72798be330b0151a309e"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
+      "bytes": 5535,
+      "sha256": "ce61166437ef41489e788a154ffa0326209a7fc4b11fe822cfe4b43fb18eb375"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "bytes": 36358,
+      "sha256": "a61cc58f8312d378eebefcbc3c95ff72aa80edaa527e4f25e9a44487d7ba222f"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+      "bytes": 36430,
+      "sha256": "2c6958984a831f73b1c36d95f9e456db57c02da8e469cf8d0f3b6099bd982361"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "bytes": 32337,
+      "sha256": "a04e761e561dc77a7d53df2dd584ac7e55d273429dec5a0ce061e61275bfa7ac"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+      "bytes": 38354,
+      "sha256": "eaa621671b5b20353f743b760ab4c07f22ac0bf8c160372f1e7fc80986606ec9"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-authoring.mjs",
+      "bytes": 3843,
+      "sha256": "99f6aa068508d12921fed235347a03971740c1d4c0b06c1d2d2f97df18c3ba0a"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-authoring.test.mjs",
+      "bytes": 7464,
+      "sha256": "e897c4ccda9e8e0f52cffce8a164940d233dafb9eeba9170b45a9941698f312f"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+      "bytes": 54232,
+      "sha256": "586ed58246f39a76b452dd573dad6605d0248dd48362b44a9f4cda8c381920e4"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
+      "bytes": 5780,
+      "sha256": "1ec2652b4b0c43d59ae6464fbf2f1c005b3790dbd0c252e62237eb5507311559"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
+      "bytes": 2492,
+      "sha256": "f52aaa6e0ea71dc04acbdd75cc0a6da44d070104e881a7d7cf18732413622fb4"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "bytes": 694735,
+      "sha256": "c5a5f4896193deefceec24c7e916e5bee5131f19d293b1f9dbecd819a2ec6a72"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs",
+      "bytes": 21837,
+      "sha256": "6c97a8a9eb4522fc61bd6558c9b999c80412cbff2b91b1b13d0a4838e25360cf"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs",
+      "bytes": 12770,
+      "sha256": "d55ffb17b5f8602201820e56aaeee947d123271febfc5b2206230bcf7d467d7a"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "bytes": 429878,
+      "sha256": "bc5cadfd2abd256d6e112bc900b6ac360efccdccd4a1d744781cb0cafec07f80"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "bytes": 590287,
+      "sha256": "325ca8f424c75d07f8e3b6e31040821642e092371e8bd9fc99b3bdf60dd9467b"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
+      "bytes": 6592,
+      "sha256": "c0e8e506b15961ce82d694dccbd646ae0e1a0011f7d4c4f51a05d3c88d00f646"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+      "bytes": 26355,
+      "sha256": "297d0039d3e8e1bfbb6f54ef32ba8f86fd715b2fb0fafcda5951fd49e3f8362a"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/test-private-tmp.test.mjs",
+      "bytes": 21422,
+      "sha256": "cac0eb1cae920bf80b249ce758ab554ef55b883d5a0f01dd07f9511dd25f0587"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs",
+      "bytes": 11882,
+      "sha256": "7bd8bf9bcb0876050302ccf184ad7e54667e3f8300231f89557560644a83d64b"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "bytes": 859859,
+      "sha256": "f62566171e5f9de659bddfccf71d816e1456c7520fa9b4f7c4a82f090b1f03d1"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.test.mjs",
+      "bytes": 194678,
+      "sha256": "62a19a61c796b50e950a599f9260f959496758f6423b80b8cb5a087baf3d9042"
+    },
+    {
+      "path": "plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md",
+      "bytes": 12792,
+      "sha256": "c5fa0b1f7602e6a29a8e6caa8d6ed333aa5eaff59016098da98aff3d1ca9f5bb"
+    }
+  ],
+  "qualification": "Owner-focused tests only; no final Verify/Critic/native acceptance"
+}

@@ -1,0 +1,19 @@
+command: node plugins/pipeline-core/scripts/report-resource-headroom.mjs --input scratch/agent-out/p1-g23-composed-registration/resource-observations.json
+label: composed-resource-unknown
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.project-resource-headroom-report.v1",
+  "candidate": {
+    "commit": "1b7fc4f0424c617c19039903ba4f88aece3116f2",
+    "tree": "8dd3f8d2c4757580aa89595da94f1da758e6b2e0"
+  },
+  "assurance": "declared-observations",
+  "compliance": "not-certified",
+  "resources": []
+}
+
+--- stderr ---

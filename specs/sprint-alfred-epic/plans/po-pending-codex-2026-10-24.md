@@ -1,5 +1,44 @@
 # Collected PO matters during the Codex fix wave
 
+**New complete operator package:** the remaining State fixture now passes3/3;
+composed K15619/19 and consumer paths9/9 pass, preserving all21 original
+assertions. The private-temp logical refusal/mutation additions also pass
+(20 counted passes,9 retained native skips; consumer9/9). The 27-path composed
+source/registration package is staged and matches the owner postimages in the
+[content-wave packet](../evidence/verify-fixes/content-wave-2026-10-24/README.md).
+The actual normal commit was refused for Verify registration, command catalogue
+and State writer; no capability was seeded and no agent bypass was used.
+Its exact pathspec is `scratch/p1-composed-operator-paths.txt`; the prepared
+human message is `scratch/commit-msg/P1-COMPOSED-OPERATOR-INTEGRATION.txt`.
+The PO received the concrete command after the final terminal offer; it can
+wait until morning. Human commit readback remains pending. No stamp/install or
+live HEAD-bound signing command has been issued. PRD/Spec hashes are unchanged.
+
+**Overnight continuation (2026-10-24; supersedes older status below):** the PO
+will run Greenfield tests in the morning. No fully qualified terminal package
+was outstanding at the final terminal offer; do not issue an incomplete signing
+command. Continue approved disjoint fixes and focused checks. The diagnostic
+correction is committed as `1b7fc4f04`; its more precise refusal does not grant
+a signature or change eligibility. G23, the P1 lifecycle composition and the
+recording overlay are applied but not yet committed. Their remaining original
+State-marker fixture setup is being corrected by its exclusive owner. The
+capability inventory must be rebaselined only after the actual source commit.
+Exact retained evidence: [content-wave custody](../evidence/verify-fixes/content-wave-2026-10-24/README.md).
+
+**Actual automatic-approval block to collect:** G17's managed-host correction
+was rejected twice by automatic approval review. The narrower rejection states
+that it still changes receipt validation/protected-mutation semantics and the
+clone briefing was not accepted as explicit user authorization. Neither host
+transformation executed; no alternate-tool application is allowed. A proposed
+normalization of actual receipt hashes is unsuitable and must not be offered
+for approval. The unfinished publisher instrumentation also exposes live owner
+objects, so it is not a reviewable application package. Narrow that proposal
+before presenting an exact safe diff and this rejection reason to the PO.
+Current source report:
+`scratch/clones/g17-source-settlement-correction/scratch/agent-out/g17-source-writer-finalization/report.md`.
+Independent work continues; do not infer authorization or fabricate a native
+receipt to clear this block.
+
 **Current terminal window resolved (2026-10-24; supersedes historical queue
 entries below):** the PO committed K156/registration as `0fb6fe6d9` and the
 five-path G19/G21 composition as `daaf074b1`. Both are read back in Git. The

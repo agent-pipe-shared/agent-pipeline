@@ -1,0 +1,75 @@
+command: node scratch/p1-red-control.mjs plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+label: p1-finalization-g27-original-callsites
+exitCode: 1
+head: daaf074b17b79f471e67651494bc59957e7c85f9
+tree: 1f657f09600dd281c2dc0e6023477ffc819a40ea
+dirty: true
+--- stdout ---
+✔ D64 criterion parser: the supported shapes locate their rows (control for the refusals below) (3.80518ms)
+✔ D64 criterion parser: the four-column table of the greenfield run locates no criterion (0.170284ms)
+✔ D64 criterion parser: a leading-zero id is not a criterion id and its row is not located (0.163591ms)
+✔ D64 criterion parser (RED mirror): the located-row check is meaningful, a shape the parser supports is distinguishable from the unsupported one (0.292235ms)
+✔ D64 review chain: the spent-round count follows the chain, not the file names; a third round is refused under any name (2.119617ms)
+✔ D64 review chain (RED mirror): a producer given a predecessor derives round 2 from the chain, the caller cannot label it 'initial' (0.596142ms)
+✖ D64 submit-plan: unsupported criteria refuse before State mutation; legacy present-plan retains the same defense (170.656915ms)
+✔ D64 present-plan (RED mirror): the refusal is scoped; a supported Spec and a Spec with no criterion rows are not refused by it (586.649251ms)
+✖ D64 governed submission: mixed unsupported rows refuse without mutation and legacy present-plan still defends them (167.729539ms)
+✔ D64 criterion inspection: the located and the unsupported rows come from the parser's own scan (0.935037ms)
+✔ D64 review chain: a sanitized report binds the original and the published digest and a delta after a formal correction needs no budget exception (2.743853ms)
+✔ D64 review chain (RED mirror): a pair whose original equals the published digest, or is no digest, is refused with a typed code (0.446277ms)
+✔ D64 review chain: present-plan checks the pair in the receipt it is handed and refuses a forged one (302.632635ms)
+✔ D64 review chain: the producer derives the pair from an original report file and refuses the same bytes for both (172.661841ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 12
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1747.51554
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs:157:1
+✖ D64 submit-plan: unsupported criteria refuse before State mutation; legacy present-plan retains the same defense (170.656915ms)
+  AssertionError [ERR_ASSERTION]: four-column table
+  
+  0 !== 2
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs:161:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs:186:1
+✖ D64 governed submission: mixed unsupported rows refuse without mutation and legacy present-plan still defends them (167.729539ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 2
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs:192:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

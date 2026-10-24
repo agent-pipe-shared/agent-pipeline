@@ -1,0 +1,25 @@
+command: node --test plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs
+label: ORIGINAL-075-PRIVATE-TEMP
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+﹣ AC-231 P1/P2: the injected assess seam drives PRIVATE_TMP_ROOT_NOT_SECURE and the harden seam is consulted on the fresh root (0.957359ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+﹣ AC-231 P2: a refused call memoizes nothing; a later secure call succeeds and is then memoized (0.102855ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+﹣ AC-231 P1: with no options, or with non-function seams, the real adapter is used and a genuinely secure root results (0.148041ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+✔ AC-231 P1: the optional seam parameter does not change the exported signature shape (privateTempRoot callable with zero arguments) (0.30569ms)
+﹣ AC-231 P2: the scenario passes against an unmutated scratch mirror (0.093137ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+﹣ AC-231 P2 RED: removing the NOT_SECURE refusal in a scratch mirror makes the scenario fail (0.098638ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+﹣ AC-231 P2 RED: dropping the root cleanup before the throw is also caught (0.080142ms) # host-limitation: the harden/assess seams are consulted on win32 only; owner Coordinator, due 2026-10-19 (PO decision K7) for the Linux/WSL run
+✔ AC-231 host-limitation: POSIX branch does not consult the seams (chmod 0700 path) (32.131615ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 6
+ℹ todo 0
+ℹ duration_ms 101.256693
+
+--- stderr ---

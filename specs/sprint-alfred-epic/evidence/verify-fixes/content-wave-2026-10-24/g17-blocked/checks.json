@@ -1,0 +1,31 @@
+{
+  "schema": "g17.machine-capture-index.v1",
+  "checks": [
+    {
+      "artifact": "writer-positive.txt",
+      "command": "<home>/.local/lib/node-v24.15.0/bin/node --test plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs",
+      "exitCode": 1,
+      "sha256": "c56498400971afdc66149f9dbc95173ee2e1923244a8f09bd096780d7c59d780",
+      "scope": "partial-writer-instrumentation-original-host",
+      "owner": "G17-SOURCE-WRITER-FINALIZATION"
+    },
+    {
+      "artifact": "writer-settlement-gap.txt",
+      "command": "<home>/.local/lib/node-v24.15.0/bin/node --test plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs",
+      "exitCode": 0,
+      "sha256": "f3741e23412e98bc70aac2e3a9353ca2b2fb3caac4c813c706a6aed0edc795fb",
+      "scope": "partial-writer-instrumentation-original-host",
+      "owner": "G17-SOURCE-WRITER-FINALIZATION"
+    },
+    {
+      "artifact": "inventory-consumer-kernel.txt",
+      "command": "node --test plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "exitCode": 0,
+      "sha256": "1fbb64de1c6d6a1f3ff896686fa95af10912db9b5adcff8a9ed668b7adad8235",
+      "scope": "partial-writer-instrumentation-original-host",
+      "owner": "G17-SOURCE-WRITER-FINALIZATION"
+    }
+  ],
+  "retainedPriorCaptureIndex": "../g17-source-settlement-correction/checks.json",
+  "retainedPriorCaptureIndexSha256": "75091b88e862ba890fa81858b3740f08a41e5bdb088c0f72ea1bca81ec2892c6"
+}

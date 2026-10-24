@@ -1,0 +1,16 @@
+command: node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs --test-name-pattern "^R7-1a "
+label: ORIGINAL-075-GND-R71A
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+PASS R7-1a behavioural (RED on win32 today; may PASS on POSIX, which already uses /dev/null): runGit succeeds against a git that rejects NUL-like null devices
+PASS R7-1a ratchet detector self-check: flags a win32 NUL ternary and an inline /dev/null for a git value, ignores look-alikes and the shared GIT_NULL_DEVICE constant
+PASS R7-1a ratchet: no production module (lib, scripts, hooks) assigns a "NUL" literal to a git environment or -c value
+PASS R7-1a ratchet: no *.test.mjs fixture (lib, scripts, hooks) assigns a "NUL" literal to a git environment or -c value (fixtures may keep /dev/null)
+PASS R7-1a single-source ratchet (RED until every site is converted): no production module (lib, scripts, hooks) spells an inline /dev/null git value; each takes GIT_NULL_DEVICE
+
+5/5 checks passed.
+
+--- stderr ---

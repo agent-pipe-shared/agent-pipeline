@@ -1,0 +1,28 @@
+command: rg -n "independentCriticPass|never launches a host|MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED|No design course or dispatch is required|DWP-PRESENT-RETIRED" plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs plugins/pipeline-core/lib/model-family-host-store.mjs plugins/pipeline-core/lib/model-family-runtime-host.mjs plugins/pipeline-core/scripts/pipeline-state.mjs
+label: g8-source-proof-audit
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+plugins/pipeline-core/scripts/pipeline-state.mjs:4304:          guidance: "Run present-plan --review-receipt with the explicit tracked review receipt (at most two), and --by the presenter. No design course or dispatch is required." };
+plugins/pipeline-core/scripts/pipeline-state.mjs:11505:      if (rest.includes("--design-workflow-package")) { console.error("DWP-PRESENT-RETIRED: use present-plan --review-receipt"); return 2; }
+plugins/pipeline-core/lib/model-family-runtime-host.mjs:86:  readAuthorityInputs: () => ({ ok: false, code: "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED", retryable: false }),
+plugins/pipeline-core/lib/model-family-runtime-host.mjs:87:  readPinInputs: () => ({ ok: false, code: "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED", retryable: false }),
+plugins/pipeline-core/lib/model-family-runtime-host.mjs:90:  launchDriver: () => ({ ok: false, code: "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED", retryable: false }),
+plugins/pipeline-core/lib/model-family-runtime-host.mjs:182:      return { ok: false, code: "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED", retryable: false };
+plugins/pipeline-core/lib/model-family-runtime-host.mjs:195:      return unavailable("MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED");
+plugins/pipeline-core/lib/model-family-host-store.mjs:981:    if (typeof trustedSources.admitNativeRequest !== "function") return fail("MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED");
+plugins/pipeline-core/lib/model-family-host-store.mjs:997:      return fail(admitted?.code === "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED"
+plugins/pipeline-core/lib/model-family-host-store.mjs:1018:    if (result.ok === false && ["MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED", ...mainRefusals].includes(result.code)
+plugins/pipeline-core/lib/model-family-host-store.mjs:1093:      return fail('MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED');
+plugins/pipeline-core/lib/model-family-host-store.mjs:1169:/** A bounded unit-method driver owns its completion. This never launches a host. */
+plugins/pipeline-core/lib/model-family-host-store.mjs:1172:  const launchDriver=({invocation,nativeRequest,driverContext}={})=>{if(nativeRequest!==undefined||driverContext!==undefined||!validInvocationReceipt(invocation)||!receiptDigest(invocation))return fail('MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED');const key=invocation.receiptSha256;if(returned.has(key))return fail('MODEL-FAMILY-CONTROLLED-REPLAY');returned.set(key,digest(invocation));return {ok:true,code:'MAIN_PRELAUNCH_OBSERVED',value:null};};
+plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs:56:  exact(terminal,['schema','taskId','attemptRef','diagnosticRef','outcome','reviewCandidate','registrationCommit','evidenceRefs','sourceSha256','assurance','native','independentCriticPass']);
+plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs:59:  if(terminal.schema!=='pipeline.controlled-method-dispatch-terminal.v1'||terminal.taskId!==value.taskId||!equal(terminal.attemptRef,value.attemptRef)||!equal(terminal.diagnosticRef,value.diagnosticRef)||!equal(terminal.reviewCandidate,value.reviewCandidate)||terminal.registrationCommit!==value.registrationCommit||!equal(terminal.evidenceRefs,value.evidenceRefs)||terminal.sourceSha256!==value.sourceSha256||terminal.assurance!==value.assurance||terminal.native!==false||terminal.independentCriticPass!==false)fail('CMO-TERMINAL');
+plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs:92:  const observation={schema:'pipeline.controlled-method-dispatch-observation.v1',...value,diagnosticObservation:inspected.diagnosticObservation,courseObservation:inspected.course,adapterSourceSha256:record.source.sha256,independentCriticPass:false};
+plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs:99:  return Object.freeze({schema:'pipeline.controlled-method-dispatch-publication.v1',taskId:value.taskId,observationRef:structuredClone(record.ref),assurance:'controlled-source-method',native:false,independentCriticPass:false});
+plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs:106:  const expected={schema:'pipeline.controlled-method-dispatch-observation.v1',...inspected.value,diagnosticObservation:inspected.diagnosticObservation,courseObservation:inspected.course,adapterSourceSha256:record.source.sha256,independentCriticPass:false};
+plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs:115:  const binding=Object.freeze({schema:'pipeline.local-controlled-method-dispatch-evidence.v1',taskId:value.taskId,reviewBaseCommit:value.reviewBaseCommit,reviewCandidateCommit:value.reviewCandidate.commit,registrationCommit:value.registrationCommit,observationRef:structuredClone(record.ref),assurance:'controlled-source-method',native:false,independentCriticPass:false});
+
+--- stderr ---

@@ -1,0 +1,227 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3978,6 +3978,70 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "g23-quoted-pipeline-reads-tests",
++      "file": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
++      "invariantPinned": "Quoted test-module narrowing passes the real parser and guard while malicious filters, credentials and aliases remain refused.",
++      "nonOverlapNote": "Dedicated G23 quoted pipeline witness, distinct from the original read-option and parser suites.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G23Q001",
++          "G23Q002",
++          "G23Q003",
++          "G23Q004",
++          "G23Q005"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "architecture-close-disposition-tests",
++      "file": "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
++      "invariantPinned": "Close retains source-bound architecture findings and unavailable properties through the actual State writer.",
++      "nonOverlapNote": "Dedicated G26 close disposition producer and consumer witness; existing fitness suites retain their original duties.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "ACD001",
++          "ACD002",
++          "ACD003"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "public-handover-duty-tests",
++      "file": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
++      "invariantPinned": "Explicit public handover updates preserve other prose and State while refusing physical aliases.",
++      "nonOverlapNote": "Dedicated public handover producer and State consumer witness, separate from lifecycle command admission.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PHD001",
++          "PHD002",
++          "PHD003",
++          "PHD004",
++          "PHD005",
++          "PHD006"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "g29-public-handover-admission-tests",
++      "file": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
++      "invariantPinned": "Only the exact explicit public handover command clears the real lifecycle guard in relative and absolute forms.",
++      "nonOverlapNote": "Dedicated G29 catalogue and actual guard witness, distinct from handover document behavior.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G29P001",
++          "G29P002"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -62,6 +62,11 @@
+       "path": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "architecture-close-disposition-tests",
++      "path": "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "architecture-decision-waiver-store-tests",
+       "path": "plugins/pipeline-core/lib/architecture-decision-waiver-store.test.mjs",
+@@ -678,11 +683,21 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "g23-quoted-pipeline-reads-tests",
++      "path": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "g23-read-help-tests",
+       "path": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "g29-public-handover-admission-tests",
++      "path": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "gate-estimate-tests",
+       "path": "plugins/pipeline-core/lib/gate-estimate.test.mjs",
+@@ -1519,6 +1534,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "public-handover-duty-tests",
++      "path": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "publication-authority-tests",
+       "path": "plugins/pipeline-core/lib/publication-authority.test.mjs",
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1131,7 +1131,8 @@
+         "caseIds": [
+           "DAU001",
+           "DAU002",
+-          "DAU003"
++          "DAU003",
++          "DAU004"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -238,6 +238,7 @@
+         "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-integration-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-refresh-host-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-close-disposition-tests",
+         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
+         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+         "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
+@@ -445,7 +446,9 @@
+         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
++        "verify-phase:harness/scripts/verify.mjs:g23-quoted-pipeline-reads-tests",
+         "verify-phase:harness/scripts/verify.mjs:g23-read-help-tests",
++        "verify-phase:harness/scripts/verify.mjs:g29-public-handover-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
+@@ -929,6 +932,7 @@
+         "verify-phase:harness/scripts/verify.mjs:public-baseline-diagnose-tests",
+         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
+         "verify-phase:harness/scripts/verify.mjs:public-core-origin-allowlist-tests",
++        "verify-phase:harness/scripts/verify.mjs:public-handover-duty-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-bundle-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-bundle-v2-tests",
+diff --git a/plugins/pipeline-core/lib/architecture-close-disposition.test.mjs b/plugins/pipeline-core/lib/architecture-close-disposition.test.mjs
+--- a/plugins/pipeline-core/lib/architecture-close-disposition.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-close-disposition.test.mjs
+@@ -2,7 +2,9 @@
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+ import { fileURLToPath } from "node:url";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "./test-case-completion.mjs";
++const cases = [];
++function test(name, run) { cases.push({ id: `ACD${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+ import { join } from "node:path";
+ import { run, statePath } from "../scripts/pipeline-state.mjs";
+@@ -74,3 +76,6 @@ test("actual State close producer persists the nonblocking unavailable fitness d
+     assert.equal(closed.closedFeatures[0].architectureFitness.rigorObservationSha256, closed.rigorHistory.at(-1).entrySha256);
+   } finally { rmSync(fixture, { recursive: true, force: true }); }
+ });
++
++if (cases.length !== 3) throw new Error("architecture-close-disposition-tests case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/public-handover-duty.test.mjs b/plugins/pipeline-core/lib/public-handover-duty.test.mjs
+--- a/plugins/pipeline-core/lib/public-handover-duty.test.mjs
++++ b/plugins/pipeline-core/lib/public-handover-duty.test.mjs
+@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
+ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "./test-case-completion.mjs";
++const cases = [];
++function test(name, run) { cases.push({ id: `PHD${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ import { inspectPublicHandoverDuty, nextActionSection, updatePublicHandoverDuty } from "./onboarding-continuity.mjs";
+ import { run, statePath } from "../scripts/pipeline-state.mjs";
+ 
+@@ -105,3 +107,6 @@ test("an explicit public update refuses physical aliases without changing their
+   assert.equal(updatePublicHandoverDuty(root, state).status, "unavailable");
+   assert.equal(readFileSync(target, "utf8"), bytes);
+ }));
++
++if (cases.length !== 6) throw new Error("public-handover-duty-tests case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs b/plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs
+--- a/plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs
+@@ -1,6 +1,8 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "../test-case-completion.mjs";
++const cases = [];
++function test(name, run) { cases.push({ id: `G29P${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ import { fileURLToPath } from "node:url";
+ import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+ import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
+@@ -33,3 +35,6 @@ test("the actual lifecycle guard admits the explicit public action in a ready go
+     assert.deepEqual(result, { exitCode: 0, stderr: "" });
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
++
++if (cases.length !== 2) throw new Error("g29-public-handover-admission-tests case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

@@ -1,0 +1,18 @@
+{
+  "patchSha256": "b01853eec332b928d27dd6acf320e86a6f790c87bb507de2420c616e0a3c044c",
+  "reportPath": "scratch/agent-out/p1-lifecycle-composition/report-v3.md",
+  "reportSha256": "8dfcb63fdd7ff7dc470e0f1528862c8d09e7382d712b69c0b2eda04e9e4ad278",
+  "evidenceSha256": {
+    "scratch/p1-finalization-callsite.json": "483d27bc502ea0ef7735b790bac3ab412e948d03be7b79ef592d1cebf34e0e5a",
+    "scratch/p1-finalization-g27-red.json": "b3a752e994e2fda7c651834ed8441c9443b221d093db00bf804c3b313896b888",
+    "scratch/p1-finalization-g27-green.json": "2bb9c08ace5771180ce5a6e52e6af736cb998f2f30bf48e6ec87b7e4d31497af",
+    "scratch/p1-finalization-guard.json": "aea7752b4db9340090d6b772250ecbed110bc2d15587953b02c1ae5dc05b137f",
+    "scratch/p1-finalization-closure-consumer.json": "4daa8049acd833bf1dd02b4b6cda104e1e9dce3e2ee7bb72857d654492ad375a",
+    "scratch/p1-authored-parent-ipc.json": "93e4bec816f29b7c4227c1281253b70e11124e9da7441494f775cac97da028d5",
+    "scratch/p1-authored-parent-ipc-result.json": "6f2a6ac6b150d053dd5f065be0735236c2ba43ec6594cd3fb9718dc71a93ae74",
+    "scratch/p1-finalization-onboarding-focused.json": "c5adb943982af2ba53bfd4a973bc8ec4e4e93632b0c96277e6b36f990b96b0d1",
+    "scratch/p1-resource-headroom.json": "4158ce39188b1d573906ee597d03d3fd3605569a0110e5d6f8782a7c5b3a5be6"
+  },
+  "verifiedEvidencePathCount": 9,
+  "scope": "artifact existence and binding; not full Verify/native qualification"
+}

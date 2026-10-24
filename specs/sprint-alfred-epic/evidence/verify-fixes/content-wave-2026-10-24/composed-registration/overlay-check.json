@@ -1,0 +1,10 @@
+command: node scratch/check-overlay.mjs
+label: exact-owned-overlay
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+Exact incremental overlay reverses cleanly against composed fixture candidate. No source changed.
+
+--- stderr ---

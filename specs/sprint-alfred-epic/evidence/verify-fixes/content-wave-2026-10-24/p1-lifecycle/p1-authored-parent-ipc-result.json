@@ -1,0 +1,135 @@
+{
+  "schema": "pipeline.p1-authored-parent-ipc-observation.v1",
+  "scope": "one original 18-callback child; not full 216-callback suite",
+  "shard": 0,
+  "chunk": 1,
+  "exitCode": 0,
+  "signal": null,
+  "target": {
+    "name": "bootstrap-binding-required routes a hand-authored staging PRD through its policy-selected acknowledgement and then binds",
+    "index": 198,
+    "id": "POV-9a3d108daa8941ec",
+    "disposition": "pass"
+  },
+  "receipt": {
+    "schema": "pipeline.onboarding-test-case-results.v1",
+    "shard": 0,
+    "chunk": 1,
+    "declaredCount": 216,
+    "assignedIndices": [
+      6,
+      18,
+      30,
+      42,
+      54,
+      66,
+      78,
+      90,
+      102,
+      114,
+      126,
+      138,
+      150,
+      162,
+      174,
+      186,
+      198,
+      210
+    ],
+    "results": [
+      {
+        "index": 6,
+        "id": "POV-20a3806d9e40d456",
+        "disposition": "pass"
+      },
+      {
+        "index": 18,
+        "id": "POV-40031932c7d8be71",
+        "disposition": "pass"
+      },
+      {
+        "index": 30,
+        "id": "POV-e3b1deb6f648b10d",
+        "disposition": "pass"
+      },
+      {
+        "index": 42,
+        "id": "POV-dc813e6f97dbfa35",
+        "disposition": "pass"
+      },
+      {
+        "index": 54,
+        "id": "POV-465c717cde41215f",
+        "disposition": "pass"
+      },
+      {
+        "index": 66,
+        "id": "POV-f452dd1e7c4436f9",
+        "disposition": "pass"
+      },
+      {
+        "index": 78,
+        "id": "POV-d1f08fbcf7f4cad0",
+        "disposition": "pass"
+      },
+      {
+        "index": 90,
+        "id": "POV-ae3963a33e9df5ad",
+        "disposition": "pass"
+      },
+      {
+        "index": 102,
+        "id": "POV-ad675b3ae5319535",
+        "disposition": "pass"
+      },
+      {
+        "index": 114,
+        "id": "POV-81b42c7101b78049",
+        "disposition": "pass"
+      },
+      {
+        "index": 126,
+        "id": "POV-5ad747f219cca159",
+        "disposition": "pass"
+      },
+      {
+        "index": 138,
+        "id": "POV-3b1d68d331feee57",
+        "disposition": "pass"
+      },
+      {
+        "index": 150,
+        "id": "POV-d5778f82678f8fcc",
+        "disposition": "pass"
+      },
+      {
+        "index": 162,
+        "id": "POV-5786f961395b4d14",
+        "disposition": "pass"
+      },
+      {
+        "index": 174,
+        "id": "POV-8ca8f5fdd2a0a77d",
+        "disposition": "pass"
+      },
+      {
+        "index": 186,
+        "id": "POV-1936d59b5229accd",
+        "disposition": "pass"
+      },
+      {
+        "index": 198,
+        "id": "POV-9a3d108daa8941ec",
+        "disposition": "pass"
+      },
+      {
+        "index": 210,
+        "id": "POV-4aef2c78ffbc85a9",
+        "disposition": "pass"
+      }
+    ],
+    "classes": [
+      "partial:po-authority-decision-plan"
+    ]
+  }
+}

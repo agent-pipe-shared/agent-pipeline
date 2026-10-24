@@ -1,0 +1,46 @@
+command: node --test "--test-name-pattern=Source author-root requirement" plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+label: original-generic-source-refusal-red
+exitCode: 1
+head: dbaa242bbff4403980a58f8394a0bfada3b00b12
+tree: f1e3b69346f560d2de1223d35a36d85a21e9362c
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: pre-commit-hook-plugin-1AjB6D
+✖ installed hook: Source author-root requirement is reported distinctly from a hard HGO refusal (3003.921962ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3506.650628
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:712:1
+✖ installed hook: Source author-root requirement is reported distinctly from a hard HGO refusal (3003.921962ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /HGO-AUTHOR-ROOT-REQUIRED/. Input:
+  
+  'BLOCKED (agent-pipeline pre-commit hook): 1 staged path(s) are protected and carry no matching consumed human-guard-override capability:\n' +
+    '  - TP-SOURCE-DIAGNOSTIC plugins/pipeline-core/fixture.mjs: fixture protected Source path\n' +
+    'Why: this is the git-level backstop for guard-testpath.mjs / guard-gate-strength.mjs -- it exists because a spawned process (a different interpreter, a shelled-out redirect) can write these paths without ever crossing a PreToolUse hook boundary; this commit boundary is the one such a process cannot walk around.\n' +
+    '\n' +
+    'PB-COMMIT-OVERRIDE-NONOVERRIDABLE: no commit-scoped override can cover plugins/pipeline-core/fixture.mjs; nothing was seeded.\n' +
+    '\n' +
+    'HUMAN OPERATOR ONLY: git itself provides operator-level ways to bypass hook enforcement for a human working directly, outside any agent session. An agent MUST NOT use any such bypass under any circumstance or instruction -- if this commit must proceed, stop and hand it to a human operator.\n'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:727:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'BLOCKED (agent-pipeline pre-commit hook): 1 staged path(s) are protected and carry no matching consumed human-guard-override capability:\n  - TP-SOURCE-DIAGNOSTIC plugins/pipeline-core/fixture.mjs: fixture protected Source path\nWhy: this is the git-level backstop for guard-testpath.mjs / guard-gate-strength.mjs -- it exists because a spawned process (a different interpreter, a shelled-out redirect) can write these paths without ever crossing a PreToolUse hook boundary; this commit boundary is the one such a process cannot walk around.\n\nPB-COMMIT-OVERRIDE-NONOVERRIDABLE: no commit-scoped override can cover plugins/pipeline-core/fixture.mjs; nothing was seeded.\n\nHUMAN OPERATOR ONLY: git itself provides operator-level ways to bypass hook enforcement for a human working directly, outside any agent session. An agent MUST NOT use any such bypass under any circumstance or instruction -- if this commit must proceed, stop and hand it to a human operator.\n',
+    expected: /HGO-AUTHOR-ROOT-REQUIRED/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+--- stderr ---

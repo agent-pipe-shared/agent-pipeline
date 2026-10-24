@@ -1,0 +1,21 @@
+command: node --test "--test-name-pattern=Source author-root requirement|sensitive-path HGO hard refusal|staged NON-protected path is unaffected" plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+label: source-root-hard-refusal-and-normal-control-green
+exitCode: 0
+head: dbaa242bbff4403980a58f8394a0bfada3b00b12
+tree: f1e3b69346f560d2de1223d35a36d85a21e9362c
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: pre-commit-hook-plugin-e1BjIQ
+✔ installed hook: Source author-root requirement is reported distinctly from a hard HGO refusal (2608.006598ms)
+✔ installed hook: a sensitive-path HGO hard refusal remains NONOVERRIDABLE with its real code (2659.099686ms)
+✔ installed hook: staged NON-protected path is unaffected -> commit succeeds (2325.071554ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8048.402665
+
+--- stderr ---

@@ -1,0 +1,60 @@
+command: node --test plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs
+label: ORIGINAL-075-CALIBRATION
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+✔ S1 placeholder without metadata resolves root-derived to the physical root name (5.328334ms)
+✔ S1 the placeholder is never reported as the project name (legacy path too) (2.425277ms)
+✔ S1 a root genuinely named new-project still reports the placeholder as unavailable (2.622422ms)
+✔ S2 root-derived metadata with matching rootSha256 resolves (2.640516ms)
+✔ S2 a stored name differing from the root name is refused PCI-NAME-MISMATCH (2.434556ms)
+✔ S3 metadata whose rootSha256 does not match the physical root is refused PCI-ROOT-MISMATCH (2.085151ms)
+✔ S3 a calibration copied from another root is refused PCI-ROOT-MISMATCH (3.724005ms)
+✔ S4 a non-placeholder project without metadata that is not the root name is refused PCI-ALIAS-REFUSED (2.501432ms)
+✔ S4 metadata kind configured-alias whose name is not the root name is refused PCI-ALIAS-REFUSED (2.404178ms)
+✔ S4 a stored name equal to the root name is no alias and resolves without metadata (2.526781ms)
+✔ S4 metadata kind configured-alias whose name equals the root name resolves (2.161947ms)
+✔ S4 the alias refusal reaches the consumer fail-closed with the repair in its message (2.876084ms)
+✔ S4x the real identity files of this repository resolve in a root with an arbitrary name, typed source-checkout (26.059769ms)
+✔ S4x the source-checkout identity reaches consumer verify without PCI-ALIAS-REFUSED (25.512239ms)
+✔ S4x a root really named agent-pipeline is no alias and carries no source-checkout mode (19.187603ms)
+✔ S4x a consumer-shaped repository with the same stored alias is still refused PCI-ALIAS-REFUSED (30.264907ms)
+✔ S4x a repository that copies only the marketplace file is refused PCI-ALIAS-REFUSED (26.369939ms)
+✔ S4x a repository that copies only the calibration file is refused PCI-ALIAS-REFUSED (23.56468ms)
+✔ S4x both identity files present but not tracked by Git are refused PCI-ALIAS-REFUSED (20.039972ms)
+✔ S4x both identity files in a directory that is not a Git repository are refused PCI-ALIAS-REFUSED (7.15383ms)
+✔ S4x a marketplace that deviates from the closed identity is refused PCI-ALIAS-REFUSED (120.059214ms)
+✔ S4x a stored alias other than agent-pipeline is refused even in the source-checkout shape (17.802532ms)
+✔ S4x root-derived metadata keeps PCI-NAME-MISMATCH in the source-checkout shape (18.494798ms)
+✔ S4x a symbolic-link marketplace file is refused PCI-ALIAS-REFUSED (28.483083ms)
+✔ S5 no calibration file is refused PCI-CALIBRATION-MISSING (1.629937ms)
+✔ S5 a calibration without a project field is refused PCI-PROJECT-MISSING (4.136148ms)
+✔ S6 invalid JSON is refused PCI-CALIBRATION-INVALID (2.143392ms)
+✔ S6 a bad project label is refused PCI-PROJECT-INVALID (3.842189ms)
+✔ S6 a bad metadata shape is refused PCI-METADATA-INVALID (5.79548ms)
+✔ S6 neutral and legacy calibration present and not byte-equal is refused PCI-CALIBRATION-DRIFT (2.730517ms)
+✔ S6 byte-equal neutral and legacy calibrations do not drift (2.522172ms)
+✔ S6 a symlinked root is unavailable PCI-ROOT-UNAVAILABLE (2.573609ms)
+✔ S6 an unavailable root (deps seam) is refused PCI-ROOT-UNAVAILABLE (1.059303ms)
+✔ S7 onboarding seeds a root-derived identity, never the new-project placeholder (2.329806ms)
+✔ S7 the onboarding source calls buildRootProjectCalibrationIdentity for the seeded identity (1.669692ms)
+✔ S8 consumer reads a resolved identity; the placeholder yields the root name (3.133443ms)
+✔ S8 consumer fails closed with VEP-PROJECT-IDENTITY: PCI-PROJECT-MISSING (2.52683ms)
+✔ S8 consumer fails closed with VEP-PROJECT-IDENTITY: PCI-CALIBRATION-INVALID (2.239796ms)
+✔ S8 consumer fails closed with VEP-PROJECT-IDENTITY: PCI-PROJECT-INVALID (2.198066ms)
+✔ S8 consumer fails closed with VEP-PROJECT-IDENTITY: PCI-METADATA-INVALID (2.399499ms)
+✔ S8 consumer fails closed with VEP-PROJECT-IDENTITY: PCI-ROOT-MISMATCH (2.629265ms)
+✔ S8 consumer fails closed with VEP-PROJECT-IDENTITY: PCI-NAME-MISMATCH (2.566867ms)
+✔ S8 consumer fails closed with VEP-PROJECT-IDENTITY: PCI-CALIBRATION-DRIFT (2.988668ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 782.900397
+
+--- stderr ---

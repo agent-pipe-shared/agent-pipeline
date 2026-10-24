@@ -1,0 +1,17 @@
+{
+  "schema": "pipeline.original-075-requalification-proposals.v1",
+  "authority": "inert-methodological-proposal-only",
+  "candidateCommit": "1b7fc4f0424c617c19039903ba4f88aece3116f2",
+  "fixtureComposition": ["G23 owned.patch", "P1 complete-v3.patch"],
+  "review": "pending",
+  "integratedVerify": "pending-coordinator",
+  "poAcceptance": "open",
+  "projectResourceHeadroom": "unknown-no-supplied-observations",
+  "items": [
+    {"itemId":"pipeline.git-for-windows-2-56-rejects-git-config-global-nul","stageProposal":75,"tests":9,"pass":9,"fail":0,"skip":0,"artifact":"git-null-device-sites.txt","companionCaptures":[{"artifact":"node-null-pin.txt","tests":14,"pass":14,"fail":0,"skip":0},{"artifact":"gnd-r71a-ratchets.txt","command":"node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs --test-name-pattern \"^R7-1a \"","checks":5,"pass":5,"fail":0,"exitCode":0}],"authorityRef":"PO 2026-10-23 batch 10 native-only 75","priorDisposition":{"stageProposal":null,"retainStage":50,"reason":"Current R7-1a companion ratchets were unexecuted in the initial packet; preserved here as outcome history."},"remaining":["Native Git for Windows 2.56.0.windows.2","Review","PO acceptance"]},
+    {"itemId":"pipeline.project-calibration-retains-new-project-placeholder","stageProposal":75,"tests":43,"pass":43,"fail":0,"skip":0,"artifact":"calibration.txt","authorityRef":"PO 2026-10-23 batches 10/11/12; accepted S1-S8/R1/source-checkout exemption","remaining":["Review","PO acceptance"]},
+    {"itemId":"pipeline.role-route-preflight-with-self-dispatch-fallback","stageProposal":75,"tests":31,"pass":31,"fail":0,"skip":0,"artifact":"role-route.txt","authorityRef":"PO 2026-10-23 batch 10 native-only 75 and batch 12 row 41","remaining":["Live Codex host-boundary qualification","Review","PO acceptance"]},
+    {"itemId":"pipeline.read-blocks-and-misleading-denial-texts-across-runners","stageProposal":null,"retainStage":50,"tests":23,"pass":22,"fail":0,"skip":1,"todo":0,"artifact":"read-matrix.txt","remaining":["Additional Greenfield external-file/symlink/restart matrix scope audit","U3 native-host check","Actual affected runner/platform qualification","Integrated Verify","Review","PO acceptance"]},
+    {"itemId":"pipeline.private-temp-root-not-secure-branch-has-no-test-seam","stageProposal":null,"retainStage":50,"tests":8,"pass":2,"fail":0,"skip":6,"artifact":"private-temp.txt","remaining":["Genuine Linux-reachable original NOT_SECURE seam witness under D133","Review","PO acceptance"]}
+  ]
+}

@@ -1,0 +1,19 @@
+command: node plugins/pipeline-core/scripts/report-resource-headroom.mjs --input scratch/resource-observations.json
+label: p1-resource-headroom-unknown
+exitCode: 0
+head: daaf074b17b79f471e67651494bc59957e7c85f9
+tree: 1f657f09600dd281c2dc0e6023477ffc819a40ea
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.project-resource-headroom-report.v1",
+  "candidate": {
+    "commit": "daaf074b17b79f471e67651494bc59957e7c85f9",
+    "tree": "1f657f09600dd281c2dc0e6023477ffc819a40ea"
+  },
+  "assurance": "declared-observations",
+  "compliance": "not-certified",
+  "resources": []
+}
+
+--- stderr ---
