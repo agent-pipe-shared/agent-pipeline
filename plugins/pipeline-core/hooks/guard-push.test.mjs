@@ -2569,6 +2569,35 @@ function freshRepoIn(parentDir, name) {
   }
 }
 
+// ---- K153 / G11: a read-only revision expression with braces is not a push target ---------------------------------
+// `git rev-parse "HEAD^{tree}"` carries a brace inside double quotes (literal there). The marker-only proof trusted a
+// handful of subcommands but not the read-only object readers, so the braces were judged as shell expansion of a push target.
+{
+  const { dir } = freshRepo("k153-readonly-rev");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  for (const [id, command] of [
+    ["PG-K153-01", 'git rev-parse "HEAD^{tree}"'],
+    ["PG-K153-02", 'git cat-file -p "HEAD^{tree}"'],
+    ["PG-K153-03", 'git ls-tree "HEAD^{tree}"'],
+    ["PG-K153-04", 'git rev-list --count "HEAD^{commit}"'],
+  ]) {
+    check(`${id} allow  read-only git reader with a braced quoted revision: ${command}`, command, dir, ALLOW, {
+      stderrEmpty: true,
+    });
+  }
+  // Nothing about the reader set loosens an actual push, an unquoted brace, a chained push or a hidden substitution push.
+  for (const [id, command] of [
+    ["PG-K153-05", 'git push origin "main:refs/heads/{a,b}"'],
+    ["PG-K153-06", "git push origin main:refs/heads/{a,b}"],
+    ["PG-K153-07", "git rev-parse HEAD^{tree}"],
+    ["PG-K153-08", 'git rev-parse "HEAD^{tree}" ; git push origin main:refs/heads/feature-test'],
+    ["PG-K153-09", 'git rev-parse "$(git push origin main:refs/heads/feature-test)"'],
+    ["PG-K153-10", 'git cat-file -p "HEAD^{tree}" && git push origin main:refs/heads/feature-test'],
+  ]) {
+    check(`${id} block  brace/push shape stays refused: ${command}`, command, dir, BLOCK);
+  }
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

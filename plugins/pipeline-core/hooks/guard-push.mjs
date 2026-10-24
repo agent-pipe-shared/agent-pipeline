@@ -370,7 +370,10 @@ if (ghDelivery.kind === "refused") emit(2, [
 //     must be a plain read (a small allow-list program or `git <read-only subcommand>`, a body charset with no quote, `$`, `;`,
 //     `|`, `&`, `<` or `>`) that `commandIsGitPush` itself does not classify as a push;
 //   - `git grep -O` / `--open-files-in-pager` runs a command, so it is never admitted.
-const NON_PUSH_MARKER_SUBCOMMANDS = new Set(["commit", "grep", "log", "show", "diff", "status"]);
+// K153 / G11: the read-only object readers (`rev-parse`, `rev-list`, `cat-file`, `ls-tree`) join the set, so a braced revision
+// such as `"HEAD^{tree}"` inside double quotes (literal there) is proven a plain read instead of a hidden push target. Every
+// other condition above is unchanged: an unquoted brace, a chain, a pipe and a push-classified substitution body still fail.
+const NON_PUSH_MARKER_SUBCOMMANDS = new Set(["commit", "grep", "log", "show", "diff", "status", "rev-parse", "rev-list", "cat-file", "ls-tree"]);
 const NON_PUSH_BODY_GIT_SUBCOMMANDS = new Set(["merge-base", "rev-parse", "log", "show", "diff", "status", "rev-list", "describe", "ls-files", "symbolic-ref"]);
 const NON_PUSH_BODY_PROGRAMS = new Set(["date", "pwd", "whoami", "hostname", "uname", "basename", "dirname", "id"]);
 const NON_PUSH_UNQUOTED_RE = /^[A-Za-z0-9_./:@%+,=^~-]$/u;

@@ -647,9 +647,16 @@ export async function runAntigravityPreToolGuard(rawInput) {
   } catch {
     // A malformed/unreadable policy is never a reason to relax the PO gate.
   }
-  if (toolName === "Bash" && /(?:^|\s|\/)(?:pipeline-state(?:\.mjs)?)\s+approve-plan\b/u.test(command)) {
-    if (!globalChatAttribution) {
-      deny("BLOCKED (PO Gate): Agent self-approval prohibited. 'approve-plan' is an explicit Human/PO decision. You must present the PRD and Technical Specification to the user in chat and request approval. The user must approve the plan by running: pipeline-state approve-plan --by <name>");
+  if (toolName === "Bash" && /(?:^|\s|\/)(?:pipeline-state(?:\.mjs)?)["']?\s+approve-plan\b/u.test(command)) {
+    // K153 / G9 (a): the proof-bearing route is the shared lifecycle admission's decision, not a copy of it. The PO's
+    // detached signature over the approval intent sits behind `--design-approval-request <scratch request>`;
+    // `isSanctionedLifecycleCommand` (the same catalogue Claude's guard consults) admits that closed argv only for the
+    // plugin's own pipeline-state script and a physically contained request file, and pipeline-state.mjs itself verifies
+    // the proof, its commit/tree/intent binding and the policy before writing. Every other spelling (a bare `--by`, a
+    // missing, foreign or spliced request) stays refused here exactly as before.
+    const proofBearingRoute = isLifecycleTool && /(?:^|\s)--design-approval-request\s+\S/u.test(command);
+    if (!globalChatAttribution && !proofBearingRoute) {
+      deny("BLOCKED (PO Gate): Agent self-approval prohibited. 'approve-plan' is an explicit Human/PO decision. You must present the PRD and Technical Specification to the user in chat and request approval. The user must approve the plan by running: pipeline-state approve-plan --by <name> (or, once the PO has signed the design-approval request, run the exact `approve-plan --design-approval-request <request>` command that inspect offers)");
     }
   }
   if (toolName === "Bash" && /(?:^|\s|\/)(?:pipeline-state(?:\.mjs)?)\s+approve-push\b/u.test(command)) {

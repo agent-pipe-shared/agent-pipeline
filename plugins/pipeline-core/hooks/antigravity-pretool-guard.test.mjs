@@ -933,6 +933,58 @@ check("Antigravity pretool guard admits approve-push when external cryptographic
   rmSync(root, { recursive: true, force: true });
 });
 
+// K153 / G9 (a): the shared lifecycle admission already lets the agent run `approve-plan` on the proof-bearing
+// `--design-approval-request` route (the PO signs the request out of band; pipeline-state.mjs verifies the proof, the bound
+// commit/tree/intent and the policy). Antigravity must reach the same decision by delegating to that admission, and must keep
+// refusing every other spelling. Each case mirrors a real-harness absolute script path plus a repository-relative request.
+function designApprovalFixture() {
+  const root = readyLifecycleFixture("signature");
+  const digest = "a".repeat(64);
+  const requestPath = `scratch/design-approval-request-${digest}.json`;
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  writeFileSync(join(root, requestPath), "{}\n");
+  const cli = realpathSync(join(pluginRoot, "scripts", "pipeline-state.mjs"));
+  const prefix = ["node", cli].map((value) => JSON.stringify(value)).join(" ");
+  return { root, requestPath, prefix, digest };
+}
+
+check("Antigravity admits approve-plan on the proof-bearing design-approval-request route (K153 G9a)", () => {
+  const { root, requestPath, prefix } = designApprovalFixture();
+  try {
+    for (const command of [
+      `${prefix} approve-plan --design-approval-request ${requestPath}`,
+      `${prefix} approve-plan --by 'PO' --design-approval-request ${requestPath}`,
+    ]) {
+      const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: command } } }, root));
+      assert.equal(res.decision, "allow", `${command}: ${JSON.stringify(res)}`);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity still refuses approve-plan without a proof-bearing request or with an unsanctioned spelling (K153 G9a)", () => {
+  const { root, requestPath, prefix, digest } = designApprovalFixture();
+  try {
+    writeFileSync(join(root, `scratch/design-approval-request-${"b".repeat(64)}.json`), "{}\n");
+    mkdirSync(join(root, "reviews"), { recursive: true });
+    writeFileSync(join(root, `reviews/design-approval-request-${digest}.json`), "{}\n");
+    writeFileSync(join(root, "pipeline-state.mjs"), "// foreign script\n");
+    for (const command of [
+      `${prefix} approve-plan --by 'Agent'`,
+      `${prefix} approve-plan`,
+      `${prefix} approve-plan --design-approval-request scratch/design-approval-request-${"c".repeat(64)}.json`,
+      `${prefix} approve-plan --design-approval-request reviews/design-approval-request-${digest}.json`,
+      `${prefix} approve-plan --design-approval-request=${requestPath}`,
+      `${prefix} approve-plan --design-approval-request ${requestPath} --design-approval-request ${requestPath}`,
+      `${prefix} approve-plan --design-approval-request ${requestPath} --root /elsewhere`,
+      `node ${JSON.stringify(join(root, "pipeline-state.mjs"))} approve-plan --design-approval-request ${requestPath}`,
+    ]) {
+      const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: command } } }, root));
+      assert.equal(res.decision, "deny", `${command}: ${JSON.stringify(res)}`);
+      assert.match(res.reason, /'approve-plan' is an explicit Human\/PO decision/u, command);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 check("Antigravity honors the explicit global chat attribution route for plan and push approval", () => {
   const root = readyLifecycleFixture("chat");
   try {
