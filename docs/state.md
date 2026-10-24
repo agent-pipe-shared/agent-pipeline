@@ -4,7 +4,15 @@
 > Previous state text is preserved as a public projection in the archive below.
 > Calibration: [`project/pipeline.json`](../project/pipeline.json) names this file as the handover.
 
-**Session cut (2026-10-24, Claude tokens exhausted until Sunday 2026-10-25 21:00; the PO continues two days with Codex as the Elephant; this block wins over every older block below):**
+**Codex continuation (2026-10-24; this block wins over older session cuts below):**
+- The PO supplied both additional Greenfield reports and mandated every P0/P1 finding in the approved fix wave. Complete intake G18-G32 and source confirmations: `specs/sprint-alfred-epic/plans/plan_greenfield-followup-2026-10-24.md`. Existing G6/G7/G10/G17 and the remaining Verify reds stay in scope.
+- PO direction: extend existing delivery machinery, use existing accepted ACs, no new design course. PRD and Spec must not change without explicit PO permission; neither has changed. Signature-dependent work is collected until the PO is at a terminal; questions may be answered from mobile.
+- The PO extended the one-task K146 methodological exception to the approved fix wave: fresh workers, owned inert clones, focused tests and truthful patch reports. No native host integration was observed for these Codex workers; no native receipts or automatic commits are claimed.
+- Committed proposal packages: K146 carrier/generated-briefing repair (`evidence/verify-fixes/k146-protected-proposal.patch`, report beside it), and K152A Antigravity native file-tool coverage (`evidence/verify-fixes/k152a-native-tools.diff`, focused proposal check and report beside it), relative to the Alfred spec directory. The PO subsequently explicitly approved K146 application and ordinary checks/commit with hooks enabled; its exact source patch is now applied. Main generator 76/76 and synthetic carrier/model 4/4 pass. K152A remains inert, its proposal regression RED 0/3 to GREEN 3/3. Broader native qualification, Full Verify, independent Critic, and PO acceptance remain open.
+- Fresh proposal workers are preparing K150B/G31 signing disclosure/proof handoff, G17 Codex Critic baseline, and K152B Antigravity model enforcement. They do not own main tracked source. No stamp, install, push, release, Critic batch or C28 re-pin has been performed.
+- Automatic approval review initially rejected live K146 application under the inert-only scope. After a specific PO tile explicitly authorized this exact patch, the sanctioned import helper applied it successfully. No rejection was bypassed, and no signature command is outstanding. The PO requests decision needs be collected until available; do not block unrelated repair work or repeatedly send decisions while the PO is away.
+
+**Earlier session cut (2026-10-24, Claude tokens exhausted until Sunday 2026-10-25 21:00; the PO continues two days with Codex as the Elephant):**
 - Detailed state, queue, mechanics and standing rules: `specs/sprint-alfred-epic/plans/handover-codex-switch-2026-10-24.md`. Read `CLAUDE.md` in
   full first (Codex does not load it). Findings register: `specs/sprint-alfred-epic/plans/greenfield-findings-2026-10-23.md` (G1 to G16, V1 to V4).
 - Since the sitting: Full Verify run once (red 51 of 1095, classified), fixes K140 to K150 part A imported on `feat/sprint-alfred` (implementation
