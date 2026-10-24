@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-scope-0.7.0/snapshot.json",
-  "sha256": "2d51838c4bb114534c6857c009f11290061e39422c261bc3e66d7663fd872119",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/snapshot.json",
+  "sha256": "4ccaf5542d360cd7590f7510463d0cde07ee2f32ea3b491cca2f7ed8634845c8",
   "measuredAt": "2026-10-24",
-  "head": "daaf074b17b79f471e67651494bc59957e7c85f9",
+  "head": "6095f8e33940d4b3e34a0ea676abf506849c1fa2",
   "counts": {
     "25": 2,
-    "50": 41,
-    "75": 151,
+    "50": 36,
+    "75": 156,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 69.2,
+  "index": 69.85,
   "total": 194,
-  "scope": "0.7.0 active release; post-0.7.0 deferrals excluded; GreenfieldP0/P1 included"
+  "scope": "0.7.0 active release; original P0/P1 coverage and exclusions unchanged; five native-only rubric corrections"
 }

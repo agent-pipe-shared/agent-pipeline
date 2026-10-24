@@ -1,0 +1,29 @@
+{
+  "schema": "pipeline.native-only-stage-rubric.reader-proposals.v1",
+  "taskId": "NATIVE-ONLY-STAGE-RUBRIC",
+  "outcome": "five-proposals-two-qualification-holds",
+  "inspectedCandidate": {"commit":"1b7fc4f0424c617c19039903ba4f88aece3116f2","tree":"8dd3f8d2c4757580aa89595da94f1da758e6b2e0","dirtySourceExcluded":true},
+  "snapshotPath": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-scope-0.7.0/snapshot.json",
+  "snapshotHead": "daaf074b17b79f471e67651494bc59957e7c85f9",
+  "snapshotTotal": 194,
+  "stageChanges": [],
+  "rows": [
+    {"itemId":"pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows","currentStage":"50","proposedStage":"75","clauses":"report.md final item 1","openNative":"native Windows libuv/decoy; residual-risk observation"},
+    {"itemId":"pipeline.signed-quality-package-route-is-not-agent-operable-on-windows","currentStage":"50","proposedStage":"75","clauses":"report.md final item 2 P1-P6","openNative":"native Windows route/backslash and actual pre-prompt latency"},
+    {"itemId":"pipeline.windows-greenfield-scratch-write-denied","currentStage":"50","proposedStage":"75","clauses":"report.md final item 3 W1-W5","openNative":"native Windows guard/drive/fresh intake W5; macOS execution"},
+    {"itemId":"pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error","currentStage":"50","proposedStage":"75","clauses":"report.md final item 4 A1-A5","openNative":"Windows drive case; A5 installed Claude fresh session"},
+    {"itemId":"pipeline.windows-pre-push-installer-fsync-and-relative-action","currentStage":"50","proposedStage":"75","clauses":"report.md final item 5 A-F","openNative":"Windows descriptor/install/readback/push/removal; macOS execution"},
+    {"itemId":"pipeline.three-runner-happy-path-with-two-po-approvals","currentStage":"50","proposedStage":"50","clauses":"report.md final item 6","missingQualification":"matching deterministic added P0-1 and D64 course/restart/actor qualification after actual pipeline-state/onboarding-continuity drift","openNative":"E genuine three-runner pushed-branch path, two proofs, zero overrides"},
+    {"itemId":"pipeline.read-only-guard-admits-execution-and-output-options","currentStage":"50","proposedStage":"50","clauses":"report.md final item 7 A1-A3","missingQualification":"compatible A1-A3 qualification after actual grammar/passive-read/catalogue drift since d2e9bd4e9","openNative":"Windows drive spelling","openReview":"independent security Critic concrete mutation/execution probes; lateness alone is not a 50 reason"}
+  ],
+  "reason": "Five native-only proposals under batch-10 rubric; two genuine candidate-compatible content qualification gaps. Clause/evidence/source assessments are in final report; no acceptance or native proof.",
+  "recovery":{"singleStripRetryExitCode":0,"remainingStripExitCodes":[0,0,0,0,0,0],"initialFailuresPreserved":true,"budgetReset":false},
+  "artifactInspection":{"path":"scratch/agent-out/native-only-stage-rubric/artifact-inspection.txt","exitCode":0,"behaviorQualification":false},
+  "resourceReport":{"path":"scratch/agent-out/native-only-stage-rubric/resource-headroom.txt","exitCode":0,"complianceCertified":false},
+  "preservedOpenDuties": ["native execution", "independent review", "final integrated Verify/Security", "PO acceptance"],
+  "resourceHeadroom": "unknown",
+  "testsRun": [],
+  "commits": [],
+  "failures": {"command":"backlog-item-strip-for-dispatch.mjs --item <scoped item> --out <owned scratch copy>","count":7,"exitCode":1,"cause":"owned output directory absent; all parallel first attempts returned ENOENT","retried":false},
+  "report": "scratch/agent-out/native-only-stage-rubric/report.md"
+}

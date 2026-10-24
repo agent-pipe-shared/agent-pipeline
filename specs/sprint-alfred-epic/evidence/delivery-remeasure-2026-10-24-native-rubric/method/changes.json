@@ -1,0 +1,42 @@
+[
+  {
+    "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+    "from": "50",
+    "to": "75",
+    "priorReason": "The 4/4 GREEN Linux pin and POSIX decoy proof d49737b34 do not exercise Windows libuv lookup. The pinned G31 signing changes concern bounded signing paths and supply no native Windows decoy run, so the Windows clause remains unqualified.",
+    "adjudication": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/method/report.md",
+    "inspectedCandidate": "1b7fc4f0424c617c19039903ba4f88aece3116f2"
+  },
+  {
+    "itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+    "from": "50",
+    "to": "75",
+    "priorReason": "The pin is counted again in pin-counted-results-2026-10-23-d.md at 756248e0d: 14 pass and 1 skip of 15 on Linux, the native-Windows case still a typed skip; the Proposal asks for fixtures on win32 and POSIX. D133 rules out further full native Windows runs.",
+    "adjudication": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/method/report.md",
+    "inspectedCandidate": "1b7fc4f0424c617c19039903ba4f88aece3116f2"
+  },
+  {
+    "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+    "from": "50",
+    "to": "75",
+    "priorReason": "Counted again in pin-counted-results-2026-10-23-d.md at 756248e0d: 11 pass and 1 skip of 12 on Linux; the pin names W5 (fresh Windows intake) as not covered and the win32 branches have not run natively.",
+    "adjudication": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/method/report.md",
+    "inspectedCandidate": "1b7fc4f0424c617c19039903ba4f88aece3116f2"
+  },
+  {
+    "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+    "from": "50",
+    "to": "75",
+    "priorReason": "Counted again in pin-counted-results-2026-10-23-d.md at 756248e0d: 7 pass and 2 typed skips of 9; the drive-letter-case clause of A1 and A5 (installed candidate in a fresh Windows session) stay skipped.",
+    "adjudication": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/method/report.md",
+    "inspectedCandidate": "1b7fc4f0424c617c19039903ba4f88aece3116f2"
+  },
+  {
+    "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+    "from": "50",
+    "to": "75",
+    "priorReason": "The AC-272 Linux pin remains 14/14 GREEN, but native Windows install, readback, blocking push and removal have no counted run at the pinned candidate. The f2aee4ec2 intermediate stamp and 31db7853a installation readback establish availability, not native acceptance, so stage 50 remains.",
+    "adjudication": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/method/report.md",
+    "inspectedCandidate": "1b7fc4f0424c617c19039903ba4f88aece3116f2"
+  }
+]

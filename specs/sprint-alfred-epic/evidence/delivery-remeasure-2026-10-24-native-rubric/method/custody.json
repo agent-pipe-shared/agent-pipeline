@@ -1,0 +1,32 @@
+{
+  "schema": "pipeline.fix-wave-artifact-custody.v1",
+  "artifacts": [
+    {
+      "source": "scratch/agent-out/native-only-stage-rubric/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/method/report.md",
+      "bytes": 15724,
+      "sha256": "7d606ccf2a3dc648af9c1c67baee5fea1e4096c11c7fb0a65b0554ce3cc90b42",
+      "sourceBytes": 15844,
+      "sourceSha256": "1b456e1624be2562f6d5680086d41368e127cc0718935a1434cd6cd88c9d0f4d",
+      "transformation": "Markdown-only local path projection; original retained privately"
+    },
+    {
+      "source": "scratch/agent-out/native-only-stage-rubric/proposals.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/method/proposals.json",
+      "bytes": 3706,
+      "sha256": "35127440f64b5ebb92d2b7e61c0e9380beb4b6d177ca2c2025e7ddb1578aa1c2"
+    },
+    {
+      "source": "scratch/agent-out/native-only-stage-rubric/artifact-inspection.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/method/artifact-inspection.txt",
+      "bytes": 5582,
+      "sha256": "41b33683f2cbd60704bd7f96010046f31595913f7fea939d9fb92820ebe8f214"
+    },
+    {
+      "source": "scratch/agent-out/native-only-stage-rubric/resource-headroom.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/method/resource-headroom.txt",
+      "bytes": 952,
+      "sha256": "7c2c67077f660c527542d72a26832482b22df2fba5ece6bc3ac2d8e87ca8a064"
+    }
+  ]
+}

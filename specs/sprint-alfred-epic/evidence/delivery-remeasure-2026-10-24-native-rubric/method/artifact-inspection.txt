@@ -1,0 +1,99 @@
+command: python3 <repo-root>/scratch/agent-out/native-only-stage-rubric/inspect-artifacts.py
+label: native-only-stage-rubric-artifact-inspection
+exitCode: 0
+head: 1b7fc4f0424c617c19039903ba4f88aece3116f2
+tree: 8dd3f8d2c4757580aa89595da94f1da758e6b2e0
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.native-only-stage-rubric.artifact-inspection.v1",
+  "scope": "seven scoped row identities, stripped originals and cited artifact existence/digests only",
+  "owner": "NATIVE-ONLY-STAGE-RUBRIC reader",
+  "snapshotSha256": "2d51838c4bb114534c6857c009f11290061e39422c261bc3e66d7663fd872119",
+  "snapshotTotal": 194,
+  "rows": [
+    {
+      "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+      "stage": "50",
+      "strippedPath": "scratch/agent-out/native-only-stage-rubric/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.stripped.md",
+      "strippedSha256": "cabb3a313fb7b39ccc38a81c2f59577fd2833daf972af3f79a0fd77051a619e4",
+      "pinPath": "plugins/pipeline-core/lib/pins/sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.test.mjs",
+      "pinSha256": "9ae973fcb66c4a326d6a4c6c0f5957c76199b2cb7ea1b96150cc5f4cbb01ea16"
+    },
+    {
+      "itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+      "stage": "50",
+      "strippedPath": "scratch/agent-out/native-only-stage-rubric/2026-10-04-signed-quality-package-route-is-not-agent-operable-on-windows.stripped.md",
+      "strippedSha256": "124659d710ba484e3d03c7213beb762f20790dbfd778e0fbc92be23984af0b87",
+      "pinPath": "plugins/pipeline-core/lib/pins/signed-quality-package-route-is-not-agent-operable-on-windows.test.mjs",
+      "pinSha256": "9d9f1363bcc8b7cb8aac5154fb0b53b4444eb39a1ce4b1146a48291b117a9c4c"
+    },
+    {
+      "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+      "stage": "50",
+      "strippedPath": "scratch/agent-out/native-only-stage-rubric/2026-09-29-windows-greenfield-scratch-write-denied.stripped.md",
+      "strippedSha256": "6b88077f46918457230ad0001706e70020e192474493d865d6537a7d371efb16",
+      "pinPath": "plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs",
+      "pinSha256": "0b98f14662f8ca079227fa418ab7a2fa99bcc0e72bae9b77dfc094d218efd52e"
+    },
+    {
+      "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+      "stage": "50",
+      "strippedPath": "scratch/agent-out/native-only-stage-rubric/2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.stripped.md",
+      "strippedSha256": "416e1661228e20edff64adc8c6b421805294db5cb3aedda201ef762f22cb53a6",
+      "pinPath": "plugins/pipeline-core/lib/pins/windows-portable-seed-rolls-back-with-hidden-worktree-error.test.mjs",
+      "pinSha256": "5fecd52d4d6a108ecbfee4194fc5787f7c1dc8d5cd75893c530f5b0f12cec24b"
+    },
+    {
+      "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+      "stage": "50",
+      "strippedPath": "scratch/agent-out/native-only-stage-rubric/2026-09-29-windows-pre-push-installer-fsync-and-relative-action.stripped.md",
+      "strippedSha256": "8ff38dc8d63760538d3b6dbd41a22b4df9a1af036f7e07a559575bfe472537cd",
+      "pinPath": "plugins/pipeline-core/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs",
+      "pinSha256": "f72c8503a42aad8e0380c87c6e3d9cba83ab8f87c8989a805d62932af2ad2ead"
+    },
+    {
+      "itemId": "pipeline.three-runner-happy-path-with-two-po-approvals",
+      "stage": "50",
+      "strippedPath": "scratch/agent-out/native-only-stage-rubric/2026-10-03-three-runner-happy-path-with-two-po-approvals.stripped.md",
+      "strippedSha256": "c41d49cec1da452fea482da80fed582a18ff9b799f10d74fe1f3c6c189825100",
+      "pinPath": "plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs",
+      "pinSha256": "1b7eb17192ddfdc788ea32401fdd9d28c300f8577ab153677198f1ab21731345"
+    },
+    {
+      "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+      "stage": "50",
+      "strippedPath": "scratch/agent-out/native-only-stage-rubric/2026-09-30-read-only-guard-admits-execution-and-output-options.stripped.md",
+      "strippedSha256": "cd1c5b18611d2cb0d5e54d592feb6624f8221296b8e980b8cb434793946babaf",
+      "pinPath": "plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs",
+      "pinSha256": "b376fee4915b5579b407bcfdda20183216bf097741f39a86c33b7c331d0111bc"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23.md",
+      "sha256": "faa2b8183c2fccbbb1fe9ad9536c1e04ee586bc68fa06b73cfb7bb77310cd9af"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-d.md",
+      "sha256": "777a85a1b8cd896e499b7f3751480c2f436680faeb27731c694ce7e347f7dbec"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md",
+      "sha256": "37b9422edac1d3700c3d9e87419d962a2216f6f0f5a80fd715d46e9881b41355"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/g27-integrated-renderer.txt",
+      "sha256": "460d9b2dc9da18c2a8b950a39164abbdf232e43ef33d5169679b0c08d403c225"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/g27-integrated-acknowledgement.txt",
+      "sha256": "ababf68c850990ebe12e83c2b1343e10f8bbfbc50dcedc19e71ac3e1a3613e2d"
+    }
+  ],
+  "nativeQualification": false,
+  "behaviorQualification": false,
+  "acceptance": false
+}
+
+--- stderr ---

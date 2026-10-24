@@ -6,8 +6,8 @@ It supersedes older ordering below: content/Greenfield stabilization, preparator
 full Verify and fixes, freeze, one Critic batch with at most three correction-diff
 reviews, then final release Full Verify/Security on the reviewed candidate.
 
-**Current 0.7.0 matrix scope:** 194 distinct items: 2 at25,41 at50,151 at75,
-none at100 orUNKNOWN, index69.20%. Five explicit post-0.7.0 deferrals are excluded;
+**Current 0.7.0 matrix scope:** 194 distinct items: 2 at25,36 at50,156 at75,
+none at100 orUNKNOWN, index69.85%. Five explicit post-0.7.0 deferrals are excluded;
 25 new Greenfield identities are added and three exact aliases counted once.
 The Greenfield cohort has28 rows:1 at25,18 at50,9 at75. Original retained
 evidence binds31db7853a; Greenfield assessments binddaaf074b1. The older174-row
@@ -52,6 +52,11 @@ This is the continuation of the approved three-runner fix wave. It changes no
 PRD, Spec, original acceptance criterion, approval posture or review budget.
 The currently installed intermediate build is stamp `f2aee4ec2`, version
 `0.7.0+codex.20261024154452.355dba9`; fresh installed readback is ready.
+
+
+Five native-only rubric corrections are now counted with original scope/duties
+preserved:38 items remain below75. The pending27-path package and its separate
+qualification proposals are excluded from this snapshot.
 
 ## Historical completion matrix boundary
 
