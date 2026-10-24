@@ -289,6 +289,10 @@ below assumes it holds and is written to catch a change that would break it.
   `push-prepare.mjs` imports `release-promotion-envelope.mjs`, so neither
   evidence capture nor candidate release promotion can be altered via a
   maintenance window.
+- G28's admitted read-only audit command adds `scripts/audit-pack.mjs` as a
+  never-liftable Source root. Its direct first-party import
+  `scripts/publication-gate-evidence.mjs` is also never liftable. GMWKC01 walks
+  their import closure; the other direct dependencies were already protected.
 - The 2026-09-20 Alfred candidate architecture adoption, design advisory, and rigor closure adds:
   `lib/advisory-receipt.mjs`, `lib/architecture-adoption-authority.mjs`,
   `lib/architecture-adoption-orientation.mjs`, `lib/architecture-design.mjs`,

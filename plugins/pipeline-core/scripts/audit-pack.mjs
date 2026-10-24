@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Project-scoped, local audit-pack planner and create-only builder. */
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -14,6 +14,7 @@ import { verifyQualityPackageIntegrationPostCommit } from "../lib/signed-quality
 import { parseIntegrationTrailerBlock } from "../lib/commit-message-policy.mjs";
 import { readBoundConsumedCriticReceipt } from "../lib/critic-verify-lifecycle.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
 
 export const AUDIT_PACK_SCHEMA = "pipeline.audit-pack.v1";
 export const AUDIT_PACK_PLAN_SCHEMA = "pipeline.audit-pack-plan.v1";
@@ -83,6 +84,24 @@ function safeOutput(root, outputPath, packId) {
   }
   const ignored = spawnSync("git", ["-C", root, "check-ignore", "--quiet", outputPath], { encoding: "utf8", timeout: 3000, shell: false });
   if (ignored.error || ignored.status !== 0) fail("AP-OUTPUT-NOT-IGNORED");
+  if (existsSync(absolute)) fail("AP-OUTPUT-EXISTS");
+  return absolute;
+}
+function publicPackPath(featureId, packId) {
+  return `specs/${featureId}/evidence/audit-packs/${packId}`;
+}
+function safePublicOutput(root, outputPath, featureId, packId) {
+  if (!SAFE_ID.test(featureId ?? "") || outputPath !== publicPackPath(featureId, packId)) fail("AP-PUBLIC-OUTPUT-SCOPE");
+  let cursor = root;
+  for (const part of outputPath.split("/").slice(0, -1)) {
+    cursor = join(cursor, part);
+    if (!existsSync(cursor)) continue;
+    const stat = lstatSync(cursor);
+    if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(cursor) !== cursor) fail("AP-PUBLIC-OUTPUT-PARENT");
+  }
+  const ignored = spawnSync("git", ["-C", root, "check-ignore", "--quiet", outputPath], { timeout: 3000, shell: false });
+  if (ignored.error || ignored.status !== 1) fail("AP-PUBLIC-OUTPUT-IGNORED");
+  const absolute = resolve(root, outputPath);
   if (existsSync(absolute)) fail("AP-OUTPUT-EXISTS");
   return absolute;
 }
@@ -183,8 +202,25 @@ function verifyEvidence(root, featureId, candidate, path) {
     missing: [],
   };
 }
+function securityEvidence(root, featureId, candidate, path) {
+  if (path === null) return { verified: null, sources: [], missing: ["candidate-security-evidence-not-referenced"] };
+  if (!publicEvidencePath(featureId, path)) fail("AP-SECURITY-EVIDENCE-PATH");
+  const bytes = sourceBytes(root, path);
+  const value = parseStrictJson(bytes);
+  if (value.schema !== "pipeline.security-evidence.v0") fail("AP-SECURITY-EVIDENCE-INVALID");
+  let derived;
+  try { derived = deriveGateEvidence({ rootDir: root, gate: "security", sourcePath: path }); }
+  catch { fail("AP-SECURITY-EVIDENCE-INVALID"); }
+  if (derived.evidence.candidate.commit !== candidate.commit || derived.evidence.candidate.tree !== candidate.tree
+    || derived.evidence.status !== "passed" || derived.source.sha256 !== digest(bytes)) fail("AP-SECURITY-EVIDENCE-INVALID");
+  return {
+    verified: { path, sha256: digest(bytes), verification: "canonical-security-gate-evidence-derived" },
+    sources: [{ kind: "security-evidence", path, sha256: digest(bytes), candidateBound: false }],
+    missing: [],
+  };
+}
 
-export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath, criticPacketIds = [], approvalPairs = [], verifyEvidencePath = null } = {}) {
+export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath, criticPacketIds = [], approvalPairs = [], verifyEvidencePath = null, securityEvidencePath = null } = {}) {
   const root = realpathSync(resolve(repositoryRoot ?? ""));
   if (!SAFE_ID.test(packId ?? "")) fail("AP-PACK-ID");
   safeOutput(root, outputPath, packId);
@@ -192,11 +228,12 @@ export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath
   const approval = approvals(root, pkg.featureId, approvalPairs, pkg.candidate);
   const critic = critics(root, pkg.candidate, criticPacketIds);
   const verify = verifyEvidence(root, pkg.featureId, pkg.candidate, verifyEvidencePath);
+  const security = securityEvidence(root, pkg.featureId, pkg.candidate, securityEvidencePath);
   const qualityIntegrations = qualityPackageIntegrations(root, pkg.candidate);
-  if (pkg.totalBytes + approval.sourceBytes + verify.sources.reduce((sum, source) => sum + sourceBytes(root, source.path, pkg.candidate.commit).length, 0) > MAX_TOTAL_BYTES) fail("AP-SOURCE-BUDGET");
-  const sources = [...pkg.sources, ...approval.sources, ...verify.sources];
+  if (pkg.totalBytes + approval.sourceBytes + [...verify.sources, ...security.sources].reduce((sum, source) => sum + sourceBytes(root, source.path).length, 0) > MAX_TOTAL_BYTES) fail("AP-SOURCE-BUDGET");
+  const sources = [...pkg.sources, ...approval.sources, ...verify.sources, ...security.sources];
   const scanSources = sources.filter((entry) => entry.kind === "supply-chain" || /scan/iu.test(basename(entry.path)));
-  const missingEvidence = [...approval.missing, ...critic.missing, ...verify.missing];
+  const missingEvidence = [...approval.missing, ...critic.missing, ...verify.missing, ...security.missing];
   if (scanSources.length === 0) missingEvidence.push("candidate-bound-scan-artifact-not-present");
   const status = missingEvidence.length === 0 ? "complete" : "partial";
   const manifest = {
@@ -211,6 +248,7 @@ export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath
     scanSources: scanSources.map((entry) => ({ path: entry.path, sha256: entry.sha256, binding: "candidate-feature-package-digest" })),
     approvals: approval.verified,
     verifyEvidence: verify.verified,
+    securityEvidence: security.verified,
     criticReports: critic.verified,
     qualityPackageIntegrations: qualityIntegrations,
     missingEvidence,
@@ -221,8 +259,9 @@ export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath
 }
 
 function planShape(plan) {
+  const baseKeys = ["schema", "packId", "status", "candidate", "featureId", "featurePackage", "sources", "sourceKindCounts", "scanSources", "approvals", "verifyEvidence", "criticReports", "qualityPackageIntegrations", "missingEvidence", "outputPath", "privacyOmissions"];
   return exact(plan, ["schema", "status", "pack", "packSha256"]) && plan.schema === AUDIT_PACK_PLAN_SCHEMA
-    && plan.status === "preview" && exact(plan.pack, ["schema", "packId", "status", "candidate", "featureId", "featurePackage", "sources", "sourceKindCounts", "scanSources", "approvals", "verifyEvidence", "criticReports", "qualityPackageIntegrations", "missingEvidence", "outputPath", "privacyOmissions"])
+    && plan.status === "preview" && (exact(plan.pack, baseKeys) || exact(plan.pack, [...baseKeys, "securityEvidence"]))
     && plan.pack.schema === AUDIT_PACK_SCHEMA && SAFE_ID.test(plan.pack.packId ?? "") && ["complete", "partial"].includes(plan.pack.status)
     && OID.test(plan.pack.candidate?.commit ?? "") && OID.test(plan.pack.candidate?.tree ?? "")
     && SHA.test(plan.packSha256 ?? "") && canonicalSha256(plan.pack) === plan.packSha256;
@@ -230,10 +269,14 @@ function planShape(plan) {
 function README(pack) {
   const sources = pack.sources.map((entry) => `- ${entry.path} (${entry.kind}, SHA-256 ${entry.sha256})`).join("\n");
   const missing = pack.missingEvidence.length ? pack.missingEvidence.map((entry) => `- ${entry}`).join("\n") : "- None recorded by the pack planner.";
-  return `# Local audit pack: ${pack.packId}\n\nStatus: **${pack.status}**. Candidate: ${pack.candidate.commit} (tree ${pack.candidate.tree}).\n\n## Included candidate sources\n\n${sources}\n\n## Missing evidence\n\n${missing}\n\n## Privacy omissions\n\n${pack.privacyOmissions.map((entry) => `- ${entry}`).join("\n")}\n\nThis local pack is a review aid, not a release approval, compliance certificate, publication, or proof of external retention. Canonical verifiers were used for any included public PO proof, consumed Critic receipt, and signed quality-package integration. Pack verification checks internal digests only; it does not re-evaluate authority or freshness.\n`;
+  return `# Audit pack: ${pack.packId}\n\nStatus: **${pack.status}**. Historical candidate: ${pack.candidate.commit} (tree ${pack.candidate.tree}).\n\n## Included candidate sources\n\n${sources}\n\n## Missing evidence\n\n${missing}\n\n## Privacy omissions\n\n${pack.privacyOmissions.map((entry) => `- ${entry}`).join("\n")}\n\nThis pack is a review aid, not a release approval or compliance certificate. Canonical verifiers were used when it was built for any included public PO proof, consumed Critic receipt, and signed quality-package integration. Offline verification checks archived bytes and, for a committed public pack, its Git blobs; it does not re-evaluate authority, freshness, or qualify the archive commit as the candidate.\n`;
+}
+/** Remove local packet correlation only after the ordinary builder has reverified it. */
+export function projectPublicAuditPack(pack) {
+  return { ...pack, criticReports: pack.criticReports.map(({ packetId: _localPacketId, ...summary }) => summary) };
 }
 
-export function buildAuditPack({ repositoryRoot, plan } = {}) {
+export function buildAuditPack({ repositoryRoot, plan, outputPath = null } = {}) {
   if (!planShape(plan)) fail("AP-PLAN");
   const root = realpathSync(resolve(repositoryRoot ?? ""));
   const fresh = planAuditPack({
@@ -244,9 +287,14 @@ export function buildAuditPack({ repositoryRoot, plan } = {}) {
     criticPacketIds: plan.pack.criticReports.map((item) => item.packetId),
     approvalPairs: plan.pack.approvals.map((item) => ({ intentPath: item.intentPath, proofPath: item.proofPath })),
     verifyEvidencePath: plan.pack.verifyEvidence?.path ?? null,
+    securityEvidencePath: plan.pack.securityEvidence?.path ?? null,
   });
   if (canonicalizeJson(fresh.pack) !== canonicalizeJson(plan.pack) || fresh.packSha256 !== plan.packSha256) fail("AP-PLAN-DRIFT");
-  const output = safeOutput(root, plan.pack.outputPath, plan.pack.packId);
+  const publicArchive = outputPath !== null;
+  const resolvedOutputPath = publicArchive ? outputPath : plan.pack.outputPath;
+  const output = publicArchive
+    ? safePublicOutput(root, resolvedOutputPath, plan.pack.featureId, plan.pack.packId)
+    : safeOutput(root, resolvedOutputPath, plan.pack.packId);
   const current = gitCandidate(root);
   if (current.commit !== plan.pack.candidate.commit || current.tree !== plan.pack.candidate.tree) fail("AP-CANDIDATE-DRIFT");
   const content = [];
@@ -259,8 +307,11 @@ export function buildAuditPack({ repositoryRoot, plan } = {}) {
     const ext = basename(source.path).replace(/[^a-z0-9.-]/giu, "_").slice(-40) || "artifact";
     content.push({ source, path: `artifacts/${String(index + 1).padStart(3, "0")}-${ext}`, bytes });
   }
-  mkdirSync(join(root, "scratch", "audit-packs"), { recursive: true });
-  for (const parent of [join(root, "scratch"), join(root, "scratch", "audit-packs")]) {
+  const parentPath = publicArchive ? join(root, "specs", plan.pack.featureId, "evidence", "audit-packs") : join(root, "scratch", "audit-packs");
+  mkdirSync(parentPath, { recursive: true });
+  for (const parent of publicArchive
+    ? [join(root, "specs"), join(root, "specs", plan.pack.featureId), join(root, "specs", plan.pack.featureId, "evidence"), parentPath]
+    : [join(root, "scratch"), parentPath]) {
     const stat = lstatSync(parent);
     if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(parent) !== parent) fail("AP-OUTPUT-PARENT");
   }
@@ -272,35 +323,74 @@ export function buildAuditPack({ repositoryRoot, plan } = {}) {
     artifacts.push({ path: item.path, sourcePath: item.source.path, kind: item.source.kind, sha256: digest(item.bytes) });
   }
   const readmeBytes = Buffer.from(README(plan.pack), "utf8");
-  const manifest = { schema: "pipeline.audit-pack-manifest.v1", pack: plan.pack, artifacts, readmeSha256: digest(readmeBytes) };
+  const manifest = { schema: "pipeline.audit-pack-manifest.v1", pack: publicArchive ? projectPublicAuditPack(plan.pack) : plan.pack, artifacts, readmeSha256: digest(readmeBytes) };
   const manifestBytes = Buffer.from(`${canonicalizeJson(manifest)}\n`, "utf8");
   writeFileSync(join(output, "manifest.json"), manifestBytes, { flag: "wx", mode: 0o644 });
   writeFileSync(join(output, "README.md"), readmeBytes, { flag: "wx", mode: 0o644 });
-  return { schema: "pipeline.audit-pack-build-receipt.v1", status: plan.pack.status, packId: plan.pack.packId, outputPath: plan.pack.outputPath, manifestSha256: digest(manifestBytes), artifactCount: artifacts.length, missingEvidence: plan.pack.missingEvidence };
+  return { schema: "pipeline.audit-pack-build-receipt.v1", status: plan.pack.status, packId: plan.pack.packId, outputPath: resolvedOutputPath, manifestSha256: digest(manifestBytes), artifactCount: artifacts.length, missingEvidence: plan.pack.missingEvidence };
 }
 
 export function verifyAuditPack({ repositoryRoot, packPath } = {}) {
   const root = realpathSync(resolve(repositoryRoot ?? ""));
-  if (typeof packPath !== "string" || !packPath.startsWith("scratch/audit-packs/")) fail("AP-VERIFY-PATH");
+  const local = typeof packPath === "string" && /^scratch\/audit-packs\/[a-z][a-z0-9-]{2,63}$/u.test(packPath);
+  const publicMatch = typeof packPath === "string" ? /^specs\/([a-z][a-z0-9-]{2,63})\/evidence\/audit-packs\/([a-z][a-z0-9-]{2,63})$/u.exec(packPath) : null;
+  if (!local && !publicMatch) fail("AP-VERIFY-PATH");
   const packRoot = resolve(root, packPath); const rel = relative(root, packRoot);
   if (rel.startsWith(`..${sep}`) || isAbsolute(rel)) fail("AP-VERIFY-PATH");
   const findings = [];
   let manifest;
   try { manifest = parseStrictJson(readFileSync(join(packRoot, "manifest.json"))); }
   catch { return { schema: "pipeline.audit-pack-verification.v1", status: "invalid", findings: ["AP-MANIFEST"] }; }
-  if (!exact(manifest, ["schema", "pack", "artifacts", "readmeSha256"]) || manifest.schema !== "pipeline.audit-pack-manifest.v1" || !planShape({ schema: AUDIT_PACK_PLAN_SCHEMA, status: "preview", pack: manifest.pack, packSha256: canonicalSha256(manifest.pack) }) || !Array.isArray(manifest.artifacts) || !SHA.test(manifest.readmeSha256 ?? "")) findings.push("AP-MANIFEST");
+  if (!exact(manifest, ["schema", "pack", "artifacts", "readmeSha256"]) || manifest.schema !== "pipeline.audit-pack-manifest.v1" || !Array.isArray(manifest.artifacts) || !SHA.test(manifest.readmeSha256 ?? ""))
+    return { schema: "pipeline.audit-pack-verification.v1", status: "invalid", findings: ["AP-MANIFEST"] };
+  try { if (!planShape({ schema: AUDIT_PACK_PLAN_SCHEMA, status: "preview", pack: manifest.pack, packSha256: canonicalSha256(manifest.pack) })) findings.push("AP-MANIFEST"); }
+  catch { findings.push("AP-MANIFEST"); }
+  if (findings.length) return { schema: "pipeline.audit-pack-verification.v1", status: "invalid", findings };
   try { if (digest(readFileSync(join(packRoot, "README.md"))) !== manifest.readmeSha256) findings.push("AP-README-DIGEST"); } catch { findings.push("AP-README-MISSING"); }
+  if (publicMatch && (manifest.pack?.featureId !== publicMatch[1] || manifest.pack?.packId !== publicMatch[2])) findings.push("AP-PUBLIC-BINDING");
+  if (publicMatch && manifest.pack.criticReports.some((entry) => Object.hasOwn(entry, "packetId"))) findings.push("AP-PUBLIC-PRIVATE-FIELD");
+  const expectedArtifacts = new Set((manifest.artifacts ?? []).map((entry) => entry.path));
+  if (expectedArtifacts.size !== manifest.artifacts?.length || manifest.artifacts?.length !== manifest.pack?.sources?.length) findings.push("AP-ARTIFACT-COVERAGE");
+  for (const [index, artifact] of (manifest.artifacts ?? []).entries()) {
+    const source = manifest.pack?.sources?.[index];
+    if (artifact.sourcePath !== source?.path || artifact.kind !== source?.kind || artifact.sha256 !== source?.sha256) findings.push("AP-ARTIFACT-COVERAGE");
+  }
+  try {
+    const actual = readdirSync(join(packRoot, "artifacts"));
+    if (actual.length !== expectedArtifacts.size || actual.some((name) => !expectedArtifacts.has(`artifacts/${name}`))) findings.push("AP-ARTIFACT-COVERAGE");
+  } catch { findings.push("AP-ARTIFACT-COVERAGE"); }
+  if (publicMatch) {
+    try {
+      const entries = readdirSync(packRoot);
+      if (entries.length !== 3 || entries.some((name) => !["manifest.json", "README.md", "artifacts"].includes(name))) findings.push("AP-PUBLIC-COVERAGE");
+    } catch { findings.push("AP-PUBLIC-COVERAGE"); }
+  }
   for (const artifact of manifest.artifacts ?? []) {
     if (!exact(artifact, ["path", "sourcePath", "kind", "sha256"]) || !/^artifacts\/[0-9]{3}-[-a-z0-9._]{1,40}$/u.test(artifact.path) || !SHA.test(artifact.sha256 ?? "")) { findings.push("AP-ARTIFACT-SHAPE"); continue; }
     try { if (digest(readFileSync(join(packRoot, artifact.path))) !== artifact.sha256) findings.push(`AP-DIGEST:${artifact.path}`); }
     catch { findings.push(`AP-MISSING:${artifact.path}`); }
   }
-  return { schema: "pipeline.audit-pack-verification.v1", status: findings.length ? "invalid" : manifest.pack.status, candidate: manifest.pack.candidate, findings, assurance: "internal-digests-only" };
+  if (publicMatch) {
+    const paths = ["manifest.json", "README.md", ...(manifest.artifacts ?? []).map((entry) => entry.path)];
+    for (const path of paths) {
+      const relPath = `${packPath}/${path}`;
+      try {
+        const physical = physicalFile(root, relPath);
+        const committed = git(root, ["show", `HEAD:${relPath}`], null);
+        if (digest(readFileSync(physical)) !== digest(committed)) findings.push(`AP-PUBLIC-UNCOMMITTED:${path}`);
+      } catch { findings.push(`AP-PUBLIC-UNCOMMITTED:${path}`); }
+    }
+    try {
+      const historicalTree = String(git(root, ["rev-parse", `${manifest.pack.candidate.commit}^{tree}`])).trim();
+      if (historicalTree !== manifest.pack.candidate.tree) findings.push("AP-HISTORICAL-CANDIDATE");
+    } catch { findings.push("AP-HISTORICAL-CANDIDATE"); }
+  }
+  return { schema: "pipeline.audit-pack-verification.v1", status: findings.length ? "invalid" : manifest.pack.status, candidate: manifest.pack.candidate, findings, assurance: publicMatch ? "committed-historical-archive-integrity-only" : "internal-digests-only" };
 }
 
 function parseCli(argv) {
   const [command, ...rest] = argv;
-  if (!new Set(["plan", "build", "verify"]).has(command) || rest.length % 2 !== 0) fail("AP-ARGUMENT", "Usage: audit-pack.mjs plan|build|verify --request <json>");
+  if (!new Set(["plan", "build", "publish", "verify"]).has(command) || rest.length % 2 !== 0) fail("AP-ARGUMENT", "Usage: audit-pack.mjs plan|build|publish|verify --request <json>");
   const args = new Map();
   for (let index = 0; index < rest.length; index += 2) {
     const key = rest[index]; const value = rest[index + 1];
@@ -314,11 +404,16 @@ export function main(argv = process.argv.slice(2)) {
   const { command, requestPath } = parseCli(argv);
   const request = parseStrictJson(readFileSync(requestPath));
   if (command === "plan") {
-    if (!exact(request, ["repositoryRoot", "manifestPath", "packId", "outputPath", "criticPacketIds", "approvalPairs", "verifyEvidencePath"])) fail("AP-REQUEST");
+    const baseKeys = ["repositoryRoot", "manifestPath", "packId", "outputPath", "criticPacketIds", "approvalPairs", "verifyEvidencePath"];
+    if (!exact(request, baseKeys) && !exact(request, [...baseKeys, "securityEvidencePath"])) fail("AP-REQUEST");
     return planAuditPack(request);
   }
   if (command === "build") {
     if (!exact(request, ["repositoryRoot", "plan"])) fail("AP-REQUEST");
+    return buildAuditPack(request);
+  }
+  if (command === "publish") {
+    if (!exact(request, ["repositoryRoot", "plan", "outputPath"])) fail("AP-REQUEST");
     return buildAuditPack(request);
   }
   if (!exact(request, ["repositoryRoot", "packPath"])) fail("AP-REQUEST");

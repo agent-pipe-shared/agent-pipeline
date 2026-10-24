@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import test from "node:test";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { compactSigningDisclosure, formatHumanApprovalCliResult } from "./po-human-approval.mjs";
 
 const digest = "a".repeat(64);
 const longPath = `scratch/${"nested/".repeat(25)}review-${digest}.json`;
+const cases = [];
+function test(name, run) { cases.push({ id: `PHS${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
 
 test("K150B: a long material path retains its full identity and digest in the disclosure", () => {
   assert.ok(longPath.length > 240);
@@ -49,3 +51,6 @@ test("G31: human-facing critical authorization names the external proof", () => 
     null, "a missing external path cannot fall back to the scratch mirror");
   assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })), result);
 });
+
+if (cases.length !== 4) throw new Error("signing handoff case count drift");
+registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

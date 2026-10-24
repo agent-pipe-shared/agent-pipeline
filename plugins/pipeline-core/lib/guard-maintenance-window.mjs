@@ -488,6 +488,10 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // push-prepare.mjs imports release-promotion-envelope.mjs.
   "plugins/pipeline-core/scripts/capture-evidence.mjs",
   "plugins/pipeline-core/lib/release-promotion-envelope.mjs",
+  // G28 read-only lifecycle admission invokes audit-pack.mjs as trusted Source.
+  // Its publication-gate evidence dependency must remain protected as well.
+  "plugins/pipeline-core/scripts/audit-pack.mjs",
+  "plugins/pipeline-core/scripts/publication-gate-evidence.mjs",
   // Alfred architecture-adoption, design-advisory, and candidate verification closure (GMWKC01):
   "plugins/pipeline-core/lib/advisory-receipt.mjs",
   "plugins/pipeline-core/lib/architecture-adoption-authority.mjs",

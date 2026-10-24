@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir, devNull } from "node:os";
+import { devNull } from "node:os";
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
 import { canonicalSha256 } from "../lib/governance-event.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
-import { buildAuditPack, planAuditPack, verifyAuditPack } from "./audit-pack.mjs";
+import { buildAuditPack, planAuditPack, projectPublicAuditPack, verifyAuditPack } from "./audit-pack.mjs";
 const completionCases = [];
 function test(name, optionsOrRun, possibleRun) {
   const options = typeof optionsOrRun === "function" ? {} : optionsOrRun ?? {};
@@ -22,8 +22,13 @@ function test(name, optionsOrRun, possibleRun) {
 
 
 function git(root, ...args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: "pipe" }).trim(); }
+function fixtureDirectory(prefix) {
+  const base = join(process.cwd(), "scratch", "audit-pack-fixtures");
+  mkdirSync(base, { recursive: true });
+  return mkdtempSync(join(base, prefix));
+}
 function completedPackageFixture() {
-  const root = mkdtempSync(join(tmpdir(), "audit-pack-completed-"));
+  const root = fixtureDirectory("audit-pack-completed-");
   git(root, "init", "--quiet", "--template=");
   git(root, "config", "user.name", "Audit Pack Fixture");
   git(root, "config", "user.email", "audit-pack-fixture@example.test");
@@ -90,7 +95,7 @@ test("completed candidate audit pack is candidate-bound, partial on missing revi
     assert.deepEqual(Object.keys(plan).sort(), ["pack", "packSha256", "schema", "status"]);
     assert.deepEqual(Object.keys(plan.pack).sort(), [
       "approvals", "candidate", "criticReports", "featureId", "featurePackage", "missingEvidence",
-      "outputPath", "packId", "privacyOmissions", "qualityPackageIntegrations", "scanSources", "schema",
+      "outputPath", "packId", "privacyOmissions", "qualityPackageIntegrations", "scanSources", "schema", "securityEvidence",
       "sourceKindCounts", "sources", "status", "verifyEvidence",
     ].sort());
     assert.equal(plan.pack.schema, "pipeline.audit-pack.v1");
@@ -101,6 +106,7 @@ test("completed candidate audit pack is candidate-bound, partial on missing revi
     assert.equal(plan.pack.status, "partial");
     assert.equal(plan.pack.featurePackage.state, "completed");
     assert.deepEqual([...plan.pack.missingEvidence].sort(), [
+      "candidate-security-evidence-not-referenced",
       "candidate-verify-evidence-not-referenced",
       "fresh-critic-report-not-referenced",
       "public-approval-proof-not-referenced",
@@ -122,6 +128,77 @@ test("completed candidate audit pack is candidate-bound, partial on missing revi
     assert.equal(tampered.status, "invalid");
     assert.ok(tampered.findings.some((finding) => finding.startsWith("AP-DIGEST:")));
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test("populated Critic summary loses local packet correlation in the public projection", () => {
+  const fixture = completedPackageFixture();
+  try {
+    const plan = planAuditPack({ repositoryRoot: fixture.root, manifestPath: fixture.manifestPath,
+      packId: "case-audit-pack", outputPath: "scratch/audit-packs/case-audit-pack",
+      criticPacketIds: [], approvalPairs: [], verifyEvidencePath: null });
+    const packetId = "a".repeat(32);
+    const summary = { kind: "consumed-session-critic", packetId,
+      candidate: plan.pack.candidate, reviewRange: { base: "b".repeat(40), head: plan.pack.candidate.commit },
+      reviewPass: true, receiptSha256: "c".repeat(64), verdictSha256: "d".repeat(64),
+      findingCount: 0, assurance: "synthetic-summary-only", verification: "synthetic-not-a-receipt" };
+    const local = { ...plan.pack, criticReports: [summary] };
+    const publicPack = projectPublicAuditPack(local);
+    assert.equal(local.criticReports[0].packetId, packetId);
+    assert.equal(Object.hasOwn(publicPack.criticReports[0], "packetId"), false);
+    assert.equal(JSON.stringify(publicPack).includes(packetId), false);
+    const { packetId: _privateId, ...expectedPublicSummary } = summary;
+    assert.deepEqual(publicPack.criticReports[0], expectedPublicSummary);
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test("public archive preserves signed bytes and reports historical integrity after a fresh clone", () => {
+  const fixture = completedPackageFixture();
+  const cloneParent = fixtureDirectory("audit-pack-clone-");
+  try {
+    const approval = createApprovalEvidence(fixture);
+    const candidate = { commit: git(fixture.root, "rev-parse", "HEAD"), tree: git(fixture.root, "rev-parse", "HEAD^{tree}") };
+    const securityPath = "specs/case-completed/evidence/security.json";
+    writeFileSync(join(fixture.root, securityPath), `${JSON.stringify({ schema: "pipeline.security-evidence.v0", candidate, findings: [], exitCode: 0 })}\n`);
+    const input = { repositoryRoot: fixture.root, manifestPath: fixture.manifestPath,
+      packId: "case-audit-pack", outputPath: "scratch/audit-packs/case-audit-pack",
+      criticPacketIds: [], approvalPairs: [approval], verifyEvidencePath: null, securityEvidencePath: securityPath };
+    const plan = planAuditPack(input);
+    assert.equal(plan.pack.securityEvidence.verification, "canonical-security-gate-evidence-derived");
+    assert.ok(plan.pack.missingEvidence.includes("fresh-critic-report-not-referenced"));
+    const publicPath = "specs/case-completed/evidence/audit-packs/case-audit-pack";
+    assert.throws(() => buildAuditPack({ repositoryRoot: fixture.root, plan, outputPath: "project/private/archive" }), { code: "AP-PUBLIC-OUTPUT-SCOPE" });
+    const signedBytes = readFileSync(join(fixture.root, approval.proofPath));
+    const receipt = buildAuditPack({ repositoryRoot: fixture.root, plan, outputPath: publicPath });
+    assert.equal(receipt.status, "partial");
+    assert.equal(verifyAuditPack({ repositoryRoot: fixture.root, packPath: publicPath }).status, "invalid");
+    const archiveManifest = JSON.parse(readFileSync(join(fixture.root, publicPath, "manifest.json"), "utf8"));
+    const proofArtifact = archiveManifest.artifacts.find((entry) => entry.sourcePath === approval.proofPath);
+    assert.deepEqual(readFileSync(join(fixture.root, publicPath, proofArtifact.path)), signedBytes);
+    const validSecurityBytes = readFileSync(join(fixture.root, securityPath));
+    writeFileSync(join(fixture.root, securityPath), `${JSON.stringify({ schema: "pipeline.security-evidence.v0", candidate: { ...candidate, commit: "f".repeat(40) }, findings: [], exitCode: 0 })}\n`);
+    assert.throws(() => planAuditPack(input), { code: "AP-SECURITY-EVIDENCE-INVALID" });
+    writeFileSync(join(fixture.root, securityPath), validSecurityBytes);
+    assert.throws(() => planAuditPack({ ...input, securityEvidencePath: "project/private/security.json" }), { code: "AP-SECURITY-EVIDENCE-PATH" });
+    git(fixture.root, "add", "--", publicPath);
+    git(fixture.root, "commit", "--quiet", "-m", "test: carry historical audit archive");
+    const current = verifyAuditPack({ repositoryRoot: fixture.root, packPath: publicPath });
+    assert.equal(current.status, "partial", JSON.stringify(current));
+    assert.equal(current.assurance, "committed-historical-archive-integrity-only");
+    const clone = join(cloneParent, "checkout");
+    execFileSync("git", ["clone", "--quiet", fixture.root, clone], { stdio: "pipe" });
+    assert.equal(verifyAuditPack({ repositoryRoot: clone, packPath: publicPath }).status, "partial");
+    const artifactPath = join(clone, publicPath, proofArtifact.path);
+    writeFileSync(artifactPath, "altered\n");
+    assert.equal(verifyAuditPack({ repositoryRoot: clone, packPath: publicPath }).status, "invalid");
+    writeFileSync(artifactPath, signedBytes);
+    const extraPath = join(clone, publicPath, "extra.txt");
+    writeFileSync(extraPath, "not indexed\n");
+    assert.equal(verifyAuditPack({ repositoryRoot: clone, packPath: publicPath }).status, "invalid");
+    rmSync(extraPath);
+    rmSync(artifactPath);
+    assert.equal(verifyAuditPack({ repositoryRoot: clone, packPath: publicPath }).status, "invalid");
+    writeFileSync(artifactPath, signedBytes);
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); rmSync(cloneParent, { recursive: true, force: true }); }
 });
 
 test("audit pack refuses public-proof references outside the candidate evidence boundary", () => {
@@ -164,7 +241,7 @@ test("audit pack verifies and copies exact public PO intent and proof bytes with
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
 });
 
-if (completionCases.length !== 3) throw new Error("case completion count drift: expected 3, got " + completionCases.length);
+if (completionCases.length !== 5) throw new Error("case completion count drift: expected 5, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

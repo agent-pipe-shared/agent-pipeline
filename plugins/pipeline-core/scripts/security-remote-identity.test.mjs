@@ -3,14 +3,17 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { runSecurityScan } from "./security-scan.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 const scratch = join(process.cwd(), "scratch", "g32-security-remote-fixtures");
 mkdirSync(scratch, { recursive: true });
 const fixture = mkdtempSync(join(scratch, "repo-"));
-test.after(() => rmSync(fixture, { recursive: true, force: true }));
+nodeTest.after(() => rmSync(fixture, { recursive: true, force: true }));
+const cases = [];
+function test(name, run) { cases.push({ id: `SRI${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
 
 function git(...args) {
   const result = spawnSync("git", args, { cwd: fixture, encoding: "utf8", shell: false });
@@ -104,3 +107,6 @@ test("push guard rejects evidence for a different effective destination", () => 
     assert.doesNotMatch(right.stderr, /candidate repository identity does not match the effective push destination/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+if (cases.length !== 2) throw new Error("security remote identity case count drift");
+registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

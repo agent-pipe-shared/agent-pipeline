@@ -99,6 +99,11 @@
       "disposition": "required"
     },
     {
+      "name": "audit-pack-command-admission-tests",
+      "path": "plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "audit-pack-tests",
       "path": "plugins/pipeline-core/scripts/audit-pack.test.mjs",
       "disposition": "required"
@@ -674,6 +679,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "g23-read-help-tests",
+      "path": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "gate-estimate-tests",
       "path": "plugins/pipeline-core/lib/gate-estimate.test.mjs",
       "disposition": "legacy-process-only",
@@ -947,6 +957,11 @@
       "path": "plugins/pipeline-core/lib/main-session-route.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "mid-session-hook-refresh-tests",
+      "path": "plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "model-family-acceptance-tests",
@@ -1275,6 +1290,11 @@
       "disposition": "required"
     },
     {
+      "name": "pin-antigravity-design-phase-scripts-refused-in-draft-tests",
+      "path": "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "pin-denial-names-a-diagnosis-it-refuses-tests",
       "path": "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs",
       "disposition": "required"
@@ -1367,6 +1387,11 @@
       "path": "plugins/pipeline-core/lib/po-gate-profile-publisher.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "po-human-approval-signing-handoff-tests",
+      "path": "plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "po-language-projection-tests",
@@ -1539,6 +1564,16 @@
     {
       "name": "publication-executor-v2-tests",
       "path": "plugins/pipeline-core/scripts/publication-executor-v2.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "publication-guard-candidate-tests",
+      "path": "plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "publication-review-requirement-tests",
+      "path": "plugins/pipeline-core/lib/publication-review-requirement.test.mjs",
       "disposition": "required"
     },
     {
@@ -1739,6 +1774,11 @@
       "path": "harness/scripts/security-readiness/security-readiness.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "security-remote-identity-tests",
+      "path": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "security-scanner-diagnostics-tests",

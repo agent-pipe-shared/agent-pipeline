@@ -3814,6 +3814,126 @@
       "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs",
       "invariantPinned": "The gitleaks scan source excludes scratch/clones and nothing else (K98 row 13)",
       "nonOverlapNote": "Unique cases: the scratch/clones exclusion of the gitleaks adapter scan source"
+    },
+    {
+      "name": "audit-pack-command-admission-tests",
+      "file": "plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs",
+      "invariantPinned": "The audit-pack command guard admits the exact read and publication routes and keeps source kernel paths protected across project and installed roots.",
+      "nonOverlapNote": "Unique G28 audit-pack command admission witness; the audit-pack script suite checks artifact behavior.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "APC001",
+          "APC002",
+          "APC003"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "g23-read-help-tests",
+      "file": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
+      "invariantPinned": "Bounded read globs, source-owned PO help and missing target diagnostics remain distinct and preserve credential exclusions.",
+      "nonOverlapNote": "Unique G23 read/help guard interaction witness; separate from the wider guard lifecycle suite.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "G23C001",
+          "G23C002",
+          "G23C003"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "pin-antigravity-design-phase-scripts-refused-in-draft-tests",
+      "file": "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs",
+      "invariantPinned": "The design-phase command catalogue admits exactly the documented model-role bootstrap and native dispatch preparation argv shapes and refuses variants.",
+      "nonOverlapNote": "Unique K152 script admission pin; distinct from runner route tests.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "K152C001",
+          "K152C002",
+          "K152C003",
+          "K152C004",
+          "K152C005"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "po-human-approval-signing-handoff-tests",
+      "file": "plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs",
+      "invariantPinned": "Human signing handoff retains exact material identity in bounded disclosure, refuses malformed paths and names the external proof.",
+      "nonOverlapNote": "Unique signing-handoff disclosure witness; separate from core approval transaction tests.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PHS001",
+          "PHS002",
+          "PHS003",
+          "PHS004"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "security-remote-identity-tests",
+      "file": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",
+      "invariantPinned": "Security evidence follows the effective push destination and the push guard refuses evidence bound to another destination.",
+      "nonOverlapNote": "Unique remote-identity integration witness; separate from scanner diagnostics.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SRI001",
+          "SRI002"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "publication-review-requirement-tests",
+      "file": "plugins/pipeline-core/lib/publication-review-requirement.test.mjs",
+      "invariantPinned": "Current candidate-bound Plan, Spec and package rigor decide whether independent publication review is required; stale or unavailable authority cannot waive it.",
+      "nonOverlapNote": "Unique G20 pure requirement decision witness; publication-guard-candidate-tests covers guard use of the proposed push commit.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PRR001",
+          "PRR002",
+          "PRR003",
+          "PRR004"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "publication-guard-candidate-tests",
+      "file": "plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs",
+      "invariantPinned": "The push guard decides review from the proposed commit despite different HEAD and dirty working files, and retains the distinct checkpoint, Verify and remote identity gates.",
+      "nonOverlapNote": "Unique G20 candidate-bound guard fixture witness; publication-review-requirement-tests covers the pure decision.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PGC001"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "mid-session-hook-refresh-tests",
+      "file": "plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs",
+      "invariantPinned": "A ready session refreshes only stale managed hooks from trusted source and reads back current state; tampered hooks or untrusted source refuse without altering original hook bytes.",
+      "nonOverlapNote": "Unique G30 contained mid-session hook refresh witness; installer and clone readiness suites retain their own startup contracts.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MSH001",
+          "MSH002"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }

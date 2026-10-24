@@ -31,6 +31,7 @@ import { loadRuntimeProjectionV3OwnedKeys } from "../runtime-projection-v3.mjs";
 // today. Closing the residual half is an eligibility() change in lib/human-guard-override.mjs,
 // which is out of scope for this file.
 export const GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../scripts/governance-scope-diagnose.mjs", import.meta.url));
+export const AUDIT_PACK_SCRIPT = fileURLToPath(new URL("../../scripts/audit-pack.mjs", import.meta.url));
 
 export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 

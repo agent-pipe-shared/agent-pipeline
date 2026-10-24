@@ -4,13 +4,15 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
+import { registerTestCaseCompletion } from "../test-case-completion.mjs";
 import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
 import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
 
 const script = fileURLToPath(new URL("../../scripts/po-human-approval.mjs", import.meta.url));
 const fixtureBase = resolve("scratch");
+const cases = [];
+function test(name, run) { cases.push({ id: `G23C${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
 
 test("G23 bounded repeated rg globs preserve hidden and credential exclusions", () => {
   mkdirSync(fixtureBase, { recursive: true });
@@ -66,3 +68,6 @@ test("G23 missing local targets are distinct from unknown grammar and protected 
     rmSync(outside, { recursive: true, force: true });
   }
 });
+
+if (cases.length !== 3) throw new Error("G23 read/help case count drift");
+registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

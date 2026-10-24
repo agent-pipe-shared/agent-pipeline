@@ -4,14 +4,14 @@
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, posix, resolve, sep, win32 } from "node:path";
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from "node:path";
 import { inspectSourceOwnedContinuityVerificationGuardContext, inspectSourceOwnedApprovedControllerCourse } from "../session-requester-bridge.mjs";
 import { readOwnedVerificationPhysicalFile, recheckOwnedVerificationPhysicalRefs, readOwnedVerificationRegistration } from "../owned-continuity-verification.mjs";
 import { inspectOwningVerificationControllerTaskSource } from "../../scripts/owning-verification-controller.mjs";
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
-import { AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+import { AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
 import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
@@ -21,6 +21,62 @@ const DESIGN_COURSE_SOURCES = ["input", "prd", "spec", "design", "traceability"]
 const DESIGN_COURSE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
 const DESIGN_COURSE_SHA = /^[a-f0-9]{64}$/u;
+const AUDIT_PACK_ID = /^[a-z][a-z0-9-]{2,63}$/u;
+const AUDIT_PACK_REQUEST = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,220}\.json$/u;
+const auditExact = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
+  && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+
+export function auditPackRequestPath(root, typed, dialect = process.platform === "win32" ? win32 : posix) {
+  if (typeof root !== "string" || typeof typed !== "string") return null;
+  const typedParts = dialect === win32 ? typed.split(/[\\/]/u) : typed.split("/");
+  if (typedParts.some(part => part === "." || part === "..")) return null;
+  const nativeRelative = dialect.isAbsolute(typed) ? dialect.relative(root, typed) : typed;
+  const path = nativeRelative.split(dialect.sep).join("/");
+  return AUDIT_PACK_REQUEST.test(path) && path.split("/").every(part => part && part !== "." && part !== "..")
+    ? path : null;
+}
+
+// Only the source CLI's one --request form. This observes the request path and
+// output scope; audit-pack.mjs remains responsible for proof/candidate checks.
+function auditPackRequest(args, root) {
+  if (args.length !== 3 || !["plan", "build", "publish", "verify"].includes(args[0]) || args[1] !== "--request"
+    || typeof args[2] !== "string" || !isAbsolute(root) || resolve(root) !== root) return null;
+  try {
+    if (realpathSync(root) !== root) return null;
+    const path = auditPackRequestPath(root, args[2]);
+    if (path === null) return null;
+    let cursor = root;
+    const parts = path.split("/");
+    for (const [index, part] of parts.entries()) {
+      cursor = join(cursor, part);
+      const info = lstatSync(cursor);
+      if (info.isSymbolicLink() || realpathSync(cursor) !== cursor
+        || (index < parts.length - 1 ? !info.isDirectory() : !info.isFile() || info.nlink !== 1 || info.size > 1048576)) return null;
+    }
+    const request = JSON.parse(readFileSync(cursor, "utf8"));
+    if (request.repositoryRoot !== root) return null;
+    if (args[0] === "plan") {
+      const keys = ["repositoryRoot", "manifestPath", "packId", "outputPath", "criticPacketIds", "approvalPairs", "verifyEvidencePath"];
+      return (auditExact(request, keys) || auditExact(request, [...keys, "securityEvidencePath"]))
+        && AUDIT_PACK_ID.test(request.packId ?? "") && request.outputPath === `scratch/audit-packs/${request.packId}`
+        ? { verb: "plan" } : null;
+    }
+    if (args[0] === "verify") {
+      if (!auditExact(request, ["repositoryRoot", "packPath"])) return null;
+      return /^scratch\/audit-packs\/[a-z][a-z0-9-]{2,63}$/u.test(request.packPath)
+        || /^specs\/[a-z][a-z0-9-]{2,63}\/evidence\/audit-packs\/[a-z][a-z0-9-]{2,63}$/u.test(request.packPath)
+        ? { verb: "verify" } : null;
+    }
+    const pack = request.plan?.pack;
+    if (!AUDIT_PACK_ID.test(pack?.featureId ?? "") || !AUDIT_PACK_ID.test(pack?.packId ?? "")
+      || pack.outputPath !== `scratch/audit-packs/${pack.packId}`) return null;
+    if (args[0] === "build") return auditExact(request, ["repositoryRoot", "plan"])
+      ? { verb: "build", outputPath: pack.outputPath } : null;
+    const outputPath = `specs/${pack.featureId}/evidence/audit-packs/${pack.packId}`;
+    return auditExact(request, ["repositoryRoot", "plan", "outputPath"]) && request.outputPath === outputPath
+      ? { verb: "publish", outputPath } : null;
+  } catch { return null; }
+}
 
 function designCourseRelativePath(value) {
   return typeof value === "string" && value.length <= 240 && !/[\\:\0]/u.test(value)
@@ -252,6 +308,7 @@ function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   // The source CLI returns its static usage before parsing or reading signing state.
   if (script === PO_HUMAN_APPROVAL_SCRIPT) return args.length === 1 && ["--help", "-h"].includes(args[0]);
+  if (script === AUDIT_PACK_SCRIPT) return ["plan", "verify"].includes(auditPackRequest(args, root)?.verb);
   if (script === MODEL_ROLE_BOOTSTRAP_SCRIPT) return sanctionedModelRoleBootstrapArgs(args, root);
   if (script === ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedAntigravityNativeDispatchPrepareArgs(args, root);
   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
@@ -357,6 +414,11 @@ export function resolveBoundArtifactPublicationInvocation(command, root, options
   if (invocation === null || typeof root !== "string" || !isAbsolute(root) || resolve(root) !== root) return null;
   const transfer = fileURLToPath(new URL("../../scripts/bound-artifact-transfer.mjs", import.meta.url));
   const comparison = fileURLToPath(new URL("../../scripts/greenfield-public-comparison.mjs", import.meta.url));
+  if (invocation.script === AUDIT_PACK_SCRIPT) {
+    const request = auditPackRequest(invocation.args, root);
+    return ["build", "publish"].includes(request?.verb)
+      ? Object.freeze({ kind: `audit-pack-${request.verb}`, outputPath: request.outputPath }) : null;
+  }
   if (![transfer, comparison].includes(invocation.script)) return null;
   const relativePath = value => typeof value === "string" && value.length > 0 && value.length <= 512
     && !/[\\:\x00-\x1f\x7f]/u.test(value)

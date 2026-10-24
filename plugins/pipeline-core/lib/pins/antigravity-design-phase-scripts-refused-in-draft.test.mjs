@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
+import { registerTestCaseCompletion } from "../test-case-completion.mjs";
 import { fileURLToPath } from "node:url";
 import { isSanctionedLifecycleCommand } from "../guard/command-catalogue.mjs";
 
@@ -17,8 +18,10 @@ const bootstrap = join(scripts, "model-role-bootstrap.mjs");
 const prepare = join(scripts, "antigravity-native-dispatch-prepare.mjs");
 const receipt = join(scripts, "design-review-receipt.mjs");
 const root = mkdtempSync(join(tmpdir(), "k152-draft-scripts-"));
-test.after(() => rmSync(root, { recursive: true, force: true }));
+nodeTest.after(() => rmSync(root, { recursive: true, force: true }));
 const admitted = (command) => isSanctionedLifecycleCommand(command, root);
+const cases = [];
+function test(name, run) { cases.push({ id: `K152C${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
 
 test("K152: model-role-bootstrap is admitted with exactly its documented argv shapes", () => {
   assert.equal(admitted(`node ${bootstrap} --repo-root ${root} --runner antigravity --host-session-id sess-1234`), true);
@@ -69,3 +72,6 @@ test("K152: no other script of the plugin is admitted by these pins (design-revi
   assert.equal(admitted(`node ${receipt} create`), false, "an incomplete design-review-receipt argv is refused");
   assert.equal(admitted(`node ${receipt}`), false);
 });
+
+if (cases.length !== 5) throw new Error("K152 admission case count drift");
+registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
