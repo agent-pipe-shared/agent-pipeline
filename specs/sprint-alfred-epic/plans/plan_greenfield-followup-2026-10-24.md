@@ -6,7 +6,7 @@ The PO supplied the two reports `docs/pipeline-analyse-greenfield_AP_test_vox_co
 
 | ID | Report finding | Required outcome | Existing work / owner | State |
 |---|---|---|---|---|
-| G18 | Codex P0-1; Claude P0.2 | Diagnose and qualify dispatch through return, source binding and integration before expensive implementation; report every unavailable authority with a usable recovery | G1/K142, K146; G19 Windows prerequisite | Generator fixed in prior wave; integration and fix-wave admission remain open |
+| G18 | Codex P0-1; Claude P0.2 | Diagnose and qualify dispatch through return, source binding and integration before expensive implementation; report every unavailable authority with a usable recovery | G1/K142, K146; G19 Windows prerequisite | K146 source integrated at `a0feac3a4`, safe main checks pass; native host qualification and Windows prerequisite remain open |
 | G19 | Claude P0.1 | Early Windows project/plugin/private-state ACL diagnostics, preserving ancestor safety; explain SID-based repair without recursive ACL rewriting | New Windows readiness work | Report evidence; current source and native Windows reproduction pending |
 | G20 | Codex P0-2 | Publication qualification must bind required independent review and Verify to the actual candidate; checkpoint and authorized exception claims remain distinct | G8/K154 | Open; signature alone never establishes qualification |
 | G21 | Codex P0-3 | Official result bootstrap/reconcile preserves package, continuity and result consistency; real package validation participates in close qualification | New result transaction repair | Report includes an independently reproduced manifest/result hash mismatch and missing reconciliation fence; current source confirmation pending |
@@ -41,6 +41,8 @@ All rows are in the current fix scope. Existing G6/G7 (Antigravity native tool c
 - The second K146 worker stopped on an unsupported `ls -ld` read before producing a diff. Its returned exact read-only audit recovery was then executed successfully by the parent (`status:valid`). Unsupported read spelling can follow the guard's ordinary grammar guidance; that event is not a new PO gate.
 - The installed `duty.deep` selector returned V3 fallback `gpt-6-sol` / `medium`. K146 now uses that stronger route for the accepted-plan/requester/host contract analysis, with both earlier attempts retained. Neither a fresh owner nor the escalation erases earlier budget or outcome evidence.
 - No implementation fix, new native qualification, Full Verify, independent Critic result, Reader third round or acceptance has been claimed in this session. The P0/P1 intake is committed; K146 remains in progress.
+
+The preceding bullet records the initial intake cut. Later, the separately authorized K146 source import committed as `a0feac3a4` with all hooks enabled; main generator 76/76, carrier/model 4/4 and source whitespace check pass. No native integration receipt was observed or manufactured. The prior one-task exception and extended fix-wave exception remain methodological provenance, not independent review or acceptance.
 
 ## Current execution boundary
 

@@ -1,5 +1,9 @@
 # K146 proposal handoff
 
+## Later integration readback
+
+The PO separately approved applying this exact patch and attempting ordinary checks and commit with hooks enabled. The sanctioned import helper applied all five paths. Main-checkout generator tests passed 76/76, synthetic carrier/model tests 4/4, and the source diff whitespace check passed. PRD and Spec hashes remained unchanged. Ordinary commit `a0feac3a4` succeeded with active hooks and truthful exceptional Goldfish provenance; no operator bypass or signature was used. The earlier inert handoff below remains the attempt history. Native host qualification, independent Critic, integrated Verify and PO acceptance remain open.
+
 This is an uncommitted, inert proposal from the recorded one-task methodological exception. The installed `goldfish-commit-command-flow.mjs` produced the exact proposed message in `k146-proposed-commit-message.txt` with code `GF-COMMAND-PREVIEW-ONLY`; no dispatch identity, native admission, host commit, source signature, or approval is asserted by that preview. Operator review must choose the sanctioned protected-source integration and truthful authorship route.
 
 ## Patch and paths
