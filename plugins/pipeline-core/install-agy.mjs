@@ -210,7 +210,7 @@ export function updateAutonomousSettings({ targetFile }) {
   }
 }
 
-import { publishAgyRunnerView, pruneAgyRunnerViews, agyRunnerViewDigestOfTree } from "./lib/agy-central-snapshot.mjs";
+import { publishAgyRunnerView, agyRunnerViewDigestOfTree } from "./lib/agy-central-snapshot.mjs";
 
 /**
  * What still points at a generated view: registry entries (global and this workspace), import-manifest sources, and the view
@@ -240,12 +240,19 @@ function observeRunnerViewReferences({ configRoot, workspaceRoot }) {
   } catch { return null; }
 }
 
-/** Bounded storage after a successful view install: older Pipeline-created views nothing references any more are removed. Never throws. */
-function pruneRunnerViewsAfterInstall({ view, configRoot, workspaceRoot, deps }) {
+/**
+ * A successful install cannot establish that an older loaded view is inactive. Registry, import and managed-copy
+ * references omit a session's loaded root; the Source-owned session descriptor liveness observer reports owner
+ * status but does not bind that owner to its loaded view or enumerate every Antigravity session. Retain all older
+ * views until a complete Source-owned view/liveness observation exists. The low-level custody prune remains available
+ * for an explicitly proven inactive view, with its digest and foreign-path checks unchanged.
+ */
+function pruneRunnerViewsAfterInstall({ configRoot, workspaceRoot }) {
   try {
     const references = observeRunnerViewReferences({ configRoot, workspaceRoot });
     if (references === null) return { removed: [], retained: [], skipped: "AGV-PRUNE-UNCERTAIN" };
-    return pruneAgyRunnerViews({ keepPaths: [view.root, ...references.paths], keepDigests: references.digests, deps });
+    // The observed references are useful custody facts, but absence from them is not proof of session inactivity.
+    return { removed: [], retained: [], skipped: "AGV-PRUNE-LIVENESS-UNOBSERVABLE" };
   } catch { return { removed: [], retained: [], skipped: "AGV-PRUNE-UNAVAILABLE" }; }
 }
 

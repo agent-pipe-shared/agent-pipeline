@@ -556,7 +556,26 @@ function storageWorld(t) {
 }
 const names = (w) => readdirSync(viewBase(w)).sort();
 
-test('bounded storage: after two installs the older view is removed; foreign view-<sha> directories, view-tmp-*, notes and a view an import source names stay', (t) => {
+test('runner continuity: an older loaded view survives updates when session liveness is unobservable', (t) => {
+  const { w } = storageWorld(t);
+  const first = installView(w, fakeCli(w));
+  assert.equal(first.status, 'refreshed');
+  const oldRoot = join(viewBase(w), `view-${first.runnerView.viewSha256}`);
+  reviseSource(w, 'A second revision of the shared source.\n');
+  const second = installView(w, fakeCli(w));
+  assert.equal(second.status, 'refreshed');
+  assert.notEqual(second.runnerView.viewSha256, first.runnerView.viewSha256);
+  assert.equal(second.runnerView.pruneSkipped, 'AGV-PRUNE-LIVENESS-UNOBSERVABLE');
+  assert.deepEqual(second.runnerView.removed, []);
+  assert.equal(existsSync(oldRoot), true);
+  const repeated = installView(w, fakeCli(w));
+  assert.equal(repeated.status, 'refreshed');
+  assert.equal(repeated.runnerView.viewSha256, second.runnerView.viewSha256);
+  assert.deepEqual(repeated.runnerView.removed, []);
+  assert.equal(existsSync(oldRoot), true);
+});
+
+test('bounded storage: after two installs the older view remains when liveness is unobservable; foreign view-<sha> directories, view-tmp-*, notes and an import source stay', (t) => {
   const { w, other } = storageWorld(t);
   const referenced = snap.publishAgyRunnerView({ sourcePluginRoot: other, deps: w.snapshotDeps });
   writeFileSync(w.importsPath, `${JSON.stringify({ imports: [{ name: 'foreign-plugin', source: referenced.root }] })}\n`);
@@ -577,8 +596,9 @@ test('bounded storage: after two installs the older view is removed; foreign vie
   const second = installView(w, fakeCli(w));
   assert.equal(second.status, 'refreshed', JSON.stringify(second));
   assert.notEqual(second.runnerView.viewSha256, first.runnerView.viewSha256);
-  assert.deepEqual(second.runnerView.removed, [`view-${first.runnerView.viewSha256}`], 'only the older view is removed');
-  assert.deepEqual(names(w), [note, foreignView, `view-${second.runnerView.viewSha256}`, `view-${referenced.viewSha256}`, tmpView].sort());
+  assert.deepEqual(second.runnerView.removed, [], 'unobservable session liveness cannot authorize pruning');
+  assert.equal(second.runnerView.pruneSkipped, 'AGV-PRUNE-LIVENESS-UNOBSERVABLE');
+  assert.deepEqual(names(w), [note, foreignView, `view-${first.runnerView.viewSha256}`, `view-${second.runnerView.viewSha256}`, `view-${referenced.viewSha256}`, tmpView].sort());
   assert.equal(readFileSync(join(viewBase(w), foreignView, 'keep.txt'), 'utf8'), 'not a view this module published\n');
   assert.equal(readFileSync(join(viewBase(w), tmpView, 'partial.txt'), 'utf8'), 'an interrupted publish\n');
   assert.equal(readFileSync(join(viewBase(w), note), 'utf8'), 'operator note\n');
