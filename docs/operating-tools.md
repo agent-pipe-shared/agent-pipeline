@@ -9,6 +9,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
 | Stamp the three runner manifests with a candidate version after the content is frozen | `scripts/stamp-candidate.mjs` | the three manifests (`--dry-run` writes nothing) |
 | Run test files on isolated Linux workers in parallel | `scripts/run-parallel.mjs` | worker clones and temp dirs only |
 | Run the Full Verify (candidate mode, no reuse) in a clone with a private HOME, a short TMPDIR and a red-step summary | `scripts/full-verify.mjs` | output file, verify's run record in the clone, temp dirs |
+| Rough token split of session and subagent transcripts into impl / content / admin / dialogue (heuristic, +-10 points; target for admin: about 15 % in user repositories) | `scripts/transcript-token-buckets.mjs` | none (prints JSON) |
 | Fill the Goldfish briefing template verbatim from a JSON spec (fix-wave task without an Alfred acceptance row) | `scripts/fill-goldfish-briefing.mjs` | one briefing file under `scratch/` |
 | Run test files one after the other with a private TMPDIR | `scripts/run-in.mjs` (uses `scripts/run-quiet.mjs`) | none tracked |
 | Run the project-onboarding orchestrator suite and read only its failures | `scripts/run-onboarding-full.mjs` | `scratch/onboarding-full.log` |
