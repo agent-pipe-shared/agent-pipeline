@@ -30,8 +30,8 @@ removes their runner-specific regression and native qualification duties.
 | G24 | Codex P1-2 | Evidence writers cannot overwrite another schema's valid result; bind immutable run records and separate capture/function outputs | Shared writer and consumer ownership separated | Shared capture fix committed `18d8f3c83`; integrated controls green. Current consumer already separates paths; immutable run/index proposal retained, no global arbitrary-writer claim |
 | G25 | Codex P1-3 | Validate HEAD, criterion rendering and source closure before submission mutation; retain already answered intake values | Design submission/intake work | Open; no late approval or fabricated identity |
 | G26 | Codex P1-4 | Architecture conformance records disposition of findings and unavailable properties without claiming PASS | Architecture close work | Open; report-only observations are not automatically blocking criteria |
-| G27 | Claude P1.4 architecture portion; P1.5; P1.6 | Self-describing greenfield architecture path, editable design before binding, correct criterion examples; avoid repeated PO discard ceremonies | G2/G4 and bounded criterion producer correction | Generator/parser and contextual placeholder correction targeted green, including G32 fixture closure. Main integration and larger editable-design/early-binding route remain open |
-| G28 | Claude P1.7 | Portable sanitized approval/Verify/Security/review evidence index in the delivered branch; private keys and raw private state remain external | G14, existing audit-pack archive route | Applied six-path historical-archive/CLI fix, integrated 19/19. Ordinary commit refused on two PB guard files; operator package collected, no bypass. Offline archive integrity never qualifies later commits |
+| G27 | Claude P1.4 architecture portion; P1.5; P1.6 | Self-describing greenfield architecture path, editable design before binding, correct criterion examples; avoid repeated PO discard ceremonies | G2/G4 and bounded criterion producer correction | Criterion/parser correction committed `5815d42c9`; main renderer/consumer 12/12 and actual acknowledgement cases 3/3. Larger editable-design/early-binding route remains open |
+| G28 | Claude P1.7 | Portable sanitized approval/Verify/Security/review evidence index in the delivered branch; private keys and raw private state remain external | G14, existing audit-pack archive route | Applied eight-path historical-archive/CLI fix with explicit read-only Source kernel closure; combined main check exits 0. Earlier ordinary commit refused on two PB guard files; complete operator package collected, no bypass. Offline archive integrity never qualifies later commits |
 | G29 | Claude P1.8 | Public handover accurately follows lifecycle transitions | Lifecycle handover projection work | Report evidence; identify sanctioned writer and regression pin |
 | G30 | Claude P1.9 | Trusted hook snapshot refresh has a usable recovery during a session | Existing hook-refresh flow; G9b/K156 | Automatic view retention committed `7dddb672c` (34/34 focused, installer 25 pass/1 skip). Mid-session snapshot qualification and direct-prune limitations remain open |
 | G31 | Claude P1.10 | Signing output points to an admissible external proof destination | K150B/G31 v2 | Integrated `7a6a58488`; main synthetic signing/proof 2/2 and original bounded UI 4/4. External-proof policy preserved; native acceptance pending |
@@ -151,7 +151,7 @@ artifact baseline. No C-to-P evidence-promotion decision is assumed.
 ## Main integration after the installed intermediate build
 
 Source commits `18d8f3c83` (G24), `7a6a58488` (G31), `537d5c85d`
-(G32) and `7dddb672c` (automatic G30 view retention) used ordinary active
+(G32), `7dddb672c` (automatic G30 view retention) and `5815d42c9` (G27 criterion/parser correction) used ordinary active
 hooks. The installed version remains the earlier `16c9e1936` candidate; no
 new stamp, install or push was performed. G24/G31 main focused integration
 passed 97 tests with 2 platform skips, synthetic signing/proof passed 2/2,
@@ -161,11 +161,16 @@ under `evidence/verify-fixes/`: `g24-g31-integrated-focus.txt`,
 `g32-integrated-identity.txt`. These are targeted dirty-working-tree
 captures, not a final candidate Verify receipt.
 
-G28 main tests passed 19/19. Its complete six-path commit was refused with
+G28's original six-path main tests passed 19/19; its later eight-path closure
+check also exits 0 (21 Node subtests plus the 11-case closure script).
+The earlier six-path commit was refused with
 `PB-COMMIT-OVERRIDE-NONOVERRIDABLE` for
 `lib/guard/command-catalogue.mjs` and `lib/guard/constants.mjs` under the
-plugin. Nothing was seeded and no bypass used. Keep the full six-path
-package staged for a later human operator; independent work continues.
+plugin. Nothing was seeded and no bypass used. Preserve the complete eight-path
+package for a later human operator, including the added kernel roots and threat-model
+documentation. Five missing suite registrations and completion recording wrappers,
+plus digest-bound DAU/OBC extensions, are now applied. Main registration, completion,
+append-history and all 17 focused witness cases pass; Full Verify is still pending.
 
 K156 R2 was rejected because it wrote State before calibration and weakened
 an original State-byte-equality negative. The next correction restored that

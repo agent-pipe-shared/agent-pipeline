@@ -1,0 +1,10 @@
+command: node harness/scripts/check-verify-suite-append.mjs
+label: fix-wave-append-main
+exitCode: 0
+head: 5815d42c9a1da897a3659d354f943be526b36ad3
+tree: 6c1db46e88748e5f4ae57f72f26bfdf2a1b71c52
+dirty: true
+--- stdout ---
+{"ok":true,"code":"VSA-HISTORY-APPEND-ONLY-RECORDED-RESTORATION","checked":29}
+
+--- stderr ---

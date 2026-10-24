@@ -38,15 +38,18 @@ The G23 normal commit attempt was rejected for `lib/guard/command-catalogue.mjs`
 
 ## Later terminal or native-host work
 
-**Actual new operator requirement:** G28's applied six-path package passed
-main integration 19/19. Its ordinary commit was refused with
+**Actual new operator requirement:** G28's applied package now has eight paths,
+including explicit read-only CLI kernel closure and its threat-model documentation.
+The original six-path main integration passed 19/19; the combined closure check
+also exits 0. The earlier ordinary commit was refused with
 `PB-COMMIT-OVERRIDE-NONOVERRIDABLE` on
 `plugins/pipeline-core/lib/guard/command-catalogue.mjs` and `constants.mjs`.
-Nothing was seeded; no override can cover it. The full package remains
-staged, including its documentation, Source and tests. Prepare the exact
+Nothing was seeded; no override can cover it. Preserve the complete applied package,
+including its documentation, Source and tests; the closure delta and Verify recording
+additions must be included when preparing the final staged operator scope. Prepare the exact
 manual commit command only at the next terminal readback; no HEAD-bound
 operator/signing command is outstanding now. G24/G31/G32 and automatic G30
-retention committed normally and need no operator repetition.
+retention and G27 committed normally and need no operator repetition.
 
 The optional new model-role mapping requests attended confirmation after the
 plugin update. Collect it; the validated V3 fallback remains usable and no

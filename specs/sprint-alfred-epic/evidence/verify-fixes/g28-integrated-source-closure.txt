@@ -1,0 +1,53 @@
+command: node --test plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs plugins/pipeline-core/scripts/audit-pack.test.mjs plugins/pipeline-core/lib/guard/g23-read-help.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: g28-integrated-source-closure
+exitCode: 0
+head: 5815d42c9a1da897a3659d354f943be526b36ad3
+tree: 6c1db46e88748e5f4ae57f72f26bfdf2a1b71c52
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (2.280553ms)
+✔ a clean fixture passes (1.487065ms)
+✔ an allowlisted occurrence passes (0.543583ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.614978ms)
+✔ multiple prefix hits on one line each produce a finding (0.340927ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.395472ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.238353ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (1130.649999ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (32.54645ms)
+PASS GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports
+PASS GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)
+PASS GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)
+PASS GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)
+PASS GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry
+PASS GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise
+PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)
+PASS GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher
+PASS GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents
+PASS GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots
+PASS GMWKC10 every FIXTURE_STRING_IMPORTS exemption names a target that does NOT exist on disk
+
+guard-maintenance-window-kernel-closure: 11 passed, 0 failed
+✔ plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs (1741.144753ms)
+✔ the admitted read-only audit CLI source is never liftable in project and installed roots (2.525799ms)
+✔ native Windows request separators normalize within the exact scratch boundary (1.098938ms)
+✔ audit-pack exact read and publication verbs retain separate guard routes (25.617496ms)
+✔ G23 bounded repeated rg globs preserve hidden and credential exclusions (148.886333ms)
+✔ G23 exact source-owned PO help is a pure CLI route (1256.878782ms)
+✔ G23 missing local targets are distinct from unknown grammar and protected paths (99.896038ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ AUDPK001 completed candidate audit pack is candidate-bound, partial on missing review proofs, and offline tamper-evident (343.666636ms)
+✔ AUDPK002 populated Critic summary loses local packet correlation in the public projection (163.389329ms)
+✔ AUDPK003 public archive preserves signed bytes and reports historical integrity after a fresh clone (1247.278754ms)
+✔ AUDPK004 audit pack refuses public-proof references outside the candidate evidence boundary (144.309012ms)
+✔ AUDPK005 audit pack verifies and copies exact public PO intent and proof bytes without exporting local authority metadata (302.416759ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2956.489437
+
+--- stderr ---

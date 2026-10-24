@@ -1,0 +1,10 @@
+command: node harness/scripts/check-verify-case-completion.mjs
+label: fix-wave-completion-main
+exitCode: 0
+head: 5815d42c9a1da897a3659d354f943be526b36ad3
+tree: 6c1db46e88748e5f4ae57f72f26bfdf2a1b71c52
+dirty: true
+--- stdout ---
+Verify case-completion registry valid: 366 entries, 350 conservatively classified suites.
+
+--- stderr ---

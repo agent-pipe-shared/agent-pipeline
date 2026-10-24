@@ -1,0 +1,686 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 984724fa8..7a7765553 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -445,6 +445,7 @@
+         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
++        "verify-phase:harness/scripts/verify.mjs:g23-read-help-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
+@@ -658,6 +659,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-agy-el01-write-authorization-gap-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-agy-imported-plugin-snapshot-shadows-registered-plugin-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-agy-managed-copy-first-start-lacks-attestation-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-antigravity-design-phase-scripts-refused-in-draft-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-antigravity-global-refresh-recovers-and-installs-a-runner-view-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-antigravity-refresh-validates-the-source-before-retiring-the-managed-copy-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-approval-bound-design-package-lives-in-an-ignored-directory-tests",
+@@ -878,6 +880,7 @@
+         "verify-phase:harness/scripts/verify.mjs:po-guarded-push-tests",
+         "verify-phase:harness/scripts/verify.mjs:po-human-approval-key-pairing-tests",
+         "verify-phase:harness/scripts/verify.mjs:po-human-approval-openssl-path-tests",
++        "verify-phase:harness/scripts/verify.mjs:po-human-approval-signing-handoff-tests",
+         "verify-phase:harness/scripts/verify.mjs:po-human-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
+         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
+@@ -1008,6 +1011,7 @@
+         "verify-phase:harness/scripts/verify.mjs:security-policy-resolver-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-readiness-harness-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-readiness-tests",
++        "verify-phase:harness/scripts/verify.mjs:security-remote-identity-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-scan",
+         "verify-phase:harness/scripts/verify.mjs:security-scan-snapshot-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
+@@ -2280,6 +2284,7 @@
+       "surfaceIds": [
+         "verify-phase:harness/scripts/verify.mjs:audit-bundle-cli-tests",
+         "verify-phase:harness/scripts/verify.mjs:audit-bundle-core-tests",
++        "verify-phase:harness/scripts/verify.mjs:audit-pack-command-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:audit-pack-tests",
+         "verify-phase:harness/scripts/verify.mjs:capture-evidence-tests",
+         "verify-phase:harness/scripts/verify.mjs:evidence-viewer-tests",
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 7f8b199e7..0824981d1 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1121,6 +1121,339 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "design-authoring-tests",
++      "file": "plugins/pipeline-core/lib/design-authoring.test.mjs",
++      "previousPolicySha256": "3da2f96bbb65cbeb3dda14d5bc60664dedf50f9f276ef4fef1bb22b7252b5385",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "DAU001",
++          "DAU002",
++          "DAU003"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "onboarding-continuity-tests",
++      "file": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
++      "previousPolicySha256": "0dc05afa7fdb77c4dffb3274efb82fd60d191a55522ffcbb9e3a96af141b51ab",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "OBC001",
++          "OBC002",
++          "OBC003",
++          "OBC004",
++          "OBC005",
++          "OBC006",
++          "OBC007",
++          "OBC008",
++          "OBC009",
++          "OBC010",
++          "OBC011",
++          "OBC012",
++          "OBC013",
++          "OBC014",
++          "OBC015",
++          "OBC016",
++          "OBC017",
++          "OBC018",
++          "OBC019",
++          "OBC020",
++          "OBC021",
++          "OBC022",
++          "OBC023",
++          "OBC024",
++          "OBC025",
++          "OBC026",
++          "OBC027",
++          "OBC028",
++          "OBC029",
++          "OBC030",
++          "OBC031",
++          "OBC032",
++          "OBC033",
++          "OBC034",
++          "OBC035",
++          "OBC036",
++          "OBC037",
++          "OBC038",
++          "OBC039",
++          "OBC040",
++          "OBC041",
++          "OBC042",
++          "OBC043",
++          "OBC044",
++          "OBC045",
++          "OBC046",
++          "OBC047",
++          "OBC048",
++          "OBC049",
++          "OBC050",
++          "OBC051",
++          "OBC052",
++          "OBC053",
++          "OBC054",
++          "OBC055",
++          "OBC056",
++          "OBC057",
++          "OBC058",
++          "OBC059",
++          "OBC060",
++          "OBC061",
++          "OBC062",
++          "OBC063",
++          "OBC064",
++          "OBC065",
++          "OBC066",
++          "OBC067",
++          "OBC068",
++          "OBC069",
++          "OBC070",
++          "OBC071",
++          "OBC072",
++          "OBC073",
++          "OBC074",
++          "OBC075",
++          "OBC076",
++          "OBC077",
++          "OBC078",
++          "OBC079",
++          "OBC080",
++          "OBC081",
++          "OBC082",
++          "OBC083",
++          "OBC084",
++          "OBC085",
++          "OBC086",
++          "OBC087",
++          "OBC088",
++          "OBC089",
++          "OBC090",
++          "OBC091",
++          "OBC092",
++          "OBC093",
++          "OBC094",
++          "OBC095",
++          "OBC096",
++          "OBC097",
++          "OBC098",
++          "OBC099",
++          "OBC100",
++          "OBC101",
++          "OBC102",
++          "OBC103",
++          "OBC104",
++          "OBC105",
++          "OBC106",
++          "OBC107",
++          "OBC108",
++          "OBC109",
++          "OBC110",
++          "OBC111",
++          "OBC112",
++          "OBC113",
++          "OBC114",
++          "OBC115",
++          "OBC116",
++          "OBC117",
++          "OBC118",
++          "OBC119",
++          "OBC120",
++          "OBC121",
++          "OBC122",
++          "OBC123",
++          "OBC124",
++          "OBC125",
++          "OBC126",
++          "OBC127",
++          "OBC128",
++          "OBC129",
++          "OBC130",
++          "OBC131",
++          "OBC132",
++          "OBC133",
++          "OBC134",
++          "OBC135",
++          "OBC136",
++          "OBC137",
++          "OBC138",
++          "OBC139",
++          "OBC140",
++          "OBC141",
++          "OBC142",
++          "OBC143",
++          "OBC144",
++          "OBC145",
++          "OBC146",
++          "OBC147",
++          "OBC148",
++          "OBC149",
++          "OBC150",
++          "OBC151",
++          "OBC152",
++          "OBC153",
++          "OBC154",
++          "OBC155",
++          "OBC156",
++          "OBC157",
++          "OBC158",
++          "OBC159",
++          "OBC160",
++          "OBC161",
++          "OBC162",
++          "OBC163",
++          "OBC164",
++          "OBC165",
++          "OBC166",
++          "OBC167",
++          "OBC168",
++          "OBC169",
++          "OBC170",
++          "OBC171",
++          "OBC172",
++          "OBC173",
++          "OBC174",
++          "OBC175",
++          "OBC176",
++          "OBC177",
++          "OBC178",
++          "OBC179",
++          "OBC180",
++          "OBC181",
++          "OBC182",
++          "OBC183",
++          "OBC184",
++          "OBC185",
++          "OBC186",
++          "OBC187",
++          "OBC188",
++          "OBC189",
++          "OBC190",
++          "OBC191",
++          "OBC192",
++          "OBC193",
++          "OBC194",
++          "OBC195",
++          "OBC196",
++          "OBC197",
++          "OBC198",
++          "OBC199",
++          "OBC200",
++          "OBC201",
++          "OBC202",
++          "OBC203",
++          "OBC204",
++          "OBC205",
++          "OBC206",
++          "OBC207",
++          "OBC208",
++          "OBC209",
++          "OBC210",
++          "OBC211",
++          "OBC212",
++          "OBC213",
++          "OBC214",
++          "OBC215",
++          "OBC216",
++          "OBC217",
++          "OBC218",
++          "OBC219",
++          "OBC220",
++          "OBC221",
++          "OBC222",
++          "OBC223",
++          "OBC224",
++          "OBC225",
++          "OBC226",
++          "OBC227",
++          "OBC228",
++          "OBC229",
++          "OBC230",
++          "OBC231",
++          "OBC232",
++          "OBC233",
++          "OBC234",
++          "OBC235",
++          "OBC236",
++          "OBC237",
++          "OBC238",
++          "OBC239",
++          "OBC240",
++          "OBC241",
++          "OBC242",
++          "OBC243",
++          "OBC244",
++          "OBC245",
++          "OBC246",
++          "OBC247",
++          "OBC248",
++          "OBC249",
++          "OBC250",
++          "OBC251",
++          "OBC252",
++          "OBC253",
++          "OBC254",
++          "OBC255",
++          "OBC256",
++          "OBC257",
++          "OBC258",
++          "OBC259",
++          "OBC260",
++          "OBC261",
++          "OBC262",
++          "OBC263",
++          "OBC264",
++          "OBC265",
++          "OBC266",
++          "OBC267",
++          "OBC268",
++          "OBC269",
++          "OBC270",
++          "OBC271",
++          "OBC272",
++          "OBC273",
++          "OBC274",
++          "OBC275",
++          "OBC276",
++          "OBC277",
++          "OBC278",
++          "OBC279",
++          "OBC280",
++          "OBC281",
++          "OBC282",
++          "OBC283",
++          "OBC284",
++          "OBC285",
++          "OBC286",
++          "OBC287",
++          "OBC288",
++          "OBC289",
++          "OBC290",
++          "OBC291",
++          "OBC292",
++          "OBC293",
++          "OBC294",
++          "OBC295",
++          "OBC296",
++          "OBC297",
++          "OBC298",
++          "OBC299",
++          "OBC300",
++          "OBC301",
++          "OBC302",
++          "OBC303",
++          "OBC304",
++          "OBC305",
++          "OBC306",
++          "OBC307",
++          "OBC308"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index 636859f88..aaf752eda 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -98,6 +98,11 @@
+       "path": "plugins/pipeline-core/lib/async-execution.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "audit-pack-command-admission-tests",
++      "path": "plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "audit-pack-tests",
+       "path": "plugins/pipeline-core/scripts/audit-pack.test.mjs",
+@@ -673,6 +678,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "g23-read-help-tests",
++      "path": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "gate-estimate-tests",
+       "path": "plugins/pipeline-core/lib/gate-estimate.test.mjs",
+@@ -1274,6 +1284,11 @@
+       "path": "plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "pin-antigravity-design-phase-scripts-refused-in-draft-tests",
++      "path": "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "pin-denial-names-a-diagnosis-it-refuses-tests",
+       "path": "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs",
+@@ -1368,6 +1383,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "po-human-approval-signing-handoff-tests",
++      "path": "plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "po-language-projection-tests",
+       "path": "harness/scripts/po-language-projection.test.mjs",
+@@ -1740,6 +1760,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "security-remote-identity-tests",
++      "path": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "security-scanner-diagnostics-tests",
+       "path": "plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 679c5ee9d..a4c0a658e 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3814,6 +3814,83 @@
+       "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs",
+       "invariantPinned": "The gitleaks scan source excludes scratch/clones and nothing else (K98 row 13)",
+       "nonOverlapNote": "Unique cases: the scratch/clones exclusion of the gitleaks adapter scan source"
++    },
++    {
++      "name": "audit-pack-command-admission-tests",
++      "file": "plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs",
++      "invariantPinned": "The audit-pack command guard admits the exact read and publication routes and keeps source kernel paths protected across project and installed roots.",
++      "nonOverlapNote": "Unique G28 audit-pack command admission witness; the audit-pack script suite checks artifact behavior.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "APC001",
++          "APC002",
++          "APC003"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "g23-read-help-tests",
++      "file": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
++      "invariantPinned": "Bounded read globs, source-owned PO help and missing target diagnostics remain distinct and preserve credential exclusions.",
++      "nonOverlapNote": "Unique G23 read/help guard interaction witness; separate from the wider guard lifecycle suite.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G23C001",
++          "G23C002",
++          "G23C003"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "pin-antigravity-design-phase-scripts-refused-in-draft-tests",
++      "file": "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs",
++      "invariantPinned": "The design-phase command catalogue admits exactly the documented model-role bootstrap and native dispatch preparation argv shapes and refuses variants.",
++      "nonOverlapNote": "Unique K152 script admission pin; distinct from runner route tests.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "K152C001",
++          "K152C002",
++          "K152C003",
++          "K152C004",
++          "K152C005"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "po-human-approval-signing-handoff-tests",
++      "file": "plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs",
++      "invariantPinned": "Human signing handoff retains exact material identity in bounded disclosure, refuses malformed paths and names the external proof.",
++      "nonOverlapNote": "Unique signing-handoff disclosure witness; separate from core approval transaction tests.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PHS001",
++          "PHS002",
++          "PHS003",
++          "PHS004"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "security-remote-identity-tests",
++      "file": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",
++      "invariantPinned": "Security evidence follows the effective push destination and the push guard refuses evidence bound to another destination.",
++      "nonOverlapNote": "Unique remote-identity integration witness; separate from scanner diagnostics.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "SRI001",
++          "SRI002"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+index 954dc5ca0..dec492cbe 100644
+--- a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -4,13 +4,15 @@ import { spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "../test-case-completion.mjs";
+ import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+ import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
+ 
+ const script = fileURLToPath(new URL("../../scripts/po-human-approval.mjs", import.meta.url));
+ const fixtureBase = resolve("scratch");
++const cases = [];
++function test(name, run) { cases.push({ id: `G23C${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ test("G23 bounded repeated rg globs preserve hidden and credential exclusions", () => {
+   mkdirSync(fixtureBase, { recursive: true });
+@@ -66,3 +68,6 @@ test("G23 missing local targets are distinct from unknown grammar and protected
+     rmSync(outside, { recursive: true, force: true });
+   }
+ });
++
++if (cases.length !== 3) throw new Error("G23 read/help case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+index abbd30275..d0a24df15 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
+ import { mkdtempSync, rmSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+-import test from "node:test";
++import nodeTest from "node:test";
++import { registerTestCaseCompletion } from "../test-case-completion.mjs";
+ import { fileURLToPath } from "node:url";
+ import { isSanctionedLifecycleCommand } from "../guard/command-catalogue.mjs";
+ 
+@@ -17,8 +18,10 @@ const bootstrap = join(scripts, "model-role-bootstrap.mjs");
+ const prepare = join(scripts, "antigravity-native-dispatch-prepare.mjs");
+ const receipt = join(scripts, "design-review-receipt.mjs");
+ const root = mkdtempSync(join(tmpdir(), "k152-draft-scripts-"));
+-test.after(() => rmSync(root, { recursive: true, force: true }));
++nodeTest.after(() => rmSync(root, { recursive: true, force: true }));
+ const admitted = (command) => isSanctionedLifecycleCommand(command, root);
++const cases = [];
++function test(name, run) { cases.push({ id: `K152C${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ test("K152: model-role-bootstrap is admitted with exactly its documented argv shapes", () => {
+   assert.equal(admitted(`node ${bootstrap} --repo-root ${root} --runner antigravity --host-session-id sess-1234`), true);
+@@ -69,3 +72,6 @@ test("K152: no other script of the plugin is admitted by these pins (design-revi
+   assert.equal(admitted(`node ${receipt} create`), false, "an incomplete design-review-receipt argv is refused");
+   assert.equal(admitted(`node ${receipt}`), false);
+ });
++
++if (cases.length !== 5) throw new Error("K152 admission case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+index 42cc17965..00d7f7369 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+@@ -1,10 +1,12 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { compactSigningDisclosure, formatHumanApprovalCliResult } from "./po-human-approval.mjs";
+ 
+ const digest = "a".repeat(64);
+ const longPath = `scratch/${"nested/".repeat(25)}review-${digest}.json`;
++const cases = [];
++function test(name, run) { cases.push({ id: `PHS${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ test("K150B: a long material path retains its full identity and digest in the disclosure", () => {
+   assert.ok(longPath.length > 240);
+@@ -49,3 +51,6 @@ test("G31: human-facing critical authorization names the external proof", () =>
+     null, "a missing external path cannot fall back to the scratch mirror");
+   assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })), result);
+ });
++
++if (cases.length !== 4) throw new Error("signing handoff case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/scripts/security-remote-identity.test.mjs b/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+index 4b51873aa..3a195017d 100644
+--- a/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
++++ b/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+@@ -3,14 +3,17 @@ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+-import test from "node:test";
++import nodeTest from "node:test";
++import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { runSecurityScan } from "./security-scan.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ 
+ const scratch = join(process.cwd(), "scratch", "g32-security-remote-fixtures");
+ mkdirSync(scratch, { recursive: true });
+ const fixture = mkdtempSync(join(scratch, "repo-"));
+-test.after(() => rmSync(fixture, { recursive: true, force: true }));
++nodeTest.after(() => rmSync(fixture, { recursive: true, force: true }));
++const cases = [];
++function test(name, run) { cases.push({ id: `SRI${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ function git(...args) {
+   const result = spawnSync("git", args, { cwd: fixture, encoding: "utf8", shell: false });
+@@ -104,3 +107,6 @@ test("push guard rejects evidence for a different effective destination", () =>
+     assert.doesNotMatch(right.stderr, /candidate repository identity does not match the effective push destination/);
+   } finally { rmSync(dir, { recursive: true, force: true }); }
+ });
++
++if (cases.length !== 2) throw new Error("security remote identity case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs b/plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs
+index ae0f5b162..41da9e1a8 100644
+--- a/plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs
++++ b/plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs
+@@ -2,7 +2,7 @@
+ import assert from "node:assert/strict";
+ import { lstatSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { join, resolve, win32 } from "node:path";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "../test-case-completion.mjs";
+ import { auditPackRequestPath, isSanctionedLifecycleCommand, resolveBoundArtifactPublicationInvocation } from "./command-catalogue.mjs";
+ import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
+ import { AUDIT_PACK_SCRIPT } from "./constants.mjs";
+@@ -12,6 +12,8 @@ import { isNeverLiftableKernelPath } from "../guard-maintenance-window.mjs";
+ const root = process.cwd();
+ const script = "plugins/pipeline-core/scripts/audit-pack.mjs";
+ const base = join(root, "scratch", "audit-pack-guard-fixtures");
++const cases = [];
++function test(name, run) { cases.push({ id: `APC${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ test("the admitted read-only audit CLI source is never liftable in project and installed roots", () => {
+   assert.equal(AUDIT_PACK_SCRIPT, join(root, script));
+@@ -80,3 +82,6 @@ test("audit-pack exact read and publication verbs retain separate guard routes",
+     assert.equal(resolveBoundArtifactPublicationInvocation(command("publish"), root), null);
+   } finally { rmSync(fixture, { recursive: true, force: true }); }
+ });
++
++if (cases.length !== 3) throw new Error("audit-pack admission case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

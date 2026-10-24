@@ -1,0 +1,39 @@
+command: node --test plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs plugins/pipeline-core/lib/guard/g23-read-help.test.mjs plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+label: fix-wave-witnesses-main
+exitCode: 0
+head: 5815d42c9a1da897a3659d354f943be526b36ad3
+tree: 6c1db46e88748e5f4ae57f72f26bfdf2a1b71c52
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ APC001 the admitted read-only audit CLI source is never liftable in project and installed roots (2.595931ms)
+✔ APC002 native Windows request separators normalize within the exact scratch boundary (1.047641ms)
+✔ APC003 audit-pack exact read and publication verbs retain separate guard routes (26.385258ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ G23C001 G23 bounded repeated rg globs preserve hidden and credential exclusions (124.723517ms)
+✔ G23C002 G23 exact source-owned PO help is a pure CLI route (1350.878855ms)
+✔ G23C003 G23 missing local targets are distinct from unknown grammar and protected paths (111.563755ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ K152C001 K152: model-role-bootstrap is admitted with exactly its documented argv shapes (5.922391ms)
+✔ K152C002 K152: model-role-bootstrap stays refused for any other argv shape (3.620408ms)
+✔ K152C003 K152: antigravity-native-dispatch-prepare is admitted with exactly `prepare --root <root> --request <json>` (1.196483ms)
+✔ K152C004 K152: antigravity-native-dispatch-prepare stays refused for any other argv shape (3.069923ms)
+✔ K152C005 K152: no other script of the plugin is admitted by these pins (design-review-receipt keeps its own closed grammar) (2.083489ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ PHS001 K150B: a long material path retains its full identity and digest in the disclosure (3.169391ms)
+✔ PHS002 K150B: multi-kilobyte nested path still gives a bounded exact locator (0.760504ms)
+✔ PHS003 K150B: malformed digest and control-bearing material paths refuse (1.13222ms)
+✔ PHS004 G31: human-facing critical authorization names the external proof (1.802454ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ SRI001 security evidence follows one effective push destination across a remote rename (1422.183714ms)
+✔ SRI002 push guard rejects evidence for a different effective destination (2420.647835ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4709.016348
+
+--- stderr ---
