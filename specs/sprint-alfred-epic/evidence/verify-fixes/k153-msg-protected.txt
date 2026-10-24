@@ -1,0 +1,7 @@
+fix(guard): admit a proof-bearing approve-plan on Antigravity and stop reading a braced revision as a push
+
+Antigravity refused every approve-plan for the agent, while the shared lifecycle admission already lets the agent run the closed --design-approval-request route that carries the PO's signed proof; the Antigravity PO Gate now delegates that decision to isSanctionedLifecycleCommand and keeps refusing every other spelling, and its script match no longer lets a quoted script path slip past the gate.
+guard-push judged git rev-parse "HEAD^{tree}" as a push with shell expansion; the read-only object readers rev-parse, rev-list, cat-file and ls-tree join the marker-only non-push proof, while unquoted braces, chains, pipes and a push in a substitution stay refused.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

@@ -1,0 +1,147 @@
+From 36c2c416bc18193a31307461374714804452bd81 Mon Sep 17 00:00:00 2001
+From: The Agent-Pipeline Contributors <noreply@example.invalid>
+Date: Sat, 24 Oct 2026 09:07:35 +0200
+Subject: [PATCH] fix(guard): admit the Antigravity design-phase bootstrap and
+ native-dispatch-prepare scripts in draft
+
+The Antigravity references demand scripts/model-role-bootstrap.mjs and scripts/antigravity-native-dispatch-prepare.mjs before the first implementation dispatch, but the closed command catalogue did not know them, so the draft-lifecycle shell guard refused both as GUARD-DEVPLAN-SHELL.
+
+Each script is admitted by exactly the argv grammar of its own parser (root-bound, runner enum, request limited to a scratch/ or evidence/ .json), through the existing catalogue route and not by widening a generic rule. A pin covers the admitted shapes and the refused neighbours.
+
+AI-Assisted: true
+Dispatch: K152-AGY-ADAPTER-COVERAGE (goldfish)
+---
+ .../lib/guard/command-catalogue.mjs           | 22 ++++++
+ plugins/pipeline-core/lib/guard/constants.mjs |  3 +
+ ...gn-phase-scripts-refused-in-draft.test.mjs | 71 +++++++++++++++++++
+ 3 files changed, 96 insertions(+)
+ create mode 100644 plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index cc342fd04..d4bee3088 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -229,7 +229,29 @@ function sanctionedDispatchRecoveryArgs(args, root) {
+     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
+ }
+ 
++import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT } from "./constants.mjs";
++
++// K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
++// `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
++function sanctionedModelRoleBootstrapArgs(args, root) {
++  if (args.length !== 4 && args.length !== 6) return false;
++  if (args[0] !== "--repo-root" || args[1] !== root || args[2] !== "--runner") return false;
++  if (!["codex", "claude", "antigravity"].includes(args[3])) return false;
++  return args.length === 4 || (args[4] === "--host-session-id" && NATIVE_SESSION_ID.test(args[5]));
++}
++
++// K152 (G7): scripts/antigravity-native-dispatch-prepare.mjs accepts exactly `prepare --root <root> --request <json>`
++// (its requestFromArgv). The request is a repository-relative .json under scratch/ or evidence/ with no dot segment.
++const NATIVE_DISPATCH_REQUEST = /^(?:scratch|evidence)\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\.json$/u;
++function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
++  return args.length === 5 && args[0] === "prepare" && args[1] === "--root" && args[2] === root
++    && args[3] === "--request" && NATIVE_DISPATCH_REQUEST.test(args[4])
++    && !args[4].split("/").some((part) => part === "." || part === "..");
++}
++
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
++  if (script === MODEL_ROLE_BOOTSTRAP_SCRIPT) return sanctionedModelRoleBootstrapArgs(args, root);
++  if (script === ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedAntigravityNativeDispatchPrepareArgs(args, root);
+   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
+   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
+   if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index cbc0b06e1..4cdcbd938 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -187,6 +187,9 @@ export const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../scripts/pipeli
+ // first implementation dispatch. Their closed argument grammars live in command-catalogue.mjs.
+ export const MODEL_ROLE_DISPATCH_SELECT_SCRIPT = fileURLToPath(new URL("../../scripts/model-role-dispatch-select.mjs", import.meta.url));
+ export const DESIGN_REVIEW_RECEIPT_SCRIPT = fileURLToPath(new URL("../../scripts/design-review-receipt.mjs", import.meta.url));
++// K152 (G7): the two further scripts the Antigravity references demand in the design phase; each is admitted by its own closed argv grammar in command-catalogue.mjs.
++export const MODEL_ROLE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../../scripts/model-role-bootstrap.mjs", import.meta.url));
++export const ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT = fileURLToPath(new URL("../../scripts/antigravity-native-dispatch-prepare.mjs", import.meta.url));
+ export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scripts/register-feature-package.mjs", import.meta.url));
+ export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
+ 
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+new file mode 100644
+index 000000000..abbd30275
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+@@ -0,0 +1,71 @@
++// SPDX-License-Identifier: SUL-1.0
++// Pin: K152 part 3 (greenfield finding G7). The Antigravity references demand three scripts before the first
++// implementation dispatch: scripts/model-role-bootstrap.mjs, scripts/antigravity-native-dispatch-prepare.mjs and
++// scripts/design-review-receipt.mjs. In lifecycle `draft` the first two were refused by the shell guard as
++// GUARD-DEVPLAN-SHELL because the closed command catalogue (lib/guard/command-catalogue.mjs) did not know them.
++// Each is admitted by exactly its documented argv shape (the script's own parser), never by widening a generic rule.
++import assert from "node:assert/strict";
++import { mkdtempSync, rmSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++import { isSanctionedLifecycleCommand } from "../guard/command-catalogue.mjs";
++
++const scripts = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "scripts");
++const bootstrap = join(scripts, "model-role-bootstrap.mjs");
++const prepare = join(scripts, "antigravity-native-dispatch-prepare.mjs");
++const receipt = join(scripts, "design-review-receipt.mjs");
++const root = mkdtempSync(join(tmpdir(), "k152-draft-scripts-"));
++test.after(() => rmSync(root, { recursive: true, force: true }));
++const admitted = (command) => isSanctionedLifecycleCommand(command, root);
++
++test("K152: model-role-bootstrap is admitted with exactly its documented argv shapes", () => {
++  assert.equal(admitted(`node ${bootstrap} --repo-root ${root} --runner antigravity --host-session-id sess-1234`), true);
++  assert.equal(admitted(`node ${bootstrap} --repo-root ${root} --runner claude`), true);
++  assert.equal(admitted(`node ${bootstrap} --repo-root ${root} --runner codex`), true);
++});
++
++test("K152: model-role-bootstrap stays refused for any other argv shape", () => {
++  const other = mkdtempSync(join(tmpdir(), "k152-other-root-"));
++  try {
++    for (const tail of [
++      `--repo-root ${other} --runner claude`,                                      // a different root
++      `--repo-root ${root} --runner bogus`,                                        // an unknown runner
++      `--repo-root ${root} --runner claude --extra`,                               // an extra argument
++      `--repo-root ${root} --runner claude --host-session-id`,                     // a flag without its value
++      `--repo-root ${root} --runner antigravity --host-session-id $(id)`,         // an unsafe session id
++      `--runner claude --repo-root ${root}`,                                       // wrong order
++      "",                                                                          // no arguments
++    ]) assert.equal(admitted(`node ${bootstrap} ${tail}`.trim()), false, tail);
++  } finally { rmSync(other, { recursive: true, force: true }); }
++});
++
++test("K152: antigravity-native-dispatch-prepare is admitted with exactly `prepare --root <root> --request <json>`", () => {
++  assert.equal(admitted(`node ${prepare} prepare --root ${root} --request scratch/native-dispatch-request.json`), true);
++  assert.equal(admitted(`node ${prepare} prepare --root ${root} --request evidence/native-dispatch-request.json`), true);
++});
++
++test("K152: antigravity-native-dispatch-prepare stays refused for any other argv shape", () => {
++  const other = mkdtempSync(join(tmpdir(), "k152-other-root-"));
++  try {
++    for (const tail of [
++      `prepare --root ${other} --request scratch/r.json`,                          // a different root
++      `prepare --root ${root} --request ../outside.json`,                          // traversal
++      `prepare --root ${root} --request /etc/passwd`,                              // absolute request path
++      `prepare --root ${root} --request scratch/r.sh`,                             // not a json request
++      `prepare --root ${root} --request src/r.json`,                               // not an input directory
++      `prepare --root ${root} --request scratch/r.json --apply`,                   // an extra argument
++      `apply --root ${root} --request scratch/r.json`,                             // another subcommand
++      `--root ${root} --request scratch/r.json`,                                   // no subcommand
++      "",
++    ]) assert.equal(admitted(`node ${prepare} ${tail}`.trim()), false, tail);
++  } finally { rmSync(other, { recursive: true, force: true }); }
++});
++
++test("K152: no other script of the plugin is admitted by these pins (design-review-receipt keeps its own closed grammar)", () => {
++  assert.equal(admitted(`node ${join(scripts, "model-role-bootstrap-extra.mjs")} --repo-root ${root} --runner claude`), false);
++  assert.equal(admitted(`node ${join(root, "scratch", "model-role-bootstrap.mjs")} --repo-root ${root} --runner claude`), false);
++  assert.equal(admitted(`node ${receipt} create`), false, "an incomplete design-review-receipt argv is refused");
++  assert.equal(admitted(`node ${receipt}`), false);
++});
+-- 
+2.53.0
+
