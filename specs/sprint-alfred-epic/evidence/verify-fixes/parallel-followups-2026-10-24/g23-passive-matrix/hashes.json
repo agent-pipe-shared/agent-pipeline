@@ -1,0 +1,42 @@
+[
+  {
+    "path": "plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs",
+    "bytes": 10357,
+    "sha256": "96f3c73e24787f48fdd4905f80da0d151e249cc226fc8ccbbd9239e92233f86a"
+  },
+  {
+    "path": "scratch/agent-out/g23-cross-runner-passive-matrix/proposal.patch",
+    "bytes": 10836,
+    "sha256": "b475167d03d205a7a735169b903edf545004cf5aef6924ed3286a0dcb86a92d6"
+  },
+  {
+    "path": "scratch/agent-out/g23-cross-runner-passive-matrix/matrix-initial.txt",
+    "bytes": 13208,
+    "sha256": "cd73f01c9be337fe3a55db9bc960db7e7ce28ae98f19fd20060028f6cfc44f71"
+  },
+  {
+    "path": "scratch/agent-out/g23-cross-runner-passive-matrix/matrix-final.txt",
+    "bytes": 986,
+    "sha256": "bbdac1f3377e7c8eb43164b262db769a202a50ca68a74b97367eff86005d5461"
+  },
+  {
+    "path": "scratch/agent-out/g23-cross-runner-passive-matrix/matrix-complete.txt",
+    "bytes": 1078,
+    "sha256": "3a196d1b0d236d73e4b0dd75c3c3eb97dc27f6915500df920d9b2527e7346784"
+  },
+  {
+    "path": "scratch/agent-out/g23-cross-runner-passive-matrix/matrix-delivery.txt",
+    "bytes": 1079,
+    "sha256": "c421a5d887f27910bc02b6592feccfcc9231f5271dd0a7f0a3eed09ab846d736"
+  },
+  {
+    "path": "scratch/agent-out/g23-cross-runner-passive-matrix/consumer-safe.txt",
+    "bytes": 1113,
+    "sha256": "34e413c4cc996e1b015266fd52c70d4a5b9eb3c61f02b3d9e1196bc0ab09fa98"
+  },
+  {
+    "path": "scratch/agent-out/g23-cross-runner-passive-matrix/resource-headroom.txt",
+    "bytes": 926,
+    "sha256": "89d1c0f34e76226e6047f601cefe416d0652e327df2f2d52b64c11aca5605b2d"
+  }
+]

@@ -1,0 +1,19 @@
+command: node plugins/pipeline-core/scripts/report-resource-headroom.mjs --input scratch/agent-out/unsafe-options-hermetic-fixture/resource-observations.json
+label: UNSAFE-OPTIONS-HERMETIC-FIXTURE-resource
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.project-resource-headroom-report.v1",
+  "candidate": {
+    "commit": "6095f8e33940d4b3e34a0ea676abf506849c1fa2",
+    "tree": "588163a44ee6ddece6bb7c69b3b8a668d04e89c1"
+  },
+  "assurance": "declared-observations",
+  "compliance": "not-certified",
+  "resources": []
+}
+
+--- stderr ---

@@ -1,0 +1,10 @@
+command: node harness/scripts/check-verify-suite-registration.mjs
+label: registration
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+Verify suite registration is complete: 1108 registered, 0 declared exclusion(s), 0 unregistered.
+
+--- stderr ---

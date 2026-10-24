@@ -1,0 +1,21 @@
+command: node --test --test-name-pattern=source.drift.during.lifecycle|unknown.pipeline-shaped.wiring|prepared.source,.actual.hook.bytes plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+label: G6-existing-host-preimage-drift-controls-Goldfish
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ RC05C006 source drift during lifecycle is detected before additional registry/wiring writes (24.384026ms)
+✔ RC05C007 unknown pipeline-shaped wiring, shell expansion, alias and oversized configuration fail closed without destructive CLI (34.380547ms)
+✔ RC05C015 prepared source, actual hook bytes and registry preimages are bound before any mutation (63.269112ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 196.978236
+
+--- stderr ---

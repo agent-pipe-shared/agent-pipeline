@@ -1,0 +1,11 @@
+command: python3 scratch/agent-out/unsafe-options-hermetic-fixture/audit-export.py
+label: UNSAFE-OPTIONS-HERMETIC-FIXTURE-audit
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+{"schema": "fixture.lookup-audit.v1", "missing": [], "originalSha256": "b376fee4915b5579b407bcfdda20183216bf097741f39a86c33b7c331d0111bc", "fixedSha256": "1076d08dfd3bda9901a4aa63643f4ca7253fb9fa4ebf2679491c42010611004e", "patchSha256": "dadb1a21ff609c3e83d3dbec3d777726c10076bb47fd856fd73bb29f735024e2", "originalExaminerBytesRetained": 21613, "originalExaminerSuffixPreserved": true, "privateTmpReachable": false}
+{"privateCalls": [{"path": "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs", "line": 82, "text": "const root=join(userInfo().homedir,'.apsp',derivePoGateRepositoryFingerprint({gitCommonDir:actual.commonDir,primaryRoot:actual.primaryRoot}).slice(0,16));"}, {"path": "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs", "line": 106, "text": "const prefix=join(userInfo().homedir,'.apsp',derivePoGateRepositoryFingerprint({gitCommonDir:repository.commonDir,primaryRoot:repository.primaryRoot}).slice(0,16)),rel=relative(prefix,input.filePath);"}, {"path": "plugins/pipeline-core/lib/session-power.mjs", "line": 333, "text": "const home=userInfo().homedir;strictAddressChain(home);"}, {"path": "plugins/pipeline-core/lib/session-power.mjs", "line": 383, "text": "const directory=addressDirectory(repo,repositoryFingerprint),home=userInfo().homedir;"}, {"path": "plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs", "line": 99, "text": "const account = userInfo({ encoding: \"utf8\" });"}]}
+
+--- stderr ---

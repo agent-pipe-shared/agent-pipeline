@@ -1,0 +1,38 @@
+{
+  "base": "6095f8e33940d4b3e34a0ea676abf506849c1fa2",
+  "prerequisites": "Six inputs in original prepared-report order; apply this incremental overlay last.",
+  "patchSha256": "db31ce2b062221198c81e12eccd2326d2b48a35b4d52f50c916203259c1d203b",
+  "changes": [
+    {
+      "path": "plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs",
+      "preimageSha256": "96f3c73e24787f48fdd4905f80da0d151e249cc226fc8ccbbd9239e92233f86a",
+      "postimageSha256": "c362c5ae95981a034714917cd01360a729cbec6a10fbebfb58aa90b34c1141a5"
+    },
+    {
+      "path": "harness/verify-suites.json",
+      "preimageSha256": "f3213d8c2e899f7203ef1caa3852f07fed925c5a0a599f317bfcf968e0469cb1",
+      "postimageSha256": "afe88c34a95297b5dc439097d9072df81799776402e821e24d218183ba3ac72a"
+    },
+    {
+      "path": "harness/config/verify-case-completion.v1.json",
+      "preimageSha256": "032b7124e0460b1b2241e038b5e2c3fce46bfd17d93986f167ac5149a6ca706f",
+      "postimageSha256": "c5bdff97439d1ba2cb9ced0ffeabdb7f6aa292c2e8535a8d8286f2a477e7ad8c"
+    },
+    {
+      "path": "docs/product-capability-inventory.json",
+      "preimageSha256": "bbcfa619afebc18f27e0a3abb5ecf06edddb65af79cacf88d6b6b6aa4059f9f8",
+      "postimageSha256": "e6d5f52e9e8655279ae37014f25a4e8282f18ef81233eddeb2f5f8fcad4e63fb"
+    }
+  ],
+  "unchangedImportedSourcePaths": 23,
+  "originalAssertionsAndOrdering": "exact original bytes restored after removing bounded wrappers and portable consumer",
+  "existingRegistryRowsPreserved": 466,
+  "existingCompletionEntriesPreserved": 375,
+  "newRequiredCaseCount": 7,
+  "worktreeDiscovery": {
+    "surfaceId": "verify-phase:harness/scripts/verify.mjs:g23-cross-runner-passive-matrix-tests",
+    "count": 1,
+    "capability": "deterministic-verification"
+  },
+  "committedCapabilityBaseline": "RED retained; no new commit/baseline claimed"
+}

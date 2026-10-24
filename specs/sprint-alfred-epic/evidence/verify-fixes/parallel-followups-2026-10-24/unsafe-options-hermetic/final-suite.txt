@@ -1,0 +1,92 @@
+command: node scratch/agent-out/unsafe-options-hermetic-fixture/run-pin.mjs
+label: UNSAFE-OPTIONS-HERMETIC-FIXTURE-final
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+✔ A1 rg: ordinary search is admitted (positive control) (11.947152ms)
+✔ A1 rg: execution/output option denied: rg --pre=cat needle README.md (0.319737ms)
+✔ A1 rg: execution/output option denied: rg --pre cat needle README.md (0.336199ms)
+✔ A1 rg: execution/output option denied: rg --pre=cat -n needle plugins (0.180473ms)
+✔ A1 rg: execution/output option denied: rg --hostname-bin=x needle README.md (0.211462ms)
+✔ A1 rg: execution/output option denied: rg --json needle README.md (0.150906ms)
+✔ A1 rg: execution/output option denied: rg --no-config needle README.md (0.280873ms)
+✔ A1 rg: execution/output option denied: rg -n needle README.md --pre-glob=*.md (0.158841ms)
+✔ A2 rg option stays denied inside a chain or pipeline: rg --pre=cat needle README.md | head -5 (0.453592ms)
+✔ A2 rg option stays denied inside a chain or pipeline: rg --pre cat needle README.md | rg x (0.29483ms)
+✔ A2 rg option stays denied inside a chain or pipeline: rg -n needle README.md && rg --pre=cat needle README.md (5.837379ms)
+✔ A2 rg chain/pipeline positive controls (16.326753ms)
+✔ A1 node: reporter destination and loader options are not a passive read (0.683248ms)
+✔ A1 git: output/execution option denied: git diff --output=x.txt (0.602876ms)
+✔ A1 git: output/execution option denied: git diff --output x.txt (0.166016ms)
+✔ A1 git: output/execution option denied: git log --output=x.txt (0.16343ms)
+✔ A1 git: output/execution option denied: git show --output=x.txt HEAD (0.127823ms)
+✔ A1 git: output/execution option denied: git diff -o x.txt (0.10019ms)
+✔ A1 git: output/execution option denied: git log -ofoo (0.08449ms)
+✔ A1 git: output/execution option denied: git diff --ext-diff (0.101062ms)
+✔ A1 git: output/execution option denied: git diff --textconv (0.123445ms)
+✔ A1 git: output/execution option denied: git diff --no-index a b (0.155555ms)
+✔ A1 git: ordinary read subcommands are admitted (positive control) (0.357369ms)
+✔ A1 git: -c config injection is denied (0.132712ms)
+✔ A1 git fetch: --upload-pack executes a program and must not be a passive read (0.234696ms)
+✔ A1 git -C: redirecting to a directory outside the project is not a passive read (0.687035ms)
+✔ A1 git config: --edit launches an editor and must not be a passive read (0.301243ms)
+✔ A1 git fetch: helper/executable-naming options and URL transports stay refused (0.503516ms)
+✔ A1 git fetch: plain fetches stay admitted (control) (0.303837ms)
+✔ A1 git -C: a directory inside the project stays admitted (control); missing arg refused (0.454674ms)
+✔ A1 git config: other write/edit/file flags refused; pure reads admitted (control) (0.550606ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --out=x.txt (0.108836ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --outp x.txt (0.079742ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git log --outpu=x.txt (3.364141ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git show --ou=x.txt HEAD (0.149644ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --o x.txt (0.126289ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --ext (0.093277ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --ext-d (0.06333ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git log -p --ext-diff=x (0.058711ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --textc (0.109939ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git show --textco HEAD (0.139926ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --no-ind a b (0.064893ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --no-i a b (0.103046ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --no-index=x a b (0.12127ms)
+✔ A1 git: an abbreviated output/execution option stays denied inside a pipeline and a chain (needs protected patch ALF-C-C6G1-CORR-A) (5.268098ms)
+✔ A1 git: unrelated long options are not caught by the prefix rule (control) (0.328484ms)
+✔ A1 git: the exact harmless option --text is admitted although it is a prefix of --textconv (refined by protected patch ALF-C-C6G1-CORR-A2) (0.834927ms)
+✔ A1 git: the exact harmless option --text stays admitted inside a pipeline and a chain (refined by protected patch ALF-C-C6G1-CORR-A2) (4.795652ms)
+✔ A1 git: -a and the negated harmless options are admitted (control) (0.298688ms)
+✔ A1 git: an abbreviation of a denied option stays denied beside the admitted exact --text (0.375343ms)
+✔ A1 git: the glued =value form of --text and of every denied name stays denied (0.28945ms)
+✔ A1 git: an abbreviation or a glued value stays denied inside a pipeline and a chain beside --text (10.670612ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff /outside-root-c6g1/a /outside-root-c6g1/b (0.324576ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff -- /outside-root-c6g1/a /outside-root-c6g1/b (0.132252ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff ../outside-a ../outside-b (0.125739ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff README.md ../outside-b (0.20529ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git log -p -- ../outside-a (0.123094ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git show HEAD -- /outside-root-c6g1/a (0.161968ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff ~/outside-a ~/outside-b (0.145426ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff -- ~/outside-a README.md (0.118044ms)
+✔ A1 git: an operand that resolves outside the project through a directory alias is refused (needs protected patch ALF-C-C6G1-CORR-A) (1.216912ms)
+✔ A1 git: project-relative revisions and pathspecs stay admitted (control) (0.577928ms)
+✔ A1 git -C: a symlinked directory is rejected even when it resolves inside the project; a real one is admitted (1.506823ms)
+✔ A2 PowerShell Get-Content: parsed as a fixed read, credential target not admitted (0.183238ms)
+✔ A2 external user Markdown report remains readable; neighbouring secret does not (3.622261ms)
+✔ A3 direct credential files denied (4.67449ms)
+✔ A3 `~` spelling denied (1.176906ms)
+✔ A3 `..` traversal spelling denied (1.002795ms)
+﹣ A3 Windows drive spelling denied (0.245867ms) # host-limitation: Windows drive-letter spelling (non-win32 host) unavailable on this native Windows host; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)
+✔ A3 directory scans that reach credential descendants are denied (21.905416ms)
+✔ A3 credential roots denied through the shell lanes (single, chain, pipeline) (39.365737ms)
+✔ A3 directory symlink alias to a credential root (8.204747ms)
+✔ A3 directory mode-bit variants of a credential root (8.054532ms)
+✔ meaningful: weakening the rg option check in a scratch mirror admits --pre (RED mirror) (7.09526ms)
+✔ fixture: real default private lookups stay owned and cleanup restores the environment (38.929033ms)
+ℹ tests 75
+ℹ suites 0
+ℹ pass 74
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 602.816533
+
+--- stderr ---

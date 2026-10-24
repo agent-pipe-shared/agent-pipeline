@@ -1,0 +1,19 @@
+command: node --test --test-name-pattern=G6: plugins/pipeline-core/install-agy.test.mjs
+label: G6-owned-installer-host-controls-Goldfish
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+✔ G6: installer refresh expands an owned user-level matcher to native file tools (69.45321ms)
+✔ G6: host matcher ownership, approval, manifest and preimage controls (162.265275ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 583.374009
+
+--- stderr ---

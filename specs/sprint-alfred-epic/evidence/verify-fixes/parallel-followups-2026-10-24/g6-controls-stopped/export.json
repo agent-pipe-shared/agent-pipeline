@@ -1,0 +1,54 @@
+{
+  "schema": "pipeline.g6-test-control-stopped-export.v1",
+  "base": "6095f8e33940d4b3e34a0ea676abf506849c1fa2",
+  "priorPatchSha256": "0b36e6a7bfdb86c5cc972107603d2ed21c096421d6f2efe91e3bf25ee60f4d3e",
+  "incrementalChangedPaths": [],
+  "incrementalPatchSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "files": [
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+      "preimageSha256": "a2bcd2c6e05959ef9453baa51d412c323a195171f548b813b0febb34ba25912c",
+      "postimageSha256": "675dd48262816185dfbdf4187c1457eef61867d328afd1808550f5340575c9a4",
+      "currentSha256": "675dd48262816185dfbdf4187c1457eef61867d328afd1808550f5340575c9a4"
+    },
+    {
+      "path": "plugins/pipeline-core/install-agy.test.mjs",
+      "preimageSha256": "e99effa9c2d38646944b8c2950632589f7e47dd3186e56c08025494558490fb1",
+      "postimageSha256": "ced54424afacd614ba5566080fff32433a7c3f4072b25f7c7748f620f6ebf347",
+      "currentSha256": "ced54424afacd614ba5566080fff32433a7c3f4072b25f7c7748f620f6ebf347"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+      "preimageSha256": "e44c3208fd427bfcc4cb7ff9325f4dba97da6d02f5dd43ad07ec277207277a4a",
+      "postimageSha256": "7ee31f895428dcd5d882635253ace15e0c57f046b1417994c5c65252b912cf2c",
+      "currentSha256": "7ee31f895428dcd5d882635253ace15e0c57f046b1417994c5c65252b912cf2c"
+    }
+  ],
+  "tests": [
+    {
+      "path": "plugins/pipeline-core/install-agy.test.mjs",
+      "preimageFile": "test-preimage-1.mjs",
+      "sha256": "ced54424afacd614ba5566080fff32433a7c3f4072b25f7c7748f620f6ebf347"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+      "preimageFile": "test-preimage-2.mjs",
+      "sha256": "675dd48262816185dfbdf4187c1457eef61867d328afd1808550f5340575c9a4"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs",
+      "preimageFile": "test-preimage-3.mjs",
+      "sha256": "5b8c3109677f7bb7fcdbc554578a1195224f72b98780c26c73b6859edceb4adf"
+    }
+  ],
+  "reportSha256": "18908296492f74d27579edbe5acee20069e3495234abca646aa01be47e9a3214",
+  "outcome": "blocked",
+  "committed": [],
+  "verifiedGreen": [],
+  "remainsUndone": [
+    "missing/aliased source-script controls",
+    "actual final matcher-readback fault",
+    "aggregate native write/edit with intended refusal causes"
+  ],
+  "priorImplementationCalls": 65
+}

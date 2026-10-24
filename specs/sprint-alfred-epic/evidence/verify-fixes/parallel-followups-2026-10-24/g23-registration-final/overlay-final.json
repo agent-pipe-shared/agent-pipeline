@@ -1,0 +1,26 @@
+command: node scratch/agent-out/g23-passive-matrix-registration-finalization/export.mjs
+label: exact-incremental-overlay
+exitCode: 1
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+
+--- stderr ---
+node:fs:561
+  return binding.open(
+                 ^
+
+Error: ENOENT: no such file or directory, open '../../../../scratch/clones/g23-quoted-pipeline-reads/scratch/agent-out/g23-quoted-pipeline-reads/owned.patch'
+    at Object.openSync (node:fs:561:18)
+    at readFileSync (node:fs:445:35)
+    at file://<repo-root>/scratch/agent-out/g23-passive-matrix-registration-finalization/export.mjs:10:135
+    at Array.map (<anonymous>)
+    at file://<repo-root>/scratch/agent-out/g23-passive-matrix-registration-finalization/export.mjs:10:30 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '../../../../scratch/clones/g23-quoted-pipeline-reads/scratch/agent-out/g23-quoted-pipeline-reads/owned.patch'
+}
+
+Node.js v24.15.0

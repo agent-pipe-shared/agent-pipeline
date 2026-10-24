@@ -1,0 +1,21 @@
+Targeted delivery: blocked. Nothing committed. No enrollment overlay authored.
+Owned clone: scratch/clones/g23-passive-matrix-enrollment.
+Actual HEAD: 6095f8e33940d4b3e34a0ea676abf506849c1fa2. No future candidate or committed capability baseline is claimed.
+Fresh Goldfish preflight returned ready, roleScope.testCommands.route host-boundary-from-first-call. Optional modelRoleBootstrap unavailable: MODEL-ROLE-SESSION-IDENTITY-CONFLICT. No native/model attestation claimed.
+Prepared: git clone --no-hardlinks --no-checkout, exact detached checkout, official node scripts/apply-diff.mjs import of all six initial fixture patches; each actual exit 0. Imports remain uncommitted fixture data, not worker-authored delivery or authority amendments.
+Import order (all paths relative to Main):
+1 scratch/clones/g23-quoted-pipeline-reads/scratch/agent-out/g23-quoted-pipeline-reads/owned.patch
+2 scratch/clones/p1-lifecycle-composition/scratch/agent-out/p1-lifecycle-composition/complete-v3.patch
+3 scratch/clones/p1-g23-composed-registration/scratch/agent-out/p1-g23-composed-registration/owned-overlay.patch
+4 scratch/clones/p1-state-marker-fixture/scratch/agent-out/p1-state-marker-fixture/owned.patch
+5 scratch/clones/private-tmp-controlled-refusal/scratch/agent-out/private-tmp-controlled-refusal/owned.patch
+6 scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/proposal.patch
+Read: full canonical briefing; supplied matrix report and appended D96 clarification; hashes.json; postimage manifest; new matrix module; existing registration wrapper implementation; architectural index and scoped concepts; relevant decision summary; obligations. No inherited state/handover was consumed.
+Wrapper audit: original matrix has seven sequential await test calls inside fixture try/finally; direct cat owned-file consumption in PM02; Windows PM06 skip; original assertions intact. Existing registerTestCaseCompletion takes exact cases/fd/maxBytes, synchronously registers siblings and emits ordered stable-ID dispositions through the announced descriptor. Converting to registered callbacks must retain fixture lifetime until callbacks finish and preserve worker branch behavior; not implemented.
+Stop condition: three read-navigation commands were refused GUARD-READ-COMMAND-UNSUPPORTED. First guessed wildcard helper path, then guessed verify-case-completion.mjs, then guessed lib/verify-case-completion.mjs; the latter paths are absent. No repeat or alternate access was attempted after the third refusal. Exact guard-human-override.mjs verify-audit recovery after the first refusal returned valid, exit 0; the next read refusal reported HGO-ADAPTER-FAILURE. Refusals do not establish missing product capability.
+Machine-written targeted evidence: none produced; no targeted/quick checks were executed and none is green. Original author's initial failures and final 7/7 captures remain unchanged at the supplied source package.
+Changed authored paths: this scratch report only. Complete imported fixture diff includes the supplied 27 paths plus original new matrix module; no incremental source edits, staging, commits, or generated overlay.
+Deliberately NOT changed: Main, frozen operator package, G6, production guards/policies, original matrix assertions/order, existing registry/policies/inventory, PRD/Spec/ADRs/templates, operator account/home/keys.
+Remaining: bind all 27 source postimages and patch hashes; save exact fixture preimages; implement required G23PM01-07 wrappers and portable owned-file consumer; append one suite/required completion entry and exact capability assignment; canonical inherited-FD completion 7/7; registration 1108/completion 376 checks; append-history and materially affected consumer/kernel checks; honest committed capability-baseline RED capture and separate worktree discovery; export exact incremental overlay with prerequisite/preimage/postimage bindings and machine evidence.
+Resource headroom: unknown; no project measurement supplied or compliance claimed.
+Parent-owned integrated Verify: pending. Independent batch review/security qualification: pending. Native platform/tool qualification: pending. PO acceptance: open.

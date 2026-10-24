@@ -1,0 +1,171 @@
+command: node scratch/agent-out/unsafe-options-hermetic-fixture/run-pin.mjs
+label: UNSAFE-OPTIONS-HERMETIC-FIXTURE-original-poison
+exitCode: 1
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+✖ A1 rg: ordinary search is admitted (positive control) (11.125007ms)
+✔ A1 rg: execution/output option denied: rg --pre=cat needle README.md (0.354734ms)
+✔ A1 rg: execution/output option denied: rg --pre cat needle README.md (0.379441ms)
+✔ A1 rg: execution/output option denied: rg --pre=cat -n needle plugins (0.221581ms)
+✔ A1 rg: execution/output option denied: rg --hostname-bin=x needle README.md (0.17907ms)
+✔ A1 rg: execution/output option denied: rg --json needle README.md (0.163661ms)
+✔ A1 rg: execution/output option denied: rg --no-config needle README.md (0.193458ms)
+✔ A1 rg: execution/output option denied: rg -n needle README.md --pre-glob=*.md (0.148161ms)
+✔ A2 rg option stays denied inside a chain or pipeline: rg --pre=cat needle README.md | head -5 (0.409688ms)
+✔ A2 rg option stays denied inside a chain or pipeline: rg --pre cat needle README.md | rg x (0.281525ms)
+✔ A2 rg option stays denied inside a chain or pipeline: rg -n needle README.md && rg --pre=cat needle README.md (5.016451ms)
+✖ A2 rg chain/pipeline positive controls (5.173313ms)
+✔ A1 node: reporter destination and loader options are not a passive read (0.592645ms)
+✔ A1 git: output/execution option denied: git diff --output=x.txt (0.543172ms)
+✔ A1 git: output/execution option denied: git diff --output x.txt (0.15238ms)
+✔ A1 git: output/execution option denied: git log --output=x.txt (0.143543ms)
+✔ A1 git: output/execution option denied: git show --output=x.txt HEAD (0.155275ms)
+✔ A1 git: output/execution option denied: git diff -o x.txt (0.114137ms)
+✔ A1 git: output/execution option denied: git log -ofoo (0.099699ms)
+✔ A1 git: output/execution option denied: git diff --ext-diff (0.10546ms)
+✔ A1 git: output/execution option denied: git diff --textconv (0.098528ms)
+✔ A1 git: output/execution option denied: git diff --no-index a b (0.104419ms)
+✔ A1 git: ordinary read subcommands are admitted (positive control) (0.329606ms)
+✔ A1 git: -c config injection is denied (0.132222ms)
+✔ A1 git fetch: --upload-pack executes a program and must not be a passive read (0.30531ms)
+✔ A1 git -C: redirecting to a directory outside the project is not a passive read (0.731921ms)
+✔ A1 git config: --edit launches an editor and must not be a passive read (0.329857ms)
+✔ A1 git fetch: helper/executable-naming options and URL transports stay refused (0.301262ms)
+✔ A1 git fetch: plain fetches stay admitted (control) (0.395321ms)
+✔ A1 git -C: a directory inside the project stays admitted (control); missing arg refused (0.582547ms)
+✔ A1 git config: other write/edit/file flags refused; pure reads admitted (control) (0.581986ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --out=x.txt (0.135778ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --outp x.txt (0.087466ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git log --outpu=x.txt (0.077978ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git show --ou=x.txt HEAD (0.076345ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --o x.txt (0.131349ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --ext (0.148111ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --ext-d (0.100551ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git log -p --ext-diff=x (0.079421ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --textc (0.076726ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git show --textco HEAD (0.194389ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --no-ind a b (0.198257ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --no-i a b (0.134105ms)
+✔ A1 git: abbreviated long option denied (needs protected patch ALF-C-C6G1-CORR-A): git diff --no-index=x a b (0.134736ms)
+✔ A1 git: an abbreviated output/execution option stays denied inside a pipeline and a chain (needs protected patch ALF-C-C6G1-CORR-A) (4.706377ms)
+✔ A1 git: unrelated long options are not caught by the prefix rule (control) (0.350366ms)
+✔ A1 git: the exact harmless option --text is admitted although it is a prefix of --textconv (refined by protected patch ALF-C-C6G1-CORR-A2) (0.789741ms)
+✖ A1 git: the exact harmless option --text stays admitted inside a pipeline and a chain (refined by protected patch ALF-C-C6G1-CORR-A2) (4.540455ms)
+✔ A1 git: -a and the negated harmless options are admitted (control) (0.265354ms)
+✔ A1 git: an abbreviation of a denied option stays denied beside the admitted exact --text (0.308125ms)
+✔ A1 git: the glued =value form of --text and of every denied name stays denied (0.327372ms)
+✔ A1 git: an abbreviation or a glued value stays denied inside a pipeline and a chain beside --text (8.455514ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff /outside-root-c6g1/a /outside-root-c6g1/b (0.329616ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff -- /outside-root-c6g1/a /outside-root-c6g1/b (0.15233ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff ../outside-a ../outside-b (0.140557ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff README.md ../outside-b (0.213556ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git log -p -- ../outside-a (0.131339ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git show HEAD -- /outside-root-c6g1/a (0.133504ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff ~/outside-a ~/outside-b (0.13138ms)
+✔ A1 git: a path operand outside the project root is not a passive read (needs protected patch ALF-C-C6G1-CORR-A): git diff -- ~/outside-a README.md (0.129937ms)
+✔ A1 git: an operand that resolves outside the project through a directory alias is refused (needs protected patch ALF-C-C6G1-CORR-A) (1.315921ms)
+✔ A1 git: project-relative revisions and pathspecs stay admitted (control) (0.582707ms)
+✔ A1 git -C: a symlinked directory is rejected even when it resolves inside the project; a real one is admitted (3.980653ms)
+✔ A2 PowerShell Get-Content: parsed as a fixed read, credential target not admitted (0.314337ms)
+✔ A2 external user Markdown report remains readable; neighbouring secret does not (3.724135ms)
+✔ A3 direct credential files denied (4.308265ms)
+✔ A3 `~` spelling denied (0.93727ms)
+✔ A3 `..` traversal spelling denied (0.69429ms)
+﹣ A3 Windows drive spelling denied (0.053442ms) # host-limitation: Windows drive-letter spelling (non-win32 host) unavailable on this native Windows host; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)
+✔ A3 directory scans that reach credential descendants are denied (19.221117ms)
+✔ A3 credential roots denied through the shell lanes (single, chain, pipeline) (32.638167ms)
+✔ A3 directory symlink alias to a credential root (8.997022ms)
+✔ A3 directory mode-bit variants of a credential root (6.623203ms)
+✖ meaningful: weakening the rg option check in a scratch mirror admits --pre (RED mirror) (6.845134ms)
+ℹ tests 74
+ℹ suites 0
+ℹ pass 69
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 519.260762
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs:39:1
+✖ A1 rg: ordinary search is admitted (positive control) (11.125007ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs:40:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs:67:1
+✖ A2 rg chain/pipeline positive controls (5.173313ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs:68:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs:192:1
+✖ A1 git: the exact harmless option --text stays admitted inside a pipeline and a chain (refined by protected patch ALF-C-C6G1-CORR-A2) (4.540455ms)
+  AssertionError [ERR_ASSERTION]: rg -n needle README.md && git diff --text
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs:194:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs:396:1
+✖ meaningful: weakening the rg option check in a scratch mirror admits --pre (RED mirror) (6.845134ms)
+  AssertionError [ERR_ASSERTION]: the mirror without the option check must admit --pre, proving the production denial is load-bearing
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs:408:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

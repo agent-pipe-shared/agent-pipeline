@@ -1,0 +1,27 @@
+command: node --test harness/scripts/check-consumer-safe-paths.test.mjs
+label: G6-consumer-safe-Goldfish
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.182457ms)
+✔ a clean fixture passes (0.70516ms)
+✔ an allowlisted occurrence passes (0.33655ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.280372ms)
+✔ multiple prefix hits on one line each produce a finding (0.167498ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.24232ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.342861ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (168.410279ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (11.514838ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 254.092034
+
+--- stderr ---

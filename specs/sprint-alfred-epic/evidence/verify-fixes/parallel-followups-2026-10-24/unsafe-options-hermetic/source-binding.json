@@ -1,0 +1,225 @@
+{
+  "schema": "fixture.source-binding.v1",
+  "actualBase": "6095f8e33940d4b3e34a0ea676abf506849c1fa2",
+  "manifestBase": "1b7fc4f0424c617c19039903ba4f88aece3116f2",
+  "total": 27,
+  "matches": 27,
+  "paths": [
+    {
+      "path": "docs/product-capability-inventory.json",
+      "expectedSha256": "bbcfa619afebc18f27e0a3abb5ecf06edddb65af79cacf88d6b6b6aa4059f9f8",
+      "actualSha256": "bbcfa619afebc18f27e0a3abb5ecf06edddb65af79cacf88d6b6b6aa4059f9f8",
+      "expectedBytes": 180318,
+      "actualBytes": 180318,
+      "matches": true
+    },
+    {
+      "path": "harness/config/verify-case-completion-augmentations.v1.json",
+      "expectedSha256": "e4a7b2bc04c286d10a26f95266ef95a56057466b326c2d74528724205aa026f4",
+      "actualSha256": "e4a7b2bc04c286d10a26f95266ef95a56057466b326c2d74528724205aa026f4",
+      "expectedBytes": 35570,
+      "actualBytes": 35570,
+      "matches": true
+    },
+    {
+      "path": "harness/config/verify-case-completion.v1.json",
+      "expectedSha256": "032b7124e0460b1b2241e038b5e2c3fce46bfd17d93986f167ac5149a6ca706f",
+      "actualSha256": "032b7124e0460b1b2241e038b5e2c3fce46bfd17d93986f167ac5149a6ca706f",
+      "expectedBytes": 85222,
+      "actualBytes": 85222,
+      "matches": true
+    },
+    {
+      "path": "harness/verify-suites.json",
+      "expectedSha256": "f3213d8c2e899f7203ef1caa3852f07fed925c5a0a599f317bfcf968e0469cb1",
+      "actualSha256": "f3213d8c2e899f7203ef1caa3852f07fed925c5a0a599f317bfcf968e0469cb1",
+      "expectedBytes": 240448,
+      "actualBytes": 240448,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "expectedSha256": "ed7b04a3219c19674f9524f97571fad8fcc2d38244ce72798be330b0151a309e",
+      "actualSha256": "ed7b04a3219c19674f9524f97571fad8fcc2d38244ce72798be330b0151a309e",
+      "expectedBytes": 30845,
+      "actualBytes": 30845,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
+      "expectedSha256": "ce61166437ef41489e788a154ffa0326209a7fc4b11fe822cfe4b43fb18eb375",
+      "actualSha256": "ce61166437ef41489e788a154ffa0326209a7fc4b11fe822cfe4b43fb18eb375",
+      "expectedBytes": 5535,
+      "actualBytes": 5535,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "expectedSha256": "a61cc58f8312d378eebefcbc3c95ff72aa80edaa527e4f25e9a44487d7ba222f",
+      "actualSha256": "a61cc58f8312d378eebefcbc3c95ff72aa80edaa527e4f25e9a44487d7ba222f",
+      "expectedBytes": 36358,
+      "actualBytes": 36358,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+      "expectedSha256": "2c6958984a831f73b1c36d95f9e456db57c02da8e469cf8d0f3b6099bd982361",
+      "actualSha256": "2c6958984a831f73b1c36d95f9e456db57c02da8e469cf8d0f3b6099bd982361",
+      "expectedBytes": 36430,
+      "actualBytes": 36430,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "expectedSha256": "a04e761e561dc77a7d53df2dd584ac7e55d273429dec5a0ce061e61275bfa7ac",
+      "actualSha256": "a04e761e561dc77a7d53df2dd584ac7e55d273429dec5a0ce061e61275bfa7ac",
+      "expectedBytes": 32337,
+      "actualBytes": 32337,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+      "expectedSha256": "eaa621671b5b20353f743b760ab4c07f22ac0bf8c160372f1e7fc80986606ec9",
+      "actualSha256": "eaa621671b5b20353f743b760ab4c07f22ac0bf8c160372f1e7fc80986606ec9",
+      "expectedBytes": 38354,
+      "actualBytes": 38354,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-authoring.mjs",
+      "expectedSha256": "99f6aa068508d12921fed235347a03971740c1d4c0b06c1d2d2f97df18c3ba0a",
+      "actualSha256": "99f6aa068508d12921fed235347a03971740c1d4c0b06c1d2d2f97df18c3ba0a",
+      "expectedBytes": 3843,
+      "actualBytes": 3843,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-authoring.test.mjs",
+      "expectedSha256": "e897c4ccda9e8e0f52cffce8a164940d233dafb9eeba9170b45a9941698f312f",
+      "actualSha256": "e897c4ccda9e8e0f52cffce8a164940d233dafb9eeba9170b45a9941698f312f",
+      "expectedBytes": 7464,
+      "actualBytes": 7464,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+      "expectedSha256": "586ed58246f39a76b452dd573dad6605d0248dd48362b44a9f4cda8c381920e4",
+      "actualSha256": "586ed58246f39a76b452dd573dad6605d0248dd48362b44a9f4cda8c381920e4",
+      "expectedBytes": 54232,
+      "actualBytes": 54232,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
+      "expectedSha256": "1ec2652b4b0c43d59ae6464fbf2f1c005b3790dbd0c252e62237eb5507311559",
+      "actualSha256": "1ec2652b4b0c43d59ae6464fbf2f1c005b3790dbd0c252e62237eb5507311559",
+      "expectedBytes": 5780,
+      "actualBytes": 5780,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
+      "expectedSha256": "f52aaa6e0ea71dc04acbdd75cc0a6da44d070104e881a7d7cf18732413622fb4",
+      "actualSha256": "f52aaa6e0ea71dc04acbdd75cc0a6da44d070104e881a7d7cf18732413622fb4",
+      "expectedBytes": 2492,
+      "actualBytes": 2492,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "expectedSha256": "c5a5f4896193deefceec24c7e916e5bee5131f19d293b1f9dbecd819a2ec6a72",
+      "actualSha256": "c5a5f4896193deefceec24c7e916e5bee5131f19d293b1f9dbecd819a2ec6a72",
+      "expectedBytes": 694735,
+      "actualBytes": 694735,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs",
+      "expectedSha256": "6c97a8a9eb4522fc61bd6558c9b999c80412cbff2b91b1b13d0a4838e25360cf",
+      "actualSha256": "6c97a8a9eb4522fc61bd6558c9b999c80412cbff2b91b1b13d0a4838e25360cf",
+      "expectedBytes": 21837,
+      "actualBytes": 21837,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs",
+      "expectedSha256": "d55ffb17b5f8602201820e56aaeee947d123271febfc5b2206230bcf7d467d7a",
+      "actualSha256": "d55ffb17b5f8602201820e56aaeee947d123271febfc5b2206230bcf7d467d7a",
+      "expectedBytes": 12770,
+      "actualBytes": 12770,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "expectedSha256": "bc5cadfd2abd256d6e112bc900b6ac360efccdccd4a1d744781cb0cafec07f80",
+      "actualSha256": "bc5cadfd2abd256d6e112bc900b6ac360efccdccd4a1d744781cb0cafec07f80",
+      "expectedBytes": 429878,
+      "actualBytes": 429878,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "expectedSha256": "325ca8f424c75d07f8e3b6e31040821642e092371e8bd9fc99b3bdf60dd9467b",
+      "actualSha256": "325ca8f424c75d07f8e3b6e31040821642e092371e8bd9fc99b3bdf60dd9467b",
+      "expectedBytes": 590287,
+      "actualBytes": 590287,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
+      "expectedSha256": "c0e8e506b15961ce82d694dccbd646ae0e1a0011f7d4c4f51a05d3c88d00f646",
+      "actualSha256": "c0e8e506b15961ce82d694dccbd646ae0e1a0011f7d4c4f51a05d3c88d00f646",
+      "expectedBytes": 6592,
+      "actualBytes": 6592,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+      "expectedSha256": "297d0039d3e8e1bfbb6f54ef32ba8f86fd715b2fb0fafcda5951fd49e3f8362a",
+      "actualSha256": "297d0039d3e8e1bfbb6f54ef32ba8f86fd715b2fb0fafcda5951fd49e3f8362a",
+      "expectedBytes": 26355,
+      "actualBytes": 26355,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/test-private-tmp.test.mjs",
+      "expectedSha256": "cac0eb1cae920bf80b249ce758ab554ef55b883d5a0f01dd07f9511dd25f0587",
+      "actualSha256": "cac0eb1cae920bf80b249ce758ab554ef55b883d5a0f01dd07f9511dd25f0587",
+      "expectedBytes": 21422,
+      "actualBytes": 21422,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs",
+      "expectedSha256": "7bd8bf9bcb0876050302ccf184ad7e54667e3f8300231f89557560644a83d64b",
+      "actualSha256": "7bd8bf9bcb0876050302ccf184ad7e54667e3f8300231f89557560644a83d64b",
+      "expectedBytes": 11882,
+      "actualBytes": 11882,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "expectedSha256": "f62566171e5f9de659bddfccf71d816e1456c7520fa9b4f7c4a82f090b1f03d1",
+      "actualSha256": "f62566171e5f9de659bddfccf71d816e1456c7520fa9b4f7c4a82f090b1f03d1",
+      "expectedBytes": 859859,
+      "actualBytes": 859859,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.test.mjs",
+      "expectedSha256": "62a19a61c796b50e950a599f9260f959496758f6423b80b8cb5a087baf3d9042",
+      "actualSha256": "62a19a61c796b50e950a599f9260f959496758f6423b80b8cb5a087baf3d9042",
+      "expectedBytes": 194678,
+      "actualBytes": 194678,
+      "matches": true
+    },
+    {
+      "path": "plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md",
+      "expectedSha256": "c5fa0b1f7602e6a29a8e6caa8d6ed333aa5eaff59016098da98aff3d1ca9f5bb",
+      "actualSha256": "c5fa0b1f7602e6a29a8e6caa8d6ed333aa5eaff59016098da98aff3d1ca9f5bb",
+      "expectedBytes": 12792,
+      "actualBytes": 12792,
+      "matches": true
+    }
+  ]
+}

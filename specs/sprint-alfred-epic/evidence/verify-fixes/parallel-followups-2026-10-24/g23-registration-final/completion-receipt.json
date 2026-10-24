@@ -1,0 +1,23 @@
+{
+  "name": "g23-cross-runner-passive-matrix-tests",
+  "command": [
+    "node",
+    "plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs"
+  ],
+  "exit": 0,
+  "receipt": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "fcb913266e4e648787bc5eebb0168cd73732cfb3eb5b60bd661c370a0fefb0da",
+    "caseSetSha256": "e40d037bcdf7956a73e452295e70e4f9d6233d0be9dc08ebd0b951c7936d2d7a",
+    "dispositionsSha256": "14729250c5139a6529deb8852df21f54ebaf384b6f82f6078bab00e96591c95f",
+    "declaredCount": 7,
+    "disposedCount": 7,
+    "counts": {
+      "pass": 7,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  }
+}

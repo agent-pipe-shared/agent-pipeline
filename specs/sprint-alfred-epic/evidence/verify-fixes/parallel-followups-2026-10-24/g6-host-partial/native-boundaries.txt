@@ -1,0 +1,12 @@
+command: node plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs --g6-bounded
+label: G6-native-boundaries-Goldfish
+exitCode: 2
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+{"decision":"deny","reason":"Antigravity PreToolUse guard failed internally; pipeline guards fail closed."}
+
+--- stderr ---
+[pipeline.agy-pretool.v1] code=adapter-uncaught name="AssertionError" code="ERR_ASSERTION"
+BLOCKED: Antigravity PreToolUse guard failed internally; pipeline guards fail closed.

@@ -1,0 +1,24 @@
+command: node --test plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
+label: g23-passive-matrix-complete
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+✔ G23PM01 supported fixture enrollment survives fresh-process readback (325.503721ms)
+✔ G23PM02 exact repository and scratch reads: relative and absolute consumer envelopes (8887.317818ms)
+✔ G23PM03 genuinely missing in-root exact file stays denied as missing on every route (4813.180972ms)
+✔ G23PM04 nonexistent credential names stay denied for credentials, never absence (4396.486688ms)
+✔ G23PM05 external exact operand is admitted by real D96 policy and readmitted after restart (4818.708204ms)
+✔ G23PM06 symlink physical credential boundary and safe local alias (4256.533271ms)
+✔ G23PM07 native exact Grep and bounded listing controls retain SEC-11 (3398.815216ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31706.538944
+
+--- stderr ---

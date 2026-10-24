@@ -1,0 +1,15 @@
+{
+  "base": "6095f8e33940d4b3e34a0ea676abf506849c1fa2",
+  "changedPaths": [
+    "plugins/pipeline-core/install-agy.test.mjs"
+  ],
+  "patchSha256": "2d3f6f91637233495fca2a914cba0a7778b4e40026461522bc78e4e27a89a99d",
+  "files": [
+    {
+      "path": "plugins/pipeline-core/install-agy.test.mjs",
+      "preimageSha256": "e99effa9c2d38646944b8c2950632589f7e47dd3186e56c08025494558490fb1",
+      "postimageSha256": "7dd69552247e004c4a426940dfc3986c08d50ac203d59d5eaf7a7f7490983478"
+    }
+  ],
+  "status": "M plugins/pipeline-core/install-agy.test.mjs"
+}

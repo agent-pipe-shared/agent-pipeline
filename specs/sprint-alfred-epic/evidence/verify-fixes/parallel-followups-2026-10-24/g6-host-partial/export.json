@@ -1,0 +1,58 @@
+{
+  "base": "6095f8e33940d4b3e34a0ea676abf506849c1fa2",
+  "changedPaths": [
+    "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+    "plugins/pipeline-core/install-agy.test.mjs",
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs"
+  ],
+  "patchSha256": "0b36e6a7bfdb86c5cc972107603d2ed21c096421d6f2efe91e3bf25ee60f4d3e",
+  "files": [
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+      "preimageSha256": "a2bcd2c6e05959ef9453baa51d412c323a195171f548b813b0febb34ba25912c",
+      "postimageSha256": "675dd48262816185dfbdf4187c1457eef61867d328afd1808550f5340575c9a4"
+    },
+    {
+      "path": "plugins/pipeline-core/install-agy.test.mjs",
+      "preimageSha256": "e99effa9c2d38646944b8c2950632589f7e47dd3186e56c08025494558490fb1",
+      "postimageSha256": "ced54424afacd614ba5566080fff32433a7c3f4072b25f7c7748f620f6ebf347"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+      "preimageSha256": "e44c3208fd427bfcc4cb7ff9325f4dba97da6d02f5dd43ad07ec277207277a4a",
+      "postimageSha256": "7ee31f895428dcd5d882635253ace15e0c57f046b1417994c5c65252b912cf2c"
+    }
+  ],
+  "captures": [
+    {
+      "path": "installer-green.txt",
+      "sha256": "59c74fb0dadbc3f6f31c6570e04f982bffd289506b5264a9d91c46034f78aa99"
+    },
+    {
+      "path": "native-boundaries.txt",
+      "sha256": "6256ae50395c5f4de940db7e034548795774eda72945b6ce47db3b682938c90e"
+    },
+    {
+      "path": "native-boundaries-diagnostic.txt",
+      "sha256": "6da8b3302a07354c705f3d56319231b9251aa4c12a1fd89d44ec050079c832e6"
+    },
+    {
+      "path": "native-boundaries-green.txt",
+      "sha256": "ec3eb9cc5c80210dd2364739e7e44c4cb2b93aed2c7a612cb04d4b9d9f1defef"
+    },
+    {
+      "path": "consumer-safe.txt",
+      "sha256": "cd1bb5e6a624382448676e55bb396f4f1529d9f920cc13c63160046c6d743682"
+    },
+    {
+      "path": "host-existing-controls.txt",
+      "sha256": "4afbf4f74289c6609fb0cf8eada2bc9f1d9e8289b29d76657f8a94dbc664aa37"
+    },
+    {
+      "path": "resource-headroom.txt",
+      "sha256": "6248c389ce8cde2ffed22d926e862d398b5e2a44bd15d40513715ad304194933"
+    }
+  ],
+  "status": "M plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs\n M plugins/pipeline-core/install-agy.test.mjs\n M plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+  "committed": []
+}

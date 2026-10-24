@@ -1,0 +1,92 @@
+diff --git a/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs b/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs
+index dec511677..618859952 100644
+--- a/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs
++++ b/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs
+@@ -19,17 +19,53 @@ import { dirname, join, relative, resolve } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ 
+-import { isReadOnlyDiagnosticCommand } from "../guard/shell-grammar.mjs";
+-import { isAllowedPassiveReadTarget } from "../passive-read-policy.mjs";
+-import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+-
+ const here = dirname(fileURLToPath(import.meta.url));
+ const pluginRoot = resolve(here, "..", "..");
+-const repoRoot = resolve(pluginRoot, "..", "..");
+-const scratchBase = join(repoRoot, "scratch");
++const sourceRoot = resolve(pluginRoot, "..", "..");
++const scratchBase = join(sourceRoot, "scratch");
+ mkdirSync(scratchBase, { recursive: true });
+ const fixture = mkdtempSync(join(scratchBase, "p903-"));
+-test.after(() => rmSync(fixture, { recursive: true, force: true }));
++const repoRoot = fixture;
++const home = join(fixture, "process-home");
++mkdirSync(home, { recursive: true });
++mkdirSync(join(repoRoot, "plugins"));
++writeFileSync(join(repoRoot, "README.md"), "# synthetic project\n");
++
++// Default policy lookups must be isolated before loading their production graph.
++// HOME/USERPROFILE are os.homedir's supported process seams. Git's ceiling keeps
++// the synthetic project from discovering the enclosing source checkout's pointer.
++const environment = new Map();
++function setEnvironment(key, value) {
++  if (!environment.has(key)) environment.set(key, process.env[key]);
++  if (value === undefined) delete process.env[key];
++  else process.env[key] = value;
++}
++for (const key of Object.keys(process.env)) {
++  if (key.toUpperCase().startsWith("GIT_")) setEnvironment(key, undefined);
++}
++for (const key of ["HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME",
++  "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE"]) setEnvironment(key, home);
++for (const key of ["TMPDIR", "TMP", "TEMP"]) setEnvironment(key, fixture);
++setEnvironment("RIPGREP_CONFIG_PATH", "");
++setEnvironment("GIT_CONFIG_NOSYSTEM", "1");
++setEnvironment("GIT_CONFIG_GLOBAL", join(home, "gitconfig"));
++setEnvironment("GIT_CEILING_DIRECTORIES", dirname(fixture));
++let cleaned = false;
++function cleanup() {
++  if (cleaned) return;
++  cleaned = true;
++  for (const [key, value] of environment) {
++    if (value === undefined) delete process.env[key];
++    else process.env[key] = value;
++  }
++  rmSync(fixture, { recursive: true, force: true });
++}
++test.after(cleanup);
++process.once("exit", cleanup);
++
++const { isReadOnlyDiagnosticCommand } = await import("../guard/shell-grammar.mjs");
++const { isAllowedPassiveReadTarget } = await import("../passive-read-policy.mjs");
++const { parseGuardCommand } = await import("../../hooks/guard-command-grammar.mjs");
+ 
+ const HOST_LIMIT = (what) => `host-limitation: ${what} unavailable on this native Windows host; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)`;
+ const guard = (command) => isReadOnlyDiagnosticCommand(command, repoRoot);
+@@ -408,3 +444,26 @@ test("meaningful: weakening the rg option check in a scratch mirror admits --pre
+   assert.equal(mirror.isBoundedSingleRg(["--pre=cat", "needle", "README.md"], repoRoot), true,
+     "the mirror without the option check must admit --pre, proving the production denial is load-bearing");
+ });
++
++test("fixture: real default private lookups stay owned and cleanup restores the environment", async () => {
++  const { machinePlaneFilePath, readMachinePlane } = await import("../machine-plane.mjs");
++  const { resolveGitCommonDir, resolveRepoScopedDirectory } = await import("../po-key-directory.mjs");
++  const planePath = join(home, ".agent-pipeline", "machine.json");
++  assert.equal(homedir(), home);
++  assert.equal(machinePlaneFilePath(), planePath);
++  assert.equal(readMachinePlane().status, "absent");
++  assert.equal(resolveGitCommonDir(repoRoot), null);
++  assert.equal(resolveRepoScopedDirectory(repoRoot).status, "absent");
++  assert.equal(guard("rg -n needle plugins"), true);
++  mkdirSync(dirname(planePath), { recursive: true });
++  try {
++    writeFileSync(planePath, JSON.stringify({ schema: "pipeline.machine-plane.v1",
++      poKeyDirectory: join(repoRoot, "plugins"), pushApprovalDefault: "chat",
++      routing: null, language: null, session: null, usage: null, updatedAt: "2026-10-24T00:00:00Z" }));
++    assert.equal(readMachinePlane().status, "valid");
++    assert.equal(guard("rg -n needle plugins"), false, "the real guard consumes the owned default machine plane");
++  } finally { unlinkSync(planePath); }
++  assert.equal(guard("rg -n needle plugins"), true);
++  cleanup();
++  for (const [key, value] of environment) assert.equal(process.env[key], value, `restored ${key}`);
++});

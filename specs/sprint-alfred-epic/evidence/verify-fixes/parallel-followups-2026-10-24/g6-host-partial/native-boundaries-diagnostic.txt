@@ -1,0 +1,14 @@
+command: node plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs --g6-bounded
+label: G6-native-boundaries-diagnostic-Goldfish
+exitCode: 1
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+
+--- stderr ---
+AssertionError [ERR_ASSERTION]: {"status":0,"signal":null,"output":[null,"",""],"pid":1127655,"stdout":"","stderr":""}
+
+0 !== 2
+
+    at file://<repo-root>/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs:355:68

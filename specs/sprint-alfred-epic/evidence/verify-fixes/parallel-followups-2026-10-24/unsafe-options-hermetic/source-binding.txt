@@ -1,0 +1,10 @@
+command: python3 scratch/agent-out/unsafe-options-hermetic-fixture/bind.py
+label: UNSAFE-OPTIONS-HERMETIC-FIXTURE-binding
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+{"total": 27, "matches": 27}
+
+--- stderr ---

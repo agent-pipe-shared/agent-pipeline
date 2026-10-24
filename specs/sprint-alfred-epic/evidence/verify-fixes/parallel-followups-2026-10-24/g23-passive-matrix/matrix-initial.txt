@@ -1,0 +1,155 @@
+command: node --test plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
+label: g23-passive-matrix-initial
+exitCode: 1
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+✔ G23PM01 supported fixture enrollment survives fresh-process readback (334.352799ms)
+✖ G23PM02 exact repository and scratch reads: relative and absolute consumer envelopes (1721.240813ms)
+✖ G23PM03 genuinely missing in-root exact file stays denied as missing on every route (3184.890307ms)
+✖ G23PM04 nonexistent credential names stay denied for credentials, never absence (3219.326437ms)
+✖ G23PM05 external exact operand is admitted by real D96 policy and readmitted after restart (1170.049332ms)
+✖ G23PM06 symlink physical credential boundary and safe local alias (848.370844ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 1
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11325.999894
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:94:11
+✖ G23PM02 exact repository and scratch reads: relative and absolute consumer envelopes (1721.240813ms)
+  AssertionError [ERR_ASSERTION]: a silent hook is not positive admission
+      at launch (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:56:12)
+      at decide (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:66:22)
+      at allow (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:79:50)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:95:119)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+      at run (node:internal/test_runner/harness:396:12)
+      at test (node:internal/test_runner/harness:405:12) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: '',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:97:11
+✖ G23PM03 genuinely missing in-root exact file stays denied as missing on every route (3184.890307ms)
+  AssertionError [ERR_ASSERTION]: [pipeline.agy-pretool.v1] code=native-read-credential-root tool="view_file" kind="file"
+  BLOCKED: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); check the spelling or create it first.
+  
+  
+  2 !== 0
+  
+      at launch (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:55:12)
+      at decide (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:74:20)
+      at deny (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:81:20)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:98:104)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+      at run (node:internal/test_runner/harness:396:12)
+      at test (node:internal/test_runner/harness:405:12) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:100:11
+✖ G23PM04 nonexistent credential names stay denied for credentials, never absence (3219.326437ms)
+  AssertionError [ERR_ASSERTION]: [pipeline.agy-pretool.v1] code=native-read-credential-root tool="view_file" kind="file"
+  BLOCKED: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-CREDENTIAL-TARGET: The read target is a protected credential location (a private key, token, credentials or secret-named file).
+  This refusal is about the path: no change to the command, its options or its wording can lift it.
+  Repair: ask the human to put the content you need into a non-credential file inside the project (for example under docs/ or scratch/), then read that copy.
+  A signed override is a shell-command route only; a native read tool has none, so the copy above is the repair for this tool.
+  
+  
+  2 !== 0
+  
+      at launch (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:55:12)
+      at decide (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:74:20)
+      at deny (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:81:20)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:101:84)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+      at run (node:internal/test_runner/harness:396:12)
+      at test (node:internal/test_runner/harness:405:12) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:103:11
+✖ G23PM05 external exact operand is admitted by real D96 policy and readmitted after restart (1170.049332ms)
+  AssertionError [ERR_ASSERTION]: a silent hook is not positive admission
+      at launch (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:56:12)
+      at decide (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:66:22)
+      at allow (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:79:50)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:108:37)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+      at run (node:internal/test_runner/harness:396:12)
+      at test (node:internal/test_runner/harness:405:12) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: '',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:111:11
+✖ G23PM06 symlink physical credential boundary and safe local alias (848.370844ms)
+  AssertionError [ERR_ASSERTION]: claude-shell: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).
+  This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.
+  Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.
+  Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.
+  If typed retryActions are present, run only those exact read-only actions as separate tool calls.
+  The complete admitted grammar, with bounds and exact spellings:
+  - one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").
+  - bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").
+  - bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").
+  - bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").
+  - bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").
+  - up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}
+  
+      at deny (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:83:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:116:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+      at run (node:internal/test_runner/harness:396:12)
+      at test (node:internal/test_runner/harness:405:12)
+      at file://<repo-root>/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs:111:11 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).\nThis refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.\nUse one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\nDo not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.\nIf typed retryActions are present, run only those exact read-only actions as separate tool calls.\nThe complete admitted grammar, with bounds and exact spellings:\n- one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").\n- bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").\n- bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").\n- bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").\n- bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").\n- up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").\n{"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}\n`,
+    expected: /\bGUARD-READ-CREDENTIAL-TARGET\b/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,50 @@
+command: node --test plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs
+label: kernel-consumer
+exitCode: 0
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.228694ms)
+✔ a clean fixture passes (0.812153ms)
+✔ an allowlisted occurrence passes (0.283959ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.27937ms)
+✔ multiple prefix hits on one line each produce a finding (0.169341ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.197806ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.915328ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (229.139258ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (12.689759ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ BCP01 literal builtin policy survives exact digest-bound extension without rewriting the preimage (15.43306ms)
+✔ BCP02 the real SQ01 through SQ34 generator preserves every ID and underscore byte budget (7.812262ms)
+✔ BCP03 wrong hashes and exact-prior budget or ID drift remain denied (18.71752ms)
+✔ BCP04 shrinking, replacement, equal case sets and budget reductions remain non-monotone (25.564239ms)
+✔ BCP05 boolean and invalid present policies cannot be treated as absent or a bindable baseline (28.216437ms)
+✔ BCP06 static parsing never executes unsupported generator callbacks or arbitrary expressions (5.527561ms)
+✔ BCP07 existing valid policies and supplementary policy for genuinely absent registrations retain admission (11.292154ms)
+✔ BCP08 duplicate or unordered IDs and unbounded generators stay closed before allocation (30.6922ms)
+PASS GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports
+PASS GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)
+PASS GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)
+PASS GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)
+PASS GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry
+PASS GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise
+PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)
+PASS GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher
+PASS GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents
+PASS GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots
+PASS GMWKC10 every FIXTURE_STRING_IMPORTS exemption names a target that does NOT exist on disk
+
+guard-maintenance-window-kernel-closure: 11 passed, 0 failed
+✔ plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs (1044.518354ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1060.552456
+
+--- stderr ---

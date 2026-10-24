@@ -1,0 +1,48 @@
+command: node --test --test-name-pattern=G6: plugins/pipeline-core/install-agy.test.mjs
+label: G6-installer-original-red-owner-Goldfish
+exitCode: 1
+head: 6095f8e33940d4b3e34a0ea676abf506849c1fa2
+tree: 588163a44ee6ddece6bb7c69b3b8a668d04e89c1
+dirty: true
+--- stdout ---
+✖ G6: installer refresh expands an owned user-level matcher to native file tools (50.540697ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 389.852009
+
+✖ failing tests:
+
+test at plugins/pipeline-core/install-agy.test.mjs:15:1
+✖ G6: installer refresh expands an owned user-level matcher to native file tools (50.540697ms)
+  AssertionError [ERR_ASSERTION]: installer must refresh the owned user-level matcher as well as the command path
+  + actual - expected
+  
+  + [
+  +   'write_to_file',
+  +   'replace_file_content',
+  +   'invoke_subagent',
+  +   'write_file',
+  +   'edit_file',
+  +   'read_file'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/install-agy.test.mjs:51:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'write_to_file', 'replace_file_content', 'invoke_subagent', 'write_file', 'edit_file', 'read_file' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

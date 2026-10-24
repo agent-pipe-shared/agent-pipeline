@@ -1,0 +1,369 @@
+{
+  "schema": "pipeline.fix-wave-artifact-custody.v1",
+  "date": "2026-10-24",
+  "artifacts": [
+    {
+      "source": "scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/report.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-passive-matrix/report.txt",
+      "bytes": 4305,
+      "sha256": "9668fa736f017d58781b72ee271c71e829ef4a5ef0cf6b9ecacdd987f11be3aa"
+    },
+    {
+      "source": "scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/proposal.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-passive-matrix/proposal.patch",
+      "bytes": 10836,
+      "sha256": "b475167d03d205a7a735169b903edf545004cf5aef6924ed3286a0dcb86a92d6"
+    },
+    {
+      "source": "scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/hashes.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-passive-matrix/hashes.json",
+      "bytes": 1550,
+      "sha256": "5f19ef1cc82e45cf075edbb29e1030894665c2856b6e15ec3ad47183dcdd324f"
+    },
+    {
+      "source": "scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/matrix-initial.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-passive-matrix/matrix-initial.txt",
+      "bytes": 13208,
+      "sha256": "cd73f01c9be337fe3a55db9bc960db7e7ce28ae98f19fd20060028f6cfc44f71"
+    },
+    {
+      "source": "scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/matrix-final.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-passive-matrix/matrix-final.txt",
+      "bytes": 986,
+      "sha256": "bbdac1f3377e7c8eb43164b262db769a202a50ca68a74b97367eff86005d5461"
+    },
+    {
+      "source": "scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/matrix-complete.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-passive-matrix/matrix-complete.txt",
+      "bytes": 1078,
+      "sha256": "3a196d1b0d236d73e4b0dd75c3c3eb97dc27f6915500df920d9b2527e7346784"
+    },
+    {
+      "source": "scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/matrix-delivery.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-passive-matrix/matrix-delivery.txt",
+      "bytes": 1079,
+      "sha256": "c421a5d887f27910bc02b6592feccfcc9231f5271dd0a7f0a3eed09ab846d736"
+    },
+    {
+      "source": "scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/consumer-safe.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-passive-matrix/consumer-safe.txt",
+      "bytes": 1113,
+      "sha256": "34e413c4cc996e1b015266fd52c70d4a5b9eb3c61f02b3d9e1196bc0ab09fa98"
+    },
+    {
+      "source": "scratch/clones/g23-cross-runner-passive-matrix/scratch/agent-out/g23-cross-runner-passive-matrix/resource-headroom.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-passive-matrix/resource-headroom.txt",
+      "bytes": 926,
+      "sha256": "89d1c0f34e76226e6047f601cefe416d0652e327df2f2d52b64c11aca5605b2d"
+    },
+    {
+      "source": "scratch/clones/g6-installer-matcher-qualification/scratch/agent-out/g6-installer-matcher-qualification/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-original-installer-red/report.md",
+      "bytes": 4870,
+      "sha256": "7cae3ebe7575dbc7851148c037cc61493e2a429b024750daac190a40b3d3b1ec"
+    },
+    {
+      "source": "scratch/clones/g6-installer-matcher-qualification/scratch/agent-out/g6-installer-matcher-qualification/proposal.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-original-installer-red/proposal.patch",
+      "bytes": 3392,
+      "sha256": "2d3f6f91637233495fca2a914cba0a7778b4e40026461522bc78e4e27a89a99d"
+    },
+    {
+      "source": "scratch/clones/g6-installer-matcher-qualification/scratch/agent-out/g6-installer-matcher-qualification/export.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-original-installer-red/export.json",
+      "bytes": 550,
+      "sha256": "dc9905a6bad0cdc74ae391a929d780f9fd51412afa63d13db134073e3abf4244"
+    },
+    {
+      "source": "scratch/clones/g6-installer-matcher-qualification/scratch/agent-out/g6-installer-matcher-qualification/installer-original-red.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-original-installer-red/installer-original-red.txt",
+      "bytes": 1573,
+      "sha256": "92f9e53308e4b34f57bddd781637801f0b4a8d64bd031a08a7277801120b0676"
+    },
+    {
+      "source": "scratch/clones/g6-installer-matcher-qualification/scratch/agent-out/g6-installer-matcher-qualification/consumer-safe.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-original-installer-red/consumer-safe.txt",
+      "bytes": 1126,
+      "sha256": "cf90180a0f3146044dfc449acd6d1e7de39445188320f0006d58f45b8422c7a8"
+    },
+    {
+      "source": "scratch/clones/g6-installer-matcher-qualification/scratch/agent-out/g6-installer-matcher-qualification/resource-headroom.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-original-installer-red/resource-headroom.txt",
+      "bytes": 953,
+      "sha256": "d7376707beb9c104cc379ba2b43c32ef5696448f7e4c0dcbecb256f61707905c"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/report.md",
+      "bytes": 3214,
+      "sha256": "1f91efa9ce0b1046148b38704dd27da7f246f816df4886ae9fa91699720d67b2",
+      "sourceBytes": 3315,
+      "sourceSha256": "e29dfcd5016f587497264df5f068d9b706e289af70e8878c73bb707dbad7b22f",
+      "transformation": "Human report only: local repository/home prefix projection. Original retained privately; machine captures/JSON/patches unchanged."
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/final-report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/final-report.md",
+      "bytes": 5237,
+      "sha256": "8197bcf62959421cc8a5bb1d396b878a511acc250efdd704b5cee0b952c821d5"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/proposal.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/proposal.patch",
+      "bytes": 16695,
+      "sha256": "0b36e6a7bfdb86c5cc972107603d2ed21c096421d6f2efe91e3bf25ee60f4d3e"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/export.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/export.json",
+      "bytes": 2381,
+      "sha256": "569f8705e01dc15d975ce7d4e5d6a7cce35de4ecc2ebb55e86d9655fe1c00e00"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/installer-green.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/installer-green.txt",
+      "bytes": 585,
+      "sha256": "59c74fb0dadbc3f6f31c6570e04f982bffd289506b5264a9d91c46034f78aa99"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/native-boundaries.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/native-boundaries.txt",
+      "bytes": 561,
+      "sha256": "6256ae50395c5f4de940db7e034548795774eda72945b6ce47db3b682938c90e"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/native-boundaries-diagnostic.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/native-boundaries-diagnostic.txt",
+      "bytes": 512,
+      "sha256": "6da8b3302a07354c705f3d56319231b9251aa4c12a1fd89d44ec050079c832e6"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/native-boundaries-green.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/native-boundaries-green.txt",
+      "bytes": 421,
+      "sha256": "ec3eb9cc5c80210dd2364739e7e44c4cb2b93aed2c7a612cb04d4b9d9f1defef"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/consumer-safe.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/consumer-safe.txt",
+      "bytes": 1119,
+      "sha256": "cd1bb5e6a624382448676e55bb396f4f1529d9f920cc13c63160046c6d743682"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/host-existing-controls.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/host-existing-controls.txt",
+      "bytes": 1009,
+      "sha256": "4afbf4f74289c6609fb0cf8eada2bc9f1d9e8289b29d76657f8a94dbc664aa37"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-source-host-wiring-correction/resource-headroom.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-host-partial/resource-headroom.txt",
+      "bytes": 938,
+      "sha256": "6248c389ce8cde2ffed22d926e862d398b5e2a44bd15d40513715ad304194933"
+    },
+    {
+      "source": "scratch/clones/current-unsafe-options-qualification/scratch/agent-out/current-unsafe-options-qualification/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-stopped-audit/report.md",
+      "bytes": 5041,
+      "sha256": "bbbf4e8f9526dd57b3c5e9b923a677df978f8422ff9c28684828645c1ff9aaa9"
+    },
+    {
+      "source": "scratch/clones/current-unsafe-options-qualification/scratch/agent-out/current-unsafe-options-qualification/source-binding.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-stopped-audit/source-binding.json",
+      "bytes": 9914,
+      "sha256": "ddbae2456bbf0c0a1d3da9cedb9fb3a23ecff4571c83047b8801f7838974fb53"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-enrollment/report.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-enrollment-stopped-preparation/report.txt",
+      "bytes": 4205,
+      "sha256": "c83be0f2c8d8c59067fca2e3441545fa87b76ce1fb69511a759c24a73b728f3c"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/report.md",
+      "bytes": 5612,
+      "sha256": "ef703f278e5fe0a36ba659e97007f953439d7aa3e0d4e9a191dad53f8c1a1288"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/owned.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/owned.patch",
+      "bytes": 5185,
+      "sha256": "dadb1a21ff609c3e83d3dbec3d777726c10076bb47fd856fd73bb29f735024e2"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/original-controlled-red.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/original-controlled-red.txt",
+      "bytes": 8259,
+      "sha256": "c12e4ef51b7276b0292136cec7358a1efd76212cf5a8e6ce4a75976bb67b9c94"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/original-controlled-poison.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/original-controlled-poison.txt",
+      "bytes": 11935,
+      "sha256": "1a214995ac42b1c410df4bdba3d34b85588f558c6d9f476fecd45e16c5863e1f"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/fixed-original-suite.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/fixed-original-suite.txt",
+      "bytes": 8268,
+      "sha256": "2682a4d6d6e05aafe8807929f7b4809e861781639f4acb7efca8098a80371c0b"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/final-suite.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/final-suite.txt",
+      "bytes": 8356,
+      "sha256": "3c3979d71c8f1c092c5eab87421c5dfcf96feed95e587672f352b62aecfa424e"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/consumer-safe-paths.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/consumer-safe-paths.txt",
+      "bytes": 1137,
+      "sha256": "8af94365acab5f07acd57ce449f112e5f7c0e5964ea079096f661a26a4cc3fb4"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/source-binding.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/source-binding.txt",
+      "bytes": 300,
+      "sha256": "3d8b52585d0f6cfffb56e6eaa35f28faa6785e5dadc1b3eb463c23f11b775f05"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/source-binding.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/source-binding.json",
+      "bytes": 9674,
+      "sha256": "9748b415350cd9b84503e6fc732c82709defba69403adc2bb6014e9348cae1b2"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/audit-export.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/audit-export.txt",
+      "bytes": 1713,
+      "sha256": "d362ff2f439c09b30203d7bca24e5ce6bb6b2e91c069834f3f5e91102d107d4f"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/audit-export.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/audit-export.json",
+      "bytes": 22855,
+      "sha256": "2c76f0c2d24a2b9baf79a2943adafcf3f833991e96b96e0c71e17bf4b94130a8"
+    },
+    {
+      "source": "scratch/clones/unsafe-options-hermetic-fixture/scratch/agent-out/unsafe-options-hermetic-fixture/resource-headroom.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/resource-headroom.txt",
+      "bytes": 645,
+      "sha256": "144583f6d04781e4b1e675104e1a8a47bb14e1d2e281b76c36a81da9c930b3b7"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/report.md",
+      "bytes": 6443,
+      "sha256": "86a73a2e0aff0779e58352c149ccc54f8bc5ba03cd042ae2d7b18a54885775b8"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/delivery.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/delivery.json",
+      "bytes": 1853,
+      "sha256": "b43456ffab4c1a22e106e584e16e68f83a732e4ff973c098c4759c62840814a2"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/owned-overlay.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/owned-overlay.patch",
+      "bytes": 9107,
+      "sha256": "db31ce2b062221198c81e12eccd2326d2b48a35b4d52f50c916203259c1d203b"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/prerequisite-bindings.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/prerequisite-bindings.json",
+      "bytes": 3115,
+      "sha256": "b6af6da7d369843a6427a25fedd3148fae85166e6144cdc940a821318f906f40"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/completion-green.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/completion-green.json",
+      "bytes": 1156,
+      "sha256": "ec30722c2bf78ceab6607e89cb9a63c0312a2acaba108efb3cf62b5668e1681e"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/completion-stream.jsonl",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/completion-stream.jsonl",
+      "bytes": 1436,
+      "sha256": "2df3e84a3724f817c375fe206415daebdda2cbc2f6e959de2f27c893cd77afd3"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/completion-receipt.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/completion-receipt.json",
+      "bytes": 696,
+      "sha256": "05e4b8e78380ab5f8c542a072ba25439b3023d8607371f453d541dca369c418b"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/registration.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/registration.json",
+      "bytes": 332,
+      "sha256": "59e2aaf8a980176bf5b5990c57377a51070dcde8213c8ac228f77ea0d88b3360"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/completion-registry.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/completion-registry.json",
+      "bytes": 329,
+      "sha256": "8bdac46fea3c8fc867d564e8bdc1bb30ea70c206ab54caea7af88bd29ec90164"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/append-history.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/append-history.json",
+      "bytes": 310,
+      "sha256": "f6351f0bbb19de596cc42ed62e956feb5dbfa9d6753de36e5d9431512d53f6db"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/kernel-consumer.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/kernel-consumer.json",
+      "bytes": 3665,
+      "sha256": "9884ab4c8c9c1811825b9c3215765ee61f1e20e80903542d7b1de9954926be8f"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/overlay-bound.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/overlay-bound.json",
+      "bytes": 2302,
+      "sha256": "301e271d1a81456841f5f16b2b825d9bdfa3bfedfe097b32495dfc3289e9bd83"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/resource-headroom.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/resource-headroom.json",
+      "bytes": 643,
+      "sha256": "8bc7f60b0f5acc20cb85f73ca5fb7b7cf002c5f71a7908ca960f64a557984a13"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/capability-inventory.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/capability-inventory.json",
+      "bytes": 3991,
+      "sha256": "ea0d6e716b175ba5c62cfd572fb430aba7f84a0f370aa4d0c92953f152e6ad06"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/completion.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/completion.json",
+      "bytes": 1523,
+      "sha256": "0d0cc39deeaa2dda49391baeeeecc1306eed618f4231bfcf0816c006ddd7a595"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/overlay-final.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/overlay-final.json",
+      "bytes": 995,
+      "sha256": "bc12532ddf8715c0cedfe0649876d1a1dc04862bb78bf340b192fa39f50143ed"
+    },
+    {
+      "source": "scratch/clones/g23-passive-matrix-enrollment/scratch/agent-out/g23-passive-matrix-registration-finalization/overlay-proof.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/overlay-proof.json",
+      "bytes": 2123,
+      "sha256": "a13373289655adf421a792dc88851de75c34392ddeb504c1c922327de943b6d8"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-matcher-qualification-controls/final-report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-controls-stopped/final-report.md",
+      "bytes": 3557,
+      "sha256": "18908296492f74d27579edbe5acee20069e3495234abca646aa01be47e9a3214"
+    },
+    {
+      "source": "scratch/clones/g6-source-host-wiring-correction/scratch/agent-out/g6-matcher-qualification-controls/export.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/g6-controls-stopped/export.json",
+      "bytes": 2466,
+      "sha256": "51893a9d866ce6ed2c1923c1979e37c57b11216a507462faf1ae6df0c640ba9d"
+    }
+  ]
+}
