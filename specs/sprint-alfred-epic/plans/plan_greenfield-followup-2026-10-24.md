@@ -44,6 +44,10 @@ All rows are in the current fix scope. Existing G6/G7 (Antigravity native tool c
 
 ## Current execution boundary
 
+**PO direction, 2026-10-24 (mobile continuation):** extend the existing delivery machinery and use existing accepted ACs; do not open a new design course. PRD and Spec must not be changed without the PO's explicit approval. No such change is authorized by this repair wave. Collect signature-dependent packages until the PO is at a terminal; ordinary questions can be answered from mobile.
+
+The generator's supported `--criterion` route already binds an exact existing approved AC without inventing a K146 item row: a read-only AC-264 binding with the configured Deep route succeeded in this session. K146's delivery/happy-path repair uses AC-264 and its original `three-runner-happy-path-with-two-po-approvals` requirements; role/recovery clauses can reference AC-245 only where their original acceptance actually applies. AC-204 is a report-only reverse coverage inventory, so a syntactically successful binding to it does not authorize unrelated carrier enforcement. Never select an AC merely because its title sounds related. Reuse the existing criterion-bound item delivery, requester, checks, queue and host integration contracts wherever they suffice. The earlier scratch-only proposal for an unanchored `repairTask` union is not the selected course.
+
 Bootstrap resolved `0.7.0+codex.20261024080351.b00899b`, runtime ready, approved epic implementation, valid continuity. Hook snapshots were refreshed through the exact bootstrap recovery. Optional model-role confirmation is pending; the sanctioned selector returned the unchanged V3 implement fallback `gpt-6-luna` / `high`.
 
 The installed read-only dispatch generator currently refuses a fix-wave task with `DBG-AC-ROW-MISSING`: the approved Alfred acceptance matrix has no original item row for K146. Do not invent an acceptance row, transplant a different item's identity, or bypass the generator silently. K146 is the concrete repair for this missing fix-wave route and carrier/template enforcement.
