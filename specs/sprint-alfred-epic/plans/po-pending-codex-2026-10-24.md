@@ -2,6 +2,15 @@
 
 The PO requested that decision needs and signature-dependent work be collected until available, without blocking independent repairs. This is a queue, not an approval record. No HEAD/tree-bound signing command has been handed out; no signature ceremony is active. PRD and Spec changes are forbidden without separate explicit PO permission and are not requested by these packages.
 
+**Current readback after the next installation:** G28 and the complete registration
+composition are committed by the human operator as `355dba942`; stamp `f2aee4ec2`
+is installed and the new Codex build `20261024154452.355dba9` reads back ready after
+the exact hook refresh. The historical operator scope below is resolved, not a
+request to repeat it. No current signature or operator commit is outstanding.
+The PO explicitly chose to collect both optional model-role confirmation and
+the G17 short private fixture parent for later. Do not run either ceremony or
+probe that external parent; continue the independent fix wave.
+
 The PO corrected repeated routine application questions on 2026-10-24:
 approved-wave fixes, integration checks and ordinary active-hook commits
 proceed autonomously. A kernel path is not itself a fresh chat gate. Collect
@@ -38,7 +47,7 @@ The G23 normal commit attempt was rejected for `lib/guard/command-catalogue.mjs`
 
 ## Later terminal or native-host work
 
-**Actual new operator requirement:** G28's applied package now has eight paths,
+**Resolved operator requirement (historical scope):** G28's applied package had eight paths,
 including explicit read-only CLI kernel closure and its threat-model documentation.
 The original six-path main integration passed 19/19; the combined closure check
 also exits 0. The earlier ordinary commit was refused with

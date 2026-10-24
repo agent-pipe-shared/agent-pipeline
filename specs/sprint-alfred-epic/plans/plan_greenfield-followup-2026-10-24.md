@@ -31,7 +31,7 @@ removes their runner-specific regression and native qualification duties.
 | G25 | Codex P1-3 | Validate HEAD, criterion rendering and source closure before submission mutation; retain already answered intake values | Design submission/intake work | Open; no late approval or fabricated identity |
 | G26 | Codex P1-4 | Architecture conformance records disposition of findings and unavailable properties without claiming PASS | Architecture close work | Open; report-only observations are not automatically blocking criteria |
 | G27 | Claude P1.4 architecture portion; P1.5; P1.6 | Self-describing greenfield architecture path, editable design before binding, correct criterion examples; avoid repeated PO discard ceremonies | G2/G4 and bounded criterion producer correction | Criterion/parser correction committed `5815d42c9`; main renderer/consumer 12/12 and actual acknowledgement cases 3/3. Larger editable-design/early-binding route remains open |
-| G28 | Claude P1.7 | Portable sanitized approval/Verify/Security/review evidence index in the delivered branch; private keys and raw private state remain external | G14, existing audit-pack archive route | Applied eight-path historical-archive/CLI fix with explicit read-only Source kernel closure; combined main check exits 0. Earlier ordinary commit refused on two PB guard files; complete operator package collected, no bypass. Offline archive integrity never qualifies later commits |
+| G28 | Claude P1.7 | Portable sanitized approval/Verify/Security/review evidence index in the delivered branch; private keys and raw private state remain external | G14, existing audit-pack archive route | Complete Source/registration composition operator-committed `355dba942`, stamped `f2aee4ec2`, installed and ready. Combined main closure checks pass. Offline archive integrity never qualifies later commits; native/full qualification remains open |
 | G29 | Claude P1.8 | Public handover accurately follows lifecycle transitions | Lifecycle handover projection work | Report evidence; identify sanctioned writer and regression pin |
 | G30 | Claude P1.9 | Trusted hook snapshot refresh has a usable recovery during a session | Existing hook-refresh flow; G9b/K156 | Automatic view retention committed `7dddb672c`; mid-session regression committed `ee26907e9`, main synthetic refresh/tamper refusal 2/2 using existing production code. Required registration applied; native runtime and direct-prune limitations remain open |
 | G31 | Claude P1.10 | Signing output points to an admissible external proof destination | K150B/G31 v2 | Integrated `7a6a58488`; main synthetic signing/proof 2/2 and original bounded UI 4/4. External-proof policy preserved; native acceptance pending |
@@ -101,6 +101,21 @@ Stamp/install/push and the scheduled Critic batch remain on the PO's explicit ca
 | G20/K154 | Historical v2 retained; corrected nine-path Source committed `272d0f668`; main 105/105 candidate/rigor/close/preparation/remote/consumer checks green | Two new suites have a checked registration overlay applied. Production positive publication proof, independent design-review provenance, Full Verify/review/acceptance remain open |
 | G19 v2 | Exact inert eleven-path readiness/consumer/closure proposal; targeted 108/108, readiness 9/9, Windows preflight 4/4, consumer/skill 17/17 | Source integration waits for the overlapping K156 State writer; native Windows qualification pending; no new application gate or live ACL mutation |
 | G32 | Integrated `537d5c85d`, four-path effective remote identity fix; main remote/guard/consumer 11/11 | Native push, full Verify/review/acceptance pending; guard-push is not in the never-liftable GMW kernel list |
+
+### Current installed readback
+
+The PO committed the full 16-path G28 and registration composition as `355dba942`.
+All runner manifests were stamped and normally committed as `f2aee4ec2`; the PO
+installed that intermediate build. Codex version
+`0.7.0+codex.20261024154452.355dba9` is ready after the exact mandatory-hook refresh,
+with matching loaded/installed content SHA
+`961616d408f8f37b60b38f52700c21e2b87c353250a141e725f3d10b9a74df4d`.
+Runtime and continuity are current; PRD/Spec remain unchanged. Older pending
+operator/stamp/install wording below is retained history and is superseded here.
+K156 and G17 were excluded. The PO deferred optional model-role confirmation
+and the G17 short private fixture parent; no live operator/signature command
+remains. G22 worktree dependency preparation now has a disjoint implementation
+owner; overlapping State repairs wait for K156's outcome.
 
 K152B's two earlier stops are retained: library-only scope could not perform native wiring; the next dispatch hit the unavailable native opening-record command. A3's complete replacement briefing explicitly includes both minimal hook wiring and the PO-approved methodological opening exception. These are neither hidden successes nor fresh attempt budgets. G23 read/help briefing is prepared for the next slot; G24-G32 and K156/K155/G2/G4 remain in the committed intake, not silently removed.
 
