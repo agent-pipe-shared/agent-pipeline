@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -129,6 +129,71 @@ test("captureEvidence: a passing command is captured with exit code 0", () => {
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
+});
+
+test("captureEvidence preserves valid foreign JSON and malformed prior output", () => {
+  const dir = mkdtempSync(join(tmpdir(), "capture-collision-"));
+  try {
+    const out = join(dir, "browser-check.json");
+    for (const prior of [
+      '{"schema":"voxel-scene.browser-check.v1","ok":true}\n',
+      '{"schema":"voxel-scene.browser-check.v1",',
+    ]) {
+      writeFileSync(out, prior);
+      assert.throws(() => captureEvidence({ command: [process.execPath, "-e", "process.exit(0)"], label: "focused", out, repoRoot: syntheticRoot("repo") }), /EVIDENCE-OUTPUT-OWNERSHIP/u);
+      assert.equal(readFileSync(out, "utf8"), prior);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("captureEvidence preserves same-writer reruns and refuses target symlinks", () => {
+  const dir = mkdtempSync(join(tmpdir(), "capture-rerun-"));
+  try {
+    const out = join(dir, "evidence.txt");
+    const options = { command: [process.execPath, "-e", "console.log('new')"], label: "focused", out, repoRoot: syntheticRoot("repo") };
+    captureEvidence(options);
+    const first = readFileSync(out, "utf8");
+    captureEvidence({ ...options, command: [process.execPath, "-e", "console.log('rerun')"] });
+    assert.match(readFileSync(out, "utf8"), /rerun/u);
+    assert.notEqual(readFileSync(out, "utf8"), first);
+    const link = join(dir, "link.txt");
+    symlinkSync(out, link);
+    assert.throws(() => captureEvidence({ ...options, out: link }), /EVIDENCE-OUTPUT-OWNERSHIP/u);
+    assert.match(readFileSync(out, "utf8"), /rerun/u);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("captureEvidence refuses an existing publication lock and preserves prior bytes", () => {
+  const dir = mkdtempSync(join(tmpdir(), "capture-lock-"));
+  try {
+    const out = join(dir, "evidence.txt");
+    const options = { command: [process.execPath, "-e", "console.log('first')"], label: "focused", out, repoRoot: syntheticRoot("repo") };
+    captureEvidence(options);
+    const prior = readFileSync(out, "utf8");
+    writeFileSync(`${out}.capture-evidence.lock`, "other writer\n");
+    assert.throws(() => captureEvidence(options), /EVIDENCE-OUTPUT-LOCKED:.*fresh --out path/u);
+    assert.equal(readFileSync(out, "utf8"), prior);
+    const fresh = join(dir, "runs", "new-run.txt");
+    captureEvidence({ ...options, out: fresh });
+    assert.match(readFileSync(fresh, "utf8"), /first/u);
+    assert.equal(readFileSync(out, "utf8"), prior);
+    assert.equal(readFileSync(`${out}.capture-evidence.lock`, "utf8"), "other writer\n");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("captureEvidence refuses a symlinked parent before creating nested output", () => {
+  const dir = mkdtempSync(join(tmpdir(), "capture-parent-"));
+  try {
+    const external = join(dir, "external");
+    const alias = join(dir, "alias");
+    mkdirSync(external);
+    symlinkSync(external, alias, "dir");
+    assert.throws(() => captureEvidence({
+      command: [process.execPath, "-e", "process.exit(0)"], label: "focused",
+      out: join(alias, "new", "evidence.txt"), repoRoot: syntheticRoot("repo"),
+    }), /EVIDENCE-OUTPUT-OWNERSHIP/u);
+    assert.equal(existsSync(join(external, "new")), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("captureEvidence: a command that writes nothing still produces a well-formed artifact with the recorded exit code", () => {

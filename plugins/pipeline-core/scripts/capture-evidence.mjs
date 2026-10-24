@@ -26,6 +26,10 @@
  *
  * ARTIFACT SHAPE. Matches the de facto convention already in `backlog/evidence/`
  * (`command:` / `label:` / `exitCode:` / `--- stdout ---` / `--- stderr ---`).
+ * Consumer authors should give functional checks and visual captures distinct schema-specific
+ * paths. Keep per-run records immutable, bind source hash and viewport when relevant, and treat
+ * any `latest` file as a replaceable pointer to a retained run, never as the sole result.
+ * This writer protects its own output path; it cannot intercept arbitrary consumer file writes.
  *
  * CLI: `node plugins/pipeline-core/scripts/capture-evidence.mjs --out <path> --label <label> [--format text|json] --
  *   <command> [args...]`
@@ -41,7 +45,8 @@
  * here and write NO artifact at all -- never a truncated-but-plausible-looking capture, never a
  * fabricated exit code. `maxBuffer` defaults to 64 MiB and is caller-overridable.
  */
-import { lstatSync, mkdirSync, writeFileSync } from "node:fs";
+import { linkSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { dirname, resolve, win32 } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -241,6 +246,76 @@ export function formatJsonArtifact({ command, label, exitCode, stdout, stderr, c
     stderr: stderr ?? "",
     candidate,
   }, null, 2) + "\n";
+}
+
+function existingCaptureArtifact(text, format) {
+  if (format === "json") {
+    try {
+      const value = JSON.parse(text);
+      return value?.schema === "pipeline.command-evidence.v1"
+        && typeof value.command === "string" && typeof value.label === "string"
+        && Number.isInteger(value.exitCode) && typeof value.stdout === "string"
+        && typeof value.stderr === "string" && typeof value.candidate?.commit === "string"
+        && typeof value.candidate?.tree === "string";
+    } catch { return false; }
+  }
+  // The text format predates a schema field. Its complete fixed header and section markers
+  // identify this writer. Unknown or partial bytes are retained for explicit recovery.
+  return /^command: [^\n]+\nlabel: [^\n]+\nexitCode: \d+\n(?:head: (?:[0-9a-f]{40}|unavailable)\ntree: (?:[0-9a-f]{40}|unavailable)\ndirty: (?:true|false|unavailable)\n)?--- stdout ---\n[\s\S]*\n--- stderr ---\n[\s\S]*$/u.test(text);
+}
+
+function ensurePhysicalOutputDirectory(parent) {
+  const paths = [];
+  for (let path = parent; ; path = dirname(path)) {
+    paths.push(path);
+    if (dirname(path) === path) break;
+  }
+  for (const path of paths.reverse()) {
+    let stat;
+    try { stat = lstatSync(path); }
+    catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      mkdirSync(path);
+      stat = lstatSync(path);
+    }
+    if (!stat.isDirectory() && !stat.isSymbolicLink()) {
+      const error = new Error(`ENOTDIR: not a directory, mkdir '${parent}'`);
+      error.code = "ENOTDIR";
+      throw error;
+    }
+    if (stat.isSymbolicLink() || realpathSync(path) !== path) {
+      throw new Error("EVIDENCE-OUTPUT-OWNERSHIP: symlinked or non-directory output path");
+    }
+  }
+}
+
+/** Publish under a cooperating-writer lock. A same-writer rerun replaces one complete file
+ * atomically; a first publication uses a no-clobber hard link. This cannot control other tools
+ * writing the path, so it makes no global arbitrary-writer guarantee. */
+function publishCaptureArtifact(out, artifactText, format) {
+  const parent = dirname(out);
+  ensurePhysicalOutputDirectory(parent);
+  const lock = `${out}.capture-evidence.lock`;
+  try { writeFileSync(lock, "capture-evidence publication\n", { flag: "wx", mode: 0o600 }); }
+  catch (error) {
+    if (error?.code === "EEXIST") throw new Error("EVIDENCE-OUTPUT-LOCKED: competing publication or stale lock; retain this path and choose a fresh --out path for a new immutable record");
+    throw error;
+  }
+  const temporary = `${out}.capture-evidence-${randomUUID()}.tmp`;
+  try {
+    let prior = null;
+    try { prior = lstatSync(out); }
+    catch (error) { if (error?.code !== "ENOENT") throw error; }
+    if (prior && (!prior.isFile() || prior.isSymbolicLink() || prior.nlink !== 1 || !existingCaptureArtifact(readFileSync(out, "utf8"), format))) {
+      throw new Error("EVIDENCE-OUTPUT-OWNERSHIP: existing output is foreign, linked, or incomplete");
+    }
+    writeFileSync(temporary, artifactText, { flag: "wx", mode: 0o600 });
+    if (prior) renameSync(temporary, out);
+    else { linkSync(temporary, out); unlinkSync(temporary); }
+  } finally {
+    try { unlinkSync(temporary); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+    unlinkSync(lock);
+  }
 }
 
 const WINDOWS_NPM_LAUNCH_PREFIX = "CAPTURE-EVIDENCE-WINDOWS-";
@@ -460,8 +535,7 @@ export function captureEvidence({
   // an already-absolute `out` (every existing call site, including the CLI, passes one), so this
   // only changes behavior for a relative `out` combined with a non-default `cwd`.
   const resolvedOut = resolve(cwd, out);
-  mkdirSync(dirname(resolvedOut), { recursive: true });
-  writeFileSync(resolvedOut, artifactText);
+  publishCaptureArtifact(resolvedOut, artifactText, format);
 
   return { exitCode, out: resolvedOut };
 }
