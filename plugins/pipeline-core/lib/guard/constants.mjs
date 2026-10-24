@@ -187,6 +187,9 @@ export const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../scripts/pipeli
 // first implementation dispatch. Their closed argument grammars live in command-catalogue.mjs.
 export const MODEL_ROLE_DISPATCH_SELECT_SCRIPT = fileURLToPath(new URL("../../scripts/model-role-dispatch-select.mjs", import.meta.url));
 export const DESIGN_REVIEW_RECEIPT_SCRIPT = fileURLToPath(new URL("../../scripts/design-review-receipt.mjs", import.meta.url));
+// K152 (G7): the two further scripts the Antigravity references demand in the design phase; each is admitted by its own closed argv grammar in command-catalogue.mjs.
+export const MODEL_ROLE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../../scripts/model-role-bootstrap.mjs", import.meta.url));
+export const ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT = fileURLToPath(new URL("../../scripts/antigravity-native-dispatch-prepare.mjs", import.meta.url));
 export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scripts/register-feature-package.mjs", import.meta.url));
 export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
 

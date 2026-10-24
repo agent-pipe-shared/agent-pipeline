@@ -229,7 +229,29 @@ function sanctionedDispatchRecoveryArgs(args, root) {
     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
 }
 
+import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT } from "./constants.mjs";
+
+// K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
+// `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
+function sanctionedModelRoleBootstrapArgs(args, root) {
+  if (args.length !== 4 && args.length !== 6) return false;
+  if (args[0] !== "--repo-root" || args[1] !== root || args[2] !== "--runner") return false;
+  if (!["codex", "claude", "antigravity"].includes(args[3])) return false;
+  return args.length === 4 || (args[4] === "--host-session-id" && NATIVE_SESSION_ID.test(args[5]));
+}
+
+// K152 (G7): scripts/antigravity-native-dispatch-prepare.mjs accepts exactly `prepare --root <root> --request <json>`
+// (its requestFromArgv). The request is a repository-relative .json under scratch/ or evidence/ with no dot segment.
+const NATIVE_DISPATCH_REQUEST = /^(?:scratch|evidence)\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\.json$/u;
+function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
+  return args.length === 5 && args[0] === "prepare" && args[1] === "--root" && args[2] === root
+    && args[3] === "--request" && NATIVE_DISPATCH_REQUEST.test(args[4])
+    && !args[4].split("/").some((part) => part === "." || part === "..");
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+  if (script === MODEL_ROLE_BOOTSTRAP_SCRIPT) return sanctionedModelRoleBootstrapArgs(args, root);
+  if (script === ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedAntigravityNativeDispatchPrepareArgs(args, root);
   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
   if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);
