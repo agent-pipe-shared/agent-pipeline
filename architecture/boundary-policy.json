@@ -68,8 +68,8 @@
     {
       "rule": "over-line-bound",
       "path": "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
-      "maxLines": 1413,
-      "reason": "over the bound when the check was adopted on 2026-10-20 (1407); raised to 1413 for the K144 ready-fixture repair (authored mini package, Full Verify finding); split it before it grows"
+      "maxLines": 1452,
+      "reason": "over the bound when the check was adopted on 2026-10-20 (1407); raised to 1413 for the K144 ready-fixture repair (authored mini package, Full Verify finding) and to 1452 for the K150 enrolment helpers and restated cases (un-enrolled root, plan/prepare-authorization flow); temporary: owner Elephant, expiry 2026-11-30, split the test in 0.7.1 and lower this entry"
     },
     {
       "rule": "over-line-bound",
