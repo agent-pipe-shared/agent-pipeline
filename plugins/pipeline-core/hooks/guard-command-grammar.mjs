@@ -37,10 +37,9 @@ const NUMERIC_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
   "-m", "--max-count", "--max-depth", "--max-columns",
 ]);
-// Only the type filters (-t/-T) may repeat. -g/--glob is deliberately NOT repeatable: a recursive rg carries at most one bounded basename
-// glob, and a second one (in either spelling) is refused so the traversal stays selective in one place only (SEC-11; examiner: the
-// "recursive rg keeps default hidden/ignore semantics; globs may expose private paths" case of hooks/guard-lifecycle-ready.test.mjs).
-const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not"]);
+// Repeated filename filters remain bounded individually. They cannot select hidden
+// names, recurse through a path pattern, or change rg's default ignore policy.
+const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not", "-g", "--glob"]);
 
 function isBoundedFilenameFilter(value) {
   return typeof value === "string" && /^\*\.[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
@@ -370,7 +369,7 @@ function validateRg(argv, root, windows, additionalRoots = []) {
         if (arg === "--max-columns" && value === "0") return false;
         if (["-e", "--regexp"].includes(arg)) regexpProvided = true;
         if (["-g", "--glob"].includes(arg)) {
-          if (globProvided || !isBoundedFilenameFilter(value)) return false;
+          if (!isBoundedFilenameFilter(value)) return false;
           globProvided = true;
         }
         if (["-f", "--file"].includes(arg)) {

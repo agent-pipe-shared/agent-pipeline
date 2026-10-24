@@ -24,7 +24,7 @@ import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation
 import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
 import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
 import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
-import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
+import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
 import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyClaudeCaptureInvocation, isHumanPoProfileChangeCommand, isHumanPoSigningCommand } from "./po-commands.mjs";
 import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
 import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
@@ -399,6 +399,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       // K96 (PO decision 2026-10-23, rows 6/16, M7): an in-root read whose target is a credential location is refused for the PATH, so it
       // gets its own typed code (checked only when the target is inside the root: an outside-root credential read keeps the scope code, QP4-1).
       credentialTarget = !outsideRoot && qp4OperandIsCredentialTarget(rejected, root);
+      if (!outsideRoot && !credentialTarget && isMissingSingleReadTarget(rejected, root)) {
+        return withLifts(lifts, verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); check the spelling or create it first.\n"));
+      }
     } catch { outsideRoot = false; credentialTarget = false; }
     if (credentialTarget) {
       // Same override route as the other human-liftable read refusals: a consumed one-time capability lifts exactly this command; otherwise

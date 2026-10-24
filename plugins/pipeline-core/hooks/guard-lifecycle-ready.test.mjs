@@ -11606,19 +11606,21 @@ test("QP4-1 a single read-family command the grammar does not support is refused
       // (QG-04 justification, bounded to the flag in these inputs): 8d4b3613e (ALF-C-P1-10D) taught guard-command-grammar.mjs --no-heading,
       // -m/--max-count and -g, so those spellings are admitted now and can no longer be the refusal examiner. The examiner keeps its purpose
       // with --column, an rg flag that is in none of SEARCH_BOOLEAN, SEARCH_VALUE, FILE_BOOLEAN or FILE_VALUE and is still refused with the
-      // unsupported code. A repeated -g stays refused (only the type filters repeat).
+      // unsupported code. Repeated bounded -g is covered by G23's positive and negative matrix.
       for (const command of [
         `rg -n --column "authorize-commit" scratch -g "*.md" -g "*.txt" -g "*.ps1"`,
         `rg -n --column "authorize-commit" ${fwd}/scratch`,
         `rg -n --column -m 20 "authorize-commit\\|\\"apply\\"" ${script}`,
         `rg -n --column -m 20 apply ${fwd}/${script} ${fwd}/plugins/pipeline-core/lib/a.mjs`,
         `rg --column -m 5 apply ${script}`,
-        `rg -n "authorize-commit" scratch -g "*.md" -g "*.txt"`,
         "rg --hidden --no-ignore apply .",
         "grep -R apply .",
         "git diff --output scratch/escaped.txt",
         "node --test-reporter-destination scratch/escaped.txt --test",
       ]) qp4RefuseUnsupported(command, path);
+      // G23 changes only the bounded repeated-glob branch. Preserve this original
+      // examiner's unsupported-command controls above and pin the newly admitted case.
+      qp4Admit(`rg -n "authorize-commit" scratch -g "*.md" -g "*.txt"`, path);
       // The refusal still states the complete admitted grammar and a machine-readable (empty) retry envelope.
       const unsupported = qp4Refuse(`rg -n --column apply ${script}`, path);
       assert.match(unsupported.text, /pipeline\.guard-retry-actions\.v1/u);
@@ -11811,6 +11813,22 @@ test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct cod
         assert.doesNotMatch(r.text, /GUARD-READ-TARGET-MISSING/u, file);
       }
       assert.equal(read(join(path, "scratch", "log.txt")).exitCode, 0);
+      // G23: the same missing-target diagnosis reaches Bash and the two
+      // runner-normalized shell packets, with the pattern kept as data.
+      for (const command of ["cat scratch/missing.log", "rg -n 'mini|feature|epic' scratch/missing.log"]) {
+        for (const packet of [bash(command),
+          { tool_name: "Bash", tool_input: { command } },
+          { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command, cwd: path } }]) {
+          const result = qp4Verdict(packet, path);
+          assert.equal(result.exitCode, 2, command);
+          assert.match(result.text, /GUARD-READ-TARGET-MISSING/u, command);
+        }
+      }
+      const poHelp = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
+      for (const flag of ["--help", "-h"]) {
+        assert.equal(qp4Verdict(bash(`node ${poHelp} ${flag}`), path).exitCode, 0, flag);
+      }
+      assert.equal(qp4Verdict(bash(`node ${poHelp} approve`), path).exitCode, 2);
     });
   } finally {
     rmSync(path, { recursive: true, force: true });

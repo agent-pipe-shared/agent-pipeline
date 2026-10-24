@@ -560,6 +560,7 @@ const QP4_SECRET_NAME = /^(?:id_[^/\\]*|credentials|auth\.json|oauth_creds\.json
 // Read: a file that does not exist, spelled as a plain in-root path whose nearest existing ancestor is a directory physically inside the project.
 function qp4MissingInRootTarget(raw, root) {
   if (typeof raw !== "string" || raw === "" || /[\0$\x60*?\[\]{}]/u.test(raw) || raw.startsWith("~")) return false;
+  if (raw.split(/[\\/]/u).some((segment) => segment === "." || segment === "..")) return false;
   const rootResolved = resolve(root);
   const candidate = resolve(passiveCandidate(raw, root));
   if (candidate === rootResolved || !isPathWithinRoot(candidate, rootResolved)) return false;
@@ -575,6 +576,23 @@ function qp4MissingInRootTarget(raw, root) {
       }
     }
   } catch { return false; }
+}
+
+// A missing target is diagnosable only for these exact, option-bounded single
+// reads. Keep pattern operands separate from paths and leave unfamiliar flags
+// to the closed grammar's unsupported-command diagnosis.
+export function isMissingSingleReadTarget(parsed, root) {
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
+  const name = basename(executable).toLowerCase();
+  let target = null;
+  if (["cat", "wc", "stat", "file", "head", "tail"].includes(name) && argv.length === 1) target = argv[0];
+  if (["rg", "grep"].includes(name)) {
+    const args = argv[0] === "-n" ? argv.slice(1) : argv;
+    if (args.length === 2 && args[0] !== "" && !args[0].startsWith("-")) target = args[1];
+  }
+  return target !== null && !target.startsWith("-") && qp4MissingInRootTarget(target, root);
 }
 
 // ALF-C-P15-01C (AC-239, PO decision U3): native Read of ONE exact file under a WSL UNC share

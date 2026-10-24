@@ -2953,8 +2953,12 @@ export async function runForkDispositionApproval(argv = process.argv.slice(2), d
 
 if (isDirectInvocation(import.meta.url)) {
   const argv = process.argv.slice(2);
-  try {
-    const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : await runHumanApproval(argv);
-    process.stdout.write(formatHumanApprovalCliResult(result));
-  } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
+  if (argv.length === 1 && ["--help", "-h"].includes(argv[0])) {
+    process.stdout.write(`${USAGE}\n`);
+  } else {
+    try {
+      const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : await runHumanApproval(argv);
+      process.stdout.write(formatHumanApprovalCliResult(result));
+    } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
+  }
 }

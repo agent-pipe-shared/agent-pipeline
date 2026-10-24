@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
+
+const script = fileURLToPath(new URL("../../scripts/po-human-approval.mjs", import.meta.url));
+const fixtureBase = resolve("scratch");
+
+test("G23 bounded repeated rg globs preserve hidden and credential exclusions", () => {
+  mkdirSync(fixtureBase, { recursive: true });
+  const root = mkdtempSync(join(fixtureBase, "g23-read-"));
+  try {
+    mkdirSync(join(root, "docs"));
+    writeFileSync(join(root, "docs", "a.md"), "safe\n");
+    assert.equal(isBoundedSingleRg(["-n", "safe", "docs", "-g", "*.md", "-g", "*.txt"], root), true);
+    for (const bad of [".*", "../*.md", "**/*.md", "!*.md", "*.tar.gz"]) {
+      assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "-g", bad], root), false, bad);
+    }
+    assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "--pre", "run"], root), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("G23 exact source-owned PO help is a pure CLI route", () => {
+  mkdirSync(fixtureBase, { recursive: true });
+  const root = mkdtempSync(join(fixtureBase, "g23-help-"));
+  try {
+    for (const flag of ["--help", "-h"]) {
+      assert.equal(isSanctionedLifecycleCommand(`node ${script} ${flag}`, root), true);
+      const child = spawnSync(process.execPath, [script, flag], { cwd: root, encoding: "utf8" });
+      assert.equal(child.status, 0, child.stderr);
+      assert.match(child.stdout, /^Usage: po-human-approval\.mjs /u);
+      assert.deepEqual(readdirSync(root), [], "help leaves the fixture root untouched");
+    }
+    assert.equal(isSanctionedLifecycleCommand(`node ${script} --help --directory /tmp`, root), false);
+    assert.equal(isSanctionedLifecycleCommand(`node ${script} approve`, root), false);
+    assert.equal(isSanctionedLifecycleCommand(`node ${join(root, "foreign.mjs")} --help`, root), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("G23 missing local targets are distinct from unknown grammar and protected paths", () => {
+  mkdirSync(fixtureBase, { recursive: true });
+  const root = mkdtempSync(join(fixtureBase, "g23-missing-"));
+  const outside = mkdtempSync(join(fixtureBase, "g23-outside-"));
+  try {
+    mkdirSync(join(root, "docs"));
+    mkdirSync(join(root, "vault"));
+    symlinkSync(outside, join(root, "alias"), "dir");
+    const parse = command => parseGuardCommand(command, root, { platform: "linux" });
+    for (const command of ["cat docs/absent.md", "rg -n needle docs/absent.md", "grep needle docs/absent.md"]) {
+      assert.equal(isMissingSingleReadTarget(parse(command), root), true, command);
+    }
+    for (const command of ["rg --column needle docs/absent.md", "cat vault/id_rsa", "cat ../absent.md", "cat docs/*.md", "cat docs/../missing.md", "cat alias/missing.md"]) {
+      assert.equal(isMissingSingleReadTarget(parse(command), root), false, command);
+    }
+    const native = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(root, "docs", "absent.md") } }, root, {});
+    assert.equal(native.exitCode, 2);
+    assert.match(native.stderr, /GUARD-READ-TARGET-MISSING/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
