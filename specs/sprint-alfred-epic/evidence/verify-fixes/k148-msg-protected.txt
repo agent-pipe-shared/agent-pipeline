@@ -1,0 +1,8 @@
+fix(pipeline-core): publish address slots complete and tolerate a concurrent slot in the namespace check
+
+Two processes on one home preparing different repositories made the fixed address namespace listing differ between its two reads, and the first process failed with SP-ADDRESS fixed address namespace changed. A slot another process was still creating (mkdir, then anchor.json) was observable half-made and failed as a missing or foreign slot.
+
+The namespace check now accepts a changed listing only when every originally read name is still present and every new name validates as a complete slot, with at most two accepted changes before the existing refusal. A slot is staged beside the namespace with its anchor.json and renamed into place, so it is never observable without its anchor. Foreign names, over-bound namespaces, removed slots and tampered anchors are refused as before.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

@@ -1,0 +1,6 @@
+test(pipeline-core): pin the two-process address namespace race on one home
+
+Two child processes on one private home prepare different repositories. A ready/go barrier file pair holds one of them exactly between the two namespace listings (first case) or right after its slot directory appears (second case), so the race is reproduced without sleeps. Red on the unchanged code with the real message fixed address namespace changed (and a missing anchor.json for the half-made slot); green after the fix.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

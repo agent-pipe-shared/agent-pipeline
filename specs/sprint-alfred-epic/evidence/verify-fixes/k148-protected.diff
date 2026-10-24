@@ -1,0 +1,83 @@
+diff --git a/plugins/pipeline-core/lib/session-power.mjs b/plugins/pipeline-core/lib/session-power.mjs
+index c348c9d00..a84a1b430 100644
+--- a/plugins/pipeline-core/lib/session-power.mjs
++++ b/plugins/pipeline-core/lib/session-power.mjs
+@@ -14,7 +14,7 @@ import {inspectOwnedSessionPowerController,readOwnedSessionPowerEndpointSource,r
+  * action.  In particular this module never sends a signal to a recorded PID.
+  */
+ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+-import { constants, closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
++import { constants, closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+ import { dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
+ import { userInfo } from "node:os";
+ 
+@@ -354,28 +354,58 @@ function immutableAddressRecord(filePath,value){
+   if(authorityDigest(actual.value)!==authorityDigest(value)||authorityDigest(actual.sourceFact.identity)!==authorityDigest(publishedIdentity)||authorityDigest(before)!==authorityDigest(strictAddressChain(parent,{privateLeaf:true})))fail('SP-ADDRESS','address publication physical drift');
+   return actual;
+ }
++function readAddressNamespace(parent){
++  const names=readdirSync(parent).sort();
++  const foreign=names.some(name=>!/^[a-f0-9]{16}$/.test(name));
++  if(names.length>4096||foreign)fail('SP-ADDRESS',addressNamespaceRefusalMessage({count:names.length,foreign}));
++  return names;
++}
++function validateAddressSlot(parent,name){
++  const slot=join(parent,name);strictAddressChain(slot,{privateLeaf:true});const anchor=addressRead(join(slot,'anchor.json'));
++  if(!exactKeys(anchor.value,new Set(['schema','repositoryFingerprint','primaryRoot','commonDir']))||anchor.value.schema!==ADDRESS_ROOT_SCHEMA||!digest(anchor.value.repositoryFingerprint)||anchor.value.repositoryFingerprint.slice(0,16)!==name||!isAbsolute(anchor.value.primaryRoot)||!isAbsolute(anchor.value.commonDir))fail('SP-ADDRESS','foreign fixed address slot');
++}
++// A slot becomes visible in the shared namespace only complete: the directory is staged beside the namespace
++// (inside the home, never inside it) with its anchor.json and renamed into place, so no other process can list
++// a slot that has no anchor yet. An existing slot is left to the caller's anchor validation, never replaced.
++function createAddressSlot(repo,repositoryFingerprint,home,directory){
++  try{lstatSync(directory);return;}catch(error){if(error.code!=='ENOENT')throw error;}
++  const stage=join(home,'.apsp-stage-'+process.pid+'-'+randomBytes(6).toString('hex'));
++  mkdirSync(stage,{mode:0o700});
++  try{
++    immutableAddressRecord(join(stage,'anchor.json'),addressRootRecord(repo,repositoryFingerprint));
++    try{renameSync(stage,directory);}catch(error){if(error.code==='EEXIST'||error.code==='ENOTEMPTY')return;throw error;} // same repository published concurrently
++    const directoryFd=openSync(dirname(directory),constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);try{fsyncSync(directoryFd);}finally{closeSync(directoryFd);}
++  }finally{
++    if(existsSync(stage)){try{unlinkSync(join(stage,'anchor.json'));}catch{}try{rmdirSync(stage);}catch{}}
++  }
++}
+ function prepareAddressRoot(repo,repositoryFingerprint){
+   const directory=addressDirectory(repo,repositoryFingerprint),home=userInfo().homedir;
+   // Only this Source factory may create the fixed private namespace. Existing
+   // objects are validated, never repaired, chmodded, adopted or removed.
+-  let createdRepositoryRoot=false;
+   for(const target of [join(home,'.apsp'),directory]){
+     const parent=dirname(target),before=strictAddressChain(parent,{privateLeaf:parent!==home});
+     if(target===directory){
+-      const names=readdirSync(parent).sort();
+-      const foreign=names.some(name=>!/^[a-f0-9]{16}$/.test(name));if(names.length>4096||foreign)fail('SP-ADDRESS',addressNamespaceRefusalMessage({count:names.length,foreign}));
+-      for(const name of names){const slot=join(parent,name);strictAddressChain(slot,{privateLeaf:true});const anchor=addressRead(join(slot,'anchor.json'));
+-        if(!exactKeys(anchor.value,new Set(['schema','repositoryFingerprint','primaryRoot','commonDir']))||anchor.value.schema!==ADDRESS_ROOT_SCHEMA||!digest(anchor.value.repositoryFingerprint)||anchor.value.repositoryFingerprint.slice(0,16)!==name||!isAbsolute(anchor.value.primaryRoot)||!isAbsolute(anchor.value.commonDir))fail('SP-ADDRESS','foreign fixed address slot');}
+-      if(authorityDigest(names)!==authorityDigest(readdirSync(parent).sort()))fail('SP-ADDRESS','fixed address namespace changed');
++      // Processes on one home prepare different repositories at the same time. Each slot is published
++      // complete (see createAddressSlot), so a slot that appears between two listings is validated as a
++      // whole slot instead of failing the pass. The check is not weakened: every originally read name must
++      // still be there, every new name must validate, and a namespace that keeps changing is refused.
++      let names=readAddressNamespace(parent);
++      for(const name of names)validateAddressSlot(parent,name);
++      for(let attempt=0;;attempt+=1){
++        const again=readAddressNamespace(parent);
++        if(authorityDigest(names)===authorityDigest(again))break;
++        if(attempt>=2||!names.every(name=>again.includes(name)))fail('SP-ADDRESS','fixed address namespace changed');
++        for(const name of again)if(!names.includes(name))validateAddressSlot(parent,name);
++        names=again;
++      }
++      createAddressSlot(repo,repositoryFingerprint,home,directory);
++    }else{
++      try{mkdirSync(target,{mode:0o700});}catch(error){if(error.code!=='EEXIST')throw error;}
+     }
+-    try{mkdirSync(target,{mode:0o700});if(target===directory)createdRepositoryRoot=true;}catch(error){if(error.code!=='EEXIST')throw error;}
+     strictAddressChain(target,{privateLeaf:true});
+     if(authorityDigest(before)!==authorityDigest(strictAddressChain(parent,{privateLeaf:parent!==home})))fail('SP-ADDRESS','address parent changed during creation');
+   }
+-  if(createdRepositoryRoot){
+-    if(readdirSync(directory).length!==0)fail('SP-ADDRESS','new address root raced in');
+-    immutableAddressRecord(join(directory,'anchor.json'),addressRootRecord(repo,repositoryFingerprint));
+-  }
+   readAddressAnchor(repo,repositoryFingerprint,directory);
+   return directory;
+ }

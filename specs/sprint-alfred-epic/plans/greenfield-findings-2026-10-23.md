@@ -33,6 +33,14 @@ Class A, not applied: `codex-isolated-critic-protected-preimage-tests`, six pinn
 - `codex-pretool-guard-tests`: 28 of 37 were red (classification said about 13). Ready-fixture used the "feature" profile; now "mini" (committed, `c8256e280`, boundary bound 1407 to 1413). Still 16 of 37 red: tests 8, 10, 11, 22 to 25, 27 to 32, 35, 37 use a tmp dir with only `.claude/`, adapter exits 0 with empty stdout (root probably no longer governance-enrolled; test 30 needs the opposite); test 16 expects `Step: prepare-authorization`, denial prints `Step: plan`. Next dispatch.
 - Not run: `check-consumer-safe-paths.test.mjs`. Files: `evidence/verify-fixes/k144-*`.
 
+## K148 results (address-root race; fix committed `9e03bfe11`, independent Critic read and PO acceptance pending)
+
+`prepareAddressRoot` now accepts a changed namespace listing only if every originally read name is still present and every new name validates as a complete slot (at most 2 accepted changes, then the old refusal); a new slot is staged beside the namespace with its `anchor.json` and renamed into place, so it is never observable half-made. Foreign-name, 4096-bound and tamper checks unchanged. The half-made slot surfaced as a raw ENOENT on `anchor.json` (not as `foreign fixed address slot`). Pin: two child processes on one private HOME with a ready/go barrier, RED on the unchanged code (both cases), GREEN after; `session-power.test.mjs` green in the main checkout. Not run: the concurrent run of `native-goldfish-host-state` and the finalizer suite on one HOME; the D71/D72 repair verb was only grepped. Files: `evidence/verify-fixes/k148-*`.
+
+## K147 results (host registry; diffs held, not applied)
+
+CADH001 fixed in the clone by two changes (an async native driver runs after the BEGIN ticket closed in `model-family-host-store.mjs`; `session-authority-registry.mjs` opens a fresh boundary when the stored context's boundary is closed), no check weakened. NOT done: CCH136/CCH137 (cause is not the CADH001 one; `protectedChanged=["candidate"]` at `codex-critic-host.mjs` ~line 1988), the RED/GREEN proof of the new pin, the registry and store suites, the broader checks. Deliverables in `scratch/agent-out/K147-*` (untracked), not yet imported.
+
 ## G1 fix questions (for the batch, not decided)
 
 - What does the family check protect on Claude (a dispatch must not silently run another family than the agent definition declares, MP-29)? A Codex dispatch has no Claude alias, so the check needs a runner-aware reading, not a removal.
