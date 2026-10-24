@@ -1057,9 +1057,16 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
         nativeRequest: native.request, revalidate, consumed: false });
     }
     let result;
+    const callDriver = () => trustedSources.launchDriver({ invocation: invocation.receipt,
+      prelaunchToken: checked.value, ...(native ? { nativeRequest: native.request, driverContext } : {}) });
     try {
-      result = trustedSources.launchDriver({ invocation: invocation.receipt,
-        prelaunchToken: checked.value, ...(native ? { nativeRequest: native.request, driverContext } : {}) });
+      // K147: a native driver spawns a managed host whose journal registers its own producer member in the session-authority
+      // registry. The BEGIN ticket (D113) binds only the synchronous prefix of this effect and compares a whole-registry
+      // snapshot afterwards, so that nested registration must not run inside the prefix: the driver is entered one microtask
+      // later, after the ticket closed, and registers under its own boundary (the lock is not held across the await).
+      // A synchronous driver keeps its synchronous result (legacy callers); an async native driver already returns a promise.
+      result = native && trustedSources.launchDriver?.constructor?.name === "AsyncFunction"
+        ? Promise.resolve().then(callDriver) : callDriver();
     } catch { return fail("MODEL-FAMILY-LAUNCH-FAILED"); }
     try {
       if (result !== null && (typeof result === "object" || typeof result === "function")

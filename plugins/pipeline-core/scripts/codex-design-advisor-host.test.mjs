@@ -95,7 +95,7 @@ test('active Advisor keeps its signed S4/S2 selection through metadata rechecks 
  const initialContext=contextResult.context,courseBinding={courseId:'advisor-native-course',initialContextSha256:contextResult.contextSha256,reservationId:'advisor-native-reservation',slot:1,routeStepSha256:hostDigest(native.observation.route)};
  live.execution=native.execution;live.args={initialContext,dispatch,profile:'feature',reason:'risk-review',route:native.observation.route,courseBinding};
  const prepared=await native.execution.prepareInitial(live.args);assert.equal(prepared.ok,true,prepared.code);
- const result=await native.execution.executeInitial(live.args,prepared.preparedRequest);const emittedAnswer=JSON.parse(readFileSync(answerPath,'utf8'));
+ const result=await native.execution.executeInitial(live.args,prepared.preparedRequest);assert.equal(result.ok,true,JSON.stringify({code:result.code,outcome:result.outcome,launch:live.launchResult?.code,failureCode:live.finalizationFailureCode}));const emittedAnswer=JSON.parse(readFileSync(answerPath,'utf8'));
  const exact=(value,keys)=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join('\0')===[...keys].sort().join('\0');
  const citationValid=refs=>Array.isArray(refs)&&refs.length<=5&&refs.every((ref,index)=>exact(ref,['path','sha256'])&&Object.values(initialContext.sources).some(source=>canonicalJson(source)===canonicalJson(ref))&&(index===0||refs[index-1].path<ref.path));
  const answerDiagnostics={keys:Object.keys(emittedAnswer).sort(),shape:exact(emittedAnswer,['schema','dispatchId','initialContextSha256','questionSha256','evidenceSha256','answer','evidenceReferences','proposals']),

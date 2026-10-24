@@ -12,7 +12,7 @@ import { nativeContractFixtureParent } from "./test-item-approved-course-fixture
 import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { createModelFamilyHostAuthorityLifecycle } from "./model-family-host-store.mjs";
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
-import { initializeSessionAuthorityRegistry } from "./session-authority-registry.mjs";
+import { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary } from "./session-authority-registry.mjs";
 import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "./model-family-discovery.mjs";
 import { createCodexFamilyAdapter } from "./model-family-codex-adapter.mjs";
 import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
@@ -355,6 +355,37 @@ test("S4 private driver context carries the original sealed invocation and admit
       packetBindingSha256: prepared.value.receipt.packetBindingSha256,
       nativeRequestCapability: capability.value }).code, "MODEL-FAMILY-NATIVE-CAPABILITY-REQUIRED");
     assert.equal(drivers, 1, "neither context nor admitted request replays to a second driver call");
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
+});
+
+test("K147 an async native driver runs after the BEGIN ticket closed and opens its own live registry boundary", async () => {
+  // Cause (K145 CADH001): the driver's synchronous prefix ran inside the open model-family-host ticket, so a nested producer
+  // registration was refused as a foreign concurrent registry writer, and a continuation inherited the closed boundary context
+  // (a dead token, no registry lock). The driver is now entered after the ticket and a closed boundary is never reused.
+  const f = fixture();
+  try {
+    activate(f);
+    const prepared = invoke(f, key("k147-nested-boundary"));
+    assert.equal(prepared.ok, true, prepared.code);
+    f.source.admitNativeRequest = () => ({ ok: true, code: "SYNTHETIC-ADMITTED" });
+    const lockFile = join(inspectSignedDescriptorCustodyRepository(f.repoDir).commonDir, "agent-pipeline", "session-authority", "registry.lock");
+    const seen = {};
+    f.source.launchDriver = async () => {
+      seen.beforeAwait = existsSync(lockFile);
+      await Promise.resolve();
+      withSessionAuthorityBoundary({ repository: inspectSignedDescriptorCustodyRepository(f.repoDir) }, () => { seen.insideBoundary = existsSync(lockFile); return null; });
+      return { ok: true, value: { nested: true } };
+    };
+    const request = { schema: "pipeline.synthetic-main-request.v1", purpose: "profile-main", runner: "codex", sessionId: "session-1",
+      invocationId: "k147-nested-boundary", taskRoute: route.taskRoute, selectedModelId: prepared.value.receipt.selectedModelId,
+      effort: prepared.value.receipt.effort, payload: { model: prepared.value.receipt.selectedModelId } };
+    const capability = await f.controller.admitNativeRequest({ invocation: prepared.value, request });
+    assert.equal(capability.ok, true, capability.code);
+    const launched = await f.controller.launch({ invocation: prepared.value,
+      packetBindingSha256: prepared.value.receipt.packetBindingSha256, nativeRequestCapability: capability.value });
+    assert.equal(launched.ok, true, JSON.stringify({ code: launched.code, seen }));
+    assert.equal(seen.beforeAwait, false, "the driver prefix runs after the BEGIN ticket released the registry lock");
+    assert.equal(seen.insideBoundary, true, "the continuation opened its own live boundary holding the registry lock");
   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
