@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   SESSION_POWER_LEASE_SECONDS,
@@ -128,6 +132,168 @@ check("fixed Linux adapter argv is allowlisted, absolute, shell false and has no
     "--controller-pid", "41", "--controller-start", tuple().controllerStart, "--lease-seconds", "43200",
   ]);
   assert.equal(launch.args.some((value) => value === C), false);
+});
+
+// K148-FV-ADDRESS-RACE: two processes on ONE home prepare the fixed Linux address namespace
+// (`<home>/.apsp`) for two DIFFERENT repositories. The barrier is a ready/go file pair under the
+// private root, not a sleep: the child that is held pauses at an exact point inside
+// `prepareAddressRoot` (reached through createSessionPowerAuthorityProducerPort), the other child
+// runs to completion meanwhile, then the held one is released. `os.userInfo().homedir` and the
+// listing/mkdir calls are patched only inside the children (the private home replaces the real one).
+async function addressRaceChild() {
+  const fs = (await import("node:fs")).default;
+  const os = (await import("node:os")).default;
+  const path = (await import("node:path")).default;
+  const { syncBuiltinESMExports } = (await import("node:module")).default;
+  const [home, repoRoot, libUrl, ownerUrl, holdAt, readyFile, goFile] = process.argv.slice(1);
+  const barrier = () => {
+    fs.writeFileSync(readyFile, "");
+    const cell = new Int32Array(new SharedArrayBuffer(4));
+    const deadline = Date.now() + 60000;
+    while (!fs.existsSync(goFile)) {
+      if (Date.now() > deadline) throw new Error("barrier go file never appeared");
+      Atomics.wait(cell, 0, 0, 10);
+    }
+  };
+  const apsp = path.join(home, ".apsp");
+  const realUserInfo = os.userInfo;
+  os.userInfo = (...args) => ({ ...realUserInfo(...args), homedir: home });
+  const realReaddir = fs.readdirSync;
+  let listings = 0;
+  fs.readdirSync = function (target, ...rest) {
+    const out = realReaddir.call(this, target, ...rest);
+    if (holdAt === "after-first-listing" && target === apsp) { listings += 1; if (listings === 1) barrier(); }
+    return out;
+  };
+  const realMkdir = fs.mkdirSync;
+  fs.mkdirSync = function (target, ...rest) {
+    const out = realMkdir.call(this, target, ...rest);
+    if (holdAt === "after-slot-mkdir" && path.dirname(String(target)) === apsp && /^[a-f0-9]{16}$/.test(path.basename(String(target)))) barrier();
+    return out;
+  };
+  syncBuiltinESMExports();
+  const { createSessionPowerAuthorityProducerPort } = await import(libUrl);
+  const { authorityRepositoryFromRoot } = await import(ownerUrl);
+  let result;
+  try {
+    createSessionPowerAuthorityProducerPort({ repository: authorityRepositoryFromRoot(repoRoot) });
+    result = { ok: true };
+  } catch (error) {
+    result = { ok: false, code: error?.code ?? null, message: String(error?.message ?? error) };
+  }
+  process.stdout.write("RESULT " + JSON.stringify(result) + "\n", () => process.exit(0));
+}
+
+async function checkAsync(name, fn) {
+  try {
+    await fn();
+    passed += 1;
+    console.log(`PASS ${name}`);
+  } catch (error) {
+    failures.push(`${name}: ${error.message}`);
+    console.error(`FAIL ${name} -- ${error.message}`);
+  }
+}
+
+function addressRaceSetup() {
+  // Short names on purpose: the fixed address path must stay within the 107-byte Linux socket bound (needs the private short TMPDIR of scripts/run-in.mjs).
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "s")));
+  mkdirSync(join(root, "h"), { mode: 0o700 });
+  const git = (cwd, ...args) => {
+    const run = spawnSync("git", args, { cwd, encoding: "utf8" });
+    assert.equal(run.status, 0, `git ${args.join(" ")} failed: ${run.stderr}`);
+  };
+  const repos = ["a", "b"].map((name) => {
+    const dir = join(root, name);
+    mkdirSync(dir);
+    git(dir, "init", "-q");
+    git(dir, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "init");
+    return dir;
+  });
+  return { root, repos };
+}
+
+function addressRaceChildProcess(root, name, repo, holdAt) {
+  const ready = join(root, `${name}.ready`);
+  const go = join(root, `${name}.go`);
+  const child = spawn(process.execPath, [
+    "--input-type=module", "-e", `(${addressRaceChild.toString()})()`,
+    join(root, "h"), repo,
+    new URL("./session-power.mjs", import.meta.url).href,
+    new URL("./session-authority-domain-owner.mjs", import.meta.url).href,
+    holdAt, ready, go,
+  ], { stdio: ["ignore", "pipe", "pipe"] });
+  let out = "";
+  let err = "";
+  child.stdout.on("data", (chunk) => { out += chunk; });
+  child.stderr.on("data", (chunk) => { err += chunk; });
+  const done = new Promise((resolveDone) => child.on("close", (code) => {
+    const line = out.split("\n").find((entry) => entry.startsWith("RESULT "));
+    resolveDone({ exit: code, result: line ? JSON.parse(line.slice(7)) : null, stderr: err.slice(0, 400) });
+  }));
+  return { ready, go, done, kill: () => child.kill("SIGKILL"), stderr: () => err.slice(-1500) };
+}
+
+async function waitForBarrier(handle) {
+  let exited = false;
+  handle.done.then(() => { exited = true; });
+  const deadline = Date.now() + 60000;
+  while (!existsSync(handle.ready) && !exited) {
+    if (Date.now() > deadline) throw new Error("barrier ready file never appeared");
+    await new Promise((resolveWait) => setTimeout(resolveWait, 10));
+  }
+  return existsSync(handle.ready);
+}
+
+function assertTwoAnchoredSlots(root) {
+  const names = readdirSync(join(root, "h", ".apsp")).sort();
+  assert.equal(names.length, 2, `expected two slots, saw ${JSON.stringify(names)}`);
+  for (const name of names) {
+    const anchor = JSON.parse(readFileSync(join(root, "h", ".apsp", name, "anchor.json"), "utf8"));
+    assert.equal(anchor.repositoryFingerprint.slice(0, 16), name);
+  }
+}
+
+await checkAsync("two processes on one home: a slot created between the two namespace listings is accepted", async () => {
+  const { root, repos } = addressRaceSetup();
+  const handles = [];
+  try {
+    const a = addressRaceChildProcess(root, "a", repos[0], "after-first-listing");
+    handles.push(a);
+    if (!(await waitForBarrier(a))) assert.fail(`held process never reached its barrier: ${JSON.stringify(await a.done)}`);
+    const b = addressRaceChildProcess(root, "b", repos[1], "none");
+    handles.push(b);
+    const rb = await b.done;
+    writeFileSync(a.go, "");
+    const ra = await a.done;
+    assert.equal(rb.result?.ok, true, `second process: ${JSON.stringify(rb)}`);
+    assert.equal(ra.result?.ok, true, `held process: ${JSON.stringify(ra)}`);
+    assertTwoAnchoredSlots(root);
+  } finally {
+    for (const handle of handles) { writeFileSync(handle.go, ""); handle.kill(); }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+await checkAsync("two processes on one home: a slot another process is still creating is never observable half-made", async () => {
+  const { root, repos } = addressRaceSetup();
+  const handles = [];
+  try {
+    const b = addressRaceChildProcess(root, "b", repos[1], "after-slot-mkdir");
+    handles.push(b);
+    await waitForBarrier(b); // false when the slot is published atomically and the process never pauses mid-creation
+    const a = addressRaceChildProcess(root, "a", repos[0], "none");
+    handles.push(a);
+    const ra = await a.done;
+    writeFileSync(b.go, "");
+    const rb = await b.done;
+    assert.equal(ra.result?.ok, true, `process preparing while the other creates its slot: ${JSON.stringify(ra)}`);
+    assert.equal(rb.result?.ok, true, `process creating its slot: ${JSON.stringify(rb)}`);
+    assertTwoAnchoredSlots(root);
+  } finally {
+    for (const handle of handles) { writeFileSync(handle.go, ""); handle.kill(); }
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 console.log(`\nsession-power core: ${passed}/${passed + failures.length} checks passed.`);
