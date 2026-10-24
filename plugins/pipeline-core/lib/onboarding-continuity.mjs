@@ -71,7 +71,7 @@ import {validateRetirementJournal} from "./enrollment-retirement-coordinator.mjs
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 import { applyBoundDesignLineEndings, planBoundDesignLineEndings } from "./bound-design-line-endings.mjs";
 import { parseArchitectureDesign } from "./architecture-design.mjs";
-import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton } from "./design-authoring.mjs";
+import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder } from "./design-authoring.mjs";
 import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -7744,7 +7744,7 @@ function bootstrapAcknowledgementPlan({ rootDir, repositoryCapability = "local",
   const unfinished = (text) => text.includes("<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.")
     || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
     || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
-    || /^- AC-01: WHEN <trigger>, the system SHALL <observable result>\.$/mu.test(text);
+    || hasGeneratedCriterionPlaceholder(text);
   if (unfinished(prdText) || unfinished(specText)) {
     fail("BOOTSTRAP-ACK-PLACEHOLDER-CONTENT", "complete the generated PRD and specification before acknowledgement");
   }

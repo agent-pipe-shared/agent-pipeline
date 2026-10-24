@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Draft authoring aids. These create no receipt, approval or implementation. */
+import { scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
 export function renderArchitectureDesignSkeleton() {
   const module = { id: "application", responsibility: "REPLACE: application responsibility",
     nonResponsibilities: ["REPLACE: excluded responsibility"], ownedPaths: ["src/**", "tests/**", "docs/contracts/application.md"],
@@ -17,9 +18,22 @@ export function renderArchitectureDesignSkeleton() {
 
 export function renderDesignTraceabilitySkeleton() {
   return "## Acceptance criteria\n\n"
-    + "- AC-01: WHEN <trigger>, the system SHALL <observable result>.\n\n"
+    + "| # | Criterion | Evidence |\n"
+    + "|---|---|---|\n"
+    + "| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |\n\n"
     + "## Traceability\n\n| Design input | Requirement | Acceptance criterion | Verification entry point |\n"
-    + "|---|---|---|---|\n| REPLACE: input reference | REPLACE: requirement | AC-01 | REPLACE: test path and case |\n";
+    + "|---|---|---|---|\n| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |\n";
+}
+
+/** Use the accepted parser's section context; normalize only the legacy unsupported bullet shape. */
+export function hasGeneratedCriterionPlaceholder(text) {
+  if (typeof text !== "string") return false;
+  const placeholder = "WHEN <trigger>, the system SHALL <observable result>.";
+  const matches = source => scanAcceptedCriterionRows(source).some(row => row.normative && row.valid !== false
+    && row.id === "AC-1" && row.text === placeholder);
+  if (matches(text)) return true;
+  const legacy = /^- AC-01: WHEN <trigger>, the system SHALL <observable result>\.[ \t]*$/gmu;
+  return matches(text.replace(legacy, `- **AC-1:** ${placeholder}`));
 }
 
 /** Keep full evidence on disk; avoid repeating document payloads in the action readback. */

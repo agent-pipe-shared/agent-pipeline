@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
 import { parseArchitectureDesign } from "./architecture-design.mjs";
-import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, compactActionReadback } from "./design-authoring.mjs";
+import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, compactActionReadback } from "./design-authoring.mjs";
+import { createHash } from "node:crypto";
+import { inspectSpecCriterionRows, parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
 import { devNull } from "node:os";
 const completionCases = [];
 function test(name, optionsOrRun, possibleRun) {
@@ -38,7 +40,54 @@ test("compact readback retains executable recovery and digests without copying d
   assert.equal(Object.hasOwn(result,"plan"), false);
 });
 
-if (completionCases.length !== 2) throw new Error("case completion count drift: expected 2, got " + completionCases.length);
+test("generated criterion uses the accepted parser shape while draft and legacy ids remain unapproved", () => {
+  const draft = renderDesignTraceabilitySkeleton();
+  assert.equal(hasGeneratedCriterionPlaceholder(draft), true);
+  assert.equal(hasGeneratedCriterionPlaceholder("## Acceptance criteria\n- AC-01: WHEN <trigger>, the system SHALL <observable result>.\n"), true);
+  assert.equal(hasGeneratedCriterionPlaceholder("## Notes\n\nThe example says WHEN <trigger>, the system SHALL <observable result>.\n"), false);
+  assert.equal(hasGeneratedCriterionPlaceholder("## Acceptance criteria\n\n> - AC-01: WHEN <trigger>, the system SHALL <observable result>.\n"), false);
+  assert.equal(hasGeneratedCriterionPlaceholder("## Notes\n\n| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | quoted example |\n"), false);
+  for (const heading of ["## Acceptance requirements — project", "## Abnahmeanforderungen"]) {
+    const variant = draft.replace("## Acceptance criteria", heading);
+    assert.deepEqual(scanAcceptedCriterionRows(variant).filter(row => row.normative).map(row => row.id), ["AC-1"]);
+    assert.equal(hasGeneratedCriterionPlaceholder(variant), true, heading);
+  }
+  const nested = draft.replace("## Acceptance criteria\n", "## Acceptance criteria\n\n### Delivery flow\n");
+  assert.deepEqual(scanAcceptedCriterionRows(nested).filter(row => row.normative).map(row => row.id), ["AC-1"]);
+  assert.equal(hasGeneratedCriterionPlaceholder(nested), true);
+  const excluded = draft.replace("## Acceptance criteria\n", "## Acceptance criteria\n\n### Notes\n");
+  assert.deepEqual(scanAcceptedCriterionRows(excluded).filter(row => row.normative).map(row => row.id), []);
+  assert.equal(hasGeneratedCriterionPlaceholder(excluded), false);
+  const legacyNested = "## Acceptance requirements — project\n\n### Delivery flow\n- AC-01: WHEN <trigger>, the system SHALL <observable result>.\n";
+  assert.equal(hasGeneratedCriterionPlaceholder(legacyNested), true);
+  assert.deepEqual(inspectSpecCriterionRows(draft), { ok: true, located: ["AC-1"] });
+  const rows = scanAcceptedCriterionRows(draft).filter(row => row.normative);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].id, "AC-1");
+  assert.equal(rows[0].text, "WHEN <trigger>, the system SHALL <observable result>.");
+  const malformed = draft.replace("| AC-1 |", "| AC-01 |");
+  assert.equal(inspectSpecCriterionRows(malformed).code, "CAC-CRITERION-UNSUPPORTED");
+  const badHeader = draft.replace("| # | Criterion | Evidence |", "| ID | Criterion | Evidence |");
+  assert.equal(inspectSpecCriterionRows(badHeader).code, "CAC-CRITERION-UNSUPPORTED");
+
+  const authored = draft.replace("WHEN <trigger>, the system SHALL <observable result>.",
+    "The package must receive a PASS verdict from an independent Critic before acceptance.")
+    .replaceAll("REPLACE: ", "Authored: ");
+  assert.equal(hasGeneratedCriterionPlaceholder(authored), false);
+  assert.deepEqual(inspectSpecCriterionRows(authored), { ok: true, located: ["AC-1"] });
+  const row = scanAcceptedCriterionRows(authored).find(item => item.id === "AC-1");
+  const bytes = Buffer.from(authored);
+  const hash = value => createHash("sha256").update(value).digest("hex");
+  const sourcePath = "specs/synthetic/spec.md";
+  const sourceSha256 = hash(bytes);
+  const result = parseAcceptedCriticCriterion({ sourceBytes: bytes,
+    locator: { schema: "pipeline.critic-criterion-locator.v1", sourcePath, sourceSha256, criterionId: "AC-1",
+      startByte: row.startByte, endByte: row.endByte, excerptSha256: hash(bytes.subarray(row.startByte, row.endByte)) },
+    packageContext: { featureId: "synthetic", sourceBindings: [{ path: sourcePath, sha256: sourceSha256, role: "spec" }] } });
+  assert.equal(result.status, "explicit-actual-independent-pass");
+});
+
+if (completionCases.length !== 3) throw new Error("case completion count drift: expected 3, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

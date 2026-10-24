@@ -5169,7 +5169,7 @@ check("planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding g
   const spec = readFileSync(join(root, generatePlan.targets.spec.path), "utf8");
   assert.match(prd, /<!-- DRAFT TEMPLATE: replace every REPLACE value/u, "fixture PRD must hold the DRAFT TEMPLATE comment");
   assert.match(prd, /REPLACE/u, "fixture PRD must hold a REPLACE value");
-  assert.match(spec, /AC-01: WHEN <trigger>, the system SHALL <observable result>\./u, "fixture spec must hold the AC-01 template line");
+  assert.match(spec, /\| AC-1 \| WHEN <trigger>, the system SHALL <observable result>\. \|/u, "fixture spec must hold the current parseable criterion placeholder");
   let refusal = null;
   try { planOnboardingBootstrapAcknowledgementChat({ rootDir: root }); } catch (error) { refusal = error; }
   assert.equal(refusal?.code, "BOOTSTRAP-ACK-PLACEHOLDER-CONTENT",
@@ -5311,7 +5311,28 @@ check("a malformed top-level rigorHistory journal is damaged", () => {
   }
 });
 
-assert.equal(cases.length, 306, "the complete onboarding continuity corpus must be registered before execution begins");
+check("planOnboardingBootstrapAcknowledgementChat accepts an authored spec quoting the criterion example only in Notes", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("quoted-criterion-example", { profile: "mini" });
+  finishPositiveAcknowledgementFixture(root, generatePlan);
+  const specPath = join(root, generatePlan.targets.spec.path);
+  writeFileSync(specPath, `${readFileSync(specPath, "utf8")}\n## Notes\nThe discarded example says WHEN <trigger>, the system SHALL <observable result>.\n`);
+  const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
+  applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
+  const plan = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+  assert.equal(plan.nextAction?.kind, "command");
+});
+
+check("planOnboardingBootstrapAcknowledgementChat refuses a placeholder under titled nested acceptance requirements", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("nested-placeholder", { profile: "mini" });
+  finishPositiveAcknowledgementFixture(root, generatePlan);
+  const specPath = join(root, generatePlan.targets.spec.path);
+  writeFileSync(specPath, "# Authored specification\n\n## Acceptance requirements — project\n\n### Delivery flow\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | Authored test path |\n");
+  const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
+  applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
+  expectKickoffError("BOOTSTRAP-ACK-PLACEHOLDER-CONTENT", () => planOnboardingBootstrapAcknowledgementChat({ rootDir: root }));
+});
+
+assert.equal(cases.length, 308, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

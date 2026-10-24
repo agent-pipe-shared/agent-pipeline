@@ -5886,6 +5886,7 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
       ["./trusted-tool-resolution.mjs", ["plugins", "pipeline-core", "lib", "trusted-tool-resolution.mjs"]],
       ["./security-scanner-diagnostics.mjs", ["plugins", "pipeline-core", "lib", "security-scanner-diagnostics.mjs"]],
       ["./security-scanner-diagnostics-publication.mjs", ["plugins", "pipeline-core", "lib", "security-scanner-diagnostics-publication.mjs"]],
+      ["./security-remote-identity.mjs", ["plugins", "pipeline-core", "lib", "security-remote-identity.mjs"]],
       ["../scripts/security-adapters/gitleaks.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "gitleaks.mjs"]],
       ["../scripts/security-adapters/osv-scanner.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "osv-scanner.mjs"]],
       ["../scripts/security-adapters/semgrep.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "semgrep.mjs"]],
@@ -9522,14 +9523,14 @@ for (const runner of ["claude", "codex", "antigravity"]) {
 // mechanical repair the final-package re-entry case above drives is applied so
 // the package stays valid.
 const GENERATED_DRAFT_BANNER = "<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.";
-const GENERATED_DRAFT_AC_LINE = /^- AC-01: WHEN <trigger>, the system SHALL <observable result>\.$/gmu;
+const GENERATED_DRAFT_AC_LINE = /^(?:- AC-01: WHEN <trigger>, the system SHALL <observable result>\.|\| AC-1 \| WHEN <trigger>, the system SHALL <observable result>\. \| REPLACE: test path and case \|)$/gmu;
 const generatedDraftIsUnfinished = (text) => text.includes(GENERATED_DRAFT_BANNER)
   || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
   || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
   || new RegExp(GENERATED_DRAFT_AC_LINE.source, "mu").test(text);
 const completeGeneratedDraftText = (text) => text
   .replaceAll(GENERATED_DRAFT_BANNER, "<!-- Reviewed draft: every value and all example paths were completed.")
-  .replaceAll(GENERATED_DRAFT_AC_LINE, "- AC-01: WHEN the PO reviews the staging package, the system SHALL bind exactly the reviewed bytes.")
+  .replaceAll(GENERATED_DRAFT_AC_LINE, "| AC-1 | WHEN the PO reviews the staging package, the system SHALL bind exactly the reviewed bytes. | Reviewed: test path and case |")
   .replaceAll("REPLACE: ", "Reviewed: ");
 function completeGeneratedStagingDraft({ path, observation, intakeDeps }) {
   for (const relativePath of [observation.prd.path, observation.spec.path]) {
