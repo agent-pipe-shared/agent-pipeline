@@ -83,6 +83,7 @@ import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify, readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
 import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
+import { prepareCommitWorktreeDependencies } from "../lib/commit-worktree-dependencies.mjs";
 import {
   GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA,
   buildGovernanceVerificationAction,
@@ -305,7 +306,7 @@ function removeCommitWorktree(root, container) {
  * Critic-bound options and an action event are bound to the checkout itself and are refused
  * (VEP-COMMIT-MODE) rather than silently producing evidence bound to something else.
  */
-async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
+async function produceVerifyEvidenceForCommit({ root, commit, prepareDependencies, ...options }) {
   const { outPath, eventOutPath, mode, criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId } = options;
   if (["release", "push"].includes(mode) || eventOutPath !== null || criticPacketId !== null || criticReverifyReceiptId !== null || criticEvidenceFeatureId !== null) {
     fail("VEP-COMMIT-MODE", "A named-commit run (--commit) produces work, critic or candidate evidence for that commit alone; the release and push lanes, the Critic-bound options and an action event bind the checkout itself. Run those without --commit in the checkout.");
@@ -330,6 +331,8 @@ async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
     // An empty hooks directory: a post-checkout hook of the shared repository must not run for this plumbing.
     try { git(root, ["-c", `core.hooksPath=${hooks}`, "worktree", "add", "--detach", "--quiet", commitWorktreePath(root, container), sha], COMMIT_WORKTREE_TIMEOUT_MS); }
     catch { fail("VEP-COMMIT-WORKTREE", `Could not create the temporary worktree for commit ${sha}.`); }
+    try { prepareDependencies({ root: commitWorktreePath(root, container), commit: sha }); }
+    catch (error) { fail(error.code ?? "VEP-DEPENDENCY-SETUP", error.message ?? "Candidate dependency preparation failed."); }
     const produced = await produceVerifyEvidence({ ...options, rootDir: commitWorktreePath(root, container), commit: null });
     // The run above wrote into the temporary worktree; publish the evidence into the requested path of the checkout.
     writeEvidence(root, target, produced.evidence);
@@ -352,10 +355,10 @@ async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
  * worktree and the shared checkout stays untouched (see
  * `produceVerifyEvidenceForCommit`).
  */
-export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null, criticEvidenceFeatureId = null, commit = null, assessPushHookBackstop = realAssessPushHookBackstop }) {
+export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null, criticEvidenceFeatureId = null, commit = null, assessPushHookBackstop = realAssessPushHookBackstop, prepareDependencies = prepareCommitWorktreeDependencies }) {
   const root = resolve(rootDir);
   if (commit !== null) {
-    return await produceVerifyEvidenceForCommit({ root, commit, outPath, eventOutPath, mode, base, reuseReceipts, criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId, assessPushHookBackstop });
+    return await produceVerifyEvidenceForCommit({ root, commit, outPath, eventOutPath, mode, base, reuseReceipts, criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId, assessPushHookBackstop, prepareDependencies });
   }
   if (criticEvidenceFeatureId !== null && (criticPacketId === null || !["candidate", "release"].includes(mode))) {
     fail("VEP-CRITIC-CARRY-INPUT", "Evidence-only carry-forward requires a Critic-bound candidate or release Verify.");

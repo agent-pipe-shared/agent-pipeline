@@ -23,6 +23,7 @@ import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
 import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
+import { planCommitNpmInvocation, prepareCommitWorktreeDependencies } from "../lib/commit-worktree-dependencies.mjs";
 
 function run(executable, args, options = {}) {
   const result = spawnSync(executable, args, { encoding: "utf8", ...options });
@@ -867,4 +868,94 @@ test("the CLI accepts --commit and reports the named commit", async () => {
     assert.match(missing.stderr, /VEP-COMMIT-NOT-LOCAL/u);
     assert.match(spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" }).stdout, /--commit <sha>/u);
   });
+});
+
+test("a named candidate prepares committed npm dependencies before Verify without copying checkout packages", async () => {
+  const scratch = join(process.cwd(), "scratch");
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "g22-project-"));
+  const bin = mkdtempSync(join(scratch, "g22-bin-"));
+  try {
+    mkdirSync(join(root, ".claude"));
+    writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: basename(root), verify: "node -e \"process.exit(require('fs').existsSync('node_modules/.g22-ready')?0:9)\"" }));
+    writeFileSync(join(root, ".gitignore"), "/evidence/\n/node_modules/\n");
+    writeFileSync(join(root, "README.md"), "first\n");
+    prepareConsumerVerify({ rootDir: root });
+    git(root, ["init", "-q"]);
+    commitFile(root, [".claude/pipeline.json", ".gitignore", "README.md", "project/consumer-verify.mjs"], "first");
+    const first = git(root, ["rev-parse", "HEAD"]);
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "g22", version: "1.0.0", packageManager: "npm@10.0.0", dependencies: { dep: "1.0.0", other: "2.0.0" } }));
+    writeFileSync(join(root, "package-lock.json"), JSON.stringify({ name: "g22", version: "1.0.0", lockfileVersion: 3, packages: { "": { dependencies: { other: "2.0.0", dep: "1.0.0" } }, "node_modules/dep": { version: "1.0.0" }, "node_modules/other": { version: "2.0.0" } } }));
+    const candidate = commitFile(root, ["package.json", "package-lock.json"], "candidate with dependencies");
+    writeFileSync(join(root, "README.md"), "later\n");
+    commitFile(root, ["README.md"], "later head");
+    mkdirSync(join(root, "node_modules"));
+    writeFileSync(join(root, "node_modules", ".g22-ready"), "host package");
+    const fake = join(bin, "fake-npm.mjs");
+    const log = join(bin, "calls.jsonl");
+    writeFileSync(fake, `#!/usr/bin/env node\nimport { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\nappendFileSync(process.env.G22_NPM_LOG, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }) + '\\n');\nif (process.argv[2] === '--version') console.log('10.0.0');\nelse if (process.env.G22_NPM_FAIL === '1') process.exitCode = 7;\nelse { mkdirSync('node_modules'); writeFileSync(join('node_modules', '.g22-ready'), 'prepared'); }\n`);
+    chmodSync(fake, 0o755);
+    const priorLog = process.env.G22_NPM_LOG;
+    process.env.G22_NPM_LOG = log;
+    const prepareDependencies = ({ root: worktree, commit }) => prepareCommitWorktreeDependencies({ root: worktree, commit, npmExecutable: process.execPath, npmPrefixArgs: [fake] });
+    try {
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies: () => ({ status: "not-required" }) }),
+        error => error.code === "VEP-VERIFY-FAILED", "the original unprepared worktree must fail its configured test");
+      assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
+      const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies });
+      assert.equal(result.status, "passed");
+      assert.equal(result.evidence.commit, candidate);
+      assert.equal(readFileSync(join(root, "node_modules", ".g22-ready"), "utf8"), "host package");
+      const calls = readFileSync(log, "utf8").trim().split("\n").map(JSON.parse);
+      assert.deepEqual(calls.map(call => call.argv), [["--version"], ["ci", "--ignore-scripts", "--no-audit", "--no-fund"]]);
+      assert.equal(calls[0].cwd, calls[1].cwd);
+      assert.notEqual(calls[0].cwd, root);
+      assertNoCommitWorktree(root);
+      process.env.G22_NPM_FAIL = "1";
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies }),
+        error => error.code === "VEP-DEPENDENCY-SETUP");
+      assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
+      assertNoCommitWorktree(root);
+      assert.throws(() => prepareCommitWorktreeDependencies({ root, commit: candidate, npmExecutable: process.execPath, npmPrefixArgs: [fake] }),
+        error => error.code === "VEP-DEPENDENCY-CANDIDATE");
+      unlinkSync(join(root, "package-lock.json"));
+      const missingLock = commitFile(root, ["package-lock.json"], "missing lock");
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: missingLock, prepareDependencies }),
+        error => error.code === "VEP-DEPENDENCY-LOCK");
+      assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
+      assertNoCommitWorktree(root);
+      writeFileSync(join(root, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": { dependencies: { dep: "2.0.0" } } } }));
+      const staleLock = commitFile(root, ["package-lock.json"], "stale lock");
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: staleLock, prepareDependencies }),
+        error => error.code === "VEP-DEPENDENCY-LOCK");
+      assertNoCommitWorktree(root);
+    } finally {
+      if (priorLog === undefined) delete process.env.G22_NPM_LOG; else process.env.G22_NPM_LOG = priorLog;
+      delete process.env.G22_NPM_FAIL;
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(bin, { recursive: true, force: true }); }
+});
+
+test("candidate npm preparation uses the existing closed Windows shim vector outside the worktree", () => {
+  const nodeDirectory = "C:\\tools\\node";
+  const candidate = "C:\\project\\candidate";
+  const cmd = "C:\\Windows\\System32\\cmd.exe";
+  const npm = `${nodeDirectory}\\npm.CMD`;
+  const files = new Set([npm.toLowerCase(), cmd.toLowerCase(), `${candidate}\\npm.CMD`.toLowerCase()]);
+  const lstatSyncFn = (path) => {
+    if (!files.has(path.toLowerCase())) { const error = new Error("ENOENT"); error.code = "ENOENT"; throw error; }
+    return { isFile: () => true, isSymbolicLink: () => false };
+  };
+  const options = { root: candidate, resolutionCwd: nodeDirectory, platform: "win32",
+    environment: { PATH: nodeDirectory, PATHEXT: ".CMD", SystemRoot: "C:\\Windows" }, lstatSyncFn };
+  const version = planCommitNpmInvocation(["--version"], options);
+  const install = planCommitNpmInvocation(["ci", "--ignore-scripts", "--no-audit", "--no-fund"], options);
+  assert.equal(version.executable, cmd);
+  assert.deepEqual(version.args.slice(0, 4), ["/d", "/s", "/v:off", "/c"]);
+  assert.match(version.args[4], /^""C:\\tools\\node\\npm\.CMD" "--version""$/u);
+  assert.match(install.args[4], /^""C:\\tools\\node\\npm\.CMD" "ci" "--ignore-scripts" "--no-audit" "--no-fund""$/u);
+  assert.equal(install.options.cwd, candidate);
+  assert.equal(install.options.shell, false);
+  assert.equal(install.options.windowsVerbatimArguments, true);
+  assert.throws(() => planCommitNpmInvocation(["a&b"], options), error => error.code === "CAPTURE-EVIDENCE-WINDOWS-NPM-ARGUMENT-UNSUPPORTED");
 });
