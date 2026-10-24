@@ -1,0 +1,213 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index 31a9fbf01..d49e51527 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -179,6 +179,8 @@ function projectCalibrationRelPath(rootDir) {
+ import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
++import { inspectCriticBoundVerify } from "../lib/critic-verify-readiness.mjs";
++import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+ // NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-
+ // calls-it.md, Point 3): read-only observer, no mkdirSync/physicalScratchRoot call -- see
+@@ -2284,6 +2286,33 @@ function readEvidence(relPath) {
+   return { ok: true, data, raw, relPath };
+ }
+ 
++function publishedStateRequiresReview() {
++  for (const path of [projectStateRelPath(evidenceProjectDir), NEUTRAL_STATE, LEGACY_STATE]) {
++    const shown = spawnSync("git", ["-C", evidenceProjectDir, "show", `${sourceCommit}:${path}`], {
++      encoding: "utf8", timeout: 5000,
++    });
++    if (shown.status !== 0) continue;
++    try { return requiresPublicationReview(JSON.parse(String(shown.stdout))); }
++    catch { return true; }
++  }
++  return false;
++}
++
++function checkIndependentPublicationReview() {
++  if (!publishedStateRequiresReview()) return [];
++  const verify = readEvidence(VERIFY_EVIDENCE_DEFAULT_PATH);
++  if (!verify.ok) return ["candidate-bound independent review and Verify evidence are unavailable"];
++  const repository = discoverRepository(evidenceProjectDir, { timeout: 5000 });
++  const status = spawnSync("git", ["-C", evidenceProjectDir, "status", "--porcelain=v1"], {
++    encoding: "utf8", timeout: 5000,
++  });
++  const review = inspectCriticBoundVerify({ repoRoot: evidenceProjectDir,
++    gitCommonDir: repository.commonDir, head: sourceCommit, tree: resolveSourceTree(),
++    worktreeState: status.status === 0 && String(status.stdout).trim() === "" ? "clean" : "dirty",
++    evidencePath: VERIFY_EVIDENCE_DEFAULT_PATH, evidence: verify.data });
++  return review.currentCheckoutOk ? [] : [`candidate-bound independent review and Verify are unavailable (${review.code})`];
++}
++
+ /** Runs the shared exitCode===0 + commit===pushed-source check; returns failure reasons (empty = pass). */
+ function checkEvidenceFreshness(relPath) {
+   const failures = [];
+@@ -2474,6 +2503,7 @@ try {
+ 
+   // (a) verify evidence -- always checked once the push gate is active.
+   failures.push(...checkEvidenceFreshness(VERIFY_EVIDENCE_DEFAULT_PATH));
++  failures.push(...checkIndependentPublicationReview());
+ 
+   // (b) security evidence -- only when a security gate is configured and not "off".
+   // PUSHWARN-1: pushed into securityFailures, NOT failures -- this bucket is dispatched
+diff --git a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+index 1f7394a22..ee37d0df0 100644
+--- a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+@@ -17,7 +17,7 @@ import test from "node:test";
+ import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../critic-skip-decision.mjs";
+ import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_SCHEMA, validateSliceQueue } from "../slice-queue.mjs";
+ 
+-const CLI = fileURLToPath(new URL("../../scripts/close-coordinator.mjs", import.meta.url));
++const CLI = process.env.G20_CLOSE_CLI ?? fileURLToPath(new URL("../../scripts/close-coordinator.mjs", import.meta.url));
+ const CANDIDATE = "a".repeat(40);
+ const FEATURE = "feature";
+ const COURSE_PATH = "specs/feature/slice-queue.json";
+@@ -200,6 +200,22 @@ test("(d) a feature with no delivery course plans, whatever other records exist"
+   assert.equal(planned.body.phase, "feature-close-prepared");
+ });
+ 
++test("rigor one close without a delivery course still needs the independent Critic/Verify audit", () => {
++  const repo = checkpointed("rigor-one-no-course", {}, (root) => {
++    const path = join(root, ".claude", "pipeline-state.json");
++    const state = JSON.parse(readFileSync(path, "utf8"));
++    state.planSubmission = { profile: "feature" };
++    writeFileSync(path, json(state));
++    git(root, ["add", ".claude/pipeline-state.json"]);
++    git(root, ["commit", "-m", "declare rigor one"]);
++  });
++  const before = repo.snapshot();
++  const refused = repo.planPrepared();
++  assert.equal(refused.status, 2, JSON.stringify(refused.body));
++  assert.equal(refused.body.code, "CLOSE-QUALIFICATION-REQUIRED");
++  assert.deepEqual(repo.snapshot(), before);
++});
++
+ test("(e) an invalid delivery course fails closed with a typed code and zero mutation", () => {
+   const repo = checkpointed("e", { [COURSE_PATH]: "{ not json" });
+   const before = repo.snapshot();
+diff --git a/plugins/pipeline-core/lib/publication-review-requirement.mjs b/plugins/pipeline-core/lib/publication-review-requirement.mjs
+new file mode 100644
+index 000000000..8d25cd29c
+--- /dev/null
++++ b/plugins/pipeline-core/lib/publication-review-requirement.mjs
+@@ -0,0 +1,13 @@
++// SPDX-License-Identifier: SUL-1.0
++/** A submitted mini/feature/epic profile carries rigor >= 1. */
++export function requiresPublicationReview(state) {
++  const profiles = new Set(["mini", "feature", "epic"]);
++  if (profiles.has(state?.planSubmission?.profile)) return true;
++  // close-feature removes planSubmission and activeFeature, but retains the
++  // feature's rigor floor in the journal and its identity in closedFeatures.
++  const latestClosed = Array.isArray(state?.closedFeatures) ? state.closedFeatures.at(-1) : null;
++  const featureId = state?.activeFeature?.id ?? latestClosed?.id;
++  return typeof featureId === "string" && Array.isArray(state?.rigorHistory)
++    && state.rigorHistory.some((row) => row?.body?.featureId === featureId
++      && profiles.has(row?.body?.observation?.retainedProfile));
++}
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 32e3468e2..7a4273a8f 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -16,6 +16,7 @@ import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs"
+ import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
+ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
++import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+ import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
+ import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
+ import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
+@@ -393,8 +394,9 @@ function continuityCloseRequest(root, snapshot, path) {
+  * A feature cannot reach `feature-close-prepared` while one of ITS OWN delivery-course dispatch records
+  * requires a Critic and has no matching Critic evidence (the evaluator's own decision, not a second one).
+  * Scope is the slice ids of the course beside the approved plan, the file resolveGovernedItemQueue reads;
+- * records of other or earlier features never block. No course file means nothing to scope and nothing to
+- * refuse. An unreadable, oversized, invalid or foreign course fails closed.
++ * records of other or earlier features never block. No course file means nothing to scope in
++ * this per-slice check; the whole-candidate qualification below still applies.
++ * An unreadable, oversized, invalid or foreign course fails closed.
+  * D27/D55 (Q1): a slice recorded only by its orchestrator commit (no dispatch record) is accepted as
+  * authored, but only on the audit route, whose candidate-bound Verify and Critic receipt stand in for
+  * the record's Critic decision (lib/close-authorship-record.mjs).
+@@ -491,6 +493,13 @@ async function transitionPlan(values) {
+     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
+     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
+     courseAuthorship = assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined });
++    // Every submitted profile maps to rigor >= 1. A missing slice queue says
++    // nothing about whether the whole candidate received independent review.
++    // The audit route below reads the consumed Critic packet and exact Verify
++    // lifecycle; a self-authored design receipt cannot stand in for either.
++    if (requiresPublicationReview(snapshot.state) && values.auditRequest === undefined) {
++      fail("CLOSE-QUALIFICATION-REQUIRED", "rigor >= 1 feature close requires the candidate-bound Critic/Verify audit route");
++    }
+     if (values.auditRequest !== undefined) {
+       const request = auditRequest(root, values.auditRequest);
+       if (!SHA256.test(values.criticVerifyLifecycle ?? "") || values.criticVerifyLifecycle !== request.value.criticVerifyLifecycleId) {
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 708a59c20..b8e40b357 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -53,6 +53,8 @@ import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHu
+ import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
++import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
++import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+ 
+ export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
+@@ -684,6 +686,15 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+     }
+   } else if (headCommit) {
+     checks.push(checkEvidenceFreshness("verify-evidence", VERIFY_EVIDENCE_DEFAULT_PATH, evidenceDir, headCommit, deps));
++    const stateRead = (deps.readState ?? readState)(dir);
++    if (stateRead?.status === "ok" && requiresPublicationReview(stateRead.state)) {
++      const review = (deps.checkCriticBoundVerify ?? checkCurrentCriticBoundVerify)(dir);
++      checks.push({ id: "critic-bound-verify", ok: review.ok === true,
++        message: review.ok ? "independent Critic and Verify bind this exact candidate"
++          : `candidate qualification unavailable (${review.code ?? "unavailable"})`,
++        ...(!review.ok ? { remedy: "complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
++      });
++    }
+     if (securityGateActive) {
+       checks.push(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", evidenceDir, headCommit, deps));
+     }
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 75313d6da..c12d6a1d6 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -774,6 +774,31 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
+   assert.doesNotMatch(humanText, /render-copy-safe|available on demand/u);
+ });
+ 
++test("rigor one publication requires candidate-bound independent Critic and Verify", () => {
++  const argv = ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"];
++  const state = { activeFeature: { id: "reviewed", planPath: "specs/reviewed/prd.md" }, planSubmission: { profile: "feature" } };
++  const missing = pushPrepareReport(argv, readyDeps({ readState: () => ({ status: "ok", state }),
++    checkCriticBoundVerify: () => ({ ok: false, code: "private-critic-binding-unavailable" }) }));
++  assert.equal(missing.report.ready, false);
++  assert.equal(missing.report.checks.find((check) => check.id === "critic-bound-verify")?.ok, false);
++  const reviewed = pushPrepareReport(argv, readyDeps({ readState: () => ({ status: "ok", state }),
++    checkCriticBoundVerify: () => ({ ok: true, code: "critic-bound-verify-valid" }) }));
++  assert.equal(reviewed.report.ready, true);
++  const checkpoint = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/feat/reviewed", "--checkpoint"],
++    readyDeps({ readState: () => ({ status: "ok", state }), loadManifestSafe: blockingSecurity }), slimOptions);
++  assert.equal(checkpoint.report.checks.some((check) => check.id === "critic-bound-verify"), false);
++});
++
++test("retained rigor after close still requires candidate review", () => {
++  const state = { closedFeatures: [{ id: "reviewed" }], rigorHistory: [{ body: {
++    featureId: "reviewed", observation: { retainedProfile: "feature" },
++  } }] };
++  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
++    readyDeps({ readState: () => ({ status: "ok", state }),
++      checkCriticBoundVerify: () => ({ ok: false, code: "private-critic-binding-unavailable" }) }));
++  assert.equal(result.report.checks.find((check) => check.id === "critic-bound-verify")?.ok, false);
++});
++
+ test("pushPrepareReport: inspection mode never folds a pending approval write", () => {
+   let foldCalls = 0;
+   const result = pushPrepareReport(

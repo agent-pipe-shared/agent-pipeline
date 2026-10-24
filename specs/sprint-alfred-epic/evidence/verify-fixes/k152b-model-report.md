@@ -1,5 +1,9 @@
 # K152B Antigravity model proposal
 
+## Later approved integration
+
+The PO explicitly approved applying K152A/K152B/G23 and attempting ordinary checks/commits with active hooks. K152B source committed as `eac1d2dc8`; no operator bypass or signature was used. Combined main model/read controls passed 39/39, the selected existing QP4 controls 2/2, and the native file-tool synthetic integration 3/3. Native model execution, integrated Verify, independent review and acceptance remain pending. The initial inert handoff below remains attempt history.
+
 The exceptional proposal worker committed four paths in its inert clone as `cecdce4431386a6cbc74cda50355129bc504e704`, based on `a0feac3a4276f06569ec9585ac96ee58877ded2b`. The exact committed diff is `k152b-model-proposal.patch`; main source is unchanged by this package. That base already contains K146, so the native model branch retains its carrier enforcement rather than overwriting it.
 
 The shared model evaluator requires explicit native `flash_lite`, `flash` or `pro`; the hook checks each `Subagents[].Model` before launch, including mixed valid/invalid batches. Missing, inherited and unknown values refuse with repair. Claude and Codex behavior is retained. A configured duty selector is compared only if directly expressed in the native enum. Current V3 Antigravity concrete Gemini IDs are not guessed into enum values; real native model selection qualification remains pending.

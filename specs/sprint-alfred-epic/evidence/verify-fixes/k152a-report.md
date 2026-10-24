@@ -1,5 +1,9 @@
 # K152A / AC-109 native file-tool proposal
 
+## Later approved integration
+
+The PO explicitly approved application and ordinary checks/commit of K152A with K152B and G23. Source committed as `43e04b207` through active hooks. The evidence test's explicit integrated phase checks the copied K152A blobs against the exact patch's postimage IDs, then retains all original behavior controls: 3/3 passed against combined main source (local capture `k152a-native/integrated-test.txt`). The evidence-test change committed as `20c07bde6`. The required generated enforcement table refresh committed as `925224574`; documentation contracts returned to 76/76 after the initial expected stale-generation finding. Native Antigravity qualification, integrated Verify, independent review and PO acceptance remain open. The initial proposal history below does not assert a native host commit.
+
 Targeted delivery: **green as an inert proposal**. Nothing committed — host commits the three proposal artifacts. No production source was changed in this checkout.
 
 ## Source base and scope
