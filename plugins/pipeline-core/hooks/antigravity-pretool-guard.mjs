@@ -226,31 +226,40 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
         isReadOnly: false,
       };
     }
-    if (name === "write_to_file") {
-      const filePath = String(args.TargetFile ?? args.file_path ?? "");
+    if (name === "write_to_file" || name === "write_file") {
+      const filePath = String((name === "write_file" ? args.Path : args.TargetFile) ?? args.file_path ?? "");
       return {
         toolName: "Write",
         toolInput: {
           file_path: filePath,
-          content: args.CodeContent ?? args.content ?? "",
+          content: (name === "write_file" ? args.Content : args.CodeContent) ?? args.content ?? "",
         },
         filePath,
         command: "",
         isReadOnly: false,
       };
     }
-    if (name === "replace_file_content") {
-      const filePath = String(args.TargetFile ?? args.file_path ?? "");
+    if (name === "replace_file_content" || name === "edit_file") {
+      const filePath = String((name === "edit_file" ? args.Path : args.TargetFile) ?? args.file_path ?? "");
       return {
         toolName: "Edit",
         toolInput: {
           file_path: filePath,
-          old_string: args.TargetContent ?? args.old_string ?? "",
-          new_string: args.ReplacementContent ?? args.new_string ?? "",
+          old_string: (name === "edit_file" ? args.Target : args.TargetContent) ?? args.old_string ?? "",
+          new_string: (name === "edit_file" ? args.Replacement : args.ReplacementContent) ?? args.new_string ?? "",
         },
         filePath,
         command: "",
         isReadOnly: false,
+      };
+    }
+    if (name === "read_file") {
+      return {
+        toolName: "Read",
+        toolInput: { file_path: args.Path },
+        filePath: null,
+        command: "",
+        isReadOnly: true,
       };
     }
     if (name === "invoke_subagent") {

@@ -38,6 +38,7 @@ export function writeTargetPath(toolInput, toolName) {
   };
   if (toolName === "NotebookEdit") return read("notebook_path");
   if (toolName === "Edit" || toolName === "Write") return read("file_path");
+  if (toolName === "write_file" || toolName === "edit_file") return read("Path");
   if (toolName === "write_to_file" || toolName === "replace_file_content") return read("TargetFile") || read("file_path");
-  return read("file_path") || read("notebook_path") || read("TargetFile");
+  return read("file_path") || read("notebook_path") || read("TargetFile") || read("Path");
 }
