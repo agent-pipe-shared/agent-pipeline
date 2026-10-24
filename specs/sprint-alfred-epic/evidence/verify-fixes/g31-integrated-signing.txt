@@ -1,0 +1,19 @@
+command: node --test "--test-name-pattern=^authorize-critical prepares and signs in ONE invocation" plugins/pipeline-core/scripts/po-human-approval.test.mjs
+label: g31-integrated-signing
+exitCode: 0
+head: f54f323dd27aeb123a778db5b46b909cbd19d795
+tree: 792374861c115d1b5092ac0dd66b6673a9daf912
+dirty: true
+--- stdout ---
+✔ authorize-critical prepares and signs in ONE invocation, and the proof is bound to the request built in that same invocation (582.503547ms)
+✔ authorize-critical prepares and signs in ONE invocation, and the resulting proof verifies against the request built in that same invocation (456.344546ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1917.850609
+
+--- stderr ---

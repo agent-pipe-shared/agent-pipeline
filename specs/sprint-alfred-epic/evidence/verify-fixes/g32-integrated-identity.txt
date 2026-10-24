@@ -1,0 +1,29 @@
+command: node --test plugins/pipeline-core/scripts/security-remote-identity.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: g32-integrated-identity
+exitCode: 0
+head: 7a6a584881ec38009495700fc418698504339338
+tree: 22d9c8fe42ea03fd195483f89bec50d018fb1078
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (2.468627ms)
+✔ a clean fixture passes (1.389038ms)
+✔ an allowlisted occurrence passes (0.717873ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.574451ms)
+✔ multiple prefix hits on one line each produce a finding (0.357619ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.478378ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (3.138109ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (315.557998ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (23.40859ms)
+✔ security evidence follows one effective push destination across a remote rename (1311.575631ms)
+✔ push guard rejects evidence for a different effective destination (2404.708407ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4403.095785
+
+--- stderr ---

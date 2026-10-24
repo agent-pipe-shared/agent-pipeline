@@ -1,0 +1,21 @@
+command: node --test --test-name-pattern=^P[1-4]: plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs
+label: g31-integrated-ui
+exitCode: 0
+head: f54f323dd27aeb123a778db5b46b909cbd19d795
+tree: 792374861c115d1b5092ac0dd66b6673a9daf912
+dirty: true
+--- stdout ---
+✔ P1: a 4000-line, multi-megabyte review record renders as a bounded block carrying the intent digest (23.539994ms)
+✔ P2: the full material is referenced by path and sha256 and the omission is stated (45.577684ms)
+✔ P3: control characters and embedded newlines cannot add lines to the block (0.976415ms)
+✔ P4: the post-sign result for a human is exactly one short line; machine callers keep the full result (2.597445ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 915.671257
+
+--- stderr ---

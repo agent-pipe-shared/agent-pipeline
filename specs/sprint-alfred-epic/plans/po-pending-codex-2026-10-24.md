@@ -2,6 +2,13 @@
 
 The PO requested that decision needs and signature-dependent work be collected until available, without blocking independent repairs. This is a queue, not an approval record. No HEAD/tree-bound signing command has been handed out; no signature ceremony is active. PRD and Spec changes are forbidden without separate explicit PO permission and are not requested by these packages.
 
+The PO corrected repeated routine application questions on 2026-10-24:
+approved-wave fixes, integration checks and ordinary active-hook commits
+proceed autonomously. A kernel path is not itself a fresh chat gate. Collect
+only actual configured decisions, required operator/signature work or typed
+hard blocks after safe recovery has been exhausted. G24 and G31/K150B also
+received explicit application confirmation and are now applied for checking.
+
 ## Approved application readback
 
 | Package | Reviewable result | Proposed next action | Boundary |
@@ -30,6 +37,16 @@ The G23 normal commit attempt was rejected for `lib/guard/command-catalogue.mjs`
 - G17: the actual bounded host fixture remains unqualified. Its proposed short `/tmp` home conflicts with the production strict ancestor rule; no fixture was created there in v3. A short private fixture parent and its sanctioned scope still need resolution. Do not weaken custody or probe denied external paths through another tool. Other repairs continue.
 
 ## Later terminal or native-host work
+
+**Actual new operator requirement:** G28's applied six-path package passed
+main integration 19/19. Its ordinary commit was refused with
+`PB-COMMIT-OVERRIDE-NONOVERRIDABLE` on
+`plugins/pipeline-core/lib/guard/command-catalogue.mjs` and `constants.mjs`.
+Nothing was seeded; no override can cover it. The full package remains
+staged, including its documentation, Source and tests. Prepare the exact
+manual commit command only at the next terminal readback; no HEAD-bound
+operator/signing command is outstanding now. G24/G31/G32 and automatic G30
+retention committed normally and need no operator repetition.
 
 The optional new model-role mapping requests attended confirmation after the
 plugin update. Collect it; the validated V3 fallback remains usable and no

@@ -27,15 +27,15 @@ removes their runner-specific regression and native qualification duties.
 | G21 | Codex P0-3 | Official result bootstrap/reconcile preserves package, continuity and result consistency; real package validation participates in close qualification | New result transaction repair | Report includes an independently reproduced manifest/result hash mismatch and missing reconciliation fence; current source confirmation pending |
 | G22 | Claude P0.3 | Reachable honest close after unavailable item dispatch, including test-dependency preparation and required Critic qualification | K146, G17, G21; close preparation work | Open; do not implement a silent no-Critic success route |
 | G23 | Codex P1-1; Claude P1.4 read-help portion | Harmless scoped reads/help use ordinary read-only admission and actionable errors; preserve credential, external-path and symlink boundaries | Read grammar/help recovery work | Operator committed complete package `6db0d31f8`; included in installed intermediate build; focused checks pass, native qualification open |
-| G24 | Codex P1-2 | Evidence writers cannot overwrite another schema's valid result; bind immutable run records and separate capture/function outputs | Consumer tooling contract / evidence writer investigation | Report confirmed consumer script collision; shared product ownership to establish |
+| G24 | Codex P1-2 | Evidence writers cannot overwrite another schema's valid result; bind immutable run records and separate capture/function outputs | Shared writer and consumer ownership separated | Shared capture fix committed `18d8f3c83`; integrated controls green. Current consumer already separates paths; immutable run/index proposal retained, no global arbitrary-writer claim |
 | G25 | Codex P1-3 | Validate HEAD, criterion rendering and source closure before submission mutation; retain already answered intake values | Design submission/intake work | Open; no late approval or fabricated identity |
 | G26 | Codex P1-4 | Architecture conformance records disposition of findings and unavailable properties without claiming PASS | Architecture close work | Open; report-only observations are not automatically blocking criteria |
-| G27 | Claude P1.4 architecture portion; P1.5; P1.6 | Self-describing greenfield architecture path, editable design before binding, correct criterion examples; avoid repeated PO discard ceremonies | G2/G4 happy-path work | Report now supplies the missing discard/early-bind evidence; current source walk pending |
-| G28 | Claude P1.7 | Portable sanitized approval/Verify/Security/review evidence index in the delivered branch; private keys and raw private state remain external | G14, audit export work | Open; durable proof references and actual exported evidence must be distinguished |
+| G27 | Claude P1.4 architecture portion; P1.5; P1.6 | Self-describing greenfield architecture path, editable design before binding, correct criterion examples; avoid repeated PO discard ceremonies | G2/G4 and bounded criterion producer correction | Generator/parser and contextual placeholder correction targeted green, including G32 fixture closure. Main integration and larger editable-design/early-binding route remain open |
+| G28 | Claude P1.7 | Portable sanitized approval/Verify/Security/review evidence index in the delivered branch; private keys and raw private state remain external | G14, existing audit-pack archive route | Applied six-path historical-archive/CLI fix, integrated 19/19. Ordinary commit refused on two PB guard files; operator package collected, no bypass. Offline archive integrity never qualifies later commits |
 | G29 | Claude P1.8 | Public handover accurately follows lifecycle transitions | Lifecycle handover projection work | Report evidence; identify sanctioned writer and regression pin |
-| G30 | Claude P1.9 | Trusted hook snapshot refresh has a usable recovery during a session | Existing hook-refresh flow; G9b/K156 | Bootstrap recovery succeeded in this session; mid-session behavior pending |
-| G31 | Claude P1.10 | Signing output points to an admissible external proof destination | Signing output work | Open; preserve external-proof requirement |
-| G32 | Claude P1.11 | Security candidate identity works for the configured remote destination, without requiring the name `origin` | Security identity work | Report evidence; source confirmation and regression test pending |
+| G30 | Claude P1.9 | Trusted hook snapshot refresh has a usable recovery during a session | Existing hook-refresh flow; G9b/K156 | Automatic view retention committed `7dddb672c` (34/34 focused, installer 25 pass/1 skip). Mid-session snapshot qualification and direct-prune limitations remain open |
+| G31 | Claude P1.10 | Signing output points to an admissible external proof destination | K150B/G31 v2 | Integrated `7a6a58488`; main synthetic signing/proof 2/2 and original bounded UI 4/4. External-proof policy preserved; native acceptance pending |
+| G32 | Claude P1.11 | Security candidate identity works for the configured remote destination, without requiring the name `origin` | Effective push destination identity | Integrated `537d5c85d`; main remote/guard/consumer checks 11/11. Native push and full qualification pending |
 
 All rows are in the current fix scope. Existing G6/G7 (Antigravity native tool coverage/model enforcement), G10 (calibration deadlock), G17 (Codex Critic mutation false positive), and the remaining red Verify suites remain in scope. No P0/P1 row is silently deferred by this table.
 
@@ -61,6 +61,17 @@ The preceding bullet records the initial intake cut. Later, the separately autho
 
 ## Current execution boundary
 
+**PO correction, 2026-10-24:** routine application, focused integration checks
+and ordinary active-hook commit attempts within this already approved fix
+wave proceed autonomously. The coordinator's repeated application questions
+were an overly narrow interpretation of the inert-worker exception, not
+additional Operating Model gates. Kernel membership alone creates no new
+chat checkpoint. Follow exact typed safe recovery on real guard refusals;
+collect only genuine configured decisions, required operator/signature steps
+or hard blocks with no safe recovery. Current PRD/Spec changes, stamp,
+installation and push keep their existing explicit boundaries. The PO also
+expressly confirmed application/ordinary checking of G24 and G31/K150B.
+
 **PO direction, 2026-10-24 (mobile continuation):** extend the existing delivery machinery and use existing accepted ACs; do not open a new design course. PRD and Spec must not be changed without the PO's explicit approval. No such change is authorized by this repair wave. Collect signature-dependent packages until the PO is at a terminal; ordinary questions can be answered from mobile.
 
 The generator's supported `--criterion` route already binds an exact existing approved AC without inventing a K146 item row: a read-only AC-264 binding with the configured Deep route succeeded in this session. K146's delivery/happy-path repair uses AC-264 and its original `three-runner-happy-path-with-two-po-approvals` requirements; role/recovery clauses can reference AC-245 only where their original acceptance actually applies. AC-204 is a report-only reverse coverage inventory, so a syntactically successful binding to it does not authorize unrelated carrier enforcement. Never select an AC merely because its title sounds related. Reuse the existing criterion-bound item delivery, requester, checks, queue and host integration contracts wherever they suffice. The earlier scratch-only proposal for an unanchored `repairTask` union is not the selected course.
@@ -84,12 +95,12 @@ Stamp/install/push and the scheduled Critic batch remain on the PO's explicit ca
 | K146 | Integrated `a0feac3a4` with ordinary active hooks; main 76/76 generator and 4/4 carrier/model | Native qualification, integrated Verify, independent Critic and acceptance remain open |
 | K152A | PO-approved source integrated `43e04b207`; main synthetic integration 3/3, evidence phase committed `20c07bde6` | Native qualification, integrated Verify, independent review and acceptance pending |
 | K152B | PO-approved source integrated `eac1d2dc8`; combined model/read controls 39/39 | Native model qualification, integrated Verify, independent review and acceptance pending |
-| K150B/G31 v2 | Inert three-path correction preserves bounded disclosure, full authoritative material path and external proof output; focused 4/4, selected AC-261 4/4, consumer 9/9 and synthetic real signing/proof flow 2/2 | Exact v2 patch/report retained; main application and integration pending; v1 regression and attempts preserved |
+| K150B/G31 v2 | Integrated `7a6a58488`, preserving bounded disclosure, full authoritative material path and external proof output | Main synthetic signing/proof 2/2 and original UI 4/4; native qualification, full Verify/review/acceptance pending; v1 attempts retained |
 | G17 v1 | Seven-path inert proposal; syntax/diff checks pass; bounded fingerprint helper 1/1, full host attempt interrupted exit 130 | Not qualified: launch/finalize timing, custody compatibility, independent negative controls and meaningful RED/GREEN still required. Do not apply or re-pin |
 | G21 v2 | Exact inert four-path patch, including retained/retired legacy Result journal recovery; final synthetic bootstrap 15/15, close 35/35, consumer 9/9 | Source companion catalogue-present route and real signature/native qualification remain unexercised. Existing proof kind is used separately for exact repair and manifest reconcile; no main application |
 | G20/K154 v2 | Exact inert seven-path proposal and cumulative report retained; focused synthetic close/push/resolver/consumer checks green | Partial: approved rigor provenance, pushed-tree binding and independent design-review provenance remain incomplete; no main application |
 | G19 v2 | Exact inert eleven-path readiness/consumer/closure proposal; targeted 108/108, readiness 9/9, Windows preflight 4/4, consumer/skill 17/17 | Source review/application decision and native Windows qualification pending; no live ACL mutation |
-| G32 | Inert four-path effective remote-identity proposal; focused scanner/synthetic guard, existing scanner and consumer checks green | Main integration, inherited kernel closure review and native push qualification remain pending |
+| G32 | Integrated `537d5c85d`, four-path effective remote identity fix; main remote/guard/consumer 11/11 | Native push, full Verify/review/acceptance pending; guard-push is not in the never-liftable GMW kernel list |
 
 K152B's two earlier stops are retained: library-only scope could not perform native wiring; the next dispatch hit the unavailable native opening-record command. A3's complete replacement briefing explicitly includes both minimal hook wiring and the PO-approved methodological opening exception. These are neither hidden successes nor fresh attempt budgets. G23 read/help briefing is prepared for the next slot; G24-G32 and K156/K155/G2/G4 remain in the committed intake, not silently removed.
 
@@ -136,3 +147,29 @@ consumer-authored scripts. G28 owns the existing audit-pack export gap; an
 archive for its exact named candidate must not be confused with a new rule
 qualifying later commits. Existing ADR-0063 and R7-3 remain the tracked
 artifact baseline. No C-to-P evidence-promotion decision is assumed.
+
+## Main integration after the installed intermediate build
+
+Source commits `18d8f3c83` (G24), `7a6a58488` (G31), `537d5c85d`
+(G32) and `7dddb672c` (automatic G30 view retention) used ordinary active
+hooks. The installed version remains the earlier `16c9e1936` candidate; no
+new stamp, install or push was performed. G24/G31 main focused integration
+passed 97 tests with 2 platform skips, synthetic signing/proof passed 2/2,
+and original signing UI passed 4/4. G32 main checks passed 11/11. Captures
+under `evidence/verify-fixes/`: `g24-g31-integrated-focus.txt`,
+`g31-integrated-signing.txt`, `g31-integrated-ui.txt` and
+`g32-integrated-identity.txt`. These are targeted dirty-working-tree
+captures, not a final candidate Verify receipt.
+
+G28 main tests passed 19/19. Its complete six-path commit was refused with
+`PB-COMMIT-OVERRIDE-NONOVERRIDABLE` for
+`lib/guard/command-catalogue.mjs` and `lib/guard/constants.mjs` under the
+plugin. Nothing was seeded and no bypass used. Keep the full six-path
+package staged for a later human operator; independent work continues.
+
+K156 R2 was rejected because it wrote State before calibration and weakened
+an original State-byte-equality negative. The next correction restored that
+examiner and passed focused transaction/commit-route controls, but
+State-write-fault/crash recovery and Source-owned postimage proof remain
+under implementation. Do not integrate it as complete or count a changed
+expectation as a product fix.
