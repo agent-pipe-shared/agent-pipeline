@@ -15,17 +15,13 @@
  *   as `.claude/guard-override.log.jsonl`).
  *
  * TWO NAMED VERIFY-RECOVERY ROUTES (NVA-CF-VERIFYDEADLOCK): `set-phase --phase implementation`
- * additionally writes the calibration's `verify` field (`project/pipeline.json`,
- * plus its legacy `.claude/pipeline.json` twin when present) when `--verify-command`
- * is supplied, or refuses the transition outright if the calibration still carries
- * the seeded UNCONFIGURED_VERIFY placeholder and no command was supplied. This is
- * the one sanctioned moment that write is allowed to happen. A project which
- * deliberately entered implementation on that baseline may later use the
- * separately typed `configure-verify --verify-command <command>` route. That
- * route is closed to every lifecycle except established implementation and
- * accepts only two intact, identical baseline calibration twins. Both routes
- * mirror the trust-anchor "same transaction" fix pattern -- see the comment on
- * `readCalibrationVerifyStatus()` below for the full rationale.
+ * may accept `--verify-command` with a committed baseline calibration. Its
+ * lock-held writer prepares the guarded calibration transition before either
+ * calibration or State is committed; a companion failure leaves State intact.
+ * After State commits, the same held transition publishes commit readiness.
+ * A project may also enter implementation with baseline-only verification and
+ * invoke `configure-verify` later. Neither route accepts a changed or divergent
+ * committed calibration layout. See `readCalibrationVerifyStatus()` below.
  *
  * SCHEMA (`pipeline.state.v0`) -- the file this CLI reads/writes:
  *   {
@@ -495,7 +491,7 @@ import { collectRigorJournalEntry, rigorVerifyRows } from "../lib/rigor-lifecycl
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
 import { discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
-import { withSessionAuthorityBoundary, executeSourceOwnedSessionAuthorityStateWrite, executeSourceOwnedSessionAuthorityCompanionWrite, executeSourceOwnedRetiredSessionAuthorityCloseWrite, inspectSourceOwnedSessionAuthorityCompanionRefresh, reserveSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityStateRefresh } from "../lib/session-authority-registry.mjs";
+import { withSessionAuthorityBoundary, isActiveSourceOwnedSessionAuthorityBoundary, executeSourceOwnedSessionAuthorityStateWrite, executeSourceOwnedSessionAuthorityCompanionWrite, executeSourceOwnedRetiredSessionAuthorityCloseWrite, inspectSourceOwnedSessionAuthorityCompanionRefresh, reserveSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityStateRefresh } from "../lib/session-authority-registry.mjs";
 import { readSourceOwnedAuthorityContext, inspectSourceOwnedCurrentAuthorityContext, createSignedCleanupRequesterObserver } from "../lib/session-requester-bridge.mjs";
 import {
   PUBLICATION_AUTHORITY_REFERENCE_SCHEMA,
@@ -561,7 +557,7 @@ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
 import { reopenDesignNextActionText } from "../lib/authority-restore.mjs";
 
-import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout, configureVerifyRepair } from "../lib/calibration-verify-commit-transition.mjs";
+import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, abandonCalibrationVerifyCommitTransition, rollbackCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout, inspectReplayableCalibrationVerifyLayout, inspectCurrentCalibrationVerifyReady, configureVerifyRepair } from "../lib/calibration-verify-commit-transition.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -913,9 +909,11 @@ function writeState(dir, state, expectedState, options = {}) {
       finally { frame.validatingCompanion=false;frame.boundary=previousBoundary; }
     });
   }
-  if (frame?.cataloguePresent && !frame.executingWrite && !frame.executingCompanion && !frame.validatingCompanion) {
-    const entry = frame.push ? `state.approve-push.${frame.push.effect}` : STATE_AUTHORITY_ENTRIES.get(frame.sub);
-    if (!entry || !frame.sourceDefaults || options.reuseLock || options.afterValidation || options.afterCommit) {
+  if ((frame?.cataloguePresent || frame?.entry === "state.set-phase-with-calibration")
+    && !frame.executingWrite && !frame.executingCompanion && !frame.validatingCompanion) {
+    const entry = frame.push ? `state.approve-push.${frame.push.effect}` : frame.entry;
+    if (!entry || !frame.sourceDefaults || options.reuseLock
+      || (options.afterValidation && entry !== "state.set-phase-with-calibration") || options.afterCommit) {
       return {ok:false,committed:false,code:"SDC-AUTHORITY-UNAVAILABLE"};
     }
     const publish = boundary => {
@@ -933,7 +931,8 @@ function writeState(dir, state, expectedState, options = {}) {
   // instead of acquiring a second lock avoids a self-collision on the same lock path; this
   // call then does not own the lock's lifecycle and must not release it.
   const reusedLock = options.reuseLock;
-  const lock = reusedLock ?? acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN);
+  const lock = reusedLock ?? acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN,
+    frame?.entry === "state.set-phase-with-calibration" ? {ownerPid:process.pid} : {});
   if (!lock.ok) return { ok: false, committed: false, code: lock.code };
   let stateLockWitness = null;
   let externalMutation = false;
@@ -994,12 +993,21 @@ function writeState(dir, state, expectedState, options = {}) {
       // replacement, so a State I/O failure can still leave that companion write
       // durable; callers must report that disposition truthfully.
       if (options.afterValidation) {
+        const sourceWitness = Object.freeze({});
+        const sourceWrite = stateAuthorityInvocation?.executingWrite;
+        if (sourceWrite?.entry === "state.set-phase-with-calibration") {
+          const postState = options.preserveGateEstimate === true ? nextState : clearGateEstimateForMutation(nextState);
+          validatedCalibrationSourceWitnesses.set(sourceWitness, {
+            sourceWrite, rootDir:dir, statePreSha256:sha256Bytes(sourceWrite.preBytes),
+            statePostSha256:sha256Bytes(Buffer.from(`${JSON.stringify(postState, null, 2)}\n`)),
+          });
+        }
         let gate;
         try {
-          gate = options.afterValidation();
+          gate = options.afterValidation({ state: clearGateEstimateForMutation(nextState), sourceWitness });
         } catch {
           return { ok: false, committed: false, code: "PS-AFTER-VALIDATION" };
-        }
+        } finally { validatedCalibrationSourceWitnesses.delete(sourceWitness); }
         if (!gate?.ok) return {
           ok: false,
           committed: false,
@@ -1238,12 +1246,12 @@ function parseLockRecord(raw) {
   }
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   const keys = Object.keys(value);
-  if (keys.length !== 4 || !keys.every((key) => ["schema", "token", "ownerNonce", "acquiredAtMs"].includes(key))) return null;
+  if (![4,5].includes(keys.length) || !keys.every((key) => ["schema", "token", "ownerNonce", "acquiredAtMs", "ownerPid"].includes(key))) return null;
   if (value.schema !== CONTINUITY_LOCK_SCHEMA_ID
     || !LOCK_TOKEN_RE.test(value.token)
     || !LOCK_TOKEN_RE.test(value.ownerNonce)
     || !Number.isSafeInteger(value.acquiredAtMs)
-    || value.acquiredAtMs < 0) return null;
+    || value.acquiredAtMs < 0 || (keys.length === 5 && (!Number.isSafeInteger(value.ownerPid) || value.ownerPid < 1))) return null;
   return value;
 }
 
@@ -1351,7 +1359,8 @@ export function acquireContinuityLock(dir, token, deps = {}) {
   const ownerNonce = deps.ownerNonce?.() ?? randomUUID();
   if (!LOCK_TOKEN_RE.test(ownerNonce)) return { ok: false, code: "PS-CONTINUITY-LOCK-NONCE" };
   const acquiredAtMs = nowMs();
-  const record = { schema: CONTINUITY_LOCK_SCHEMA_ID, token, ownerNonce, acquiredAtMs };
+  const record = { schema: CONTINUITY_LOCK_SCHEMA_ID, token, ownerNonce, acquiredAtMs,
+    ...(deps.ownerPid === undefined ? {} : {ownerPid:deps.ownerPid}) };
 
   if (existsSync(lockRecoveryPath(dir))) return { ok: false, code: "PS-CONTINUITY-RECOVERY-IN-PROGRESS" };
   const published = publishExclusiveRecord(path, record, authorityDir);
@@ -1367,8 +1376,14 @@ export function acquireContinuityLock(dir, token, deps = {}) {
     return { ok: false, code: "PS-CONTINUITY-LOCKED" };
   }
   const ageMs = observed ? acquiredAtMs - observed.acquiredAtMs : -1;
-  if (!observed || observed.token !== token || ageMs < staleMs) {
+  if (!observed || observed.token !== token
+    || (deps.ownerPid === undefined && ageMs < staleMs)
+    || (deps.ownerPid !== undefined && (!Number.isSafeInteger(observed.ownerPid) || observed.ownerPid < 1))) {
     return { ok: false, code: "PS-CONTINUITY-LOCKED" };
+  }
+  if (deps.ownerPid !== undefined) {
+    try { process.kill(observed.ownerPid,0); return {ok:false,code:"PS-CONTINUITY-LOCKED"}; }
+    catch(error) { if(error?.code!=="ESRCH") return {ok:false,code:"PS-CONTINUITY-LOCKED"}; }
   }
 
   const recoveryGuard = acquireRecoveryGuard(dir, record);
@@ -1381,7 +1396,12 @@ export function acquireContinuityLock(dir, token, deps = {}) {
     if (!current
       || current.token !== token
       || current.ownerNonce !== observed.ownerNonce
-      || currentAgeMs < staleMs) return { ok: false, code: "PS-CONTINUITY-LOCKED" };
+      || (deps.ownerPid === undefined && currentAgeMs < staleMs)
+      || (deps.ownerPid !== undefined && current.ownerPid !== observed.ownerPid)) return { ok: false, code: "PS-CONTINUITY-LOCKED" };
+    if (deps.ownerPid !== undefined) {
+      try { process.kill(current.ownerPid,0); return {ok:false,code:"PS-CONTINUITY-LOCKED"}; }
+      catch(error) { if(error?.code!=="ESRCH") return {ok:false,code:"PS-CONTINUITY-LOCKED"}; }
+    }
     unlinkSync(path);
     const recovered = publishExclusiveRecord(path, record, authorityDir);
     if (!recovered.ok) return recovered;
@@ -1440,6 +1460,33 @@ export function releaseContinuityLock(lock) {
   } catch {
     return { ok: false, code: "PS-CONTINUITY-LOCK-IO" };
   }
+}
+
+/** Retire only this dead calibration writer's exact adjacent State lock while
+ * the existing Source registry boundary serializes recovery and new writers. */
+export function retireDeadCalibrationContinuityLock({dir,ownerPid,sourceBoundary} = {}) {
+  if (!isActiveSourceOwnedSessionAuthorityBoundary({boundary:sourceBoundary,rootDir:dir})) return false;
+  const path = continuityLockPath(dir);
+  let before;
+  try { before = lstatSync(path); }
+  catch (error) { return error?.code === "ENOENT"; }
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || before.size > 4096) return false;
+  let raw;
+  try { raw = readFileSync(path,"utf8"); } catch { return false; }
+  const record = parseLockRecord(raw);
+  if (!record || record.token !== LEGACY_WRITER_LOCK_TOKEN
+    || !Number.isSafeInteger(record.ownerPid) || record.ownerPid < 1
+    || (ownerPid !== undefined && record.ownerPid !== ownerPid)) return false;
+  try { process.kill(record.ownerPid,0); return false; }
+  catch (error) { if (error?.code !== "ESRCH") return false; }
+  try {
+    const after = lstatSync(path);
+    if (after.dev !== before.dev || after.ino !== before.ino || after.mode !== before.mode
+      || after.nlink !== before.nlink || after.size !== before.size
+      || readFileSync(path,"utf8") !== raw) return false;
+    unlinkSync(path);
+    return true;
+  } catch { return false; }
 }
 
 function assertContinuityLockOwned(lock) {
@@ -3650,14 +3697,17 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
  * present malformed or non-object peer is refused. Returns the repository-relative
  * paths actually written.
  */
-function writeCalibrationVerifyCommand(dir, command) {
-  const prepared = prepareCalibrationVerifyWrite(dir);
+function writeCalibrationVerifyCommand(dir, command, sourceEntries) {
+  const prepared = prepareCalibrationVerifyWrite(dir, sourceEntries);
   if (!prepared.ok) return prepared;
   const written = [];
-  for (const { relPath, value } of prepared.entries) {
+  const mutated = [];
+  for (const { relPath, value, alreadyCurrent } of prepared.entries) {
+    written.push(relPath);
+    if (alreadyCurrent) continue;
     try {
       writeFileSync(join(dir, relPath), `${JSON.stringify({ ...value, verify: command }, null, 2)}\n`);
-      written.push(relPath);
+      mutated.push(relPath);
     } catch {
       // A throwing write can have changed its target before reporting an I/O
       // failure (for example, truncation followed by ENOSPC). A completed
@@ -3666,7 +3716,7 @@ function writeCalibrationVerifyCommand(dir, command) {
       return { ok: false, code: "PS-CALIBRATION-WRITE", written, externalMutation: true };
     }
   }
-  return { ok: true, written, externalMutation: written.length > 0 };
+  return { ok: true, written, mutated, externalMutation: mutated.length > 0 };
 }
 
 /**
@@ -3674,22 +3724,30 @@ function writeCalibrationVerifyCommand(dir, command) {
  * may have one tier or matching twins; a missing, malformed, non-object, or
  * divergent present peer is never silently skipped or reconciled here.
  */
-function prepareCalibrationVerifyWrite(dir) {
+function prepareCalibrationVerifyWrite(dir, sourceEntries) {
+  if (!Array.isArray(sourceEntries) || sourceEntries.length < 1 || sourceEntries.length > 2) return {ok:false,code:"PS-CALIBRATION-SOURCE"};
+  const planned = new Map(sourceEntries.map(entry=>[entry.path,entry]));
+  if (planned.size !== sourceEntries.length) return {ok:false,code:"PS-CALIBRATION-SOURCE"};
   const entries = [];
   for (const relPath of [AUTHORITY_ARTIFACTS.calibration.neutral, AUTHORITY_ARTIFACTS.calibration.legacy]) {
     const path = join(dir, relPath);
     if (!existsSync(path)) continue;
     let value;
+    let currentSha256;
     try {
-      value = JSON.parse(readFileSync(path, "utf8"));
+      const observed = calibrationApprovalFile(dir,relPath);
+      currentSha256 = observed.ref.sha256;
+      value = JSON.parse(observed.bytes.toString("utf8"));
     } catch {
       return { ok: false, code: "PS-CALIBRATION-MALFORMED" };
     }
     if (value === null || typeof value !== "object" || Array.isArray(value)) return { ok: false, code: "PS-CALIBRATION-MALFORMED" };
-    entries.push({ relPath, value });
+    const plan=planned.get(relPath);
+    if (!plan || ![plan.beforeSha256,plan.afterSha256].includes(currentSha256)) return {ok:false,code:"PS-CALIBRATION-DRIFTED"};
+    entries.push({ relPath, value, alreadyCurrent:currentSha256===plan.afterSha256 });
   }
   if (entries.length === 0) return { ok: false, code: "PS-CALIBRATION-MISSING" };
-  if (entries.length === 2 && !sameJson(entries[0].value, entries[1].value)) return { ok: false, code: "PS-CALIBRATION-DRIFTED" };
+  if (entries.length !== planned.size) return {ok:false,code:"PS-CALIBRATION-DRIFTED"};
   return { ok: true, entries };
 }
 
@@ -10583,6 +10641,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         console.log('Phase already "design"; zero-write replay accepted.');
         return 0;
       }
+      if (lifecycle.status === "implementing" && flags["verify-command"] !== undefined) {
+        // A stopped phase writer may have committed State already. Re-enter the
+        // current configured-command Source route; no old journal supplies State.
+        return runStateSource(["configure-verify","--verify-command",flags["verify-command"]],
+          {...deps,sourceBoundary:stateAuthorityInvocation?.boundary});
+      }
       const architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
         rootDir: dir,
         taskScope: base.activeFeature?.planPath ?? null,
@@ -10598,18 +10662,25 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         console.log(JSON.stringify({ schema: architecture.schema, code: architecture.code, nextAction: architecture.nextAction }));
         return 2;
       }
-      // NVA-CF-VERIFYDEADLOCK: the design->implementation transition is the one
-      // sanctioned moment that may write project/pipeline.json's `verify` field --
-      // see the UNCONFIGURED_VERIFY_MARKER comment above for why. `--verify-command`
-      // is optional once a real command is already configured (idempotent replay),
-      // but this refuses to LEAVE the placeholder in place by entering implementation
-      // silently: that refusal, not a GS-10 override, is the sanctioned way through.
+      // NVA-CF-VERIFYDEADLOCK: a requested command uses the guarded calibration
+      // transition under the State writer's validated, lock-held companion step.
+      // Without a command, an already configured or baseline-only contract can
+      // enter implementation; release readiness still checks the latter.
       const requestedVerifyCommand = flags["verify-command"];
+      let calibrationNeeded = false;
       if (requestedVerifyCommand !== undefined) {
         if (classifyVerifyCommand(requestedVerifyCommand) !== "configured") {
           console.error('Error: --verify-command must be a real, non-blank verification command -- not the plugin\'s UNCONFIGURED_VERIFY placeholder text.');
           return 2;
         }
+        // Early read-only diagnosis. The writer rechecks all of this under its
+        // lock before either companion or State mutation.
+        const committed = inspectReplayableCalibrationVerifyLayout({rootDir:dir,verifyCommand:requestedVerifyCommand,phaseEntry:true});
+        if (!["baseline-only","partial-current","configured-current","committed-configured"].includes(committed.status)) {
+          console.error(`Error: set-phase implementation refused calibration commit preflight (${committed.code ?? committed.status}); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.`);
+          return 2;
+        }
+        calibrationNeeded = committed.status !== "committed-configured";
       } else {
         const verifyStatus = readCalibrationVerifyStatus(dir);
         if (!new Set(["configured", "baseline-only"]).has(verifyStatus.status)) {
@@ -10617,6 +10688,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           return 2;
         }
       }
+      let preparedCalibration = null;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           const transition = enterPlanImplementation({
@@ -10628,24 +10700,51 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
             ? { ...transition, state: { ...transition.state, updatedAt: now() } }
             : transition;
         },
-        afterValidation: requestedVerifyCommand === undefined ? undefined : () => writeCalibrationVerifyCommand(dir, requestedVerifyCommand),
+        afterValidation: !calibrationNeeded ? undefined : ({ sourceWitness }) => {
+          const prepared = prepareCalibrationVerifyCommitTransition({ rootDir: dir, verifyCommand: requestedVerifyCommand, phaseEntry: true, sourceWitness });
+          if (!prepared?.ok || !prepared.preparedHandle) return { ok: false, code: prepared?.code ?? "CVCT-PREPARE-UNAVAILABLE" };
+          const result = writeCalibrationVerifyCommand(dir, requestedVerifyCommand, prepared.entries);
+          if (result.ok) preparedCalibration = prepared.preparedHandle;
+          else {
+            const abandoned = abandonCalibrationVerifyCommitTransition({ preparedHandle: prepared.preparedHandle });
+            if (!abandoned.ok) console.error(`Error: calibration preparation remains held (${abandoned.code}); inspect private transition before retrying.`);
+          }
+          return result;
+        },
       });
       if (!stateWriteSucceeded(written)) {
+        if (preparedCalibration && written.committed === false) {
+          const rollback = rollbackCalibrationVerifyCommitTransition({ preparedHandle: preparedCalibration });
+          if (!rollback.ok) console.error(`Error: calibration rollback remains incomplete (${rollback.code}); retry the same set-phase command after this process exits.`);
+        }
         if (written.externalMutation === true) {
-          console.error(`Error: set-phase implementation failed after calibration mutation (${written.code}); inspect calibration and State before retrying.`);
+          console.error(`Error: set-phase implementation failed after possible calibration mutation (${written.code}); State was not reported committed. Inspect both tiers before recovery. No configured commit is claimed.`);
           return 2;
-        } else if (written.code?.startsWith("PS-CALIBRATION-")) {
+        }
+        if (written.code?.startsWith("PS-CALIBRATION-")) {
           console.error(`Error: set-phase implementation refused invalid calibration (${written.code}); zero mutation.`);
           return 2;
         }
         console.error(`Error: set-phase implementation requires an exact approved submission (${written.code}).`);
         return 2;
       }
+      if (calibrationNeeded) {
+        const ready = completeCalibrationVerifyCommitTransition({ preparedHandle: preparedCalibration });
+        if (!ready?.ok || ready.code !== "CVCT-COMMIT-READY") {
+          console.error(`Error: implementation State and calibration were written, but the commit-ready transition failed (${ready?.code ?? "CVCT-COMPLETE-UNAVAILABLE"}); inspect State and both calibration tiers. No configured commit is claimed.`);
+          return 2;
+        }
+      }
       syncNextActionDocs(dir, written.transition.state);
       console.log('Phase set: "implementation"; lifecycle="implementing".');
       const decisionSummary = summarizePlanningDecisionApplicability(architecture.artifacts?.decisionApplicability);
       if (decisionSummary !== null) console.log(`Architecture decisions: ${JSON.stringify(decisionSummary)}`);
       return 0;
+    }
+
+    case "recover-verify-transition": {
+      console.error("Error: the unshipped journal recovery route is unavailable; retry the original set-phase or configure-verify command with its exact verify command.");
+      return 2;
     }
 
     // NVA-GF-LATEVERIFY-1: an intentionally baseline-only project can enter
@@ -10665,30 +10764,50 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: configure-verify requires an established implementing lifecycle (${lifecycle.code ?? "PS-LIFECYCLE-NOT-IMPLEMENTING"}); zero calibration write.`);
         return 2;
       }
-      const twins = readIdenticalCalibrationVerifyTwins(dir);
       const command = parsed.value["verify-command"];
-      if (twins.status === "configured" && twins.command === command) {
+      // A different command cannot replay an already committed configured
+      // contract. Classify it from the validated, clean committed layout so
+      // callers receive the established configured-tier refusal without
+      // preparing a transition or writing either calibration tier.
+      const committedLayout = inspectCommittedCalibrationVerifyLayout({rootDir:dir});
+      if (committedLayout.status === "configured" && committedLayout.command !== command) {
+        console.error("Error: configure-verify refused calibration tiers (configured); zero calibration write.");
+        return 2;
+      }
+      const twins = inspectReplayableCalibrationVerifyLayout({rootDir:dir,verifyCommand:command});
+      if (["baseline-only","partial-current","configured-current"].includes(twins.status)
+        && !retireDeadCalibrationContinuityLock({dir,sourceBoundary:deps.sourceBoundary})) {
+        console.error("Error: a live or unknown State writer lock remains; no calibration success is claimed.");
+        return 2;
+      }
+      if (twins.status === "committed-configured"
+        || (twins.status === "configured-current"
+          && inspectCurrentCalibrationVerifyReady({rootDir:dir,verifyCommand:command}).ok)) {
         console.log("Verify command already configured; exact zero-write replay accepted.");
         return 0;
       }
-      if (twins.status !== "baseline-only") {
-        console.error(`Error: configure-verify requires intact, identical committed baseline-only calibration tiers (${twins.status}); zero calibration write.`);
+      if (!["baseline-only","partial-current","configured-current"].includes(twins.status)) {
+        if (twins.status === "unavailable" && committedLayout.status === "unavailable") {
+          console.error("Error: configure-verify refused calibration tiers (unavailable); zero calibration write.");
+        } else {
+          console.error(`Error: configure-verify requires exact committed baseline or this command's verify-field delta (${twins.code??twins.status}); zero calibration write.`);
+        }
         return 2;
       }
-      const commitTransition = prepareCalibrationVerifyCommitTransition({rootDir: dir, verifyCommand: command});
+      const commitTransition = prepareCalibrationVerifyCommitTransition({rootDir: dir, verifyCommand: command, sourceBoundary:deps.sourceBoundary});
       if (!commitTransition?.ok || !commitTransition.preparedHandle
         || !sameJson(commitTransition.paths, twins.paths)) {
         console.error(`Error: configure-verify commit route unavailable (${commitTransition?.code ?? "CVCT-PREPARE-UNAVAILABLE"}); zero calibration write; repair: ${configureVerifyRepair(commitTransition?.code ?? "CVCT-PREPARE-UNAVAILABLE")}`);
         return 2;
       }
-      const written = writeCalibrationVerifyCommand(dir, command);
+      const written = writeCalibrationVerifyCommand(dir, command, commitTransition.entries);
       if (!written.ok
         || !sameJson(written.written, commitTransition.paths)) {
         // The full write set was validated immediately above. This defensive
         // failure is retained for an unexpected filesystem race; callers must
         // inspect the durable files rather than treating an incomplete result
         // as a successful recovery.
-        console.error("Error: configure-verify could not write the exact committed calibration tiers; inspect calibration before retrying.");
+        console.error("Error: configure-verify could not write the exact committed calibration tiers; calibration mutation is possible. Inspect both tiers before retrying.");
         return 2;
       }
       const commitReady = completeCalibrationVerifyCommitTransition({preparedHandle: commitTransition.preparedHandle});
@@ -12762,7 +12881,16 @@ const STATE_AUTHORITY_ENTRIES = new Map([
   ["set-phase", "state.set-phase-no-calibration"],
 ]);
 const stateAuthorityWriteBrands = new WeakMap();
+const validatedCalibrationSourceWitnesses = new WeakMap();
 let stateAuthorityInvocation = null;
+export function inspectValidatedCalibrationSourceWitness(witness) {
+  const fact = validatedCalibrationSourceWitnesses.get(witness);
+  if (!fact || fact.sourceWrite !== stateAuthorityInvocation?.executingWrite
+    || fact.sourceWrite.entry !== "state.set-phase-with-calibration"
+    || !fact.sourceWrite.frame?.boundary) return null;
+  return Object.freeze({rootDir:fact.rootDir,statePreSha256:fact.statePreSha256,
+    statePostSha256:fact.statePostSha256,sourceBoundary:fact.sourceWrite.frame.boundary});
+}
 const stateOwnedCompanionFailureFrames = new WeakSet();
 function stateAuthorityFailure(code, reason) {
   const error = new Error(reason);
@@ -12820,10 +12948,11 @@ function stateAuthorityImage(repository) {
   };
 }
 function prepareStateAuthorityWrite(frame, entry, dir, state, expectedState, options) {
-  if (frame !== stateAuthorityInvocation || !frame.boundary || !frame.cataloguePresent
+  if (frame !== stateAuthorityInvocation || !frame.boundary
+    || (!frame.cataloguePresent && entry !== "state.set-phase-with-calibration")
     || !frame.sourceDefaults || resolve(dir) !== frame.repository.primaryRoot
     || (frame.push ? frame.sub !== "approve-push" || entry !== `state.approve-push.${frame.push.effect}`
-      : !STATE_AUTHORITY_ENTRIES.has(frame.sub) || entry !== STATE_AUTHORITY_ENTRIES.get(frame.sub))) {
+      : !STATE_AUTHORITY_ENTRIES.has(frame.sub) || entry !== frame.entry)) {
     stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-source-entry-unavailable");
   }
   const before = stateAuthorityImage(frame.repository);
@@ -12871,7 +13000,7 @@ export function executeStateAuthorityWrite(handle) {
   let result;
   try { result = writeState(data.dir,data.state,data.expectedState,data.options); }
   finally { data.frame.executingWrite = null; }
-  if (!data.sealedBytes && result?.ok === false && result.committed === false && result.externalMutation !== true) {
+  if (result?.ok === false && result.committed === false) {
     data.sealedBytes = data.preBytes;
   }
   if (!data.sealedBytes) stateAuthorityFailure("SDC-AUTHORITY-HELD", "state-write-no-valid-terminal");
@@ -12906,12 +13035,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     } catch { return 2; }
   }
   // Read-only and the State-read-only P16 twin writer retain their exact routes.
-  if (["inspect","help","-h","--help","configure-verify"].includes(sub)) return runStateSource(argv,deps);
+  if (["inspect","help","-h","--help"].includes(sub)) return runStateSource(argv,deps);
   const dir = deps.dir ?? projectDir();
   const previous = stateAuthorityInvocation;
   let owningFailureFrame = null;
   try {
     const repository = inspectSignedDescriptorCustodyRepository(dir);
+    if (sub === "configure-verify") return withSessionAuthorityBoundary({repository}, boundary =>
+      runStateSource(argv,{...deps,sourceBoundary:boundary}));
     if(sub === "approve-push") {
       const present=withSessionAuthorityBoundary({repository},()=>stateCataloguePresent(repository));
       if(!present) return runStateSource(argv,deps);
@@ -12964,7 +13095,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return result;
       });
     }
-    if (!STATE_AUTHORITY_ENTRIES.has(sub) || (sub === "set-phase" && argv.includes("--verify-command"))) {
+    if (!STATE_AUTHORITY_ENTRIES.has(sub)) {
       // The original legacy route may contain an attended prompt. Inspect the
       // catalogue under common lock, then release it BEFORE that original route.
       // PF-54 (D51 (1)): a route the State companion has not adopted writes the State outside the
@@ -12990,11 +13121,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     }
     return withSessionAuthorityBoundary({repository}, boundary => {
       const cataloguePresent = stateCataloguePresent(repository);
-      if (cataloguePresent && (!STATE_AUTHORITY_ENTRIES.has(sub)
-        || (sub === "set-phase" && argv.includes("--verify-command")))) {
+      if (cataloguePresent && !STATE_AUTHORITY_ENTRIES.has(sub)) {
         stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-outer-companion-route-not-adopted");
       }
       const frame = {repository,boundary,cataloguePresent,sub,
+        entry:sub === "set-phase" && argv.includes("--verify-command")
+          ? "state.set-phase-with-calibration" : STATE_AUTHORITY_ENTRIES.get(sub),
         sourceDefaults:Object.keys(deps).every(key => key === "dir" || key === "now"),executingWrite:null};
       stateAuthorityInvocation = frame;
       return runStateSource(argv,deps);
@@ -13768,7 +13900,7 @@ function calibrationApprovalFile(root, path, {privateState = false} = {}) {
   return {bytes,ref:Object.freeze({path,sha256:sha256Bytes(bytes),size:bytes.length})};
 }
 
-export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
+export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry = false} = {}) {
   const unavailable = code => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable."});
   try {
     const root = resolve(rootDir);
@@ -13779,7 +13911,10 @@ export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
     const physical = calibrationApprovalFile(root, selected, {privateState:true});
     const state = JSON.parse(physical.bytes.toString("utf8"));
     const lifecycle = derivePlanLifecycle(state);
-    if (!isLateVerifyRecoveryLifecycle(lifecycle) || !validCurrentPlanApproval(state.planApproval)
+    const eligibleLifecycle = phaseEntry === true
+      ? lifecycle.ok && lifecycle.status === "approved" && state.activeFeature?.phase === "design"
+      : isLateVerifyRecoveryLifecycle(lifecycle);
+    if (!eligibleLifecycle || !validCurrentPlanApproval(state.planApproval)
       || !validPlanSubmission(state.planSubmission)) return unavailable("CVCT-APPROVAL-UNAVAILABLE");
     const authority = checkPoGateAuthority({repoRoot:root});
     if (!authority?.ok || authority.divergences?.length !== 0

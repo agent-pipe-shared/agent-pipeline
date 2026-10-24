@@ -10,7 +10,8 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { observeCurrentPlanApprovalForCalibration, classifyVerifyCommand } from "../scripts/pipeline-state.mjs";
+import { observeCurrentPlanApprovalForCalibration, classifyVerifyCommand, inspectValidatedCalibrationSourceWitness, retireDeadCalibrationContinuityLock } from "../scripts/pipeline-state.mjs";
+import { isActiveSourceOwnedSessionAuthorityBoundary } from "./session-authority-registry.mjs";
 import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
 import { assertPrivateRegularFile, writePrivateFileNoReplaceAtomic } from "./private-boundary.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
@@ -92,8 +93,8 @@ function repository(rootDir) {
   return { root, common, head, tree, git, directory: join(common, "agent-pipeline", "calibration-verify-commit") };
 }
 
-function approval(repo) {
-  const value = observeCurrentPlanApprovalForCalibration({ rootDir: repo.root });
+function approval(repo, phaseEntry = false) {
+  const value = observeCurrentPlanApprovalForCalibration({ rootDir: repo.root, phaseEntry });
   if (value && value.status === "unavailable" && typeof value.code === "string" && CODE.test(value.code)) fail(value.code);
   const keys = ["status", "rootDir", "statePath", "stateSha256", "stateRevision", "candidate", "submissionSha256", "approvalSha256", "authoritySha256", "approvalBasis", "sourceRefs"];
   if (!exactKeys(value, keys) || value.status !== "eligible" || value.rootDir !== repo.root
@@ -116,8 +117,8 @@ function twinAt(repo, path, revision) {
   return { path, bytes, value, sha256: sha(bytes), gitMode: match[1], blob: match[2] };
 }
 
-// Select only actual committed and physically present tiers. An omitted legacy
-// peer must be absent in HEAD, index and the physical layout on every recheck.
+// Select only actual committed and physically present tiers. An omitted peer
+// must be absent in HEAD, index and the physical layout on every recheck.
 function committedCalibrationPaths(repo) {
   const paths = [];
   for (const path of PATHS) {
@@ -141,7 +142,7 @@ function committedCalibrationPaths(repo) {
     if (tracked !== present || (!tracked && repo.git(["ls-files", "--stage", "-z", "--", path]).length !== 0)) fail("CVCT-CALIBRATION");
     if (tracked) paths.push(path);
   }
-  if (paths[0] !== PATHS[0]) fail("CVCT-CALIBRATION");
+  if (paths.length === 0) fail("CVCT-CALIBRATION");
   return paths;
 }
 
@@ -162,7 +163,35 @@ export function inspectCommittedCalibrationVerifyLayout({ rootDir } = {}) {
   } catch (error) { return { status: "unavailable", code: unavailable(error).code }; }
 }
 
-function transition(repo, currentApproval, command) {
+/** A fresh command may normalize only exact committed-baseline or its own
+ * computed verify-field delta. This observation never reads a journal. */
+export function inspectReplayableCalibrationVerifyLayout({ rootDir, verifyCommand, phaseEntry = false } = {}) {
+  try {
+    const repo = repository(rootDir);
+    const committed = committedCalibrationPaths(repo).map(path => twinAt(repo,path,"HEAD"));
+    if (committed.length === 2 && !same(committed[0].value,committed[1].value)) fail("CVCT-TWIN-CAS");
+    if (classifyVerifyCommand(committed[0].value.verify) === "configured") {
+      if (committed[0].value.verify !== verifyCommand) fail("CVCT-COMMAND");
+      currentFiles(repo,{entries:committed.map(entry=>({...entry,beforeSha256:entry.sha256}))},false);
+      return {status:"committed-configured",paths:committed.map(entry=>entry.path)};
+    }
+    const facts = transition(repo,approval(repo,phaseEntry),verifyCommand);
+    let currentCount=0;
+    for (const entry of facts.entries) {
+      const file=readBounded(repo.root,join(repo.root,entry.path));
+      if ((file.mode & 0o111 ? "100755" : "100644") !== entry.gitMode
+        || ![entry.beforeSha256,entry.afterSha256].includes(file.sha256)) fail("CVCT-TWIN-CAS");
+      if (file.sha256===entry.afterSha256) currentCount++;
+    }
+    const finalRepo=repository(repo.root);
+    if (finalRepo.head!==repo.head || finalRepo.tree!==repo.tree
+      || !same(approval(finalRepo,phaseEntry),facts.approval)) fail("CVCT-CAS");
+    return {status:currentCount===0?"baseline-only":currentCount===facts.entries.length?"configured-current":"partial-current",
+      paths:facts.entries.map(entry=>entry.path)};
+  } catch(error) { return {status:"unavailable",code:unavailable(error).code}; }
+}
+
+function transition(repo, currentApproval, command, statePostSha256 = null) {
   if (classifyVerifyCommand(command) !== "configured" || typeof command !== "string" || Buffer.byteLength(command) > 32_768 || /[\r\n\0]/u.test(command)) fail("CVCT-COMMAND");
   const before = committedCalibrationPaths(repo).map((path) => twinAt(repo, path, "HEAD"));
   if ((before.length === 2 && !same(before[0].value, before[1].value)) || before.some((entry) => classifyVerifyCommand(entry.value.verify) !== "baseline-only")) fail("CVCT-BASELINE");
@@ -170,7 +199,11 @@ function transition(repo, currentApproval, command) {
     const after = Buffer.from(`${JSON.stringify({ ...entry.value, verify: command }, null, 2)}\n`, "utf8");
     return { path: entry.path, beforeSha256: entry.sha256, beforeBlob: entry.blob, gitMode: entry.gitMode, afterSha256: sha(after), afterSize: after.length };
   });
-  const facts = { rootDir: repo.root, commonDir: repo.common, head: repo.head, tree: repo.tree, approval: currentApproval, verifyCommand: command, entries };
+  if (statePostSha256 !== null && !HEX.test(statePostSha256)) fail("CVCT-STATE-POSTIMAGE");
+  // The original non-phase record never carried this field. Its canonical ID
+  // remains byte-for-byte compatible with records already published by hooks.
+  const facts = { rootDir: repo.root, commonDir: repo.common, head: repo.head, tree: repo.tree, approval: currentApproval, verifyCommand: command,
+    ...(statePostSha256 === null ? {} : { statePostSha256 }), entries };
   return { ...facts, id: sha(canonical(facts)) };
 }
 
@@ -181,6 +214,26 @@ function currentFiles(repo, facts, after) {
     if (file.sha256 !== (after ? entry.afterSha256 : entry.beforeSha256)
       || (file.mode & 0o111 ? "100755" : "100644") !== entry.gitMode) fail("CVCT-TWIN-CAS");
   }
+}
+function replayableFiles(repo,facts) {
+  for(const entry of facts.entries) {
+    const file=readBounded(repo.root,join(repo.root,entry.path));
+    if ((file.mode & 0o111 ? "100755" : "100644") !== entry.gitMode
+      || ![entry.beforeSha256,entry.afterSha256].includes(file.sha256)) fail("CVCT-TWIN-CAS");
+  }
+}
+function retireDeadTransitionLock(repo,sourceBoundary) {
+  if (!isActiveSourceOwnedSessionAuthorityBoundary({boundary:sourceBoundary,rootDir:repo.root})) fail("CVCT-SOURCE-WRITER");
+  const path=join(repo.directory,"transition.lock");
+  if (!existsSync(path)) return;
+  const before=lstatSync(path),file=readBounded(repo.common,path,true);
+  const match=/^([a-f0-9]{64})\n([1-9][0-9]*)\n$/u.exec(file.bytes.toString("ascii"));
+  if (!match || !Number.isSafeInteger(Number(match[2]))) fail("CVCT-LOCK");
+  try { process.kill(Number(match[2]),0); fail("CVCT-LIVE-OWNER"); }
+  catch(error) { if(error.code!=="ESRCH") throw error; }
+  if(!same(identity(before),identity(lstatSync(path)))
+    || readBounded(repo.common,path,true).sha256!==file.sha256) fail("CVCT-LOCK");
+  unlinkSync(path);
 }
 function readRecord(repo, path) {
   const raw = readBounded(repo.common, path, true).bytes;
@@ -194,29 +247,50 @@ function publish(repo, facts, phase) {
   const bytes = Buffer.from(`${JSON.stringify({ schema: SCHEMA, phase, facts }, null, 2)}\n`);
   if (bytes.length > MAX_BYTES) fail("CVCT-RECORD-BOUNDS");
   const published = writePrivateFileNoReplaceAtomic(path, bytes);
-  if (!published.created || !same(readRecord(repo, path), { schema: SCHEMA, phase, facts })) fail("CVCT-RECORD-CONFLICT");
+  if (!same(readRecord(repo, path), { schema: SCHEMA, phase, facts })) fail("CVCT-RECORD-CONFLICT");
 }
 const unavailable = (error) => ({ ok: false, code: typeof error?.code === "string" && CODE.test(error.code) ? error.code : "CVCT-UNAVAILABLE" });
 
-export function prepareCalibrationVerifyCommitTransition({ rootDir, verifyCommand } = {}) {
+function sameApprovalAcrossPhase(before, after) {
+  if (before.statePath !== after.statePath || before.stateSha256 === after.stateSha256
+    || !same(before.candidate, after.candidate)
+    || before.submissionSha256 !== after.submissionSha256
+    || before.approvalSha256 !== after.approvalSha256
+    || before.authoritySha256 !== after.authoritySha256
+    || before.approvalBasis !== after.approvalBasis
+    || before.stateRevision !== after.stateRevision) return false;
+  const withoutState = value => value.sourceRefs.filter(ref => ref.path !== value.statePath);
+  return same(withoutState(before), withoutState(after));
+}
+
+export function prepareCalibrationVerifyCommitTransition({ rootDir, verifyCommand, phaseEntry = false, sourceWitness = null, sourceBoundary = null } = {}) {
   let held = null;
   try {
     const repo = repository(rootDir);
-    const facts = transition(repo, approval(repo), verifyCommand);
-    currentFiles(repo, facts, false);
+    if (typeof phaseEntry !== "boolean") fail("CVCT-PHASE-ENTRY");
+    const source = phaseEntry ? inspectValidatedCalibrationSourceWitness(sourceWitness) : null;
+    if (phaseEntry ? !source || source.rootDir !== repo.root || !HEX.test(source.statePostSha256)
+      || !HEX.test(source.statePreSha256) : sourceWitness !== null) fail("CVCT-SOURCE-WRITER");
+    const currentApproval = approval(repo, phaseEntry);
+    if (source && source.statePreSha256 !== currentApproval.stateSha256) fail("CVCT-SOURCE-WRITER");
+    const facts = transition(repo, currentApproval, verifyCommand, source?.statePostSha256 ?? null);
+    replayableFiles(repo, facts);
     ensureHardenedPrivateDirectory(repo.common, repo.directory);
+    const boundary=source?.sourceBoundary ?? sourceBoundary;
+    retireDeadTransitionLock(repo,boundary);
     const lockPath = join(repo.directory, "transition.lock");
     const fd = openSync(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
-    held = { repo, facts, fd, lockPath, lockIdentity: null };
-    writeFileSync(fd, `${facts.id}\n`); fsyncSync(fd);
+    held = { repo, facts, phaseEntry, fd, lockPath, lockIdentity: null };
+    writeFileSync(fd, `${facts.id}\n${process.pid}\n`); fsyncSync(fd);
     held.lockIdentity = identity(assertPrivateRegularFile(lockPath));
     if (!same(identity(fstatSync(fd)), held.lockIdentity)) fail("CVCT-LOCK");
-    if (!same(approval(repository(rootDir)), facts.approval)) fail("CVCT-APPROVAL-CAS");
-    currentFiles(repo, facts, false);
+    if (!same(approval(repository(rootDir), phaseEntry), facts.approval)) fail("CVCT-APPROVAL-CAS");
+    replayableFiles(repo, facts);
     publish(repo, facts, "prepared");
     const preparedHandle = Object.freeze({});
     HELD.set(preparedHandle, held);
-    return { ok: true, preparedHandle, paths: facts.entries.map((entry) => entry.path) };
+    return { ok: true, preparedHandle, paths: facts.entries.map((entry) => entry.path),
+      entries:facts.entries.map(entry=>({path:entry.path,beforeSha256:entry.beforeSha256,afterSha256:entry.afterSha256})) };
   } catch (error) {
     // Preserve any exclusive lock/journal after interruption. Never reclaim a
     // stale preparation automatically or pretend it has no effects.
@@ -231,10 +305,15 @@ export function completeCalibrationVerifyCommitTransition({ preparedHandle } = {
   HELD.delete(preparedHandle);
   try {
     const repo = repository(held.repo.root);
-    const facts = transition(repo, approval(repo), held.facts.verifyCommand);
-    if (!same(facts, held.facts) || !same(identity(fstatSync(held.fd)), held.lockIdentity)
+    const facts = transition(repo, approval(repo), held.facts.verifyCommand, held.facts.statePostSha256);
+    const continuous = held.phaseEntry
+      ? sameApprovalAcrossPhase(held.facts.approval, facts.approval)
+        && same({ ...held.facts, id: null, approval: null }, { ...facts, id: null, approval: null })
+      : same(facts, held.facts);
+    if (!continuous || (held.phaseEntry && facts.approval.stateSha256 !== held.facts.statePostSha256)
+      || !same(identity(fstatSync(held.fd)), held.lockIdentity)
       || !same(identity(assertPrivateRegularFile(held.lockPath)), held.lockIdentity)) fail("CVCT-CAS");
-    if (!same(readRecord(repo, recordPath(repo, facts.id, "prepared")), { schema: SCHEMA, phase: "prepared", facts })) fail("CVCT-RECORD");
+    if (!same(readRecord(repo, recordPath(repo, held.facts.id, "prepared")), { schema: SCHEMA, phase: "prepared", facts: held.facts })) fail("CVCT-RECORD");
     currentFiles(repo, facts, true);
     publish(repo, facts, "ready");
     if (!same(approval(repository(repo.root)), facts.approval)) fail("CVCT-APPROVAL-CAS");
@@ -249,6 +328,51 @@ export function completeCalibrationVerifyCommitTransition({ preparedHandle } = {
   }
 }
 
+/** Release only this process's exact preparation after a refused companion write.
+ * The prepared journal stays as an audit preimage. An exact later preparation
+ * may reuse it, but only after the committed calibration preimage is restored. */
+export function abandonCalibrationVerifyCommitTransition({ preparedHandle } = {}) {
+  const held = preparedHandle && HELD.get(preparedHandle);
+  if (!held) return { ok: false, code: "CVCT-HANDLE" };
+  HELD.delete(preparedHandle);
+  try {
+    const repo = repository(held.repo.root);
+    if (repo.head !== held.repo.head || repo.tree !== held.repo.tree
+      || !same(identity(fstatSync(held.fd)), held.lockIdentity)
+      || !same(identity(assertPrivateRegularFile(held.lockPath)), held.lockIdentity)
+      || !same(readRecord(repo, recordPath(repo, held.facts.id, "prepared")), { schema: SCHEMA, phase: "prepared", facts: held.facts })
+      || !same(approval(repo, held.phaseEntry), held.facts.approval)) fail("CVCT-CAS");
+    closeSync(held.fd); held.fd = null;
+    if (!same(identity(assertPrivateRegularFile(held.lockPath)), held.lockIdentity)) fail("CVCT-LOCK");
+    unlinkSync(held.lockPath);
+    return { ok: true, code: "CVCT-ABANDONED" };
+  } catch (error) {
+    if (held.fd !== null) { try { closeSync(held.fd); } catch { /* retain the typed failure */ } }
+    return unavailable(error);
+  }
+}
+
+/** The State writer proved its replacement did not commit. Undo only the exact
+ * configured companion image held by this same process. */
+export function rollbackCalibrationVerifyCommitTransition({ preparedHandle } = {}) {
+  const held = preparedHandle && HELD.get(preparedHandle);
+  if (!held) return { ok: false, code: "CVCT-HANDLE" };
+  try {
+    const repo = repository(held.repo.root);
+    if (!same(approval(repo, held.phaseEntry), held.facts.approval)
+      || !same(identity(fstatSync(held.fd)), held.lockIdentity)
+      || !same(identity(assertPrivateRegularFile(held.lockPath)), held.lockIdentity)) fail("CVCT-CAS");
+    currentFiles(repo, held.facts, true);
+    for (const entry of held.facts.entries) {
+      const original = twinAt(repo, entry.path, "HEAD");
+      if (original.sha256 !== entry.beforeSha256) fail("CVCT-CAS");
+      writeFileSync(join(repo.root, entry.path), original.bytes);
+    }
+    currentFiles(repo, held.facts, false);
+    return abandonCalibrationVerifyCommitTransition({ preparedHandle });
+  } catch (error) { return unavailable(error); }
+}
+
 export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths } = {}) {
   try {
     const repo = repository(rootDir);
@@ -258,7 +382,13 @@ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths 
       || !same([...stagedPaths].sort(), [...actual].sort())) fail("CVCT-STAGED-SET");
     const after = paths.map((path) => twinAt(repo, path, ""));
     if (after.length === 2 && !same(after[0].value, after[1].value)) fail("CVCT-TWIN-CAS");
-    const facts = transition(repo, approval(repo), after[0].value.verify);
+    const approved = approval(repo);
+    const candidates = [
+      transition(repo, approved, after[0].value.verify),
+      transition(repo, approved, after[0].value.verify, approved.stateSha256),
+    ];
+    const facts = candidates.find(value => existsSync(recordPath(repo, value.id, "ready")));
+    if (!facts) fail("CVCT-RECORD");
     for (const entry of facts.entries) {
       const staged = after.find((value) => value.path === entry.path);
       if (staged.sha256 !== entry.afterSha256 || staged.gitMode !== entry.gitMode) fail("CVCT-STAGED-CAS");
@@ -268,7 +398,7 @@ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths 
     if (!same(readRecord(repo, recordPath(repo, facts.id, "ready")), { schema: SCHEMA, phase: "ready", facts })) fail("CVCT-RECORD");
     currentFiles(repo, facts, true);
     const finalRepo = repository(repo.root);
-    if (!same(transition(finalRepo, approval(finalRepo), facts.verifyCommand), facts)
+    if (!same(transition(finalRepo, approval(finalRepo), facts.verifyCommand, facts.statePostSha256), facts)
       || !same(finalRepo.git(["diff", "--cached", "--name-only", "-z", "HEAD"]).toString("utf8").split("\0").filter(Boolean), actual)) fail("CVCT-CAS");
     for (const entry of facts.entries) {
       const staged = twinAt(finalRepo, entry.path, "");
@@ -276,6 +406,22 @@ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths 
     }
     return { ok: true, code: "CVCT-COMMIT-READY", paths: facts.entries.map((entry) => entry.path) };
   } catch (error) { return unavailable(error); }
+}
+
+/** Existing ready records remain valid after restart; this reads their exact
+ * current approval and calibration bytes without granting journal authority. */
+export function inspectCurrentCalibrationVerifyReady({rootDir,verifyCommand}={}) {
+  try {
+    const repo=repository(rootDir),currentApproval=approval(repo);
+    const candidates=[transition(repo,currentApproval,verifyCommand),
+      transition(repo,currentApproval,verifyCommand,currentApproval.stateSha256)];
+    const facts=candidates.find(value=>existsSync(recordPath(repo,value.id,"ready")));
+    if(!facts || existsSync(join(repo.directory,"transition.lock"))) fail("CVCT-RECORD");
+    if(!same(readRecord(repo,recordPath(repo,facts.id,"ready")),{schema:SCHEMA,phase:"ready",facts})) fail("CVCT-RECORD");
+    currentFiles(repo,facts,true);
+    if(!same(approval(repository(repo.root)),currentApproval)) fail("CVCT-APPROVAL-CAS");
+    return {ok:true,code:"CVCT-COMMIT-READY",paths:facts.entries.map(entry=>entry.path)};
+  } catch(error) {return unavailable(error);}
 }
 
 /** One-line repair per unmet configure-verify condition (AC-140, never-fully-blocking). */

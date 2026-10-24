@@ -61,14 +61,16 @@ export function prepareSessionAuthorityRegistryFixture({root=null,prefix='sessio
  assert.equal(initialized.status,'initialized',JSON.stringify(initialized));
  return {repoDir,repository,root:authorityRoot};
 }
-export function prepareApprovedItemCourseFixture({root,additionalCriteria=[],pipelineUserSource=null}={}) {
+export function prepareApprovedItemCourseFixture({root,additionalCriteria=[],pipelineUserSource=null,initialPlanSurfacePath=null}={}) {
+if(initialPlanSurfacePath!==null && (typeof initialPlanSurfacePath!=='string' || !/^src\/[A-Za-z0-9._/-]+$/u.test(initialPlanSurfacePath)
+  || initialPlanSurfacePath.split('/').some(part=>part==='.'||part==='..')))throw Error('fixture initial plan surface path');
 const write=(path,bytes)=>{const target=join(root,path);mkdirSync(join(target,'..'),{recursive:true});writeFileSync(target,bytes);};
 const git=(...args)=>{const r=spawnSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false',...args],{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr);return r.stdout.trim();};
 git('init','-q');
 const source=pipelineUserSource??'schema: pipeline.user.v3\ngates:\n  human_approval: chat\nlanguage:\n  human_facing: en\n  agent_facing: en\n';
 const manifest='schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n';
 const spec='# Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-1 | The dependency returns expected bytes. | unit.test.cjs |\n'+additionalCriteria.map(row=>{if(!/^AC-[2-9][0-9]*$/.test(row.id)||typeof row.text!=='string'||/[|\n\r]/.test(row.text))throw Error('fixture criterion shape');return `| ${row.id} | ${row.text} | targeted source check |\n`;}).join('');
-const preprd=`<!-- po-language: en -->\n<!-- technical-spec-sha256: ${nativeManagedDigest(spec)} -->\n# PRD\n\nProvide the expected dependency behavior.\n`;
+const preprd=`<!-- po-language: en -->\n<!-- technical-spec-sha256: ${nativeManagedDigest(spec)} -->\n# PRD\n\nProvide the expected dependency behavior.\n${initialPlanSurfacePath===null?'':`\nImplement ${initialPlanSurfacePath}.\n`}`;
 // AC-264 (ALF-B10): '/evidence/' mirrors the onboarding seed (PROJECT_IGNORE_SEED in lib/project-onboarding-v3.mjs, PF-26D fix 2), so the dispatch guard's evidence/dispatch-route-<slice>.json, written after the baseline capture, is not a new unowned untracked path.
 write('pipeline.user.yaml',source);write('.claude/pipeline.yaml',manifest);write('.gitignore','.claude/pipeline-state.json\nscratch/\n/evidence/\n');write('specs/unit/spec.md',spec);write('specs/unit/prd_unit.md',preprd+'\n\n<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->\n');
 write('.claude/pipeline.json',JSON.stringify({project:'fixture',verify:'node --test unit.test.cjs',autonomy:'bounded',branchModel:'local',worktree:'supported',stakes:'medium',constraints:[]}));

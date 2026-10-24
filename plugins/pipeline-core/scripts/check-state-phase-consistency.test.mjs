@@ -219,7 +219,10 @@ test("the marker stays atomic with a real design -> implementation transition", 
     const approved = run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, planPath));
     assert.equal(approved, 0);
 
-    const setPhase = run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir, now: FIXED_NOW, architectureEntryReadiness: () => ({ status: "ready" }) });
+    // QG-04: this marker examiner starts with a configured verify command.
+    // The separate calibration recovery examiner covers the commit-bound
+    // --verify-command route; do not request an uncommitted rewrite here.
+    const setPhase = run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW, architectureEntryReadiness: () => ({ status: "ready" }) });
     assert.equal(setPhase, 0);
     assert.equal(JSON.parse(readFileSync(join(dir, "project/pipeline.json"), "utf8")).verify, verifyCommand);
     const afterSetPhase = checkStatePhaseConsistency({ rootDir: dir });

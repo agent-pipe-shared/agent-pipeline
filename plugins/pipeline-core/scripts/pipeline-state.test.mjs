@@ -40,6 +40,24 @@ import { designReadinessReportSha256 } from "../lib/design-readiness-host-eviden
 import { createAdvisoryAttemptTrail } from "../lib/advisory-attempt-trail.mjs";
 import { readRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
 import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+import { prepareAdoptionAuthority } from "../lib/architecture-adoption-authority.mjs";
+import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
+import { applyAdoptionDecision } from "./architecture-adoption.mjs";
+
+function prepareCalibrationArchitectureFixture(root) {
+  const source = fileURLToPath(new URL("../../..", import.meta.url));
+  cpSync(join(source, "architecture"), join(root, "architecture"), { recursive: true });
+  cpSync(join(source, "AGENTS.md"), join(root, "AGENTS.md"));
+  const adoption = { rootDir: root, decision: "deferred", scope: ["specs/", "architecture/map/"],
+    rationale: "Contained fixture physical architecture deferral", decidedAt: "2026-10-24T12:00:00.000Z",
+    reviewDate: "2099-01-01", decisionRef: "TEST-K156" };
+  const request = prepareAdoptionAuthority(adoption);
+  applyAdoptionDecision({ ...adoption, approvalRequest: request, chatApproval: {
+    mode: "chat-attributed-unattested", by: "Synthetic fixture PO", decisionRef: "TEST-K156", intentSha256: request.intent.sha256,
+  } });
+  const readiness = inspectArchitectureEntryReadiness({ rootDir: root, taskScope: "specs/unit/prd_unit.md" });
+  assert.equal(readiness.status, "ready", readiness.code);
+}
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -1940,7 +1958,7 @@ function awaitingApprovalFixture() {
 // must still support each healthy layout that project authority admits.
 {
   const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
-  const baseline = { project: "calibration-preflight", verify: "node -e \"process.exit(1)\"", handover: "docs/state.md" };
+  const baseline = { project: "calibration-preflight", verify: "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"", handover: "docs/state.md" };
   const approvedState = {
     schema: "pipeline.state.v0",
     activeFeature: { id: "calibration-preflight", planPath: "specs/calibration-preflight/prd.md", phase: "design" },
@@ -1982,31 +2000,64 @@ function awaitingApprovalFixture() {
   refused({ neutral: baseline, legacy: { ...baseline, handover: "docs/other-state.md" } }, "unequal valid calibration twins must reject before any write");
 
   for (const [label, options, expectedPaths] of [
-    ["neutral-only", { legacy: undefined }, ["project/pipeline.json"]],
-    ["legacy-only", { neutral: undefined }, [".claude/pipeline.json"]],
-    ["matching-dual", {}, ["project/pipeline.json", ".claude/pipeline.json"]],
+    ["neutral-only", { neutral: baseline, legacy: undefined }, ["project/pipeline.json"]],
+    ["legacy-only", { neutral: undefined, legacy: baseline }, [".claude/pipeline.json"]],
+    ["matching-dual", { neutral: baseline, legacy: baseline }, ["project/pipeline.json", ".claude/pipeline.json"]],
   ]) {
-    const root = fixture(options);
+    // QG-04: the old positive fixture hand-seeded an uncommitted approval and
+    // calibration. The commit transition correctly refuses both. Keep the
+    // same layout and successful mutation assertions with a production writer
+    // approval and committed baseline; the refusal cases above retain their
+    // original zero-write assertions and setup.
+    const root = mkdtempSync(join(nativeContractFixtureParent(), `phase-calibration-${label}-`));
+    prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
+    prepareCalibrationArchitectureFixture(root);
+    const stateFile = statePath(root);
+    const state = JSON.parse(readFileSync(stateFile, "utf8"));
+    writeFileSync(stateFile, `${JSON.stringify({ ...state, activeFeature: { ...state.activeFeature, phase: "design" } }, null, 2)}\n`, { mode: 0o600 });
+    if (options.legacy === undefined) rmSync(join(root, ".claude/pipeline.json"));
+    if (options.neutral !== undefined) {
+      mkdirSync(join(root, "project"), { recursive: true });
+      writeFileSync(join(root, "project/pipeline.json"), `${JSON.stringify(baseline, null, 2)}\n`);
+    }
+    if (options.legacy !== undefined) writeFileSync(join(root, ".claude/pipeline.json"), `${JSON.stringify(baseline, null, 2)}\n`);
+    const fixtureGit = (...args) => assert.equal(spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" }).status, 0);
+    fixtureGit("add", "--", ...expectedPaths);
+    if (options.legacy === undefined) fixtureGit("add", "-u", "--", ".claude/pipeline.json");
+    fixtureGit("commit", "-q", "--no-verify", "-m", "committed calibration fixture");
     const lines = [];
     const originalLog = console.log;
     console.log = (...parts) => { lines.push(parts.join(" ")); };
     try {
       assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], {
-        dir: root, now: () => now,
-        architectureEntryReadiness: () => ({ status: "ready", artifacts: { decisionApplicability: {
-          status: "advisory", areas: [{ area: "pipeline-core", status: "advisory",
-            decisions: [{ id: "ADR-0076", digest: "a".repeat(64), path: "docs/adr/0076.md" }], findings: [] }],
-          unresolvedPaths: [],
-        } } }),
+        dir: root,
       }), 0, `${label} layout must remain supported`);
     } finally { console.log = originalLog; }
     const decisionLine = lines.find((line) => line.startsWith("Architecture decisions: "));
     assert.ok(decisionLine, `${label} must display task-scoped architecture decisions`);
-    assert.equal(JSON.parse(decisionLine.slice("Architecture decisions: ".length)).areas[0].decisions[0].id, "ADR-0076");
+    const decisionSummary = JSON.parse(decisionLine.slice("Architecture decisions: ".length));
+    assert.equal(decisionSummary.schema, "pipeline.architecture-planning-decisions.v1");
+    assert.deepEqual(decisionSummary.areas, [], `${label} must not invent an effective decision for the unowned planned path`);
+    assert.deepEqual(decisionSummary.unresolvedPaths, ["src/change.mjs"], `${label} must display the actual task-scoped planning path`);
     for (const path of expectedPaths) assert.equal(JSON.parse(readFileSync(join(root, path), "utf8")).verify, verifyCommand, `${label} must configure ${path}`);
   }
 
   refused({ neutral: undefined, legacy: undefined }, "missing all calibrations with a requested command must not report implementation success");
+}
+
+// QG-04: the original CLI fixture supplied this projection through a caller
+// readiness function. Current Source forbids that caller input from granting a
+// State witness. Keep the original ADR identity/summary obligation as a bounded
+// formatting unit check; it cannot authenticate an effective decision or enter
+// the calibration writer. The three layout cases above inspect real Source
+// readback and retain their original calibration-write assertions.
+{
+  const projection = { status: "advisory", areas: [{ area: "pipeline-core", status: "advisory",
+    decisions: [{ id: "ADR-0076", digest: "a".repeat(64), path: "docs/adr/0076.md" }], findings: [] }],
+    unresolvedPaths: [] };
+  const summary = summarizePlanningDecisionApplicability(projection);
+  assert.equal(summary.areas[0].decisions[0].id, "ADR-0076");
+  assert.equal(summary.areas[0].decisions[0].decisionSha256, "a".repeat(64));
 }
 
 // NVA-B-CALIBRATION-PARTIAL-IO: an attempted first calibration write can truncate
@@ -2014,36 +2065,26 @@ function awaitingApprovalFixture() {
 // when State itself never commits; counting only completed writes falsely reports
 // this observable partial write as zero mutation.
 {
-  const root = mktempProjectDir();
-  const repositoryRoot = fileURLToPath(new URL("../../..", import.meta.url));
-  for (const directory of ["architecture", "backlog", "harness", "plugins/pipeline-core", "schemas"]) {
-    cpSync(join(repositoryRoot, directory), join(root, directory), { recursive: true });
-  }
-  writeFileSync(join(root, "AGENTS.md"), "Architecture: [map](architecture/map/index.md).\n", "utf8");
-  mkdirSync(join(root, "specs/partial-calibration-io"), { recursive: true });
-  writeFileSync(join(root, "specs/partial-calibration-io/prd.md"), "Implement plugins/pipeline-core/scripts/pipeline-state.mjs\n", "utf8");
-
-  const calibration = { project: "partial-calibration-io", verify: "node --test old.mjs", handover: "docs/state.md" };
+  // QG-04: keep the injected partial-write examiner, but enter it through
+  // current approval and a committed baseline. The old hand-seeded approval
+  // and uncommitted calibration now correctly fail before the writer.
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "partial-calibration-io-"));
+  prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
+  prepareCalibrationArchitectureFixture(root);
+  const calibration = { project: "partial-calibration-io", verify: "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"", handover: "docs/state.md" };
   const calibrationPath = join(root, "project", "pipeline.json");
   const legacyPath = join(root, ".claude", "pipeline.json");
-  const stateFile = join(root, "project", "pipeline-state.json");
+  const stateFile = statePath(root);
   mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, ".claude"), { recursive: true });
   writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
   writeFileSync(legacyPath, `${JSON.stringify(calibration, null, 2)}\n`);
-  writeFileSync(stateFile, JSON.stringify({
-    schema: "pipeline.state.v0",
-    activeFeature: { id: "partial-calibration-io", planPath: "specs/partial-calibration-io/prd.md", phase: "design" },
-    planApproved: true,
-    planApproval: { approvedBy: "PO", approvedAt: now },
-  }, null, 2));
-
-  fixtureAdoption({
-    rootDir: root,
-    decision: "approved-scoped",
-    scope: ["plugins/pipeline-core/", "architecture/map/", "project/pipeline.json", "pipeline.user.yaml", "specs/partial-calibration-io/"],
-    rationale: "partial calibration test fixture",
-  });
+  const committedBaseline = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "add", "--", "project/pipeline.json", ".claude/pipeline.json"], { encoding: "utf8" });
+  assert.equal(committedBaseline.status, 0, committedBaseline.stderr);
+  const baselineCommit = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "--no-verify", "-m", "baseline calibration fixture"], { encoding: "utf8" });
+  assert.equal(baselineCommit.status, 0, baselineCommit.stderr);
+  const approved = JSON.parse(readFileSync(stateFile, "utf8"));
+  writeFileSync(stateFile, `${JSON.stringify({ ...approved, activeFeature: { ...approved.activeFeature, phase: "design" } }, null, 2)}\n`, { mode: 0o600 });
   const before = [readFileSync(calibrationPath, "utf8"), readFileSync(legacyPath, "utf8"), readFileSync(stateFile, "utf8")];
   const originalWriteFileSync = fs.writeFileSync;
   let injected = false;
@@ -2058,11 +2099,7 @@ function awaitingApprovalFixture() {
   syncBuiltinESMExports();
   let captured;
   try {
-    captured = capturedStderr(() => run(["set-phase", "--phase", "implementation", "--verify-command", "node --test"], {
-      dir: root,
-      now: () => now,
-      architectureEntryReadiness: () => ({ status: "ready" }),
-    }));
+    captured = capturedStderr(() => run(["set-phase", "--phase", "implementation", "--verify-command", "node --test"], { dir: root }));
   } finally {
     fs.writeFileSync = originalWriteFileSync;
     syncBuiltinESMExports();
@@ -2085,47 +2122,35 @@ function awaitingApprovalFixture() {
 // never a GS-10 override, never a `git commit --no-verify` bypass (neither guard
 // nor git are invoked by this test at all: `run()` is called in-process).
 {
-  const root = mktempProjectDir();
-  const repositoryRoot = fileURLToPath(new URL("../../..", import.meta.url));
-  for (const directory of ["architecture", "backlog", "harness", "plugins/pipeline-core", "schemas"]) {
-    cpSync(join(repositoryRoot, directory), join(root, directory), { recursive: true });
-  }
-  mkdirSync(join(root, "plugins/pipeline-core"), { recursive: true });
-  writeFileSync(join(root, "plugins/pipeline-core/architecture-entry-plan.md"), "Implement plugins/pipeline-core/scripts/pipeline-state.mjs\n", "utf8");
+  // QG-04: retain the original phase and twin assertions against a genuine
+  // approved State and committed baseline; the old hand-seeded fixture could
+  // not satisfy the sanctioned calibration commit transition.
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "phase-verify-deadlock-"));
+  prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
+  prepareCalibrationArchitectureFixture(root);
   const seededVerify = "node -e \"console.error('pipeline: the verify contract of this project is not configured. Replace the verify command in project/pipeline.json with the real verification command for this project (for example its test suite), then run verify again.'); process.exit(1)\"";
   mkdirSync(join(root, "project"), { recursive: true });
-  mkdirSync(join(root, ".claude"), { recursive: true });
   const calibration = { project: "new-project", verify: seededVerify, handover: "docs/state.md" };
   writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
   writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
-  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
-    schema: "pipeline.state.v0",
-    activeFeature: { id: "verify-deadlock-repro", planPath: "plugins/pipeline-core/architecture-entry-plan.md", phase: "design" },
-    planApproved: true,
-    planApproval: { approvedBy: "PO", approvedAt: now },
-  }, null, 2));
-  fixtureAdoption({
-    rootDir: root,
-    decision: "approved-scoped",
-    scope: ["plugins/pipeline-core/", "architecture/map/", "project/pipeline.json", "pipeline.user.yaml"],
-    rationale: "verify deadlock architecture-ready fixture",
-  });
-  // This scenario isolates the verify-command deadlock. Architecture-entry
-  // readiness has its own real-map/authority suite; inject that gate as ready
-  // here so changing calibration does not turn the test into a profile-drift
-  // test as well.
-  const deps = { dir: root, now: () => now, architectureEntryReadiness: () => ({ status: "ready" }) };
+  const committedBaseline = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "add", "--", "project/pipeline.json", ".claude/pipeline.json"], { encoding: "utf8" });
+  assert.equal(committedBaseline.status, 0, committedBaseline.stderr);
+  const baselineCommit = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "--no-verify", "-m", "baseline calibration fixture"], { encoding: "utf8" });
+  assert.equal(baselineCommit.status, 0, baselineCommit.stderr);
+  const approved = JSON.parse(readFileSync(statePath(root), "utf8"));
+  writeFileSync(statePath(root), `${JSON.stringify({ ...approved, activeFeature: { ...approved.activeFeature, phase: "design" } }, null, 2)}\n`, { mode: 0o600 });
+  const deps = { dir: root };
 
   // 1. A product-specific command is not a PO gate. The legacy placeholder is
   // interpreted as baseline-only and implementation can start without another
   // human turn. Release remains independently blocked by the producer.
   assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
     "baseline-only verification must allow the approved plan to enter implementation");
-  const baselineState = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  const baselineState = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(baselineState.activeFeature.phase, "implementation");
   assert.equal(JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8")).verify, seededVerify,
     "the transition must not relabel the legacy placeholder as a full command");
-  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({ ...baselineState, activeFeature: { ...baselineState.activeFeature, phase: "design" } }, null, 2));
+  writeFileSync(statePath(root), JSON.stringify({ ...baselineState, activeFeature: { ...baselineState.activeFeature, phase: "design" } }, null, 2));
 
   // 2. --verify-command carrying the placeholder text itself (or blank) is
   // refused -- the deadlock's fix must never let the placeholder re-enter through
@@ -2142,7 +2167,7 @@ function awaitingApprovalFixture() {
   const realVerify = `${process.execPath} -e "process.exit(0)"`;
   const applied = run(["set-phase", "--phase", "implementation", "--verify-command", realVerify], deps);
   assert.equal(applied, 0, "set-phase --verify-command must succeed with a real command");
-  const afterState = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  const afterState = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(afterState.activeFeature.phase, "implementation", "phase must now be implementation");
   const neutralCalibration = JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8"));
   const legacyCalibration = JSON.parse(readFileSync(join(root, ".claude", "pipeline.json"), "utf8"));
@@ -2162,7 +2187,7 @@ function awaitingApprovalFixture() {
   // 5. Idempotent replay: once configured, re-entering implementation (e.g. after
   // reopen-design) without --verify-command is no longer refused.
   const revertedToDesign = { ...afterState, activeFeature: { ...afterState.activeFeature, phase: "design" } };
-  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify(revertedToDesign, null, 2));
+  writeFileSync(statePath(root), JSON.stringify(revertedToDesign, null, 2));
   assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
     "once the calibration already carries a real verify command, --verify-command is optional on replay");
 }
@@ -2195,7 +2220,7 @@ function awaitingApprovalFixture() {
   const gitIn = (...args) => assert.equal(spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" }).status, 0, `git ${args.join(" ")}`);
   gitIn("add", "--", "project/pipeline.json", ".claude/pipeline.json");
   gitIn("commit", "-q", "--no-verify", "-m", "seed unconfigured verify");
-  const deps = { dir: root, architectureEntryReadiness: () => ({ status: "ready" }) };
+  const deps = { dir: root };
 
   assert.equal(JSON.parse(readFileSync(statePath(root), "utf8")).activeFeature.phase, "implementation",
     "the approved baseline must already have entered implementation through the sanctioned writer");
@@ -2257,7 +2282,7 @@ function awaitingApprovalFixture() {
   gitInMalformed("add", "--", "project/pipeline.json", ".claude/pipeline.json");
   gitInMalformed("commit", "-q", "--no-verify", "-m", "seed malformed legacy twin");
   const malformedNeutralBefore = readFileSync(join(malformedRoot, "project", "pipeline.json"), "utf8");
-  const malformedAttempt = capturedStderr(() => run(["configure-verify", "--verify-command", realVerify], { dir: malformedRoot, architectureEntryReadiness: () => ({ status: "ready" }) }));
+  const malformedAttempt = capturedStderr(() => run(["configure-verify", "--verify-command", realVerify], { dir: malformedRoot }));
   assert.equal(malformedAttempt.result, 2);
   assert.ok(malformedAttempt.lines.some((line) => line.includes("calibration tiers (unavailable)")),
     `the malformed twin itself must be the refusal reason: ${malformedAttempt.lines.join(" ")}`);

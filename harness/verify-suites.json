@@ -3934,6 +3934,50 @@
         ],
         "maxBytes": 65536
       }
+    },
+    {
+      "name": "pipeline-state-calibration-recovery-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs",
+      "invariantPinned": "Calibration phase and Verify command transitions preserve exact Source and State recovery, refuse forged or concurrent writes, and report partial repair without false readiness.",
+      "nonOverlapNote": "Unique K156 calibration recovery course; the existing calibration transition and pipeline-state suites retain their own established cases.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "KCR001",
+          "KCR002",
+          "KCR003",
+          "KCR004",
+          "KCR005",
+          "KCR006",
+          "KCR007",
+          "KCR008",
+          "KCR009",
+          "KCR010",
+          "KCR011"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "windows-authority-readiness-tests",
+      "file": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
+      "invariantPinned": "Windows authority readiness aggregates closed project, plugin and private path observations, refuses inherited mutation and unknown native causes, and remains read-only.",
+      "nonOverlapNote": "Unique G19 readiness decision suite; native preflight integration and Windows ACL pins retain their own contracts.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "WAR001",
+          "WAR002",
+          "WAR003",
+          "WAR004",
+          "WAR005",
+          "WAR006",
+          "WAR007",
+          "WAR008",
+          "WAR009"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }

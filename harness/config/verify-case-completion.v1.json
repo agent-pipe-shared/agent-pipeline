@@ -1333,6 +1333,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "pipeline-state-calibration-recovery-tests",
+      "path": "plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "pipeline-state-close-audit-tests",
       "path": "plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
       "disposition": "required"
@@ -1972,6 +1977,11 @@
       "path": "plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "windows-authority-readiness-tests",
+      "path": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "windows-private-state-tests",

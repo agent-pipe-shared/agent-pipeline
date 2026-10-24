@@ -28,7 +28,7 @@ const BASELINE = "node -e \"console.error('pipeline: the verify contract of this
 let counter = 0;
 
 // A contained real-git repository: its own `git init`, every git call ceilinged at the fixture parent.
-function repository({ verify, legacyPeer = true }) {
+function repository({ verify, neutralPeer = true, legacyPeer = true }) {
   const parent = join(WORK, `fx-${counter += 1}`);
   const root = join(parent, "repo");
   mkdirSync(root, { recursive: true });
@@ -40,7 +40,7 @@ function repository({ verify, legacyPeer = true }) {
   git("config", "user.name", "Goldfish");
   assert.equal(realpathSync(root), root);
   const bytes = `${JSON.stringify({ project: "cvct-unit", verify, handover: "docs/state.md" }, null, 2)}\n`;
-  const twins = ["project/pipeline.json", ...(legacyPeer ? [".claude/pipeline.json"] : [])];
+  const twins = [...(neutralPeer ? ["project/pipeline.json"] : []), ...(legacyPeer ? [".claude/pipeline.json"] : [])];
   mkdirSync(join(root, "project"), { recursive: true });
   if (legacyPeer) mkdirSync(join(root, ".claude"), { recursive: true });
   for (const twin of twins) writeFileSync(join(root, twin), bytes);
@@ -70,6 +70,11 @@ test("identical configured twins read as configured with the command", () => {
 test("an absent legacy peer leaves exactly the neutral tier", () => {
   const { root } = repository({ verify: BASELINE, legacyPeer: false });
   assert.deepEqual(inspectCommittedCalibrationVerifyLayout({ rootDir: root }), { status: "baseline-only", paths: ["project/pipeline.json"] });
+});
+
+test("an absent neutral peer leaves exactly the original legacy tier", () => {
+  const { root } = repository({ verify: BASELINE, neutralPeer: false });
+  assert.deepEqual(inspectCommittedCalibrationVerifyLayout({ rootDir: root }), { status: "baseline-only", paths: [".claude/pipeline.json"] });
 });
 
 test("a non-repository root stays unavailable and is never read through the common-dir normalization", () => {
