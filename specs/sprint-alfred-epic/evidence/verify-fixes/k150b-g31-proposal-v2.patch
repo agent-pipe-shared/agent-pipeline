@@ -1,0 +1,149 @@
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 1f9f683ed..2d27be868 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -324,10 +324,13 @@ function describeDesignWorkflowApprovalRequest(record, intentSha256, repository)
+ 
+ // CLAUDE-P2: source-owned public observations; never a caller authority flag.
+ const DESIGN_SIGNING_MAX_BYTES = 1024 * 1024;
++// Long repository roots and nested request directories can exceed the old 240
++// character presentation bound. Keep the complete path identity through readback.
++const SIGNING_PATH_MAX_CHARS = 32767;
+ function designSigningHash(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+ function readDesignSigningFile(repository, path, { optional = false, request = false, maxBytes = DESIGN_SIGNING_MAX_BYTES } = {}) {
+   const root = realpathSync(resolve(repository));
+-  if (typeof path !== "string" || path.length === 0 || path.length > 240 || path.includes("\\") || path.includes("\0")
++  if (typeof path !== "string" || path.length === 0 || path.length > SIGNING_PATH_MAX_CHARS || /\p{C}/u.test(path) || path.includes("\\")
+     || isAbsolute(path) || /^[A-Za-z]:/u.test(path) || path.split("/").some(part => part === "" || part === "." || part === "..")) throw Error("DAB-SIGN-PATH-UNSAFE");
+   const inspect = () => {
+     let cursor = root;
+@@ -451,7 +454,7 @@ function publishSigningReviewMaterial(repository, requestPath, requestSha256, in
+   const sha256 = designSigningHash(bytes);
+   const path = join(dirname(requestPath), `review-${intentSha256}-${sha256}.json`);
+   const relativePath = repoScratchRelativePath(repository, path);
+-  if (relativePath === null || relativePath.length > 240 || realpathSync(dirname(path)) !== dirname(path)) fail("PO-SIGN-REVIEW-PATH");
++  if (relativePath === null || relativePath.length > SIGNING_PATH_MAX_CHARS || /\p{C}/u.test(relativePath) || realpathSync(dirname(path)) !== dirname(path)) fail("PO-SIGN-REVIEW-PATH");
+   assertUnlinkedRegularFileOrAbsent(path, "signing review material must be a single-link regular artifact beside its actual request");
+   if (!existsSync(path)) {
+     const fd = openSync(path, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | (fsConstants.O_NOFOLLOW ?? 0), 0o600);
+@@ -479,17 +482,34 @@ export function compactSigningDisclosure({ intentSha256, record, materialArtifac
+     ? record.lines.filter(line => typeof line === "string" && !/[\r\n]/u.test(line))
+     : ["purpose unavailable: no recorded request resolves for this digest; this signs exactly this digest and may be a guard-lift/guard-override authorization."];
+   const facts = source.slice(0, 15).map(signingDisplayLine);
+-  if (materialArtifact !== null && (typeof materialArtifact.path !== "string" || materialArtifact.path.length > 240 || /\p{C}/u.test(materialArtifact.path) || !SHA.test(materialArtifact.sha256 ?? ""))) fail("PO-SIGN-DISCLOSURE-MATERIAL");
++  if (materialArtifact !== null && (typeof materialArtifact.path !== "string" || materialArtifact.path.length === 0 || materialArtifact.path.length > SIGNING_PATH_MAX_CHARS || /\p{C}/u.test(materialArtifact.path) || !SHA.test(materialArtifact.sha256 ?? ""))) fail("PO-SIGN-DISCLOSURE-MATERIAL");
++  const materialLines = [];
++  if (materialArtifact !== null) {
++    const exactPathLine = "full review material: " + JSON.stringify(materialArtifact.path);
++    if (exactPathLine.length <= 300) materialLines.push(exactPathLine);
++    else {
++      // The canonical material reference remains intact for readback. Present a
++      // bounded filename locator so deeply nested valid paths do not swamp the
++      // terminal disclosure or silently lose their authoritative identity.
++      const name = JSON.stringify(posixPath.basename(materialArtifact.path));
++      materialLines.push("full review material: locate this exact filename under scratch/; full path is retained in the canonical request/material record:");
++      for (let offset = 0; offset < name.length; offset += 180) materialLines.push(`filename part ${Math.floor(offset / 180) + 1}: ${name.slice(offset, offset + 180)}`);
++    }
++    materialLines.push("full review material sha256: " + materialArtifact.sha256);
++  }
+   return [
+     `intent sha256: ${intentSha256}`, ...facts,
+-    ...(materialArtifact === null ? [] : ["full review material: " + JSON.stringify(materialArtifact.path), "full review material sha256: " + materialArtifact.sha256]),
++    ...materialLines,
+     ...(source.length > facts.length || (record?.lines?.length ?? 0) > source.length ? [materialArtifact === null ? "additional review details omitted: full review material is unavailable" : "additional validated review material is retained at the bound artifact"] : []),
+     "this approval covers exactly this digest; changed scope, expiry, reason or candidate requires another approval.",
+   ];
+ }
+ export function formatHumanApprovalCliResult(result, { humanFacing = process.stdout.isTTY === true } = {}) {
+   if (humanFacing && result?.ok === true && ["PO-HUMAN-SIGN-INTENT-READY", "PO-HUMAN-PROOF-READY", "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"].includes(result.code)) {
+-    return JSON.stringify({ ok: true, code: result.code, proofPath: result.paths?.proof ?? null }) + "\n";
++    const proofPath = result.code === "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"
++      ? result.externalPaths?.proof ?? null
++      : result.paths?.proof ?? null;
++    return JSON.stringify({ ok: true, code: result.code, proofPath }) + "\n";
+   }
+   return JSON.stringify(result, null, 2) + "\n";
+ }
+@@ -2487,7 +2507,8 @@ function executeHumanApprovalCore(args, dependencies = {}) {
+     const resultPaths = args.kind === "push"
+       ? mirrorCriticalPushArtifacts(repository, gitCommonDir, request, signed, paths, { write, read })
+       : { request: paths.request, proof: paths.proof, signer: paths.signer };
+-    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer, paths: resultPaths };
++    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer, paths: resultPaths,
++      externalPaths: { request: paths.request, proof: paths.proof, authority: paths.authority } };
+   }
+   if (args.command === "prepare" || args.command === "prepare-critical") {
+     if (critical) {
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+new file mode 100644
+index 000000000..42cc17965
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+@@ -0,0 +1,51 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import test from "node:test";
++import { compactSigningDisclosure, formatHumanApprovalCliResult } from "./po-human-approval.mjs";
++
++const digest = "a".repeat(64);
++const longPath = `scratch/${"nested/".repeat(25)}review-${digest}.json`;
++
++test("K150B: a long material path retains its full identity and digest in the disclosure", () => {
++  assert.ok(longPath.length > 240);
++  const lines = compactSigningDisclosure({ intentSha256: digest,
++    record: { resolved: true, lines: ["action: approve exact candidate"] },
++    materialArtifact: { path: longPath, sha256: digest } });
++  assert.ok(lines.some(line => line.includes(`review-${digest}.json`) && line.includes("scratch/")));
++  if (`full review material: ${JSON.stringify(longPath)}`.length > 300)
++    assert.ok(lines.some(line => line.includes("full path") && line.includes("record")));
++  assert.ok(lines.every(line => line.length <= 300));
++  assert.ok(lines.includes(`full review material sha256: ${digest}`));
++});
++
++test("K150B: multi-kilobyte nested path still gives a bounded exact locator", () => {
++  const path = `scratch/${"nested/".repeat(400)}review-${digest}.json`;
++  const lines = compactSigningDisclosure({ intentSha256: digest,
++    record: { resolved: true, lines: ["action: approve exact candidate"] },
++    materialArtifact: { path, sha256: digest } });
++  assert.ok(lines.every(line => line.length <= 300));
++  assert.ok(lines.some(line => line.includes(`review-${digest}.json`)));
++  assert.ok(lines.some(line => line.includes("scratch/") && line.includes("full path")));
++  assert.ok(lines.includes(`full review material sha256: ${digest}`));
++});
++
++test("K150B: malformed digest and control-bearing material paths refuse", () => {
++  const record = { resolved: true, lines: [] };
++  for (const path of [longPath + "\n", longPath + "\u001b", longPath + "\0"]) {
++    assert.throws(() => compactSigningDisclosure({ intentSha256: digest, record,
++      materialArtifact: { path, sha256: digest } }), /PO-SIGN-DISCLOSURE-MATERIAL/u);
++  }
++  assert.throws(() => compactSigningDisclosure({ intentSha256: digest, record,
++    materialArtifact: { path: longPath, sha256: "invalid" } }), /PO-SIGN-DISCLOSURE-MATERIAL/u);
++});
++
++test("G31: human-facing critical authorization names the external proof", () => {
++  const result = { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
++    paths: { proof: "/repo/scratch/critical-push-proof.json" },
++    externalPaths: { proof: "/keys/proof-critical-push.json" } };
++  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: true })),
++    { ok: true, code: result.code, proofPath: result.externalPaths.proof });
++  assert.equal(JSON.parse(formatHumanApprovalCliResult({ ...result, externalPaths: null }, { humanFacing: true })).proofPath,
++    null, "a missing external path cannot fall back to the scratch mirror");
++  assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })), result);
++});
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index ba124a11c..4ebfb73e8 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -2725,6 +2725,11 @@ test("authorize-critical prepares and signs in ONE invocation, and the proof is
+     assert.equal(request.approvalIntent.sha256, rebuilt.approvalIntent.sha256);
+ 
+     const paths = criticalArtifacts(dirs);
++    assert.deepEqual(result.externalPaths, {
++      request: paths.request,
++      proof: paths.proof,
++      authority: join(dirs.directory, "trust-policy.json"),
++    }, "the external proof handoff names files that the external-only verifier can read");
+     assert.deepEqual(JSON.parse(readFileSync(paths.request, "utf8")), request, "the durable request must be the signed one");
+     const proof = JSON.parse(readFileSync(paths.proof, "utf8"));
+     assert.equal(proof.schema, PO_APPROVAL_PROOF_SCHEMA);
