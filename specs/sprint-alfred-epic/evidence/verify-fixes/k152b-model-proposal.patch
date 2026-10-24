@@ -1,0 +1,160 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+index b47751144..1bc0c0987 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+@@ -57,9 +57,9 @@ register("D84 configured model passes its route check while K146 blocks a write-
+   }
+   const research = run({ tool_name: "spawn_agent", tool_input: { agent_type: "explorer", message: "find where X is defined" } });
+   assert.equal(research.code, ALLOW, `read-only explorer must remain available: ${research.stderr.trim().slice(0, 200)}`);
+-  const advisor = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt" }] } });
++  const advisor = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt", Model: "pro" }] } });
+   assert.equal(advisor.code, ALLOW, `read-only Antigravity Advisor must reach its native preparation gate: ${advisor.stderr.trim().slice(0, 200)}`);
+-  const unknown = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "customer-researcher", Role: "Researcher", Prompt: "inspect input.txt" }] } });
++  const unknown = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "customer-researcher", Role: "Researcher", Prompt: "inspect input.txt", Model: "flash" }] } });
+   assert.equal(unknown.code, BLOCK, `unknown Antigravity carrier must not gain a prompt exemption: ${unknown.stderr.trim().slice(0, 200)}`);
+   assert.ok(unknown.stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), `missing unknown-carrier refusal: ${unknown.stderr.trim().slice(0, 200)}`);
+ });
+@@ -69,15 +69,27 @@ register("D84 block a Claude dispatch that names a model no configured duty rout
+   assert.ok(stderr.includes("DISPATCH-MODEL-UNROUTED"), `stderr missing "DISPATCH-MODEL-UNROUTED" -- ${stderr.trim().slice(0, 200)}`);
+ });
+ 
+-register("D84 leave an Antigravity native invoke_subagent dispatch without a model finding: that tool carries no tool-layer model", () => {
+-  // The Antigravity adapter hands the hook a `Task` whose input keeps the capitalised `Subagents` array and no `model`;
+-  // the model of each entry rides in its prompt text. Requiring `model` there refused every native Antigravity dispatch (K144).
++register("K152B refuse an Antigravity entry without an explicit native Model", () => {
+   const subagents = [{ TypeName: "customer-researcher", Role: "Customer Researcher", Prompt: "Inspect the customer fixture." }];
+-  const { stderr } = run({ tool_name: "Task", tool_input: { subagent_type: "customer-researcher", prompt: "Inspect the customer fixture.", Subagents: subagents } });
+-  assert.ok(!stderr.includes("DISPATCH-MODEL"), `unexpected model finding on an Antigravity native dispatch -- ${stderr.trim().slice(0, 200)}`);
++  const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: subagents } });
++  assert.equal(code, BLOCK);
++  assert.ok(stderr.includes("Subagents[].Model"));
+ });
+ 
+-assert.equal(cases.length, 4, "the D84 dispatch-model hook corpus must register four cases");
++register("K152B check every native Model and preserve explicit model admission", () => {
++  const entry = (Model) => ({ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt", Model });
++  for (const Model of ["inherit", "unknown"]) {
++    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry("flash"), entry(Model)] } });
++    assert.equal(code, BLOCK);
++    assert.ok(stderr.includes("DISPATCH-MODEL"));
++  }
++  for (const Model of ["flash_lite", "flash", "pro"]) {
++    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry(Model)] } });
++    assert.equal(code, ALLOW, `${Model}: ${stderr}`);
++  }
++});
++
++assert.equal(cases.length, 5, "the dispatch-model hook corpus must register five cases");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+ const completionCases = cases.map((entry, index) => ({ ...entry, id: `GDM${String(index + 1).padStart(2, "0")}` }));
+ registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index e2de52483..d36602848 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -744,14 +744,19 @@ if (isDirectInvocation(import.meta.url)) {
+   const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? toolInput.agent_type ?? (codexDispatch ? "default" : "");
+   const prompt = toolInput.prompt ?? toolInput.message ?? "";
+ 
+-  // D84: the model of a Claude subagent dispatch comes from the configured routing, never from inheritance. The Antigravity adapter relabels its native invoke_subagent as a `Task` keeping the capitalised `Subagents` array; that tool has no tool-layer `model` (each entry's model rides in its prompt), so the runner is "antigravity", which evaluateDispatchModel leaves without an opinion (K144).
++  // D84: Claude's direct model parameter is checked here. K152B checks each native
++  // Antigravity Subagents[].Model separately below, before any child is launched.
+   if (["Task", "Agent"].includes(input?.tool_name)) {
+-    const modelCheck = evaluateDispatchModel({ runner: Array.isArray(toolInput.Subagents) ? "antigravity" : "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model });
+-    const modelWarnings = dispatchModelWarningText(modelCheck);
+-    if (modelWarnings !== "") process.stderr.write(modelWarnings);
+-    if (!modelCheck.ok) {
+-      process.stderr.write(dispatchModelRefusalText(modelCheck));
+-      process.exit(2);
++    const modelCheck = Array.isArray(toolInput.Subagents)
++      ? toolInput.Subagents.map((entry) => evaluateDispatchModel({ runner: "antigravity", subagentType: entry?.TypeName, model: entry?.Model }))
++      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model })];
++    for (const check of modelCheck) {
++      const modelWarnings = dispatchModelWarningText(check);
++      if (modelWarnings !== "") process.stderr.write(modelWarnings);
++      if (!check.ok) {
++        process.stderr.write(dispatchModelRefusalText(check));
++        process.exit(2);
++      }
+     }
+   }
+ 
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+index ffe85d012..3a1e34e40 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+@@ -12,6 +12,7 @@ import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
+ 
+ /** Runners whose dispatch tool carries a tool-layer `model` parameter this guard can observe. */
+ const ENFORCED_RUNNERS = Object.freeze(["claude"]);
++const ANTIGRAVITY_MODELS = Object.freeze(["flash_lite", "flash", "pro"]);
+ 
+ /** Plugin agent types that exist to serve exactly one configured duty. */
+ const AGENT_TYPE_DUTIES = Object.freeze({
+@@ -34,6 +35,31 @@ function selectorMatches(selector, model) {
+ }
+ 
+ export function evaluateDispatchModel({ runner, subagentType, model, routeSource = registeredFunctionalTaskRoutes() } = {}) {
++  if (runner === "antigravity") {
++    // Native invoke_subagent exposes a small Model enum per Subagents entry. V3 currently
++    // stores concrete Gemini IDs, which cannot be equated to that enum without an approved
++    // mapping. Only an exact enum selector in V3 is directly comparable.
++    if (!ANTIGRAVITY_MODELS.includes(model)) {
++      return { ok: false, skipped: null, findings: [{
++        code: model === undefined || model === null || model === "" || model === "inherit"
++          ? "DISPATCH-MODEL-MISSING" : "DISPATCH-MODEL-UNROUTED",
++        message: `Antigravity Subagents[].Model must be explicitly set to "flash_lite", "flash", or "pro" for each entry; "inherit" and omitted values inherit the session model. Re-issue the same invoke_subagent call with each entry's Model set explicitly.`,
++      }] };
++    }
++    const type = typeof subagentType === "string" && subagentType.startsWith("pipeline-core:")
++      ? subagentType : `pipeline-core:${subagentType}`;
++    const duties = AGENT_TYPE_DUTIES[type];
++    const routes = routeSource?.ok && Array.isArray(routeSource.taskRoutes) && duties
++      ? routeSource.taskRoutes.filter((route) => route.runner === "antigravity" && route.state !== "unavailable"
++        && duties.includes(route.taskRoute.slice("duty.".length))) : [];
++    const expected = [...new Set(routes.map((route) => route.selector?.value).filter((value) => ANTIGRAVITY_MODELS.includes(value)))];
++    if (expected.length > 0 && !expected.includes(model)) {
++      return { ok: false, skipped: null, findings: [{ code: "DISPATCH-MODEL-DUTY-MISMATCH",
++        message: `Antigravity Subagents[].Model for ${subagentType} must match its configured duty selector (${expected.map((value) => `"${value}"`).join(" or ")}). Re-issue that entry with Model set to the configured selector.`,
++      }] };
++    }
++    return { ok: true, findings: [], skipped: null };
++  }
+   if (!ENFORCED_RUNNERS.includes(runner)) return { ok: true, findings: [], skipped: "runner-not-enforced" };
+   if (!routeSource?.ok || !Array.isArray(routeSource.taskRoutes)) return { ok: true, findings: [], skipped: "route-source-unavailable" };
+   const available = routeSource.taskRoutes.filter((route) => route.runner === runner && route.state !== "unavailable");
+@@ -74,6 +100,7 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
+ 
+ export function dispatchModelRefusalText(evaluation) {
+   const lines = evaluation.findings.map((finding) => `${finding.code}: ${finding.message}`);
++  if (lines.some((line) => line.includes("Antigravity Subagents[].Model"))) return `BLOCKED (guard-dispatch): ${lines.join("\n")}\n`;
+   return `BLOCKED (guard-dispatch): ${lines.join("\n")}\nTo repair: pass the tool-layer \`model\` parameter on the dispatch call (the briefing text alone does not set it; MP-29).\n`;
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+index d3fc0e6c4..6ecb069a0 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+@@ -92,3 +92,22 @@ test("DME09 a model id selector matches only exactly", () => {
+   assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: "claude-sonnet-5-5", routeSource: source }).ok, true);
+   assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: "claude-sonnet-5", routeSource: source }).findings[0].code, "DISPATCH-MODEL-UNROUTED");
+ });
++
++test("DME10 Antigravity requires an explicit native Model enum on each entry", () => {
++  for (const model of [undefined, "", "inherit", "unknown", "Flash"]) {
++    const result = evaluateDispatchModel({ runner: "antigravity", subagentType: "goldfish-implementor", model, routeSource: routes() });
++    assert.equal(result.ok, false, String(model));
++    assert.match(dispatchModelRefusalText(result), /Subagents\[\]\.Model/u);
++  }
++  for (const model of ["flash_lite", "flash", "pro"]) {
++    assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "customer-researcher", model, routeSource: routes() }).ok, true);
++  }
++});
++
++test("DME11 a directly comparable Antigravity duty selector binds the role", () => {
++  const routeSource = { ok: true, taskRoutes: [{ taskRoute: "duty.implement", runner: "antigravity",
++    state: "opt-in", selector: { kind: "alias", value: "flash" } }] };
++  assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "goldfish-implementor", model: "flash", routeSource }).ok, true);
++  const mismatch = evaluateDispatchModel({ runner: "antigravity", subagentType: "goldfish-implementor", model: "pro", routeSource });
++  assert.equal(mismatch.findings[0].code, "DISPATCH-MODEL-DUTY-MISMATCH");
++});
