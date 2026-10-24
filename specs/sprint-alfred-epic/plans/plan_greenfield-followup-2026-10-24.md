@@ -12,8 +12,8 @@ report's original intake remains in
 |---|---|---|
 | P0-1 | G6 / K152A: native file-tool admission and write-target mapping | Source integrated `43e04b207`; synthetic checks passed; native qualification remains open |
 | P0-2 | G7 / K144, K152B and the design-phase catalogue route | Source fixes integrated; qualify complete dispatch/return/integration and retain any remaining catalogue refusal |
-| P1-1 | G8 / K154, combined with G20 below | Candidate-bound publication/close qualification and independent design-review provenance remain open |
-| P1-2 | G9a / K153; G9b / K156 and G30 below | Signed plan-proof delegation integrated earlier; active runner-view retention and mid-session refresh qualification remain open |
+| P1-1 | G8 / K154, combined with G20 below | Candidate-bound publication/close repair committed `272d0f668`, 105 main synthetic checks pass; production positive proof and independent design-review provenance remain open |
+| P1-2 | G9a / K153; G9b / K156 and G30 below | Signed plan-proof delegation and conservative active-view retention integrated; main synthetic mid-session refresh 2/2. Native runtime qualification and calibration correction remain open |
 
 The lower-priority Antigravity findings already admitted to the working plan,
 including G10/K156, also remain in scope. Combining duplicate findings never
@@ -23,7 +23,7 @@ removes their runner-specific regression and native qualification duties.
 |---|---|---|---|---|
 | G18 | Codex P0-1; Claude P0.2 | Diagnose and qualify dispatch through return, source binding and integration before expensive implementation; report every unavailable authority with a usable recovery | G1/K142, K146; G19 Windows prerequisite | K146 source integrated at `a0feac3a4`, safe main checks pass; native host qualification and Windows prerequisite remain open |
 | G19 | Claude P0.1 | Early Windows project/plugin/private-state ACL diagnostics, preserving ancestor safety; explain SID-based repair without recursive ACL rewriting | New Windows readiness work | Report evidence; current source and native Windows reproduction pending |
-| G20 | Codex P0-2 | Publication qualification must bind required independent review and Verify to the actual candidate; checkpoint and authorized exception claims remain distinct | G8/K154 | Open; signature alone never establishes qualification |
+| G20 | Codex P0-2 | Publication qualification must bind required independent review and Verify to the actual candidate; checkpoint and authorized exception claims remain distinct | G8/K154 | Source committed `272d0f668`; main synthetic checks 105/105. Production positive publication proof and independent design-review provenance remain open; signature alone never establishes qualification |
 | G21 | Codex P0-3 | Official result bootstrap/reconcile preserves package, continuity and result consistency; real package validation participates in close qualification | New result transaction repair | Report includes an independently reproduced manifest/result hash mismatch and missing reconciliation fence; current source confirmation pending |
 | G22 | Claude P0.3 | Reachable honest close after unavailable item dispatch, including test-dependency preparation and required Critic qualification | K146, G17, G21; close preparation work | Open; do not implement a silent no-Critic success route |
 | G23 | Codex P1-1; Claude P1.4 read-help portion | Harmless scoped reads/help use ordinary read-only admission and actionable errors; preserve credential, external-path and symlink boundaries | Read grammar/help recovery work | Operator committed complete package `6db0d31f8`; included in installed intermediate build; focused checks pass, native qualification open |
@@ -33,7 +33,7 @@ removes their runner-specific regression and native qualification duties.
 | G27 | Claude P1.4 architecture portion; P1.5; P1.6 | Self-describing greenfield architecture path, editable design before binding, correct criterion examples; avoid repeated PO discard ceremonies | G2/G4 and bounded criterion producer correction | Criterion/parser correction committed `5815d42c9`; main renderer/consumer 12/12 and actual acknowledgement cases 3/3. Larger editable-design/early-binding route remains open |
 | G28 | Claude P1.7 | Portable sanitized approval/Verify/Security/review evidence index in the delivered branch; private keys and raw private state remain external | G14, existing audit-pack archive route | Applied eight-path historical-archive/CLI fix with explicit read-only Source kernel closure; combined main check exits 0. Earlier ordinary commit refused on two PB guard files; complete operator package collected, no bypass. Offline archive integrity never qualifies later commits |
 | G29 | Claude P1.8 | Public handover accurately follows lifecycle transitions | Lifecycle handover projection work | Report evidence; identify sanctioned writer and regression pin |
-| G30 | Claude P1.9 | Trusted hook snapshot refresh has a usable recovery during a session | Existing hook-refresh flow; G9b/K156 | Automatic view retention committed `7dddb672c` (34/34 focused, installer 25 pass/1 skip). Mid-session snapshot qualification and direct-prune limitations remain open |
+| G30 | Claude P1.9 | Trusted hook snapshot refresh has a usable recovery during a session | Existing hook-refresh flow; G9b/K156 | Automatic view retention committed `7dddb672c`; main synthetic mid-session refresh and tamper refusal 2/2 using existing production code. Test registration in progress; native runtime and direct-prune limitations remain open |
 | G31 | Claude P1.10 | Signing output points to an admissible external proof destination | K150B/G31 v2 | Integrated `7a6a58488`; main synthetic signing/proof 2/2 and original bounded UI 4/4. External-proof policy preserved; native acceptance pending |
 | G32 | Claude P1.11 | Security candidate identity works for the configured remote destination, without requiring the name `origin` | Effective push destination identity | Integrated `537d5c85d`; main remote/guard/consumer checks 11/11. Native push and full qualification pending |
 
@@ -98,8 +98,8 @@ Stamp/install/push and the scheduled Critic batch remain on the PO's explicit ca
 | K150B/G31 v2 | Integrated `7a6a58488`, preserving bounded disclosure, full authoritative material path and external proof output | Main synthetic signing/proof 2/2 and original UI 4/4; native qualification, full Verify/review/acceptance pending; v1 attempts retained |
 | G17 v1 | Seven-path inert proposal; syntax/diff checks pass; bounded fingerprint helper 1/1, full host attempt interrupted exit 130 | Not qualified: launch/finalize timing, custody compatibility, independent negative controls and meaningful RED/GREEN still required. Do not apply or re-pin |
 | G21 v2 | Exact inert four-path patch, including retained/retired legacy Result journal recovery; final synthetic bootstrap 15/15, close 35/35, consumer 9/9 | Source companion catalogue-present route and real signature/native qualification remain unexercised. Existing proof kind is used separately for exact repair and manifest reconcile; no main application |
-| G20/K154 v2 | Exact inert seven-path proposal and cumulative report retained; focused synthetic close/push/resolver/consumer checks green | Partial: approved rigor provenance, pushed-tree binding and independent design-review provenance remain incomplete; no main application |
-| G19 v2 | Exact inert eleven-path readiness/consumer/closure proposal; targeted 108/108, readiness 9/9, Windows preflight 4/4, consumer/skill 17/17 | Source review/application decision and native Windows qualification pending; no live ACL mutation |
+| G20/K154 | Historical v2 retained; corrected nine-path Source committed `272d0f668`; main 105/105 candidate/rigor/close/preparation/remote/consumer checks green | Two new suites have a checked registration overlay applied. Production positive publication proof, independent design-review provenance, Full Verify/review/acceptance remain open |
+| G19 v2 | Exact inert eleven-path readiness/consumer/closure proposal; targeted 108/108, readiness 9/9, Windows preflight 4/4, consumer/skill 17/17 | Source integration waits for the overlapping K156 State writer; native Windows qualification pending; no new application gate or live ACL mutation |
 | G32 | Integrated `537d5c85d`, four-path effective remote identity fix; main remote/guard/consumer 11/11 | Native push, full Verify/review/acceptance pending; guard-push is not in the never-liftable GMW kernel list |
 
 K152B's two earlier stops are retained: library-only scope could not perform native wiring; the next dispatch hit the unavailable native opening-record command. A3's complete replacement briefing explicitly includes both minimal hook wiring and the PO-approved methodological opening exception. These are neither hidden successes nor fresh attempt budgets. G23 read/help briefing is prepared for the next slot; G24-G32 and K156/K155/G2/G4 remain in the committed intake, not silently removed.
@@ -178,3 +178,26 @@ examiner and passed focused transaction/commit-route controls, but
 State-write-fault/crash recovery and Source-owned postimage proof remain
 under implementation. Do not integrate it as complete or count a changed
 expectation as a product fix.
+
+G20 Source committed `272d0f668` through ordinary active hooks. Main integration
+passed 105/105, including actual guard subprocesses for pushed C versus different
+HEAD/dirty package, revoked or missing approval, checkpoint refusal and G32's
+wrong-destination control. The mini approval is synthetic canonical fixture data;
+no production signed/native publication positive is claimed. Current evidence is
+`g20-publication-candidate-proposal.patch`, `g20-publication-candidate-report.md`
+and `g20-integrated-publication.txt` under `evidence/verify-fixes/`. Historical
+v1/v2 and interrupted attempts remain preserved. Independent design-review
+provenance remains a separate unresolved clause.
+
+G30's bounded mid-session fixture passed 2/2 in main using the existing production
+refresh code. Trusted stale snapshots refresh to current; tampered hooks and an
+untrusted source refuse while preserving hook bytes. All writes are derived from
+and checked below a disposable Git common directory; hooks are rendered, never
+executed. Native installed-session qualification is still open. The new witness
+is applied and its Verify registration is in progress.
+
+K156 fresh-current-Source retry has 13/13 focused checks, but remains inert. Review
+found three candidate regressions requiring correction: legacy-only layout
+support, old ready-record canonical IDs, and a caller readiness dependency being
+accepted into the fixed Source witness gate. The original State-byte-equality
+negative remains. No new Source principal or journal-carried authority is selected.

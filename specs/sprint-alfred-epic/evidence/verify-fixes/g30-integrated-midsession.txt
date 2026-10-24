@@ -1,0 +1,19 @@
+command: node --test plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs
+label: g30-integrated-midsession
+exitCode: 0
+head: 8ac8893456ac6ba0c1b57b6042365da85df8e2ec
+tree: f4aeaadae6344e0e4c306f3e477a82bed3d1de01
+dirty: true
+--- stdout ---
+✔ ready-session trusted source update refreshes only stale managed hooks and reads back current snapshot (579.246375ms)
+✔ tampered hook and untrusted source refuse refresh while preserving original hook bytes (256.796733ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1012.089529
+
+--- stderr ---

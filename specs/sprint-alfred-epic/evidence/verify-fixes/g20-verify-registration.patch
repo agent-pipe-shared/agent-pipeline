@@ -1,0 +1,132 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 7a7765553..2afbdd8cd 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -937,6 +937,8 @@
+         "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-executor-v2-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
++        "verify-phase:harness/scripts/verify.mjs:publication-guard-candidate-tests",
++        "verify-phase:harness/scripts/verify.mjs:publication-review-requirement-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-state-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-batch-contract-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-batch-execution-tests",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index aaf752eda..8b4f830de 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -1561,6 +1561,16 @@
+       "path": "plugins/pipeline-core/scripts/publication-executor-v2.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "publication-guard-candidate-tests",
++      "path": "plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs",
++      "disposition": "required"
++    },
++    {
++      "name": "publication-review-requirement-tests",
++      "path": "plugins/pipeline-core/lib/publication-review-requirement.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "publication-state-authority-tests",
+       "path": "harness/scripts/publication-state-authority.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index a4c0a658e..73ee6bc7b 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3891,6 +3891,35 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "publication-review-requirement-tests",
++      "file": "plugins/pipeline-core/lib/publication-review-requirement.test.mjs",
++      "invariantPinned": "Current candidate-bound Plan, Spec and package rigor decide whether independent publication review is required; stale or unavailable authority cannot waive it.",
++      "nonOverlapNote": "Unique G20 pure requirement decision witness; publication-guard-candidate-tests covers guard use of the proposed push commit.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PRR001",
++          "PRR002",
++          "PRR003",
++          "PRR004"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "publication-guard-candidate-tests",
++      "file": "plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs",
++      "invariantPinned": "The push guard decides review from the proposed commit despite different HEAD and dirty working files, and retains the distinct checkpoint, Verify and remote identity gates.",
++      "nonOverlapNote": "Unique G20 candidate-bound guard fixture witness; publication-review-requirement-tests covers the pure decision.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PGC001"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/publication-review-requirement.test.mjs b/plugins/pipeline-core/lib/publication-review-requirement.test.mjs
+index ed11377b7..49706a8ec 100644
+--- a/plugins/pipeline-core/lib/publication-review-requirement.test.mjs
++++ b/plugins/pipeline-core/lib/publication-review-requirement.test.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
+ import { resolvePublicationReviewRequirement as resolve } from "./publication-review-requirement.mjs";
+ 
+@@ -9,6 +9,8 @@ const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+ const bytes = new Map([["specs/feature/prd.md", Buffer.from("# PRD\n")], ["specs/feature/spec.md", Buffer.from("# Spec\n")]]);
+ const readSource = path => bytes.get(path) ?? null;
+ const source = { readSource };
++const cases = [];
++function test(name, run) { cases.push({ id: `PRR${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ function approved(profile = "mini") {
+   const planPath = "specs/feature/prd.md", specPath = "specs/feature/spec.md";
+@@ -51,3 +53,6 @@ test("unavailable and malformed rigor never waive review", () => {
+   assert.equal(resolve({ ...approved(), rigorHistory: [{}] }, source).required, true);
+   assert.equal(resolve(approved(), {}).required, true);
+ });
++
++if (cases.length !== 4) throw new Error("publication review case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs b/plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs
+index 4e32f7d08..3d03792eb 100644
+--- a/plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs
++++ b/plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs
+@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
+ import { join } from "node:path";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ 
+@@ -12,6 +12,8 @@ const scratch = join(process.cwd(), "scratch", "g20-publication-guard-fixtures")
+ mkdirSync(scratch, { recursive: true });
+ const guardPath = join(process.cwd(), "plugins", "pipeline-core", "hooks", "guard-push.mjs");
+ const hash = bytes => createHash("sha256").update(bytes).digest("hex");
++const cases = [];
++function test(name, run) { cases.push({ id: `PGC${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ test("guard uses the proposed push commit for review, despite HEAD and dirty package changes", () => {
+   const dir = mkdtempSync(join(scratch, "repo-"));
+@@ -121,3 +123,6 @@ test("guard uses the proposed push commit for review, despite HEAD and dirty pac
+     assert.doesNotMatch(wrongDestination.stderr, /wrong\.git|right\.git/);
+   } finally { rmSync(dir, { recursive: true, force: true }); }
+ });
++
++if (cases.length !== 1) throw new Error("publication guard case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

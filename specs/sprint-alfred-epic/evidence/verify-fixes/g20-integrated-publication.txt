@@ -1,0 +1,150 @@
+command: node --test plugins/pipeline-core/lib/publication-review-requirement.test.mjs plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs plugins/pipeline-core/scripts/push-prepare.test.mjs plugins/pipeline-core/scripts/security-remote-identity.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: g20-integrated-publication
+exitCode: 0
+head: 8ac8893456ac6ba0c1b57b6042365da85df8e2ec
+tree: f4aeaadae6344e0e4c306f3e477a82bed3d1de01
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (2.477426ms)
+✔ a clean fixture passes (1.964612ms)
+✔ an allowlisted occurrence passes (0.72068ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.603807ms)
+✔ multiple prefix hits on one line each produce a finding (0.419026ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.541168ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.320519ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (336.021716ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (23.597791ms)
+✔ the fixture delivery course is a valid slice queue (9.196632ms)
+✔ (a) this feature's course slice with a required record and no evidence refuses the close with zero mutation (4270.388439ms)
+✔ (a) the apply step re-checks: a required record that appears after planning refuses the transition (5775.620422ms)
+✔ (a) only the uncovered course slice is named (4838.907557ms)
+✔ (b) the same record with matching Critic evidence plans (4896.856714ms)
+✔ (c) a required record without evidence whose id is not in this feature's course plans (3177.088233ms)
+✔ (d) a feature with no delivery course plans, whatever other records exist (3177.379307ms)
+✔ rigor one close without a delivery course still needs the independent Critic/Verify audit (3128.852539ms)
+✔ (e) an invalid delivery course fails closed with a typed code and zero mutation (3118.081667ms)
+✔ (f) a delivery course that belongs to another feature fails closed rather than scoping the gate (3234.93066ms)
+✔ (g) the item course fixture is a valid slice queue (2.206953ms)
+✔ (g) a course slice recorded only by its orchestrator commit refuses the close off the audit route, naming it and the repair (3153.33932ms)
+✔ (g) on the audit route the commit-only slice is accepted and the audit route's own checks decide (3172.711655ms)
+✔ (g) a slice whose commit carries no Dispatch trailer is not commit-recorded and plans as before (3907.133163ms)
+✔ a current approved mini with exact Plan and Spec source bytes has rank zero (10.110568ms)
+✔ minimal, stale, and revoked mini submissions cannot waive review (0.959192ms)
+✔ registered package rigor is distinct from mini rank and candidate source wins (1.170604ms)
+✔ unavailable and malformed rigor never waive review (0.581424ms)
+✔ guard uses the proposed push commit for review, despite HEAD and dirty package changes (11232.25638ms)
+R7-6j [pinned set] row 1 (env set, plane set, legacy set) oracle=resolved/environment: GREEN
+R7-6j [trustAnchors []] row 1 (env set, plane set, legacy set) oracle=resolved/environment: GREEN
+R7-6j [TOFU (no trustAnchor, no trustAnchors)] row 1 (env set, plane set, legacy set) oracle=resolved/environment: GREEN
+R7-6j [pinned set] row 2 (env unset, plane set, legacy set) oracle=resolved/machine-plane: GREEN
+R7-6j [trustAnchors []] row 2 (env unset, plane set, legacy set) oracle=resolved/machine-plane: GREEN
+R7-6j [TOFU (no trustAnchor, no trustAnchors)] row 2 (env unset, plane set, legacy set) oracle=resolved/machine-plane: GREEN
+R7-6j [pinned set] row 3 (env unset, plane absent, legacy set) oracle=resolved/repo-scope: GREEN
+R7-6j [trustAnchors []] row 3 (env unset, plane absent, legacy set) oracle=resolved/repo-scope: GREEN
+R7-6j [TOFU (no trustAnchor, no trustAnchors)] row 3 (env unset, plane absent, legacy set) oracle=resolved/repo-scope: GREEN
+R7-6j [pinned set] row 4 (env unset, plane absent, legacy absent) oracle=unset: GREEN
+R7-6j [trustAnchors []] row 4 (env unset, plane absent, legacy absent) oracle=unset: GREEN
+R7-6j [TOFU (no trustAnchor, no trustAnchors)] row 4 (env unset, plane absent, legacy absent) oracle=unset: GREEN
+R7-6j [pinned set] row 5 (env unset, plane invalid, legacy set) oracle=invalid: GREEN
+R7-6j [trustAnchors []] row 5 (env unset, plane invalid, legacy set) oracle=invalid: GREEN
+R7-6j [TOFU (no trustAnchor, no trustAnchors)] row 5 (env unset, plane invalid, legacy set) oracle=invalid: GREEN
+R7-6j [pinned set] row 6 (env set, plane invalid, legacy set) oracle=resolved/environment: GREEN
+R7-6j [trustAnchors []] row 6 (env set, plane invalid, legacy set) oracle=resolved/environment: GREEN
+R7-6j [TOFU (no trustAnchor, no trustAnchors)] row 6 (env set, plane invalid, legacy set) oracle=resolved/environment: GREEN
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+[PO-CHALLENGE] Human confirmation required for push approval in chat mode.
+The confirmation code is: PO-11CC
+A human must now re-run this EXACT command themselves, directly in their own attended terminal (not through an agent's tool call), and type the code above when prompted:
+node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by "PO" --remote "origin" --destination "refs/heads/main"
+Push approved by "PO" for commit 917197655fde5974ead66d0b0d8737a353e05307 (2026-10-24T15:03:28.281Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+✔ parseArgs: accepts a well-formed --by/--remote/--destination (4.405881ms)
+✔ checkWorkingTreeClean: accepts the WSL EPERM-after-status-zero shape, but not a non-zero or missing status (0.865695ms)
+✔ parseArgs: refuses a missing --by (0.52619ms)
+✔ parseArgs: refuses an unsafe --remote (0.297485ms)
+✔ parseArgs: refuses a --destination that is not refs/heads/* (0.276696ms)
+✔ checkWorkingTreeClean: met -> ok, unmet -> ok:false with remedy (0.819447ms)
+✔ checkWorkingTreeClean: git failure -> ok:false with remedy (0.240387ms)
+✔ checkEvidenceFreshness: missing file -> ok:false with remedy (0.975753ms)
+✔ checkEvidenceFreshness: non-zero exitCode -> ok:false with remedy (0.606222ms)
+✔ checkEvidenceFreshness: stale commit -> ok:false with remedy (1.001553ms)
+✔ checkEvidenceFreshness: exitCode 0 and matching commit -> ok:true (2.612503ms)
+✔ checkEvidenceFreshness: stale commit with valid promotion envelope -> ok:true (1.311803ms)
+✔ checkEvidenceFreshness: Security promotion reads and binds canonical Verify evidence (1.009728ms)
+✔ checkEvidenceFreshness: stale commit with invalid promotion envelope -> ok:false (0.373429ms)
+✔ resolveEvidenceProjectDir: linked worktree reads Verify evidence from its primary checkout (3.752018ms)
+✔ resolveVerifyRemedy (D1): resolves from the project's own calibration verify key (0.512654ms)
+✔ resolveVerifyRemedy (D2): no calibration resolves -> honest degradation, never a source-only path (0.293187ms)
+✔ resolveVerifyRemedy (D2): calibration present but no verify key -> honest degradation (0.368941ms)
+✔ resolveVerifyRemedy (D2): unreadable calibration -> honest degradation, never invents a command (0.225839ms)
+✔ checkEvidenceFreshness (D1): remedy comes from the injected calibration resolver, not a hardcoded path (0.449604ms)
+✔ checkPushThreatModel: absent -> ok:false with materialize remedy; present -> ok:true (0.321961ms)
+✔ checkCriticalHumanProofPolicy: unrestricted posture (no trust anchors) -> ok:true (0.595491ms)
+✔ checkCriticalHumanProofPolicy: pinned set, local key IS a member -> ok:true (0.429666ms)
+✔ checkCriticalHumanProofPolicy: pinned set, local key is NOT a member -> ok:false with remedy (0.397796ms)
+✔ checkCriticalHumanProofPolicy: pinned set, directory unresolved -> ok:false with setup remedy (0.509308ms)
+✔ checkCriticalHumanProofPolicy: unreadable policy file -> ok:false (0.197826ms)
+✔ R7-6j: push-prepare resolves the key directory like the shared resolver and pins first-use keys only from the machine-wide default (19.941937ms)
+✔ checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor, machine HAS a resolvable operator key -> ok:true, unrestricted-once (trust-on-first-use, NVA-TOFU-1/NVA-CF-TOFUAGREE) (6.135506ms)
+✔ checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor, machine has NO resolvable operator key -> ok:false, TRUST-ANCHOR-MISSING-shaped (NVA-CF-TOFUAGREE) (9.599138ms)
+✔ agreement: v1 document, no trustAnchor field, machine HAS a resolvable operator key -> BOTH readers call the route open, trust-on-first-use (NVA-TOFU-1/NVA-CF-TOFUAGREE) (10.329384ms)
+✔ agreement: v1 document, no trustAnchor field, machine has NO resolvable operator key -> BOTH readers refuse, TRUST-ANCHOR-MISSING (NVA-CF-TOFUFIX/NVA-CF-TOFUAGREE) (11.22227ms)
+✔ agreement: v3 document, explicit EMPTY trustAnchors -> BOTH readers call it unrestricted, but the push still fails closed (4.610258ms)
+✔ isSecurityGateActive: no manifest / no security gate configured -> false (0.466456ms)
+✔ isSecurityGateActive: gates.security.mode = 'off' -> false (0.250656ms)
+✔ isSecurityGateActive: gates.security.mode = 'blocking' -> true (0.322764ms)
+✔ resolveFeatureContext: derives specPath as a sibling of planPath (0.691584ms)
+✔ resolveFeatureContext: no active feature -> ok:false (0.322092ms)
+✔ criticalArtifactPaths: agent-side push artifacts stay in repository scratch (0.64229ms)
+✔ pushPrepareReport: all preconditions met -> ready:true, all three commands rendered (106.099241ms)
+✔ rigor one publication requires candidate-bound independent Critic and Verify (229.405342ms)
+✔ retained rigor after close still requires candidate review (72.395479ms)
+✔ pushPrepareReport: inspection mode never folds a pending approval write (68.56946ms)
+✔ committed global chat reports chat-attributed-unattested and omits all proof/key preparation (203.498343ms)
+✔ legacy chat policy conflict is reported before pending approval folding (0.55275ms)
+✔ printReport keeps stdout machine-readable and sends the bounded human commands to stderr (89.113691ms)
+✔ pushPrepareReport: v1/v2 trust-on-first-use uses the registered machine key directory without exposing it in command rendering (97.156091ms)
+✔ pushPrepareReport: v1/v2 trust-on-first-use leaves private directory resolution to the human command (93.548716ms)
+✔ pushPrepareReport: one unmet precondition -> ready:false, no command lines, remedy present (73.119315ms)
+✔ pushPrepareReport: verify-evidence check reads the shared VERIFY_EVIDENCE_DEFAULT_PATH constant (104.174704ms)
+✔ pushPrepareReport: bad argv -> {ok:false, error} (0.55269ms)
+✔ pushPrepareReport: gates.security off -> no security-evidence check, ready:true even without evidence/security-latest.json (106.96763ms)
+✔ pushPrepareReport: gates.security blocking, good evidence -> security-evidence check present and ok (107.907807ms)
+✔ pushPrepareReport: gates.security blocking, missing evidence -> ready:false, security-evidence check present and failing (82.295347ms)
+✔ pushPrepareReport: HEAD unresolved + gates.security off -> no security-evidence failure pushed (107.445599ms)
+✔ pushPrepareReport: HEAD unresolved + gates.security blocking -> security-evidence failure still pushed (108.372259ms)
+✔ PUSHSIG-S4c: slim profile omits both evidence ids and keeps every other check id (395.078293ms)
+✔ PUSHSIG-S4c regression: default profile still has both evidence checks and an unchanged HEAD push line (236.439376ms)
+✔ PF-32: --checkpoint without a checkpoint policy, or to a destination the guard would not classify as one, is refused before any signing command (325.255372ms)
+✔ PUSHSIG-S4c: profile note and sourceRef push line appear only in the slim profile (284.869459ms)
+✔ PUSHSIG-S4c: slim profile with unresolved HEAD -> failing head-commit check (99.253933ms)
+✔ D3: preparePushSubject() matches the real `pipeline-state.mjs prepare-push-subject` CLI (19129.725359ms)
+✔ NVA-PUSHFOLD-1: bugfix discipline -- the CURRENT gap (red) demonstrated on a real repo, then fixed (green) (969.742288ms)
+✔ NVA-PUSHFOLD-1: pushPrepareReport folds the pending write in at the START, before working-tree-clean is evaluated (671.706615ms)
+✔ foldPendingPushApprovalWrite: leaves the tree alone when another file is ALSO dirty (never silently absorbs unrelated WIP) (0.440867ms)
+✔ foldPendingPushApprovalWrite: no-op on a clean tree (ordinary case unchanged) (0.201102ms)
+✔ foldPendingPushApprovalWrite: a dirty path that is NOT the state file is left alone (0.508636ms)
+✔ foldPendingPushApprovalWrite (DoD a): state file dirty for a reason OTHER than a pending fold is never auto-committed (pendingAuditWrite absent) (0.868781ms)
+✔ foldPendingPushApprovalWrite (DoD a): pendingAuditWrite explicitly false is also never auto-committed (0.560886ms)
+✔ foldPendingPushApprovalWrite (DoD b): a live approval (forCommit === HEAD) blocks the fold entirely (0.588908ms)
+✔ foldPendingPushApprovalWrite: HEAD unavailable -> refuses to fold rather than guessing (0.861447ms)
+✔ foldPendingPushApprovalWrite (DoD c): forCommit different from HEAD -> folds, commit message carries both AI-Assisted and Dispatch trailers (0.897255ms)
+✔ foldPendingPushApprovalWrite: accepts EPERM only after a zero status for both git writes (0.78971ms)
+✔ foldPendingPushApprovalWrite: non-zero or status-less git write remains fail-closed (1.20015ms)
+✔ PF-31: a tree dirty only with the slice queue or the override log names commit-pipeline-owned; any other change keeps the plain remedy (0.46325ms)
+✔ PF-36: commit-pipeline-owned commits exactly the Pipeline's own files and refuses when anything else is dirty (233.73313ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ SRI001 security evidence follows one effective push destination across a remote rename (1466.711659ms)
+✔ SRI002 push guard rejects evidence for a different effective destination (3513.035063ms)
+ℹ tests 105
+ℹ suites 0
+ℹ pass 105
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46635.557968
+
+--- stderr ---
