@@ -2725,6 +2725,11 @@ test("authorize-critical prepares and signs in ONE invocation, and the proof is 
     assert.equal(request.approvalIntent.sha256, rebuilt.approvalIntent.sha256);
 
     const paths = criticalArtifacts(dirs);
+    assert.deepEqual(result.externalPaths, {
+      request: paths.request,
+      proof: paths.proof,
+      authority: join(dirs.directory, "trust-policy.json"),
+    }, "the external proof handoff names files that the external-only verifier can read");
     assert.deepEqual(JSON.parse(readFileSync(paths.request, "utf8")), request, "the durable request must be the signed one");
     const proof = JSON.parse(readFileSync(paths.proof, "utf8"));
     assert.equal(proof.schema, PO_APPROVAL_PROOF_SCHEMA);

@@ -324,10 +324,13 @@ function describeDesignWorkflowApprovalRequest(record, intentSha256, repository)
 
 // CLAUDE-P2: source-owned public observations; never a caller authority flag.
 const DESIGN_SIGNING_MAX_BYTES = 1024 * 1024;
+// Long repository roots and nested request directories can exceed the old 240
+// character presentation bound. Keep the complete path identity through readback.
+const SIGNING_PATH_MAX_CHARS = 32767;
 function designSigningHash(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function readDesignSigningFile(repository, path, { optional = false, request = false, maxBytes = DESIGN_SIGNING_MAX_BYTES } = {}) {
   const root = realpathSync(resolve(repository));
-  if (typeof path !== "string" || path.length === 0 || path.length > 240 || path.includes("\\") || path.includes("\0")
+  if (typeof path !== "string" || path.length === 0 || path.length > SIGNING_PATH_MAX_CHARS || /\p{C}/u.test(path) || path.includes("\\")
     || isAbsolute(path) || /^[A-Za-z]:/u.test(path) || path.split("/").some(part => part === "" || part === "." || part === "..")) throw Error("DAB-SIGN-PATH-UNSAFE");
   const inspect = () => {
     let cursor = root;
@@ -451,7 +454,7 @@ function publishSigningReviewMaterial(repository, requestPath, requestSha256, in
   const sha256 = designSigningHash(bytes);
   const path = join(dirname(requestPath), `review-${intentSha256}-${sha256}.json`);
   const relativePath = repoScratchRelativePath(repository, path);
-  if (relativePath === null || relativePath.length > 240 || realpathSync(dirname(path)) !== dirname(path)) fail("PO-SIGN-REVIEW-PATH");
+  if (relativePath === null || relativePath.length > SIGNING_PATH_MAX_CHARS || /\p{C}/u.test(relativePath) || realpathSync(dirname(path)) !== dirname(path)) fail("PO-SIGN-REVIEW-PATH");
   assertUnlinkedRegularFileOrAbsent(path, "signing review material must be a single-link regular artifact beside its actual request");
   if (!existsSync(path)) {
     const fd = openSync(path, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | (fsConstants.O_NOFOLLOW ?? 0), 0o600);
@@ -479,17 +482,34 @@ export function compactSigningDisclosure({ intentSha256, record, materialArtifac
     ? record.lines.filter(line => typeof line === "string" && !/[\r\n]/u.test(line))
     : ["purpose unavailable: no recorded request resolves for this digest; this signs exactly this digest and may be a guard-lift/guard-override authorization."];
   const facts = source.slice(0, 15).map(signingDisplayLine);
-  if (materialArtifact !== null && (typeof materialArtifact.path !== "string" || materialArtifact.path.length > 240 || /\p{C}/u.test(materialArtifact.path) || !SHA.test(materialArtifact.sha256 ?? ""))) fail("PO-SIGN-DISCLOSURE-MATERIAL");
+  if (materialArtifact !== null && (typeof materialArtifact.path !== "string" || materialArtifact.path.length === 0 || materialArtifact.path.length > SIGNING_PATH_MAX_CHARS || /\p{C}/u.test(materialArtifact.path) || !SHA.test(materialArtifact.sha256 ?? ""))) fail("PO-SIGN-DISCLOSURE-MATERIAL");
+  const materialLines = [];
+  if (materialArtifact !== null) {
+    const exactPathLine = "full review material: " + JSON.stringify(materialArtifact.path);
+    if (exactPathLine.length <= 300) materialLines.push(exactPathLine);
+    else {
+      // The canonical material reference remains intact for readback. Present a
+      // bounded filename locator so deeply nested valid paths do not swamp the
+      // terminal disclosure or silently lose their authoritative identity.
+      const name = JSON.stringify(posixPath.basename(materialArtifact.path));
+      materialLines.push("full review material: locate this exact filename under scratch/; full path is retained in the canonical request/material record:");
+      for (let offset = 0; offset < name.length; offset += 180) materialLines.push(`filename part ${Math.floor(offset / 180) + 1}: ${name.slice(offset, offset + 180)}`);
+    }
+    materialLines.push("full review material sha256: " + materialArtifact.sha256);
+  }
   return [
     `intent sha256: ${intentSha256}`, ...facts,
-    ...(materialArtifact === null ? [] : ["full review material: " + JSON.stringify(materialArtifact.path), "full review material sha256: " + materialArtifact.sha256]),
+    ...materialLines,
     ...(source.length > facts.length || (record?.lines?.length ?? 0) > source.length ? [materialArtifact === null ? "additional review details omitted: full review material is unavailable" : "additional validated review material is retained at the bound artifact"] : []),
     "this approval covers exactly this digest; changed scope, expiry, reason or candidate requires another approval.",
   ];
 }
 export function formatHumanApprovalCliResult(result, { humanFacing = process.stdout.isTTY === true } = {}) {
   if (humanFacing && result?.ok === true && ["PO-HUMAN-SIGN-INTENT-READY", "PO-HUMAN-PROOF-READY", "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"].includes(result.code)) {
-    return JSON.stringify({ ok: true, code: result.code, proofPath: result.paths?.proof ?? null }) + "\n";
+    const proofPath = result.code === "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"
+      ? result.externalPaths?.proof ?? null
+      : result.paths?.proof ?? null;
+    return JSON.stringify({ ok: true, code: result.code, proofPath }) + "\n";
   }
   return JSON.stringify(result, null, 2) + "\n";
 }
@@ -2487,7 +2507,8 @@ function executeHumanApprovalCore(args, dependencies = {}) {
     const resultPaths = args.kind === "push"
       ? mirrorCriticalPushArtifacts(repository, gitCommonDir, request, signed, paths, { write, read })
       : { request: paths.request, proof: paths.proof, signer: paths.signer };
-    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer, paths: resultPaths };
+    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer, paths: resultPaths,
+      externalPaths: { request: paths.request, proof: paths.proof, authority: paths.authority } };
   }
   if (args.command === "prepare" || args.command === "prepare-critical") {
     if (critical) {
