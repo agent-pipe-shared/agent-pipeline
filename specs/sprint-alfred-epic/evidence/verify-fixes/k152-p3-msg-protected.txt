@@ -1,0 +1,6 @@
+fix(guard): admit the Antigravity design-phase bootstrap scripts in the shell guard with closed argument grammars
+
+The references demand model-role-bootstrap.mjs and antigravity-native-dispatch-prepare.mjs in the design phase, and the Greenfield run measured both refused as GUARD-DEVPLAN-SHELL in lifecycle draft (findings G7 F-03 and F-05). Both are now in the command catalogue with exactly their sanctioned argument shapes, pinned by a new test; design-review-receipt.mjs was already catalogued and its refusal in draft is still unexplained.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

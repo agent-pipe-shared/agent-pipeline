@@ -4,36 +4,17 @@
 > Previous state text is preserved as a public projection in the archive below.
 > Calibration: [`project/pipeline.json`](../project/pipeline.json) names this file as the handover.
 
-**Session cut (2026-10-22 night; read this first, it wins over every older block below):**
-- At the cut: branch `feat/sprint-alfred`; stamp `9355151ff` (`0.7.0+<runner>.20261022204428.79cda46`); `approve-push` route fix `ec1c22db2`
-  (signature-mode approve-push runs its proof-verified legacy route while the session-authority catalogue exists; PO option A); checkpoint
-  commit `57aa08996` carries `Checkpoint-Intent`. Gates there: boundary check 0 violations, capability inventory PASS, case-completion
-  registry valid (356). Not a Full Verify. Evidence: `specs/sprint-alfred-epic/evidence/linux-single-verifys-2026-10-22.md`,
-  `gap-readers-2026-10-22/` (unverified verdicts).
-- Push DONE: `0913fa941..57aa08996` reached `origin/feat/sprint-alfred` (feature checkpoint, PO signature, `approve-push` run from the repo
-  script because the installed plugin copy lacked the fix; the fix is proven live). Later commits, this handover included, are not pushed.
-- F1 to F3 (signing ceremony, first-anchor recovery `BTR-RECOVERED`, prompt fix `98a53938e`): PO statement 2026-10-22: proven.
-- Install: the PO installs the stamp and syncs later commits by rsync; the stamp need not be the last HEAD. No agent runs in the background;
-  `scratch/clones/k5*` are disposable.
-- After the PO's resume, the PO away, in this order: (1) scripts consolidation (K53, `scratch/briefing-k53.md`, no commit yet): move the
-  reusable helpers from untracked `scratch/` to the tracked `scripts/` (stamp with the 7-char hash, `run-parallel`, `run-in`,
-  `run-onboarding-full`, `rebaseline-inventory`, `rehearse-held`, `matrix-gaps`, `delivery-owners`, `delivery-agent-items`, `gap-*`) with
-  usage headers, add `docs/operating-tools.md`, propose a `CLAUDE.md` line for the PO; check first whether the other PC has its own
-  stamp script; find why `run-parallel --src` misses uncommitted changes (counted 8 of 9 once); (2) fresh delivery-matrix remeasure on
-  the final HEAD (replaces `delivery-status-current.md`, last at `9a12beab7`); (3) all content work the agent can do alone (`agent`
-  clauses; re-verify "still open" first, K50/K51 found 8 already done); (4) PO topics only in the separate PO list, never blocking.
-- PO list: chat-mode `approve-push` with a catalogue still has no shell route and its refusal names an empty `inspect`;
-  `TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE` should name the missing home directory; WINACL001 possible product defect; orphan node.exe;
-  MFHS023/028 cross-process ownership (post-0.7.0); stale "still open" backlog item texts.
-- Path to close 0.7.0 (ordered; owner in brackets; a finding in any step goes back to a fix and a re-stamp before the next step):
-  1 [PO] install stamp `9355151ff`, rsync later commits, restart; [agent] guard smoke check right after the restart, before any work.
-  2 [agent, PO away] the post-resume block above (K53, remeasure, `agent` clauses, PO list).
-  3 [PO] greenfield happy-path tests on the installed candidate (Claude/Windows, Codex/WSL, Antigravity); findings feed back into fixes.
-  4 [agent] Windows efficiency without native runs (D133: typed skips, canary set, WINACL001), then WSL Full Verify once, counted.
-  5 [agent, cost estimate to the PO first] independent Opus Critic batch (D86/D119), then delta Critics on fixes.
-  6 [agent] Reader 2+1 course at content freeze (D140; the two documentation findings first).
-  7 [agent] final remeasure of the matrix; [PO] decision tiles (29), signature ceremonies (5), native-host runs (101), acceptance lists
-  in blocks (144). 8 [PO call] final stamp, push signature, release decision. Nothing here is accepted before step 7.
+**Session cut (2026-10-24, Claude tokens exhausted until Sunday 2026-10-25 21:00; the PO continues two days with Codex as the Elephant; this block wins over every older block below):**
+- Detailed state, queue, mechanics and standing rules: `specs/sprint-alfred-epic/plans/handover-codex-switch-2026-10-24.md`. Read `CLAUDE.md` in
+  full first (Codex does not load it). Findings register: `specs/sprint-alfred-epic/plans/greenfield-findings-2026-10-23.md` (G1 to G16, V1 to V4).
+- Since the sitting: Full Verify run once (red 51 of 1095, classified), fixes K140 to K150 part A imported on `feat/sprint-alfred` (implementation
+  complete; independent Critic read, a fresh Full Verify and PO acceptance pending); the installed build is the Codex hotfix stamp `bd9ee06`,
+  later commits are not stamped. Waiting on the PO: one human-operator commit (K152 part 3, guard-hook path, command in the handover section 6).
+- Queued, not started (order in the handover section 5): K146 dispatch enforcement with a fix-wave route, K152 parts 1 and 2, K150 part B,
+  CCH136/137 fix, K156 calibration deadlock, K154 critic gate, K155 docs; then Full Verify, Reader third round, Critic batch, C28 re-pin, final
+  stamp. Two more runner reports (Codex, Claude) are to be triaged into the findings register. No stamp, install, push or release without a PO call.
+- The 2026-10-22 night session cut (stamp `9355151ff`, push `57aa08996`, the old path to close 0.7.0) is archived verbatim in
+  `specs/sprint-alfred-epic/plans/state-archive-session-cut-2026-10-22.md`.
 
 **AFK window (2026-10-23, written during the window; wins over the session cut where they differ):**
 - Agents imported on `feat/sprint-alfred` (implementation complete; Critic read and PO acceptance pending): K53 to K132 batches (scripts,

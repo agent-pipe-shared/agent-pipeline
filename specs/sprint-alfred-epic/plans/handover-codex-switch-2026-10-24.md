@@ -1,0 +1,83 @@
+# Handover for the Codex stretch, 2026-10-24 (written by the Claude Elephant at the token limit)
+
+Purpose: the PO works two days with Codex as the Elephant in this repository because the Claude weekly tokens are exhausted until Sunday 2026-10-25 21:00. This file is the detailed state. `docs/state.md` points here and wins on conflict. Read it after `CLAUDE.md`, which Codex does not load by itself (`AGENTS.md` is only a pointer to `pipeline-core:pipeline-start`): read `CLAUDE.md` in full first, it carries the hard rules.
+
+## 1. Working mode and standing rules (Claude memory is not visible to Codex, so they are repeated here)
+
+- The PO is the product owner. The Elephant is the chief developer and does everything alone: apply diffs, commit, run suites, dispatch, import results. The PO signs only where a signature is technically required (push approval, design approval, human-guard override). Never hand the PO a command list; prepare the full ceremony so that signing is the only act. The one exception found so far: commits to `PB-GUARD-HOOKS` paths (see 6) are human-operator only.
+- Chat with the PO is German; every repository artifact is English.
+- The token limit of the Claude account ends Sunday 2026-10-25 21:00. The Claude Critic batch is planned for that evening; Codex has its own quota and may run the queue in section 5 meanwhile.
+- Nothing is stamped, installed, pushed or released without an explicit PO call. The PO installs the plugin build. The dev build in use is `0.7.0+<runner>.20261023185750.bd9ee06` (the Codex hotfix build); later commits are not stamped.
+- Never replace a feature to turn a test green: keep good new logic, restate the test at equal strength (QG-04). Never fully block: every refusal needs a repair the agent or the PO can actually run, and a refused operation leaves no state.
+- Runner-neutral enforcement: new rules go into the hook layer, with self-describing messages, neutral across runners and OS.
+- Heavy suites run one at a time (private HOME and short TMPDIR via `scripts/run-in.mjs`), never against the real HOME (the PO's installed plugin uses `~/.apsp`); direct `node --test` leaves TMPDIR at `/tmp`, which is domain-ancestor-unsafe.
+- Every Goldfish dispatch uses the repository template (`templates/prompts/goldfish-task.md`) and, where the runner offers them, the pipeline agent types. Dispatch metadata (model) comes from `pipeline.user.yaml`, never from habit. Reusable helpers live in `scripts/`, never in `scratch/`.
+- Commit trailers exactly `AI-Assisted: true` and `Dispatch: stage-0 (elephant)` (GIT-03); no co-author or session lines.
+- No tree mutation while a HEAD- or tree-bound PO command is outstanding (signature ceremonies).
+- Never report "done" while a check is open: name verify, Critic read, manual check and PO acceptance by category.
+
+## 2. Repository state at the cut
+
+- Branch `feat/sprint-alfred`, HEAD at the time of writing `4c23b0dea` plus the commit of this handover. Not pushed since `57aa08996` (see `docs/state.md`).
+- Uncommitted at the cut: `plugins/pipeline-core/lib/guard/command-catalogue.mjs` and `constants.mjs` (modified) plus the staged new pin `plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs`: K152 part 3, waiting for the human-operator commit, exact command in section 6. Do not touch these three files until the PO has committed.
+- Open PO list: `plans/po-list-afk-2026-10-22.md` rows 1 to 59 (rows 52 to 59 are from this window; row 59 records the dispatch-route finding below).
+- Decision batches 13 to 17: `plans/po-decisions-2026-10-23-tiles.md`. Sitting index: `plans/sitting-preparation-index-2026-10-23.md`.
+- Findings register of the Greenfield runs and the Full Verify: `plans/greenfield-findings-2026-10-23.md` (G1 to G16, V1 to V4, K143 to K149 results). It is the working list; update it as results land.
+
+## 3. What was done since the sitting (task, result, commit)
+
+| Task | Result | Commits |
+|---|---|---|
+| K140 | Reader checker scope limited to the own course; owner acceptance route | `bd9e7c1e0`, `9b915ddd1` |
+| K141 | Eleven class-A restates after the Full Verify | `041819ac7` |
+| K142 (G1) | Codex briefing generator: runner-aware model check, `runner` key in the briefing package | `b0e15fee1` (protected builder, PO), `bd9ee062e`; stamps `a1ca1806f`, `714dea68e` |
+| K143 (V1 to V4) | `SKILL.md` trimmed to 24,373 bytes; semgrep `maxBuffer` 64 MiB (security-scan CLEAN, the 42 findings did not reproduce); append-history recovery kind `rewrites` plus `evaluateCaseListExtension`; `scripts/full-verify.mjs` | `60ff09ed2`, `8d5a4903a` |
+| K144 (G5 and fixtures) | Antigravity native dispatch no longer refused `DISPATCH-MODEL-MISSING` (guard picks runner "antigravity" when a `Subagents` array is present); GD15m runs in its own fixture; agy finalize and Codex ready-fixture restated | `c8256e280`, `439f4c60d` |
+| K147 | `codex-design-advisor-host-tests` CADH001 fixed: an async native driver runs after the BEGIN ticket closed; a closed registry boundary is never reused. Store suite green (exit 0). The new pin's RED-on-base proof was not run | `54bde5613` |
+| K148 | Address-root race: changed listing accepted only if all original names remain and new names validate; slots staged and renamed; two-process pin RED to GREEN | `9e03bfe11` |
+| K150 part A | `codex-pretool-guard-tests` 16 red cases restated (scope-only admission enrols the fixture root; plan-first denial; typed-recovery sentence); line bound 1413 to 1452; test 30 is a bounded weakening that needs the independent Critic read | `13b983087` |
+| Tooling | `scripts/fill-goldfish-briefing.mjs`, `scripts/transcript-token-buckets.mjs`, `scripts/apply-diff.mjs`, `scripts/full-verify.mjs` | various |
+
+Measured but not fixed: K145 (CADH001 cause, now fixed by K147), K149 (cause of CCH136/CCH137: the product's own family-host reservations under the candidate's `.git/agent-pipeline/` are read as a mutation by `finalizeNativeCritic`), K151 (stopped: a baseline taken before the child start needs a seam inside `launchHeldCriticFamilyRoute` in `codex-critic-session-route.mjs`, a persisted-format change, and an edit of the CCH137 pre-check).
+
+## 4. In flight at the cut
+
+- **K153** (G9 a and G11): Antigravity `approve-plan` with a verified PO proof by delegation to the shared guard logic, and `guard-push` no longer reading braces in a read-only rev expression as a push. Clone `scratch/clones/k153`; hand-back files `scratch/agent-out/K153-*`.
+- **K157** (bisect of CCH136/CCH137): which commit turned them red, and whether a real Codex Critic run writes the family-host reservations into the candidate's git directory (then every real run fails), with a recommendation. Notes `scratch/agent-out/K157-notes.md`.
+- **K152 remainder**: parts 1 and 2 are NOT done. Clone `scratch/clones/k152` holds 7 uncommitted RED checks in `hooks/antigravity-pretool-guard.test.mjs` for part 1 and the committed part 3 (`36c2c416b`).
+- Importing a hand-back: copy the diffs from `scratch/agent-out/` into `specs/sprint-alfred-epic/evidence/verify-fixes/` (lower-case names), apply with `node scripts/apply-diff.mjs <diff>`, run the touched suite alone with `node scripts/run-in.mjs . <label> <test-file>`, commit by explicit pathspec with the Goldfish's message file (`git commit -F <msg> -- <paths>`), then record the result in the findings file. Format-patch files: `git -C <clone> format-patch -1 <sha> -o scratch/agent-out/<dir>` writes inside the clone.
+
+## 5. Queue (ordered; each item re-verify "still open" first, CLAUDE.md)
+
+1. K146: dispatch enforcement. `guard-dispatch` must refuse a write-capable dispatch whose carrier is not a `pipeline-core` goldfish or critic agent type and whose briefing is not the template output, with a refusal that names the repair; read-only research carriers stay admitted. Prerequisite found on 2026-10-23: a pipeline Goldfish is refused for a task without an Alfred acceptance row (`SQ-NATIVE-ITEM-ADMISSION-REQUIRED`, `DBG-AC-ROW-MISSING`), so K146 must also add an admitted fix-wave route (a task kind that needs no spec row but is recorded and bound). Without it the enforced route has no path for fix-wave work (PO list row 59).
+2. K152 parts 1 and 2: map the Antigravity CLI tools `write_file` (Path, Content), `edit_file` (Path, Target, Replacement), `read_file` (Path) in `hooks.json:6`, `hooks/antigravity-pretool-guard.mjs` (lines ~229, 242, `nativeReadTargets`, `readOnlyTools`) and `lib/tool-write-target.mjs:41`; add the `invoke_subagent` rule for the `Model` enum `inherit|flash_lite|flash|pro` (absent or `inherit` refused with the repair named). Finding G6 is the security-relevant one: native file writes bypass `guard-devplan` and `guard-testpath`. Spec `evidence/dispatch-specs/spec-k152.json`.
+3. K150 part B: `po-human-approval-tests`, `PO-SIGN-DISCLOSURE-MATERIAL` at `po-human-approval.mjs:482`; reproduces on the base; the tripped condition (length over 240, control character, bad sha256) is not measured; best guess the human-guard-override signature-digest path (`describeHumanGuardOverrideSignatureRequest`). Budget at least 80.
+4. CCH136/CCH137 per the K157 recommendation (never skip a path of the git-directory inventory; the file is in the sha256-pinned Critic set, so the C28 re-pin follows).
+5. K156 (G10 and G9 b): the calibration deadlock (find which command leaves `.claude/pipeline.json` and `project/pipeline.json` modified in the working tree after inspect / `set-phase implementation`; make `configure-verify` and the guard offer a sanctioned repair instead of refusing everything) and the runner-view directory that a background plugin update deletes while the active hook is bound to it.
+6. K154 (G8): a self-written design-review receipt is accepted by `submit-plan`, and push/close pass without any post-implementation Critic evidence; read the sources first (`close-coordinator.mjs` ~402, `push-prepare.mjs`), then bind the receipt to a dispatch record and require Critic evidence for rigor 1 and above.
+7. K155 (G12, G16): documentation sweep (argument signatures of `feature-package-status` and `close-coordinator`, trailer rules, `git add -u` and protected `result.md`) and push-credential discovery.
+8. Pin proof for K147 (the pin must be RED on `bd9ee06` and GREEN now): run the store suite alone on the base in a clone, then on HEAD (the suite takes more than 10 minutes).
+9. Then, in this order: Full Verify (`node scripts/full-verify.mjs <clone> <label>`; expect the class-B wrapper environment fixed, and the 16 open class-C steps reduced), Reader third round plus terminal v2 record (escalation justification `afterRound: 2` committed before the readers start; owner decision `by: APS`), count pass, delivery remeasure, independent Critic batch (models: Opus for G1, G4, G5, G6; Sonnet for G2, G3, G7, G9, G10; tool-layer `model` parameter always; built from `templates/prompts/critic-review.md`; plan `plans/critic-batch-plan-2026-10-23.md`), corrections, C28 re-pin directly before the final stamp, final stamp, PO install, push last.
+
+The dispatch specs of K147 to K157 (JSON for `scripts/fill-goldfish-briefing.mjs`) are in `evidence/dispatch-specs/`. Rebuild a briefing with `node scripts/fill-goldfish-briefing.mjs --spec <spec.json> --out scratch/briefing-<id>.md`.
+
+## 6. Mechanics learned (pay for them once)
+
+- Shell grammar: one simple command per call; no heredocs, redirects, `&&` with writes, `$()`; bounded `rg ... | head -N` only; no `rg --glob`, `-A/-B` or `-rn` combos; `rg -n` works. `git apply <diff>` as a tool call is refused: use `scripts/apply-diff.mjs`. Reading outside the project root is refused for shell reads; the file Read tool works for absolute paths.
+- Commits: `git commit -F <msgfile> -- <explicit paths>`; new files need `git add -- <path>` first. A commit of a path in the `PB-GUARD-HOOKS` set (`plugins/pipeline-core/lib/guard/*.mjs`, authority-bearing guard hook implementations) is refused by the pre-commit hook with `PB-COMMIT-OVERRIDE-NONOVERRIDABLE`: only a human operator commits it with `git commit --no-verify -F <msg> -- <paths>`. Other plugin paths, including `hooks/guard-dispatch.mjs` and `lib/session-authority-registry.mjs`, were committed by the Elephant without objection. The exact command waiting now:
+  `git commit --no-verify -F scratch/msg-k152-p3.txt -- plugins/pipeline-core/lib/guard/command-catalogue.mjs plugins/pipeline-core/lib/guard/constants.mjs plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs` (the message file is untracked under `scratch/`; recreate it from the K152 part 3 text in the findings file if missing).
+- Dispatch on Claude: a pipeline Goldfish agent type is refused for fix-wave tasks (above), so the 2026-10-24 wave ran on the `general-purpose` carrier with template-filled briefings, recorded as a deviation (PO list row 59, decided by tile). On Codex the carrier is `spawn_agent` with `nativeAgentType: "worker"` and the v2 host briefing binding (`templates/prompts/goldfish-task.md`, `references/implementation-continuation.md` line ~39); `dispatch-briefing.mjs binding --runner codex` works since K142 but needs an Alfred acceptance row for its `--item`, so for fix-wave tasks expect the same `SQ-NATIVE-ITEM-ADMISSION-REQUIRED` / `DBG-AC-ROW-MISSING` refusals and either wait for K146 or decide the deviation explicitly with the PO. Never fall back silently.
+- Clone workflow for a Goldfish: `git clone --quiet . scratch/clones/<name>`; deliverables as diffs plus message files in `scratch/agent-out/`; a second fresh clone `<name>-check` proves `git apply --check`. A Goldfish clone has no git identity: pass `-c user.name -c user.email` for its commit; the Elephant commits the imported diff with the real identity.
+- Budgets: a full suite run is one long call (3 to 10+ minutes; the store suite over 10); brief `goldfish-deep` at least 60 and prefer 80 for suite-heavy tasks; Goldfish repeatedly overran 60. Backgrounded suites keep running after a dispatch ends; do not edit a clone while a RED run is in flight.
+- Stamp: `node scripts/stamp-candidate.mjs [--dry-run]` (clean tree, rewrites three manifests, commits nothing). Never run before the PO calls it.
+- Token split heuristic: `node scripts/transcript-token-buckets.mjs <transcript.jsonl|dir>`; this window: pipeline work 24 %, pipeline-required content 25 %, pure administration 40 %, dialogue 12 % (main session administration 40 %, Goldfish transcripts 39 %); the PO's target for user repositories is about 15 % administration.
+
+## 7. Runner reports and findings still to come
+
+- The PO delivers two more runner Greenfield reports (expected: Codex and Claude). Triage each the way the Antigravity report was triaged (`greenfield-findings-2026-10-23.md`, section "Antigravity Greenfield report 1"): verify claims against the source, assign ids, severity, a plan row; separate product defects, documentation gaps, agent errors, expected gates. Known classes to watch: unguarded native tools, dispatch refusals without a repair, the calibration deadlock, signature ceremonies with two PO commands, onboarding turn count, evidence not reaching the remote.
+- G4 (architecture happy path not followable without detours, missing in the design driver) is OPEN and uninvestigated: walk the path from `intake-generate-apply` to the first implementation dispatch on a scratch project and list every state without a `nextAction`. It ties to G2 (the `discard-feature` gap: the Elephant may not return to design after an implementation blockade because `--by` must come from the PO; find why the session ends up there, then add a repair hint to the refusal), G7 (b) and G10.
+- Antigravity Greenfield needs a re-stamp that contains K144 (committed) and K152 and K153 (not yet) before it can be repeated; the Codex hotfix build is installed.
+
+## 8. Open evidence gaps (not claims)
+
+Nothing in the K140 to K153 range is PO-accepted. Outstanding for all of it: a fresh Full Verify, the independent Critic batch and the Reader third round. Test 30 of `codex-pretool-guard.test.mjs` (bounded stderr weakening) and the K147 pin (no RED proof) are the two items the Critic must look at first. The K148 concurrent-suite run (`native-goldfish-host-state` with the finalizer suite on one HOME) and the D71/D72 repair verb were not exercised.
