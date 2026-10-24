@@ -788,14 +788,29 @@ async function commitOverrideCourse(projectRoot, commonDir, findings) {
     const { ensureHardenedPrivateDirectory } = await import(pathToFileURL(resolve(pluginRoot, "lib", "hardened-private-directory.mjs")).href);
 
     phase = "eligibility";
-    const nonOverridable = [];
+    const eligibilityFailures = [];
     for (const relPath of protectedPaths) {
-      let eligible = false;
-      try { eligible = hgo.humanGuardOverrideInternals.eligibility(root, "Write", { file_path: resolve(root, relPath) }).eligible === true; } catch { eligible = false; }
-      if (!eligible) nonOverridable.push(relPath);
+      let result;
+      try { result = hgo.humanGuardOverrideInternals.eligibility(root, "Write", { file_path: resolve(root, relPath) }); }
+      catch { result = { eligible: false, code: "HGO-ELIGIBILITY-UNAVAILABLE" }; }
+      if (result?.eligible !== true) eligibilityFailures.push({ path: relPath, code: String(result?.code || "HGO-ELIGIBILITY-UNAVAILABLE"), authorCandidate: result?.authorCandidate === true });
     }
-    if (nonOverridable.length > 0) {
-      return { admit: false, lines: overrideNote("NONOVERRIDABLE", "no commit-scoped override can cover " + nonOverridable.join(", ") + "; nothing was seeded.") };
+    if (eligibilityFailures.length > 0) {
+      const authorRootRequired = eligibilityFailures.filter((failure) => failure.code === "HGO-AUTHOR-ROOT-REQUIRED" && failure.authorCandidate);
+      const hardRefusals = eligibilityFailures.filter((failure) => failure.code.startsWith("HGO-NONOVERRIDABLE-"));
+      const unclassified = eligibilityFailures.filter((failure) => !authorRootRequired.includes(failure) && !hardRefusals.includes(failure));
+      const details = [];
+      if (authorRootRequired.length > 0) details.push(
+        "HGO-AUTHOR-ROOT-REQUIRED (authorCandidate) for " + authorRootRequired.map((failure) => failure.path).join(", ") + ": this commit-scope adapter does not select a Source author root. The existing author-repair signature flow applies to a Source action with its selected root; this adapter has no such selection, so it did not seed a request."
+      );
+      if (hardRefusals.length > 0) details.push(
+        "hard HGO refusal for " + hardRefusals.map((failure) => failure.path + " (" + failure.code + ")").join(", ") + "; nothing was seeded."
+      );
+      if (unclassified.length > 0) details.push(
+        "HGO eligibility could not establish an override route for " + unclassified.map((failure) => failure.path + " (" + failure.code + ")").join(", ") + "; this does not establish that the path itself is prohibited, and nothing was seeded."
+      );
+      const code = hardRefusals.length > 0 ? "NONOVERRIDABLE" : authorRootRequired.length > 0 ? "AUTHOR-ROOT-REQUIRED" : "ELIGIBILITY-UNAVAILABLE";
+      return { admit: false, lines: overrideNote(code, details.join(" ")) };
     }
 
     phase = "scope";

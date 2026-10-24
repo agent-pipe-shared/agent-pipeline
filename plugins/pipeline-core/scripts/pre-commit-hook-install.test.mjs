@@ -709,6 +709,50 @@ test("installed hook: staged path with a matching CONSUMED capability -> commit 
   assert.equal(code, 0, stderr);
 });
 
+test("installed hook: Source author-root requirement is reported distinctly from a hard HGO refusal", { timeout: commitTestTimeout(1) }, () => {
+  const { dir, git } = freshRepo("e2e-source-author-root-diagnostic");
+  mkdirSync(join(dir, "project"), { recursive: true });
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"], trustAnchor: { keyReference: "diagnostic-fixture", publicKeySha256: "0".repeat(64) } }));
+  writeFileSync(join(dir, ".claude", "guard-config.json"), JSON.stringify({ protectedTestPaths: [{ pattern: "plugins/pipeline-core/.*\\.mjs$", reason: "fixture protected Source path", id: "TP-SOURCE-DIAGNOSTIC" }] }));
+  mkdirSync(join(dir, "plugins", "pipeline-core"), { recursive: true });
+  writeFileSync(join(dir, "plugins", "pipeline-core", "fixture.mjs"), "// before\n");
+  git("add", "project/critical-human-proof.json", ".claude/guard-config.json", "plugins/pipeline-core/fixture.mjs");
+  assert.equal(git("commit", "-q", "-m", "seed Source diagnostic fixture").status, 0);
+  installHook(dir);
+  writeFileSync(join(dir, "plugins", "pipeline-core", "fixture.mjs"), "// after\n");
+  git("add", "plugins/pipeline-core/fixture.mjs");
+  const refused = commit(dir, "attempt protected Source fixture");
+  assert.notEqual(refused.code, 0);
+  assert.match(refused.stderr, /HGO-AUTHOR-ROOT-REQUIRED/);
+  assert.match(refused.stderr, /authorCandidate/);
+  assert.match(refused.stderr, /commit-scope adapter does not select a Source author root/);
+  assert.match(refused.stderr, /did not seed a request/);
+  assert.doesNotMatch(refused.stderr, /PB-COMMIT-OVERRIDE-NONOVERRIDABLE:/);
+  const commonDir = commonDirOf(dir);
+  assert.equal(existsSync(join(commonDir, "agent-pipeline", "pre-commit-hook", "commit-scope")), false, "no commit-scope request was seeded");
+});
+
+test("installed hook: a sensitive-path HGO hard refusal remains NONOVERRIDABLE with its real code", { timeout: commitTestTimeout(1) }, () => {
+  const { dir, git } = freshRepo("e2e-hard-hgo-refusal-diagnostic");
+  mkdirSync(join(dir, "project"), { recursive: true });
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  mkdirSync(join(dir, "secrets"), { recursive: true });
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"], trustAnchor: { keyReference: "diagnostic-fixture", publicKeySha256: "0".repeat(64) } }));
+  writeFileSync(join(dir, ".claude", "guard-config.json"), JSON.stringify({ protectedTestPaths: [{ pattern: "secrets/password\\.txt$", reason: "fixture hard-boundary path", id: "TP-HARD-DIAGNOSTIC" }] }));
+  writeFileSync(join(dir, "secrets", "password.txt"), "fixture secret path\n");
+  git("add", "project/critical-human-proof.json", ".claude/guard-config.json", "secrets/password.txt");
+  assert.equal(git("commit", "-q", "-m", "seed hard-refusal fixture").status, 0);
+  installHook(dir);
+  writeFileSync(join(dir, "secrets", "password.txt"), "changed fixture secret path\n");
+  git("add", "secrets/password.txt");
+  const refused = commit(dir, "attempt hard-boundary fixture");
+  assert.notEqual(refused.code, 0);
+  assert.match(refused.stderr, /PB-COMMIT-OVERRIDE-NONOVERRIDABLE/);
+  assert.match(refused.stderr, /HGO-NONOVERRIDABLE-PATH/);
+  assert.doesNotMatch(refused.stderr, /HGO-AUTHOR-ROOT-REQUIRED/);
+});
+
 test("installed hook: admits one complete proof-bound quality package, never a widened index", { timeout: commitTestTimeout(2) }, () => {
   const { dir, git } = freshRepo("e2e-quality-package-commit");
   const pair = generateKeyPairSync("ed25519");
