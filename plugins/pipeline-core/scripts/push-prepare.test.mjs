@@ -725,7 +725,11 @@ function readyDeps(overrides = {}) {
     },
     readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [] }),
     parseHumanArgs: () => ({ directory: "/external/po-dir" }),
+    // These older preparation examiners test other gates; their synthetic
+    // State is not an approved plan. The dedicated review cases below use
+    // the real requirement resolver instead of granting this test-only seam.
     readState: () => ({ status: "ok", state: { activeFeature: { id: "nova-push-prepare", planPath: "specs/sprint-nova-epic/plans/nova-push-prepare.md" } } }),
+    requiresPublicationReview: () => false,
     gitCommonDir: () => "/external/po-dir/.fake-common",
     derivePoGateRepositoryFingerprint: () => "0123456789ab",
     now: () => new Date("2026-08-16T20:00:00.000Z"),
@@ -772,6 +776,35 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.equal(humanText.split(/\r?\n/u).every((line) => line.length <= 72), true, humanText);
   assert.doesNotMatch(humanText, /^git push origin HEAD:refs\/heads\/main$/mu);
   assert.doesNotMatch(humanText, /render-copy-safe|available on demand/u);
+});
+
+test("rigor one publication requires candidate-bound independent Critic and Verify", () => {
+  const argv = ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"];
+  const state = { activeFeature: { id: "reviewed", planPath: "specs/reviewed/prd.md" }, planSubmission: { profile: "feature" } };
+  const missing = pushPrepareReport(argv, readyDeps({ readState: () => ({ status: "ok", state }),
+    requiresPublicationReview: () => true,
+    checkCriticBoundVerify: () => ({ ok: false, code: "private-critic-binding-unavailable" }) }));
+  assert.equal(missing.report.ready, false);
+  assert.equal(missing.report.checks.find((check) => check.id === "critic-bound-verify")?.ok, false);
+  const reviewed = pushPrepareReport(argv, readyDeps({ readState: () => ({ status: "ok", state }),
+    requiresPublicationReview: () => true,
+    checkCriticBoundVerify: () => ({ ok: true, code: "critic-bound-verify-valid" }) }));
+  assert.equal(reviewed.report.ready, true);
+  const checkpoint = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/feat/reviewed", "--checkpoint"],
+    readyDeps({ readState: () => ({ status: "ok", state }), requiresPublicationReview: () => true,
+      loadManifestSafe: blockingSecurity }), slimOptions);
+  assert.equal(checkpoint.report.checks.some((check) => check.id === "critic-bound-verify"), false);
+});
+
+test("retained rigor after close still requires candidate review", () => {
+  const state = { closedFeatures: [{ id: "reviewed" }], rigorHistory: [{ body: {
+    featureId: "reviewed", observation: { retainedProfile: "feature" },
+  } }] };
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({ readState: () => ({ status: "ok", state }),
+      requiresPublicationReview: () => true,
+      checkCriticBoundVerify: () => ({ ok: false, code: "private-critic-binding-unavailable" }) }));
+  assert.equal(result.report.checks.find((check) => check.id === "critic-bound-verify")?.ok, false);
 });
 
 test("pushPrepareReport: inspection mode never folds a pending approval write", () => {

@@ -180,6 +180,8 @@ import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs
 import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { inspectCriticBoundVerify } from "../lib/critic-verify-readiness.mjs";
+import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 // NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-
 // calls-it.md, Point 3): read-only observer, no mkdirSync/physicalScratchRoot call -- see
@@ -2285,6 +2287,38 @@ function readEvidence(relPath) {
   return { ok: true, data, raw, relPath };
 }
 
+/** Read only the proposed push tree. A source lookup fault is never an absent package. */
+function readPushedSource(path) {
+  const listing = spawnSync("git", ["-C", evidenceProjectDir, "ls-tree", "--name-only", sourceCommit, "--", path],
+    { encoding: "utf8", timeout: 5000 });
+  if (listing.status !== 0) throw new Error("pushed source tree unavailable");
+  if (String(listing.stdout).trim() === "") return null;
+  const shown = spawnSync("git", ["-C", evidenceProjectDir, "show", `${sourceCommit}:${path}`],
+    { encoding: null, timeout: 5000, maxBuffer: 1048576 });
+  if (shown.status !== 0 || !Buffer.isBuffer(shown.stdout)) throw new Error("pushed source bytes unavailable");
+  return shown.stdout;
+}
+
+function pushedStateRequiresReview() {
+  const paths = [...new Set([projectStateRelPath(evidenceProjectDir), NEUTRAL_STATE, LEGACY_STATE])];
+  const present = paths.map(path => readPushedSource(path)).filter(bytes => bytes !== null);
+  if (present.length !== 1) return true;
+  try { return requiresPublicationReview(JSON.parse(present[0].toString("utf8")), { readSource: readPushedSource }); }
+  catch { return true; }
+}
+
+function checkIndependentPublicationReview() {
+  if (!pushedStateRequiresReview()) return [];
+  const verify = readEvidence(VERIFY_EVIDENCE_DEFAULT_PATH);
+  if (!verify.ok) return ["candidate-bound independent review and Verify evidence are unavailable"];
+  const repository = discoverRepository(evidenceProjectDir, { timeout: 5000 });
+  const review = inspectCriticBoundVerify({ repoRoot: evidenceProjectDir,
+    gitCommonDir: repository.commonDir, head: sourceCommit, tree: resolveSourceTree(),
+    worktreeState: "dirty", requireClean: false,
+    evidencePath: VERIFY_EVIDENCE_DEFAULT_PATH, evidence: verify.data });
+  return review.currentCheckoutOk ? [] : [`candidate-bound independent review and Verify are unavailable (${review.code})`];
+}
+
 /** Runs the shared exitCode===0 + commit===pushed-source check; returns failure reasons (empty = pass). */
 function checkEvidenceFreshness(relPath) {
   const failures = [];
@@ -2481,6 +2515,7 @@ try {
 
   // (a) verify evidence -- always checked once the push gate is active.
   failures.push(...checkEvidenceFreshness(VERIFY_EVIDENCE_DEFAULT_PATH));
+  failures.push(...checkIndependentPublicationReview());
 
   // (b) security evidence -- only when a security gate is configured and not "off".
   // PUSHWARN-1: pushed into securityFailures, NOT failures -- this bucket is dispatched

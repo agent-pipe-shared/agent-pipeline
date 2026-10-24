@@ -16,6 +16,7 @@ import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs"
 import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
 import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
 import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
 import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
 import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
@@ -393,8 +394,9 @@ function continuityCloseRequest(root, snapshot, path) {
  * A feature cannot reach `feature-close-prepared` while one of ITS OWN delivery-course dispatch records
  * requires a Critic and has no matching Critic evidence (the evaluator's own decision, not a second one).
  * Scope is the slice ids of the course beside the approved plan, the file resolveGovernedItemQueue reads;
- * records of other or earlier features never block. No course file means nothing to scope and nothing to
- * refuse. An unreadable, oversized, invalid or foreign course fails closed.
+ * records of other or earlier features never block. No course file means nothing to scope in
+ * this per-slice check; the whole-candidate qualification below still applies.
+ * An unreadable, oversized, invalid or foreign course fails closed.
  * D27/D55 (Q1): a slice recorded only by its orchestrator commit (no dispatch record) is accepted as
  * authored, but only on the audit route, whose candidate-bound Verify and Critic receipt stand in for
  * the record's Critic decision (lib/close-authorship-record.mjs).
@@ -491,6 +493,13 @@ async function transitionPlan(values) {
     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
     courseAuthorship = assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined });
+    // A missing slice queue says nothing about whether the whole candidate
+    // received independent review. Resolve the State and package contracts.
+    // The audit route below reads the consumed Critic packet and exact Verify
+    // lifecycle; a self-authored design receipt cannot stand in for either.
+    if (requiresPublicationReview(snapshot.state, { rootDir: root }) && values.auditRequest === undefined) {
+      fail("CLOSE-QUALIFICATION-REQUIRED", "rigor >= 1 feature close requires the candidate-bound Critic/Verify audit route");
+    }
     if (values.auditRequest !== undefined) {
       const request = auditRequest(root, values.auditRequest);
       if (!SHA256.test(values.criticVerifyLifecycle ?? "") || values.criticVerifyLifecycle !== request.value.criticVerifyLifecycleId) {

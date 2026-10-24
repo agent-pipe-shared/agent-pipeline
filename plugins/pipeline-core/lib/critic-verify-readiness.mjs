@@ -8,7 +8,7 @@ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const RECEIPT = /^[a-f0-9]{64}\.json$/u;
 
 export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head, tree, worktreeState,
-  evidencePath = "evidence/verify-latest.json", evidence,
+  evidencePath = "evidence/verify-latest.json", evidence, requireClean = true,
   readLifecycle = readCriticVerifyLifecycle } = {}) {
   const base = { headEvidenceOk: false, currentCheckoutOk: false,
     privateLifecycleBound: false, receiptId: null };
@@ -24,7 +24,9 @@ export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head, 
     return { ...base, code: "verify-evidence-not-exact-green" };
   }
   const exact = { ...base, headEvidenceOk: true };
-  if (worktreeState !== "clean") return { ...exact, code: "checkout-not-clean" };
+  // An actual push can name a commit other than checkout HEAD. Its source tree
+  // is supplied explicitly; checkout cleanliness is a preparation constraint.
+  if (requireClean && worktreeState !== "clean") return { ...exact, code: "checkout-not-clean" };
   if (typeof gitCommonDir !== "string" || gitCommonDir.length === 0) {
     return { ...exact, code: "git-common-dir-unavailable" };
   }

@@ -16,8 +16,9 @@ import test from "node:test";
 
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../critic-skip-decision.mjs";
 import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_SCHEMA, validateSliceQueue } from "../slice-queue.mjs";
+import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../plan-spec-state-v2.mjs";
 
-const CLI = fileURLToPath(new URL("../../scripts/close-coordinator.mjs", import.meta.url));
+const CLI = process.env.G20_CLOSE_CLI ?? fileURLToPath(new URL("../../scripts/close-coordinator.mjs", import.meta.url));
 const CANDIDATE = "a".repeat(40);
 const FEATURE = "feature";
 const COURSE_PATH = "specs/feature/slice-queue.json";
@@ -76,6 +77,14 @@ function fixtureRepository(label, files = {}) {
   }
   const prdSha256 = sha256(readFileSync(join(root, paths.prd)));
   const specSha256 = sha256(readFileSync(join(root, paths.spec)));
+  const profileSha256 = "a".repeat(64);
+  const planSubmission = { schema: PLAN_SUBMISSION_SCHEMA, featureId: FEATURE,
+    planPath: paths.prd, planSha256: prdSha256, specPath: paths.spec, specSha256,
+    profile: "mini", profileSha256, submittedBy: "fixture", submittedAt: "2026-10-24T00:00:00.000Z" };
+  const poGateAuthority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en",
+    sourceSha256: "b".repeat(64), runtimeSha256: "c".repeat(64), receiptSha256: "d".repeat(64),
+    repositoryFingerprint: "e".repeat(64), planPath: paths.prd, planSha256: prdSha256,
+    specPath: paths.spec, specSha256 };
   const result = { path: paths.result, sha256: sha256(readFileSync(join(root, paths.result))) };
   writeFileSync(join(root, "evidence", "close-request.json"), json({
     schema: "pipeline.continuity-close.v0", featureId: FEATURE, expectedRevision: 7, result,
@@ -85,8 +94,12 @@ function fixtureRepository(label, files = {}) {
   writeFileSync(join(root, ".claude", "pipeline-state.json"), json({
     schema: "pipeline.state.v0",
     activeFeature: { id: FEATURE, planPath: paths.prd, phase: "implementation" },
+    // QG-04: the old positive fixture had no approved submission binding.
+    planSubmission,
     planApproved: true,
-    planApproval: { poGateAuthority: { planSha256: prdSha256, specPath: paths.spec, specSha256 } },
+    planApproval: { schema: CURRENT_APPROVAL_SCHEMA, approvedBy: "fixture", approvedAt: "2026-10-24T00:01:00.000Z",
+      submissionSha256: sha256CanonicalJson(planSubmission), profileSha256, poGateAuthority,
+      priorInvalidationSha256: null, designApprovalBinding: null, designApproval: null },
     continuity: {
       revision: 7,
       authority: { prd: { path: paths.prd, sha256: prdSha256 }, spec: { path: paths.spec, sha256: specSha256 }, result },
@@ -198,6 +211,28 @@ test("(d) a feature with no delivery course plans, whatever other records exist"
   const planned = repo.planPrepared();
   assert.equal(planned.status, 0, JSON.stringify(planned.body));
   assert.equal(planned.body.phase, "feature-close-prepared");
+});
+
+test("rigor one close without a delivery course still needs the independent Critic/Verify audit", () => {
+  const repo = checkpointed("rigor-one-no-course", {}, (root) => {
+    const path = join(root, ".claude", "pipeline-state.json");
+    const state = JSON.parse(readFileSync(path, "utf8"));
+    state.planSubmission = { ...state.planSubmission, profile: "feature" };
+    // Existing v4 approval remains readable: it binds this exact feature
+    // submission without introducing a synthetic design-review receipt.
+    state.planApproval = { schema: "pipeline.plan-approval.v4", approvedBy: "fixture",
+      approvedAt: "2026-10-24T00:01:00.000Z", submissionSha256: sha256CanonicalJson(state.planSubmission),
+      profileSha256: state.planSubmission.profileSha256, poGateAuthority: state.planApproval.poGateAuthority,
+      priorInvalidationSha256: null };
+    writeFileSync(path, json(state));
+    git(root, ["add", ".claude/pipeline-state.json"]);
+    git(root, ["commit", "-m", "declare rigor one"]);
+  });
+  const before = repo.snapshot();
+  const refused = repo.planPrepared();
+  assert.equal(refused.status, 2, JSON.stringify(refused.body));
+  assert.equal(refused.body.code, "CLOSE-QUALIFICATION-REQUIRED");
+  assert.deepEqual(repo.snapshot(), before);
 });
 
 test("(e) an invalid delivery course fails closed with a typed code and zero mutation", () => {

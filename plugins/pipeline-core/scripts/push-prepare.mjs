@@ -47,12 +47,14 @@ import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { CHECKPOINT_LANE, PUSH_DESTINATION_POLICY_SCHEMA, classifyPushDestination } from "../lib/push-destination-policy.mjs";
 import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
-import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs, resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
@@ -60,6 +62,27 @@ export const PIPELINE_STATE_SCRIPT_PATH = fileURLToPath(new URL("./pipeline-stat
 const REMOTE_RE = /^[A-Za-z0-9._-]{1,80}$/u;
 const DESTINATION_RE = /^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u;
 export const PUSH_THREAT_MODEL_PATH = "project/push-threat-model.md";
+
+function readCandidateSource(dir, commit, path) {
+  const listed = spawnSync("git", ["-C", dir, "ls-tree", "--name-only", commit, "--", path],
+    { encoding: "utf8", shell: false, timeout: 5000 });
+  if (listed.status !== 0) throw new Error("candidate source tree unavailable");
+  if (String(listed.stdout).trim() === "") return null;
+  const shown = spawnSync("git", ["-C", dir, "show", `${commit}:${path}`],
+    { encoding: null, shell: false, timeout: 5000, maxBuffer: 1048576 });
+  if (shown.status !== 0 || !Buffer.isBuffer(shown.stdout)) throw new Error("candidate source bytes unavailable");
+  return shown.stdout;
+}
+
+function readCandidateState(dir, commit, readSource) {
+  try {
+    const selected = relative(resolve(dir), statePath(dir)).split(sep).join("/");
+    const present = [...new Set([selected, NEUTRAL_STATE, LEGACY_STATE])]
+      .map(path => readSource(path)).filter(bytes => bytes !== null);
+    if (present.length !== 1) return { status: "unavailable" };
+    return { status: "ok", state: JSON.parse(present[0].toString("utf8")) };
+  } catch { return { status: "unavailable" }; }
+}
 
 export function parseArgs(argv) {
   const values = {};
@@ -684,6 +707,17 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     }
   } else if (headCommit) {
     checks.push(checkEvidenceFreshness("verify-evidence", VERIFY_EVIDENCE_DEFAULT_PATH, evidenceDir, headCommit, deps));
+    const readSource = deps.readCandidateSource ?? (path => readCandidateSource(dir, headCommit, path));
+    const stateRead = deps.readState ? deps.readState(dir) : readCandidateState(dir, headCommit, readSource);
+    if ((deps.requiresPublicationReview ?? requiresPublicationReview)(stateRead?.status === "ok" ? stateRead.state : null,
+      { readSource })) {
+      const review = (deps.checkCriticBoundVerify ?? checkCurrentCriticBoundVerify)(dir);
+      checks.push({ id: "critic-bound-verify", ok: review.ok === true,
+        message: review.ok ? "independent Critic and Verify bind this exact candidate"
+          : `candidate qualification unavailable (${review.code ?? "unavailable"})`,
+        ...(!review.ok ? { remedy: "complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
+      });
+    }
     if (securityGateActive) {
       checks.push(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", evidenceDir, headCommit, deps));
     }
