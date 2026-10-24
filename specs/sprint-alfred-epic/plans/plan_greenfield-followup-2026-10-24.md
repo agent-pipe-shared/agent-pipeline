@@ -1,8 +1,23 @@
-# Codex and Claude Greenfield follow-up, 2026-10-24
+# Three-runner Greenfield follow-up, 2026-10-24
 
 The PO supplied the two reports `docs/pipeline-analyse-greenfield_AP_test_vox_codex_070_1.md` and `docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md` from their respective Greenfield projects and requested all P0 and P1 findings in this fix wave. This is an execution mandate for investigation and repairs, not acceptance or permission to weaken guards. Reports describe older builds; source confirmation and regression evidence are required before claiming a current defect fixed. Original report priorities are retained below.
 
 ## Complete P0/P1 intake
+
+This is the combined fix wave for all three runner reports. The Antigravity
+report's original intake remains in
+[Greenfield findings](greenfield-findings-2026-10-23.md), section "Antigravity Greenfield report 1":
+
+| Original Antigravity priority | Existing finding / repair | Current boundary |
+|---|---|---|
+| P0-1 | G6 / K152A: native file-tool admission and write-target mapping | Source integrated `43e04b207`; synthetic checks passed; native qualification remains open |
+| P0-2 | G7 / K144, K152B and the design-phase catalogue route | Source fixes integrated; qualify complete dispatch/return/integration and retain any remaining catalogue refusal |
+| P1-1 | G8 / K154, combined with G20 below | Candidate-bound publication/close qualification and independent design-review provenance remain open |
+| P1-2 | G9a / K153; G9b / K156 and G30 below | Signed plan-proof delegation integrated earlier; active runner-view retention and mid-session refresh qualification remain open |
+
+The lower-priority Antigravity findings already admitted to the working plan,
+including G10/K156, also remain in scope. Combining duplicate findings never
+removes their runner-specific regression and native qualification duties.
 
 | ID | Report finding | Required outcome | Existing work / owner | State |
 |---|---|---|---|---|
@@ -11,7 +26,7 @@ The PO supplied the two reports `docs/pipeline-analyse-greenfield_AP_test_vox_co
 | G20 | Codex P0-2 | Publication qualification must bind required independent review and Verify to the actual candidate; checkpoint and authorized exception claims remain distinct | G8/K154 | Open; signature alone never establishes qualification |
 | G21 | Codex P0-3 | Official result bootstrap/reconcile preserves package, continuity and result consistency; real package validation participates in close qualification | New result transaction repair | Report includes an independently reproduced manifest/result hash mismatch and missing reconciliation fence; current source confirmation pending |
 | G22 | Claude P0.3 | Reachable honest close after unavailable item dispatch, including test-dependency preparation and required Critic qualification | K146, G17, G21; close preparation work | Open; do not implement a silent no-Critic success route |
-| G23 | Codex P1-1; Claude P1.4 read-help portion | Harmless scoped reads/help use ordinary read-only admission and actionable errors; preserve credential, external-path and symlink boundaries | Read grammar/help recovery work | Exact package approved/applied, combined focused checks pass; ordinary commit blocked on three protected guard files, operator commit collected |
+| G23 | Codex P1-1; Claude P1.4 read-help portion | Harmless scoped reads/help use ordinary read-only admission and actionable errors; preserve credential, external-path and symlink boundaries | Read grammar/help recovery work | Operator committed complete package `6db0d31f8`; included in installed intermediate build; focused checks pass, native qualification open |
 | G24 | Codex P1-2 | Evidence writers cannot overwrite another schema's valid result; bind immutable run records and separate capture/function outputs | Consumer tooling contract / evidence writer investigation | Report confirmed consumer script collision; shared product ownership to establish |
 | G25 | Codex P1-3 | Validate HEAD, criterion rendering and source closure before submission mutation; retain already answered intake values | Design submission/intake work | Open; no late approval or fabricated identity |
 | G26 | Codex P1-4 | Architecture conformance records disposition of findings and unavailable properties without claiming PASS | Architecture close work | Open; report-only observations are not automatically blocking criteria |
@@ -82,3 +97,25 @@ G19's first owner created an untracked diagnostic module but stopped after clone
 **Approved combined integration:** the PO specifically approved K152A/K152B/G23 applications and ordinary tests/commits. K152A and K152B committed with active hooks. G23 remains applied after the ordinary pre-commit hook refused three `PB-GUARD-HOOKS` paths as `PB-COMMIT-OVERRIDE-NONOVERRIDABLE`; nothing was seeded and no bypass used. Keep its complete seven-path package for a later operator commit, not a different partial composition. Main checks: model/read 39/39, selected QP4 2/2, native file tools synthetic 3/3, generator 76/76, consumer 9/9. Documentation initially failed three assertions because K152A changed the source matcher; the exact generator recovery updated `docs/enforcement.md`, committed `925224574`, and documentation contracts passed 76/76. PRD/Spec hashes are unchanged.
 
 **Stamp call:** the PO explicitly requested a new intermediate version now and will run operator commands/install after the mobile window (later extended to 40 minutes). Stamping is authorized. The sanctioned `scripts/stamp-candidate.mjs` requires a clean committed checkout; the outstanding operator-only G23 commit must precede the actual main stamp. Do not evade that freeze check or stamp an unstated different source. Prepare the remaining ordinary commits and operator handoff, then stamp as soon as the operator commit returns. Installation remains the PO's action. Open P0/P1, actual dispatch-route compatibility, native qualification, integrated Verify, independent review and acceptance remain explicit.
+
+## Installation readback and continuation, 2026-10-24
+
+This readback supersedes the pending operator/stamp wording above. The PO
+committed G23 as `6db0d31f8`. The sanctioned stamp then committed as
+`16c9e1936`, build `20261024111543.6db0d31`. Following the PO's installation
+and continuation message, installed Codex preflight reports version
+`0.7.0+codex.20261024111543.6db0d31`, matching loaded/installed content digest
+`39885be0c06d5a62cb5dfe2532a65961d1f9a023731c2618065511866d63b7cc`.
+Its exact hook-refresh recovery completed; fresh preflight and onboarding
+inspection are ready, runtime readback is current, continuity is valid and
+the existing Epic plan remains approved in implementation. PRD/Spec hashes
+match their recorded authority. Observation governance passed.
+
+Optional model-role mapping confirmation is collected for a later attended
+terminal; it has no lifecycle impact. The sanctioned `duty.deep` selector
+still returns V3 `gpt-6-sol` / `medium`. No signature or HEAD-bound command
+is outstanding. No new stamp, push, Critic batch, re-pin or acceptance is
+implied by installation. The prior session's workers are no longer live;
+retain their clones, partial diffs, evidence and attempt histories when
+preparing further bounded work. Inert proposals remain separate from this
+installed candidate.
