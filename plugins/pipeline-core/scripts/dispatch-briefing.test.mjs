@@ -684,6 +684,40 @@ test("the dispatch admission (D78) admits a generated briefing and refuses an ed
   assert.equal(generatedBriefingAdmission("A plain research prompt with no binding."), null);
 });
 
+test("a fresh fix wave uses an existing accepted criterion and a missing original row names that route", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const missing = runDispatchBriefing(argvOf(fx, { "--item": "fresh-fix-wave" }), depsOf(fx));
+  assert.equal(missing.code, "DBG-AC-ROW-MISSING");
+  assert.match(missing.message, /--criterion AC-<n>/u);
+  const bound = runDispatchBriefing(argvOf(fx, { "--item": "fresh-fix-wave" }, ["--criterion", "AC-1"]), depsOf(fx));
+  assert.equal(bound.ok, true, JSON.stringify(bound));
+  assert.equal(bound.binding.itemDelivery.criterionLocator.criterionId, "AC-1");
+  assert.equal(bound.binding.itemDelivery.itemId, "feat-x.fresh-fix-wave");
+});
+
+test("writable dispatch carrier and generated briefing admission retain a read-only research route", async () => {
+  const { writeCapableCarrierAdmission } = await import("../hooks/guard-dispatch.mjs");
+  const { generatedBriefingAdmission } = await buildLib();
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const text = runDispatchBriefing(argv, depsOf(fx)).text;
+  assert.equal(writeCapableCarrierAdmission({ subagentType: "pipeline-core:goldfish-deep", transport: "direct", prompt: text }), null);
+  assert.equal(generatedBriefingAdmission(text), null);
+  assert.equal(writeCapableCarrierAdmission({ subagentType: "worker", transport: "codex", prompt: "write the fix" }).code, "DISPATCH-WRITE-CARRIER-REQUIRED");
+  assert.equal(writeCapableCarrierAdmission({ subagentType: "explorer", transport: "codex", prompt: "inspect the code" }), null);
+  assert.equal(writeCapableCarrierAdmission({ subagentType: "Explore", transport: "direct", prompt: "inspect the code" }), null);
+  assert.equal(writeCapableCarrierAdmission({ subagentType: "consult-advisor", transport: "antigravity", prompt: "input.txt" }), null);
+  assert.equal(writeCapableCarrierAdmission({ subagentType: "customer-researcher", transport: "antigravity", prompt: "input.txt" }).code, "DISPATCH-WRITE-CARRIER-REQUIRED");
+  assert.equal(writeCapableCarrierAdmission({ subagentType: "pipeline-core:critic", transport: "direct", prompt: "review the diff" }), null);
+  const skeleton = runDispatchBriefing(argvOf(fx), depsOf(fx)).skeleton;
+  assert.equal(generatedBriefingAdmission(skeleton).code, "DBG-GENERATED-BRIEFING-REQUIRED");
+  assert.equal(generatedBriefingAdmission("A hand-written Goldfish briefing.", "node gen.mjs", { requireGenerated: true }).code, "DBG-GENERATED-BRIEFING-REQUIRED");
+  const emptyBindingBody = "A hand-written Goldfish briefing.\n";
+  const markedWithoutBinding = `${emptyBindingBody}<!-- pipeline-briefing-generator:v1 sha256=${sha(emptyBindingBody)} -->\n`;
+  assert.equal(generatedBriefingAdmission(markedWithoutBinding, "node gen.mjs", { requireGenerated: true }).code, "DBG-GENERATED-BINDING-REQUIRED");
+});
+
 test("init-dispatch-record prints a valid opening v4 record whose digests come from the generated briefing (AC-163)", async () => {
   const { runDispatchBriefing } = await lib();
   const { runInitDispatchRecord } = await import("./init-dispatch-record.mjs");

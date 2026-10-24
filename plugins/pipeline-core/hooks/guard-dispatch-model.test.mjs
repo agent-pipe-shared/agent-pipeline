@@ -45,12 +45,23 @@ register("D84 block a Claude dispatch that names no model, typed and naming the 
     assert.ok(stderr.includes("`model`"), `${tool_name}: stderr does not name the \`model\` parameter`);
   }
 });
-register("D84 allow a Claude dispatch that names a configured model, with no model finding", () => {
+// K146 / PO decision batch 17: the old GDM02 allowed general-purpose because the prompt said
+// "find". That carrier can write; prompt wording cannot grant a read-only exemption. Preserve
+// D84's model-route observation and add a real read-only carrier as the positive control.
+register("D84 configured model passes its route check while K146 blocks a write-capable research prompt", () => {
   for (const tool_name of ["Task", "Agent"]) {
     const { code, stderr } = run({ tool_name, tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt: "find where X is defined" } });
-    assert.equal(code, ALLOW, `${tool_name}: exit ${code} (expected ${ALLOW}) -- ${stderr.trim().slice(0, 200)}`);
+    assert.equal(code, BLOCK, `${tool_name}: exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 200)}`);
     assert.ok(!stderr.includes("DISPATCH-MODEL"), `${tool_name}: unexpected model finding -- ${stderr.trim().slice(0, 200)}`);
+    assert.ok(stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), `${tool_name}: missing carrier refusal -- ${stderr.trim().slice(0, 200)}`);
   }
+  const research = run({ tool_name: "spawn_agent", tool_input: { agent_type: "explorer", message: "find where X is defined" } });
+  assert.equal(research.code, ALLOW, `read-only explorer must remain available: ${research.stderr.trim().slice(0, 200)}`);
+  const advisor = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt" }] } });
+  assert.equal(advisor.code, ALLOW, `read-only Antigravity Advisor must reach its native preparation gate: ${advisor.stderr.trim().slice(0, 200)}`);
+  const unknown = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "customer-researcher", Role: "Researcher", Prompt: "inspect input.txt" }] } });
+  assert.equal(unknown.code, BLOCK, `unknown Antigravity carrier must not gain a prompt exemption: ${unknown.stderr.trim().slice(0, 200)}`);
+  assert.ok(unknown.stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), `missing unknown-carrier refusal: ${unknown.stderr.trim().slice(0, 200)}`);
 });
 register("D84 block a Claude dispatch that names a model no configured duty route selects, typed and naming the configured selectors", () => {
   const { code, stderr } = run({ tool_name: "Agent", tool_input: { subagent_type: "general-purpose", model: "not-a-configured-model", prompt: "find where X is defined" } });

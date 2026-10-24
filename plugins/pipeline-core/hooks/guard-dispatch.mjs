@@ -78,7 +78,7 @@ import {
   prepareAdvisorProhibitionBindings,
 } from "../lib/advisor-prohibition-binding.mjs";
 import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
-import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
+import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, isShippedPipelineAgentType, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
 // Circular by design: the producer imports this module's route exports, and this module calls the producer only at hook
 // run time (recordAdmittedBriefingRoutes), never while either module is evaluating. Function declarations are hoisted.
 import { recordDispatchBriefingRoute } from "../lib/dispatch-briefing-route-record.mjs";
@@ -200,6 +200,19 @@ export function extractAntigravityDispatches(subagents) {
 // A caller's prompt cannot turn a writable Goldfish capability into read-only.
 export function requiresGovernedItemAdmission(policy) {
   return policy?.role === "goldfish";
+}
+
+// Capability comes from the selected carrier, never from a prompt's claim to be read-only.
+// A shipped read-only Pipeline role can arrive bare (Antigravity TypeName) or namespaced.
+// Runner-native explorers have separate, transport-specific names; general workers can write.
+export function writeCapableCarrierAdmission({ subagentType, transport = "direct" } = {}) {
+  const type = typeof subagentType === "string" ? subagentType : "";
+  const bareType = type.startsWith("pipeline-core:") ? type.slice("pipeline-core:".length) : type;
+  if (isShippedPipelineAgentType(type) && ["consult-advisor", "critic", "plan-verifier", "readiness-reviewer"].includes(bareType)) return null;
+  if (transport === "codex" && type === "explorer") return null;
+  if (transport === "direct" && type === "Explore") return null;
+  if (["pipeline-core:goldfish-deep", "pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"].includes(type)) return null;
+  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; repair: select a shipped pipeline-core:goldfish-* or pipeline-core:critic role and dispatch its generated or required role briefing` };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -789,6 +802,13 @@ if (isDirectInvocation(import.meta.url)) {
     policy: dispatchFindings(dispatch),
     budget: dispatchBudgetBinding(dispatch),
   }));
+  for (const { dispatch } of evaluated) {
+    const carrier = writeCapableCarrierAdmission(dispatch);
+    if (carrier) {
+      process.stderr.write(`BLOCKED (guard-dispatch): ${carrier.code}: ${carrier.message}\n`);
+      process.exit(2);
+    }
+  }
   const blocked = evaluated.map(({ policy }) => policy).filter((result) => result.findings.length > 0);
   const routeRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
   if (blocked.length === 0) {
@@ -835,11 +855,13 @@ if (isDirectInvocation(import.meta.url)) {
     process.stderr.write(scopes.stderr || (scopes.status === 0 ? "" : "WARNING (guard-dispatch): GUARD-DISPATCH-SCOPE-UNJUDGED: the write-scope overlap check could not run; this call is admitted without it.\n"));
     if (scopes.status === 2) process.exit(2);
   }
-  // D78: a governed Goldfish briefing should be the unedited generator output. QG-06 warn state: reason transition
-  // to generated briefings, owner PO, expires with 0.7.1 (PO 2026-10-21); then this becomes the refusal.
+  // D78/K146: enforce generated Goldfish briefings before queue and native pending effects.
   for (const { dispatch } of productive) {
-    const finding = generatedBriefingAdmission(dispatch.prompt, `node ${BRIEFING_GENERATOR_SCRIPT}`);
-    if (finding) process.stderr.write(`WARNING (guard-dispatch): ${finding.code}: ${finding.message}\n`);
+    const finding = generatedBriefingAdmission(dispatch.prompt, `node ${BRIEFING_GENERATOR_SCRIPT}`, { requireGenerated: true });
+    if (finding) {
+      process.stderr.write(`BLOCKED (guard-dispatch): ${finding.code}: ${finding.message}\n`);
+      process.exit(2);
+    }
   }
   let itemGovernanceRequired = false;
   // Once a native pending state names the queue row, a later refusal keeps the row with it.

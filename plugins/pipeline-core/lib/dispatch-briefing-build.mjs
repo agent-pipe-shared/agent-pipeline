@@ -190,15 +190,20 @@ export function verifyGeneratedBriefing(text) {
  * and a governed item briefing (a native binding with itemDelivery) must carry the marker. Returns null
  * when the prompt is admitted, else `{ code, message }` whose message names the generator command.
  */
-export function generatedBriefingAdmission(prompt, generatorCommand = "node <plugin-root>/scripts/dispatch-briefing.mjs") {
+export function generatedBriefingAdmission(prompt, generatorCommand = "node <plugin-root>/scripts/dispatch-briefing.mjs", { requireGenerated = false } = {}) {
   if (typeof prompt !== "string") return null;
   const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run \`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\`, and dispatch that file's text unchanged`;
   if (prompt.includes("<!-- pipeline-briefing-generator:")) {
     const verified = verifyGeneratedBriefing(prompt);
-    return verified.ok ? null : { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
+    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
+    const parsed = parseNativeGoldfishBriefing(prompt);
+    if (requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) {
+      return { code: "DBG-GENERATED-BINDING-REQUIRED", message: `a generated Goldfish briefing must carry a valid item-delivery binding; ${repair}` };
+    }
+    return null;
   }
   const parsed = parseNativeGoldfishBriefing(prompt);
-  if (!parsed.ok || parsed.binding.itemDelivery === undefined) return null;
+  if (!requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) return null;
   return { code: "DBG-GENERATED-BRIEFING-REQUIRED", message: `a governed Goldfish item briefing must come from the briefing generator, not be assembled by hand; ${repair}` };
 }
 
@@ -241,6 +246,7 @@ ${arch === "" ? "" : `${arch}\n`}${bullets(pkg.context)}${reconContextLine(pkg)}
 ### 3. DoD checks
 
 - Acceptance criteria: ${pkg.ac}.
+- Source binding: ${pkg.criterion === undefined ? "the accepted original-item row" : `existing accepted criterion ${pkg.criterion} (fresh bounded attempt under its unchanged Spec text)`}; candidate ${b.candidateCommit}, write scope ${b.allowedPaths.join(", ")}, check ${pkg.check}. Report the targeted outcome and leave integrated review and PO acceptance to the Coordinator.
 - Project resource headroom: unknown — no project resource limit applies to this change.
 - Targeted checks — Goldfish owner:
 ${pkg.targeted.map((command) => `  - ${command}`).join("\n")}

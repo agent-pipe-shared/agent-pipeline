@@ -526,7 +526,7 @@ export function generateDispatchBinding(options, deps = {}) {
     const needle = `Original Alfred item ${item} is delivered`;
     let rows;
     try { rows = findCriterionRows(specBytes, needle); } catch { refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not valid UTF-8`); }
-    if (rows.length === 0) refuse("DBG-AC-ROW-MISSING", `no 3-column acceptance row in ${specPath} names "${needle}" (item ${item})`);
+    if (rows.length === 0) refuse("DBG-AC-ROW-MISSING", `no 3-column acceptance row in ${specPath} names "${needle}" (item ${item}); repair: if this is a fresh fix-wave attempt covered by an existing accepted criterion, bind that actual criterion with --criterion AC-<n> and keep its approved Spec text unchanged; otherwise obtain the missing acceptance authority through the normal design route`);
     if (rows.length > 1) refuse("DBG-AC-ROW-AMBIGUOUS", `${rows.length} acceptance rows in ${specPath} name "${needle}" (item ${item})`);
     const [idCell, criterionCell, evidenceCell] = rows[0];
     if (!isCriterionId(idCell.value)) refuse("DBG-AC-ROW-ID", `the row naming item ${item} has id cell ${JSON.stringify(idCell.value)}, not ${CRITERION_ID_FORMS}`);
