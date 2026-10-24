@@ -84,11 +84,12 @@ Stamp/install/push and the scheduled Critic batch remain on the PO's explicit ca
 | K146 | Integrated `a0feac3a4` with ordinary active hooks; main 76/76 generator and 4/4 carrier/model | Native qualification, integrated Verify, independent Critic and acceptance remain open |
 | K152A | PO-approved source integrated `43e04b207`; main synthetic integration 3/3, evidence phase committed `20c07bde6` | Native qualification, integrated Verify, independent review and acceptance pending |
 | K152B | PO-approved source integrated `eac1d2dc8`; combined model/read controls 39/39 | Native model qualification, integrated Verify, independent review and acceptance pending |
-| K150B/G31 v1 | Inert patch, focused RED 1/3 to GREEN 3/3, AC-261 selected pin 4/4 and consumer 9/9 | Revision required: a 719-character material path renders a 743-character line, exceeding existing bounded UI acceptance. Preserve full authority identity and compact display together; no new PO decision needed |
+| K150B/G31 v2 | Inert three-path correction preserves bounded disclosure, full authoritative material path and external proof output; focused 4/4, selected AC-261 4/4, consumer 9/9 and synthetic real signing/proof flow 2/2 | Exact v2 patch/report retained; main application and integration pending; v1 regression and attempts preserved |
 | G17 v1 | Seven-path inert proposal; syntax/diff checks pass; bounded fingerprint helper 1/1, full host attempt interrupted exit 130 | Not qualified: launch/finalize timing, custody compatibility, independent negative controls and meaningful RED/GREEN still required. Do not apply or re-pin |
-| G21 v1 | Exact inert four-path patch: canonical fence, validated package preimage, signed reconciliation pending action, close package checks. Bootstrap RED 5/7 to GREEN 9/9, close 35/35, consumer 9/9 | Partial: old pre-fence journals are retained with typed refusal but have no executable repair transaction yet. Continue authenticated recovery before claiming complete fix; source stays inert |
-| G20/K154 v1 | Exact inert six-path source patch; close 14/14, push preparation 75/75, lifecycle 7/7 | Partial: governing rigor/unknown state and actual design-review provenance need completion; v2 owner active, no source application |
+| G21 v2 | Exact inert four-path patch, including retained/retired legacy Result journal recovery; final synthetic bootstrap 15/15, close 35/35, consumer 9/9 | Source companion catalogue-present route and real signature/native qualification remain unexercised. Existing proof kind is used separately for exact repair and manifest reconcile; no main application |
+| G20/K154 v2 | Exact inert seven-path proposal and cumulative report retained; focused synthetic close/push/resolver/consumer checks green | Partial: approved rigor provenance, pushed-tree binding and independent design-review provenance remain incomplete; no main application |
 | G19 v2 | Exact inert eleven-path readiness/consumer/closure proposal; targeted 108/108, readiness 9/9, Windows preflight 4/4, consumer/skill 17/17 | Source review/application decision and native Windows qualification pending; no live ACL mutation |
+| G32 | Inert four-path effective remote-identity proposal; focused scanner/synthetic guard, existing scanner and consumer checks green | Main integration, inherited kernel closure review and native push qualification remain pending |
 
 K152B's two earlier stops are retained: library-only scope could not perform native wiring; the next dispatch hit the unavailable native opening-record command. A3's complete replacement briefing explicitly includes both minimal hook wiring and the PO-approved methodological opening exception. These are neither hidden successes nor fresh attempt budgets. G23 read/help briefing is prepared for the next slot; G24-G32 and K156/K155/G2/G4 remain in the committed intake, not silently removed.
 
@@ -119,3 +120,19 @@ implied by installation. The prior session's workers are no longer live;
 retain their clones, partial diffs, evidence and attempt histories when
 preparing further bounded work. Inert proposals remain separate from this
 installed candidate.
+
+The G21 v2 source patch is 73,944 bytes, SHA-256
+`8dbcf5911dcac363041c1eefb279ce33631a2623c7dbebfd3dc76d4450e635d7`.
+The G20 v2 patch SHA-256 is
+`0115916161f171f9dd80b8c4436260db3e1cb1eddb6e8469d3b4c3bebfcfa46b`.
+Both were copied byte-for-byte from retained worker outputs into
+`evidence/verify-fixes/`, with matching source/destination hashes; this is
+proposal custody, not live Source application or additional test execution.
+
+Current bounded work: K156/G30 continues calibration and runtime recovery in
+the existing inert clone, retaining the prior attempt. G24 owns evidence
+collision prevention and the distinction between shared writer behavior and
+consumer-authored scripts. G28 owns the existing audit-pack export gap; an
+archive for its exact named candidate must not be confused with a new rule
+qualifying later commits. Existing ADR-0063 and R7-3 remain the tracked
+artifact baseline. No C-to-P evidence-promotion decision is assumed.

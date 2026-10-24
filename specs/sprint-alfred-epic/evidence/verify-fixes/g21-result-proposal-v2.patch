@@ -1,0 +1,998 @@
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 32e3468e2..99771fdda 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -19,6 +19,7 @@ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+ import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
+ import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
+ import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
++import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import {
+   assertPrivateRegularFile,
+   ensurePrivateDirectory,
+@@ -490,6 +491,23 @@ async function transitionPlan(values) {
+     const observed = authorityFromState(root, snapshot, { requireResult: true });
+     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
+     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
++    const registeredManifest = `${dirname(observed.feature.planPath).split(sep).join("/")}/lifecycle.json`;
++    let hasRegisteredManifest = false;
++    try { lstatSync(join(root, registeredManifest)); hasRegisteredManifest = true; }
++    catch (error) { if (error?.code !== "ENOENT") fail("CLOSE-PACKAGE", "registered feature package path is unreadable"); }
++    if (hasRegisteredManifest) {
++      const checked = validateFeaturePackage(root, registeredManifest);
++      if (!checked.ok) fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}`);
++      const packageValue = readJsonFile(root, registeredManifest, "feature package").value;
++      for (const [kind, path, digest] of [
++        ["prd", observed.feature.planPath, observed.authority.prdSha256],
++        ["spec", snapshot.state.planApproval?.poGateAuthority?.specPath, observed.authority.specSha256],
++        ["result", snapshot.state.continuity?.authority?.result?.path, observed.authority.implementationResultSha256],
++      ]) {
++        const entries = packageValue.artifacts?.filter((item) => item?.class === kind && item.authority === true) ?? [];
++        if (entries.length !== 1 || entries[0].path !== path || entries[0].sha256 !== digest) fail("CLOSE-PACKAGE-AUTHORITY", `registered package ${kind} does not bind current State authority`);
++      }
++    }
+     courseAuthorship = assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined });
+     if (values.auditRequest !== undefined) {
+       const request = auditRequest(root, values.auditRequest);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index ca72b2f10..512d705d8 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -273,7 +273,7 @@ function writeJson(path, value) {
+   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+ }
+ 
+-function processFixture(name) {
++function processFixture(name, options = {}) {
+   const root = mkdtempSync(join(tmpdir(), `h5-${name}-`));
+   mkdirSync(join(root, ".claude"), { recursive: true });
+   mkdirSync(join(root, "specs", "feature"), { recursive: true });
+@@ -362,6 +362,16 @@ function processFixture(name) {
+     result: state.continuity.authority.result,
+     closeEvidence: { path: paths.closeEvidence, sha256: closeEvidenceSha256 },
+   });
++  if (options.beforePrepared) options.beforePrepared({ root, paths, state, lifecycle });
++  if (options.expectPreparedRefusal) {
++    const refused = invoke([
++      "plan-transition", "--root", root, "--lifecycle", lifecycle, "--actor", "PO",
++      "--phase", "feature-close-prepared", "--architecture-impact", "architecture-conforms",
++      "--continuity-close-request", paths.closeRequest,
++    ], 2);
++    assert.equal(refused.code, options.expectPreparedRefusal);
++    return { root, lifecycle, refused };
++  }
+   const prepared = transition("feature-close-prepared", [
+     "--continuity-close-request", paths.closeRequest,
+   ]);
+@@ -432,6 +442,26 @@ function processFixture(name) {
+   };
+ }
+ 
++test("process: registered package digest drift blocks close preparation before any transition", () => {
++  const f = processFixture("package-drift", {
++    beforePrepared({ root, paths }) {
++      for (const name of ["acceptance.md", "candidate-evidence.md"]) writeFileSync(join(root, "specs/feature", name), `${name}\n`);
++      const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: digest(readFileSync(join(root, path))), authority, mutability, retention: "active" });
++      writeJson(join(root, "specs/feature/lifecycle.json"), {
++        schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
++        artifacts: [
++          artifact("prd", paths.prd, true, "mutable"), artifact("spec", paths.spec, true, "immutable"),
++          artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
++          { ...artifact("result", paths.result, true, "append-only"), sha256: h("f") },
++          artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
++        ], candidate: null, supersedes: null,
++      });
++    },
++    expectPreparedRefusal: "CLOSE-PACKAGE",
++  });
++  assert.equal(f.refused.code, "CLOSE-PACKAGE");
++});
++
+ test("process: local close is read-only planned, replay-safe, candidate-bound and never pushes", () => {
+   const fixture = processFixture("local");
+   const originalTracked = readFileSync(fixture.trackedPath);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index a248ba31b..2452febe4 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -3,12 +3,13 @@
+ 
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+-import { createHash } from "node:crypto";
++import { createHash, createHmac } from "node:crypto";
+ import { afterEach, test } from "node:test";
+ import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { run } from "./pipeline-state.mjs";
++import { planFeaturePackageReconcile, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ 
+ const roots = [];
+ const NOW = "2026-07-31T12:00:00.000Z";
+@@ -70,6 +71,188 @@ function plan(f) {
+   assert.equal(value.status, 0, value.err); assert.deepEqual(readFileSync(f.statePath), before); return JSON.parse(value.out);
+ }
+ 
++function registerPackage(f) {
++  for (const name of ["acceptance.md", "candidate-evidence.md"]) writeFileSync(join(f.root, "specs/feature", name), `${name}\n`);
++  const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: hash(readFileSync(join(f.root, path))), authority, mutability, retention: "active" });
++  const manifest = {
++    schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
++    artifacts: [
++      artifact("prd", "specs/feature/prd_feature.md", true, "mutable"),
++      artifact("spec", "specs/feature/spec.md", true, "immutable"),
++      artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
++      artifact("result", "specs/feature/result.md", true, "append-only"),
++      artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
++    ], candidate: null, supersedes: null,
++  };
++  const manifestPath = "specs/feature/lifecycle.json";
++  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
++  return { manifestPath, manifest };
++}
++
++function legacyJournalFixture(name, stage = "post-state") {
++  const f = fixture(name);
++  const { manifestPath } = registerPackage(f);
++  const oldSuffix = Buffer.from('```pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n```\n');
++  const oldBytes = Buffer.concat([f.historical, oldSuffix]);
++  const preState = readFileSync(f.statePath);
++  const postState = structuredClone(f.value);
++  postState.continuity.revision = 8;
++  postState.continuity.resume.sourceRevision = 8;
++  postState.continuity.authority.result = { path: "specs/feature/result.md", sha256: hash(oldBytes) };
++  postState.updatedAt = NOW;
++  const postStateBytes = Buffer.from(JSON.stringify(postState, null, 2) + "\n");
++  writeFileSync(f.resultPath, oldBytes);
++  if (stage === "post-state") writeFileSync(f.statePath, postStateBytes);
++  const key = Buffer.alloc(32, 11);
++  mkdirSync(join(f.commonDir, "agent-pipeline", "result-bootstrap"), { recursive: true, mode: 0o700 });
++  writeFileSync(join(f.commonDir, "agent-pipeline", "result-bootstrap", "key"), key, { mode: 0o600 });
++  const core = { schema: "pipeline.continuity-result-bootstrap-journal.v1", planSha256: h("a"),
++    stateSha256: hash(preState), postStateSha256: hash(postStateBytes),
++    result: { path: "specs/feature/result.md", sha256: hash(oldBytes) } };
++  const mac = createHmac("sha256", key).update(JSON.stringify(core)).digest("hex");
++  writeFileSync(f.journalPath, JSON.stringify({ ...core, mac }) + "\n", { mode: 0o600 });
++  const action = ["continuity-result-bootstrap-apply", "--feature-id", "feature", "--expected-revision", "7",
++    "--expected-state-sha256", core.stateSha256, "--expected-post-state-sha256", core.postStateSha256,
++    "--updated-at", NOW, "--plan-sha256", core.planSha256, "--activate"];
++  return { ...f, manifestPath, oldBytes, oldSuffix, action };
++}
++
++test("legacy MAC journal recovers the exact pre-fence postimage and yields the signed package preview", () => {
++  const f = legacyJournalFixture("legacy-post");
++  const manifestBefore = readFileSync(join(f.root, f.manifestPath));
++  const result = invoke(f.root, f.action);
++  assert.equal(result.status, 0, result.err);
++  const receipt = JSON.parse(result.out);
++  assert.equal(receipt.status, "recovered-legacy");
++  assert.equal(receipt.completion.state, "reconciliation-pending");
++  assert.equal(receipt.completion.preview.status, "reconcile-preview");
++  assert.deepEqual(readFileSync(join(f.root, f.manifestPath)), manifestBefore);
++  assert.deepEqual(readFileSync(f.resultPath).subarray(0, f.historical.length), f.historical);
++  assert.equal(readFileSync(f.resultPath).includes(Buffer.from("pipeline.result-reconciliation-fence.v1")), true);
++  assert.equal(JSON.parse(readFileSync(f.statePath)).continuity.authority.result.sha256, hash(readFileSync(f.resultPath)));
++  assert.equal(existsSync(f.journalPath), false);
++});
++
++test("legacy journal repairs Result-before-State and replays each interrupted repair phase", () => {
++  for (const [name, stage, seam] of [
++    ["prestate", "pre-state", "afterLegacyResultRepairJournal"],
++    ["after-result", "post-state", "afterLegacyResultRepairResult"],
++    ["after-state", "post-state", "afterLegacyResultRepairState"],
++  ]) {
++    const f = legacyJournalFixture(name, stage);
++    const stopped = invoke(f.root, f.action, { [seam]: () => false });
++    assert.equal(stopped.status, 2, name);
++    assert.equal(existsSync(f.journalPath), true, name);
++    const resumed = invoke(f.root, f.action);
++    assert.equal(resumed.status, 0, `${name}: ${resumed.err}`);
++    assert.equal(JSON.parse(resumed.out).completion.preview.status, "reconcile-preview", name);
++    assert.equal(existsSync(f.journalPath), false, name);
++  }
++});
++
++test("legacy journal refuses forged proof, altered historical prefix and PRD drift without writing", () => {
++  for (const kind of ["forged-mac", "prefix", "prd"]) {
++    const f = legacyJournalFixture(`legacy-${kind}`);
++    if (kind === "forged-mac") {
++      const value = JSON.parse(readFileSync(f.journalPath)); value.mac = h("f");
++      writeFileSync(f.journalPath, JSON.stringify(value) + "\n", { mode: 0o600 });
++    }
++    if (kind === "prefix") writeFileSync(f.resultPath, Buffer.concat([Buffer.from("tampered\n"), f.oldBytes]));
++    if (kind === "prd") writeFileSync(join(f.root, "specs/feature/prd_feature.md"), "drift\n");
++    const stateBefore = readFileSync(f.statePath);
++    const resultBefore = readFileSync(f.resultPath);
++    const manifestBefore = readFileSync(join(f.root, f.manifestPath));
++    const refused = invoke(f.root, f.action);
++    assert.equal(refused.status, 2, kind);
++    assert.deepEqual(readFileSync(f.statePath), stateBefore, kind);
++    assert.deepEqual(readFileSync(f.resultPath), resultBefore, kind);
++    assert.deepEqual(readFileSync(join(f.root, f.manifestPath)), manifestBefore, kind);
++  }
++});
++
++test("retired legacy journal exposes one exact signed repair preview and then the existing package reconcile", () => {
++  const f = legacyJournalFixture("legacy-retired");
++  rmSync(f.journalPath);
++  const manifestBefore = readFileSync(join(f.root, f.manifestPath));
++  const previewRun = invoke(f.root, ["continuity-result-bootstrap-plan"]);
++  assert.equal(previewRun.status, 0, previewRun.err);
++  const preview = JSON.parse(previewRun.out);
++  assert.equal(preview.status, "legacy-repair-preview");
++  assert.equal(preview.preview.result.from, hash(f.oldBytes));
++  assert.equal(preview.applyAction.approvalKind, "feature-package-reconcile");
++  const args = ["feature-package-reconcile", "--root", f.root, "--manifest", f.manifestPath, "--plan-sha256", preview.planSha256];
++  const stateBefore = readFileSync(f.statePath); const resultBefore = readFileSync(f.resultPath);
++  const defaultAbsent = invoke(f.root, args, { gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(defaultAbsent.status, 2); assert.deepEqual(readFileSync(f.statePath), stateBefore);
++  assert.deepEqual(readFileSync(f.resultPath), resultBefore);
++  const absent = invoke(f.root, args, { featurePackageReconcileApproval: () => ({ ok: false }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(absent.status, 2); assert.deepEqual(readFileSync(f.statePath), stateBefore);
++  assert.deepEqual(readFileSync(f.resultPath), resultBefore);
++  const repaired = invoke(f.root, args, { now: undefined, featurePackageReconcileApproval: () => ({ ok: true }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(repaired.status, 0, repaired.err);
++  const receipt = JSON.parse(repaired.out);
++  assert.equal(receipt.status, "legacy-repaired");
++  assert.equal(receipt.completion.preview.status, "reconcile-preview");
++  assert.deepEqual(readFileSync(join(f.root, f.manifestPath)), manifestBefore);
++  const reconciled = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", f.manifestPath,
++    "--plan-sha256", receipt.completion.planSha256], {
++    featurePackageReconcileApproval: () => ({ ok: true }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }),
++  });
++  assert.equal(reconciled.status, 0, reconciled.err);
++  assert.equal(validateFeaturePackage(f.root, f.manifestPath).ok, true);
++});
++
++test("signed legacy repair replays after interruption without consuming another approval", () => {
++  const f = legacyJournalFixture("legacy-signed-replay"); rmSync(f.journalPath);
++  const preview = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"]).out);
++  const args = ["feature-package-reconcile", "--root", f.root, "--manifest", f.manifestPath, "--plan-sha256", preview.planSha256];
++  const stopped = invoke(f.root, args, { featurePackageReconcileApproval: () => ({ ok: true }),
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }), afterLegacyResultRepairResult: () => false });
++  assert.equal(stopped.status, 2);
++  const resumed = invoke(f.root, args, { featurePackageReconcileApproval: () => ({ ok: false }) });
++  assert.equal(resumed.status, 0, resumed.err);
++  assert.equal(JSON.parse(resumed.out).completion.preview.status, "reconcile-preview");
++});
++
++test("signed legacy preview refuses source drift and forged repair replay without new writes", () => {
++  const drift = legacyJournalFixture("legacy-signed-drift"); rmSync(drift.journalPath);
++  const preview = JSON.parse(invoke(drift.root, ["continuity-result-bootstrap-plan"]).out);
++  writeFileSync(join(drift.root, "specs/feature/spec.md"), "drift\n");
++  const args = ["feature-package-reconcile", "--root", drift.root, "--manifest", drift.manifestPath, "--plan-sha256", preview.planSha256];
++  const stateBefore = readFileSync(drift.statePath); const resultBefore = readFileSync(drift.resultPath);
++  const refused = invoke(drift.root, args, { featurePackageReconcileApproval: () => ({ ok: true }),
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(refused.status, 2);
++  assert.deepEqual(readFileSync(drift.statePath), stateBefore);
++  assert.deepEqual(readFileSync(drift.resultPath), resultBefore);
++
++  const keyless = legacyJournalFixture("legacy-signed-keyless"); rmSync(keyless.journalPath);
++  const keylessPlan = JSON.parse(invoke(keyless.root, ["continuity-result-bootstrap-plan"]).out);
++  rmSync(join(keyless.commonDir, "agent-pipeline", "result-bootstrap", "key"));
++  let approvals = 0;
++  const keylessResult = invoke(keyless.root, ["feature-package-reconcile", "--root", keyless.root, "--manifest", keyless.manifestPath,
++    "--plan-sha256", keylessPlan.planSha256], { featurePackageReconcileApproval: () => { approvals++; return { ok: true }; },
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(keylessResult.status, 2); assert.equal(approvals, 0);
++  assert.deepEqual(readFileSync(keyless.resultPath), keyless.oldBytes);
++
++  const forged = legacyJournalFixture("legacy-signed-forged"); rmSync(forged.journalPath);
++  const signedPlan = JSON.parse(invoke(forged.root, ["continuity-result-bootstrap-plan"]).out);
++  const signedArgs = ["feature-package-reconcile", "--root", forged.root, "--manifest", forged.manifestPath, "--plan-sha256", signedPlan.planSha256];
++  const stopped = invoke(forged.root, signedArgs, { featurePackageReconcileApproval: () => ({ ok: true }),
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }), afterLegacyResultRepairJournal: () => false });
++  assert.equal(stopped.status, 2);
++  const repairPath = join(forged.commonDir, "agent-pipeline", "result-bootstrap", "legacy-repair-journal");
++  const record = JSON.parse(readFileSync(repairPath)); record.mac = h("f");
++  writeFileSync(repairPath, JSON.stringify(record) + "\n", { mode: 0o600 });
++  const oldState = readFileSync(forged.statePath); const oldResult = readFileSync(forged.resultPath);
++  const replay = invoke(forged.root, signedArgs, { featurePackageReconcileApproval: () => ({ ok: true }) });
++  assert.equal(replay.status, 2);
++  assert.deepEqual(readFileSync(forged.statePath), oldState);
++  assert.deepEqual(readFileSync(forged.resultPath), oldResult);
++});
++
+ // Windows: Node synthesizes `.mode` on native Windows from the read-only
+ // attribute alone, so the bare `(info.mode & 0o077)` comparison in
+ // ensureBootstrapPrivateDirectory/readPrivateBootstrap failed closed
+@@ -99,7 +282,7 @@ test("win32: an insecure DACL assessment on the private result-bootstrap directo
+ 
+ test("AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence", () => {
+   const f = fixture("success"); const p = plan(f);
+-  const fence = Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n");
++  const fence = Buffer.from("\n<!-- pipeline.result-reconciliation-fence.v1 -->\n```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n");
+   assert.equal(p.schema, "pipeline.continuity-result-bootstrap-plan.v1"); assert.equal(p.preimage.result.path, "specs/feature/result.md"); assert.equal(p.preimage.result.sha256, hash(f.historical));
+   assert.deepEqual(Buffer.from(p.preimage.historicalMarkdown.bytesBase64, "base64"), f.historical); assert.deepEqual(Buffer.from(p.append.bytesBase64, "base64"), fence);
+   assert.deepEqual(Buffer.from(p.result.bytesBase64, "base64"), Buffer.concat([f.historical, fence])); assert.equal(existsSync(f.journalPath), false);
+@@ -115,6 +298,62 @@ test("AC-047-143--146: readonly plan binds existing lowercase canonical Result p
+   assert.equal(existsSync(join(f.root, ".claude", ".pipeline-result-bootstrap-private")), false); assert.equal(existsSync(f.journalPath), false);
+ });
+ 
++test("registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview", () => {
++  const f = fixture("registered"); const { manifestPath } = registerPackage(f);
++  const manifestBytes = readFileSync(join(f.root, manifestPath));
++  const p = plan(f);
++  assert.equal(p.preimage.package.path, manifestPath);
++  const applied = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(applied.status, 0, applied.err);
++  const completion = JSON.parse(applied.out).completion;
++  assert.equal(completion.state, "reconciliation-pending");
++  assert.equal(completion.preview.status, "reconcile-preview");
++  assert.equal(completion.preview.changes.length, 1);
++  assert.equal(completion.preview.changes[0].class, "result");
++  assert.equal(completion.preview.changes[0].from, hash(f.historical));
++  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, false);
++  assert.equal(planFeaturePackageReconcile(f.root, manifestPath, JSON.parse(readFileSync(f.statePath)).continuity.authority.result).status, "reconcile-preview");
++  const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
++  assert.equal(JSON.parse(replay.out).completion.planSha256, completion.planSha256);
++  const reconciled = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", manifestPath, "--plan-sha256", completion.planSha256], {
++    featurePackageReconcileApproval: () => ({ ok: true }),
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }),
++  });
++  assert.equal(reconciled.status, 0, reconciled.err);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
++  const afterReconcileReplay = invoke(f.root, p.applyAction.argv.slice(1));
++  assert.equal(afterReconcileReplay.status, 0, afterReconcileReplay.err);
++  assert.equal(JSON.parse(afterReconcileReplay.out).completion.queueAction, "review");
++});
++
++test("registered bootstrap interruption and replay retain a single provable reconciliation plan", () => {
++  for (const [name, seam] of [["result", "afterResultBootstrapResult"], ["state", "afterResultBootstrapState"]]) {
++    const f = fixture(`registered-${name}`); const { manifestPath } = registerPackage(f); const p = plan(f);
++    const manifestBytes = readFileSync(join(f.root, manifestPath));
++    assert.equal(invoke(f.root, p.applyAction.argv.slice(1), { [seam]: () => false }).status, 2);
++    assert.equal(existsSync(f.journalPath), true);
++    assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
++    const resumed = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(resumed.status, 0, resumed.err);
++    const receipt = JSON.parse(resumed.out);
++    assert.equal(receipt.completion.preview.status, "reconcile-preview");
++    assert.equal(receipt.completion.preview.changes.length, 1);
++    assert.equal(existsSync(f.journalPath), false);
++    const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
++    assert.equal(JSON.parse(replay.out).completion.planSha256, receipt.completion.planSha256);
++  }
++});
++
++test("registered package authority drift refuses bootstrap before Result, State or manifest mutation", () => {
++  const f = fixture("package-drift"); const { manifestPath, manifest } = registerPackage(f);
++  manifest.artifacts.find((entry) => entry.class === "result").sha256 = h("f");
++  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
++  const stateBytes = readFileSync(f.statePath); const resultBytes = readFileSync(f.resultPath); const manifestBytes = readFileSync(join(f.root, manifestPath));
++  const refused = invoke(f.root, ["continuity-result-bootstrap-plan"]);
++  assert.equal(refused.status, 2); assert.match(refused.err, /PS-RESULT-BOOTSTRAP-PACKAGE/);
++  assert.deepEqual(readFileSync(f.statePath), stateBytes); assert.deepEqual(readFileSync(f.resultPath), resultBytes);
++  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes); assert.equal(existsSync(f.journalPath), false);
++});
++
+ test("AC-047-147: journal and Result-before-State interruptions resume once and exact replay is zero-mutation", () => {
+   const beforeResult = fixture("journal-before-result"); const beforeResultPlan = plan(beforeResult);
+   const stoppedBeforeResult = invoke(beforeResult.root, beforeResultPlan.applyAction.argv.slice(1), { afterResultBootstrapJournal: () => false });
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 54b3d799b..b859a5e04 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -472,6 +472,7 @@ import {
+   validPlanSubmission,
+ } from "../lib/plan-spec-state-v2.mjs";
+ import {
++  RESULT_RECONCILIATION_FENCE,
+   inventoryFeaturePackages,
+   planFeaturePackageBootstrap,
+   planFeaturePackageReconcile,
+@@ -5793,7 +5794,36 @@ function resultBootstrapPath(dir, prdPath) {
+ }
+ 
+ function canonicalResultBootstrapBytes() {
+-  return Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n", "utf8");
++  return Buffer.from(`${RESULT_RECONCILIATION_FENCE}\`\`\`pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n\`\`\`\n`, "utf8");
++}
++
++// The exact postimage emitted before the reconciliation fence was introduced.
++// It is useful only with an authenticated bootstrap journal and a registered
++// package whose stale Result digest binds the bytes preceding this suffix.
++const LEGACY_RESULT_BOOTSTRAP_BYTES = Buffer.from('```pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n```\n', "utf8");
++const LEGACY_RESULT_REPAIR_SCHEMA = "pipeline.continuity-result-legacy-repair-journal.v1";
++
++function legacyResultPackage(dir, state, prd, spec, observed) {
++  const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
++  const manifest = physicalRebindFile(dir, path);
++  if (manifest === null) return null;
++  let value;
++  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return null; }
++  if (value?.feature?.id !== state.activeFeature?.id || !Array.isArray(value.artifacts)) return null;
++  const bindings = {};
++  for (const kind of ["prd", "spec", "result"]) {
++    const entries = value.artifacts.filter((entry) => entry?.class === kind && entry.authority === true);
++    if (entries.length !== 1) return null;
++    bindings[kind] = entries[0];
++  }
++  if (bindings.prd.path !== prd.path || bindings.prd.sha256 !== prd.sha256
++    || bindings.spec.path !== spec.path || bindings.spec.sha256 !== spec.sha256
++    || bindings.result.path !== observed.path) return null;
++  const checked = validateFeaturePackage(dir, path);
++  const resultIndex = value.artifacts.indexOf(bindings.result);
++  if (checked.receipt?.manifestSha256 !== manifest.sha256 || checked.findings.length !== 1
++    || checked.findings[0] !== `FTP-ARTIFACT-${resultIndex}: digest does not bind file bytes`) return null;
++  return { path, sha256: manifest.sha256, historicalSha256: bindings.result.sha256 };
+ }
+ 
+ function observeCanonicalResultBootstrap(dir, relativePath) {
+@@ -5836,6 +5866,29 @@ function atomicAppendResultBootstrap(result, bytes, lock, deps = {}) {
+   finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
+ }
+ 
++function atomicRepairLegacyResult(result, oldBytes, newBytes, lock, deps = {}) {
++  const tmp = `${result.absolute}.tmp.${lock.ownerNonce}`;
++  let fd;
++  try {
++    const before = physicalRebindFile(result.root, result.path);
++    if (before === null || !before.bytes.equals(oldBytes) || !sameJson(before.identity, result.identity))
++      return { ok: false, code: "PS-RESULT-LEGACY-REPAIR-RACE" };
++    fd = openSync(tmp, "wx", 0o600);
++    (deps.replaceResultFdContents ?? replaceFdContents)(fd, newBytes);
++    fsyncSync(fd); closeSync(fd); fd = undefined;
++    const rechecked = physicalRebindFile(result.root, result.path);
++    if (rechecked === null || !rechecked.bytes.equals(oldBytes) || !sameJson(rechecked.identity, result.identity))
++      return { ok: false, code: "PS-RESULT-LEGACY-REPAIR-RACE" };
++    sealStateCompanion("repository", result.path, newBytes);
++    (deps.renameResultSync ?? renameSync)(tmp, result.absolute);
++    const synced = deps.syncResultDirectory?.(result.parent) ?? syncDirectory(result.parent);
++    const observed = physicalRebindFile(result.root, result.path);
++    return synced.ok && observed !== null && observed.bytes.equals(newBytes)
++      ? { ok: true } : { ok: false, code: "PS-RESULT-LEGACY-REPAIR-READBACK" };
++  } catch { return { ok: false, code: "PS-RESULT-LEGACY-REPAIR-IO" }; }
++  finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
++}
++
+ function resultBootstrapEligible(state, prd, spec) {
+   const continuity = state?.continuity;
+   const lifecycle = derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 });
+@@ -5859,7 +5912,86 @@ function resultBootstrapNextState(state, result, updatedAt) {
+   return next;
+ }
+ 
+-function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt) {
++function resultBootstrapPackage(dir, state, prd, spec, resultPath) {
++  const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
++  const manifest = physicalRebindFile(dir, path);
++  if (manifest === null) {
++    // A missing manifest is the legacy unregistered course. An unsafe present
++    // manifest must never be mistaken for that course.
++    try { lstatSync(resolve(dir, path)); return { ok: false }; }
++    catch (error) { return error?.code === "ENOENT" ? { ok: true, package: null } : { ok: false }; }
++  }
++  const checked = validateFeaturePackage(dir, path);
++  if (!checked.ok || checked.receipt?.featureId !== state.activeFeature.id) return { ok: false };
++  let value;
++  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return { ok: false }; }
++  for (const [kind, observed] of [["prd", prd], ["spec", spec], ["result", resultPath]]) {
++    const entries = value.artifacts.filter((entry) => entry.class === kind && entry.authority === true);
++    if (entries.length !== 1 || entries[0].path !== observed.path || entries[0].sha256 !== observed.sha256) return { ok: false };
++  }
++  return { ok: true, package: { path, sha256: manifest.sha256, resultSha256: resultPath.sha256 } };
++}
++
++function planLegacyResultRepair(dir, state, manifestPath) {
++  const authority = state?.continuity?.authority;
++  const prd = physicalRebindFile(dir, authority?.prd?.path);
++  const spec = physicalRebindFile(dir, authority?.spec?.path);
++  const result = physicalRebindFile(dir, authority?.result?.path);
++  if (prd === null || spec === null || result === null
++    || prd.sha256 !== authority.prd.sha256 || spec.sha256 !== authority.spec.sha256
++    || result.sha256 !== authority.result.sha256 || result.path !== resultBootstrapPath(dir, prd.path)
++    || state.activeFeature?.planPath !== prd.path
++    || !validateContinuityState(state.continuity, state.activeFeature.id).ok
++    || derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 }).status !== "implementing") return null;
++  const registration = legacyResultPackage(dir, state, prd, spec, result);
++  const bytes = registration === null ? null : legacyResultRepairObservation(result, registration.historicalSha256);
++  if (bytes === null || !bytes.isOld || registration.path !== manifestPath) return null;
++  return {
++    schema: "pipeline.result-legacy-repair-preview.v1", status: "legacy-repair-preview",
++    featureId: state.activeFeature.id, manifest: registration.path, manifestSha256: registration.sha256,
++    historicalPrefixSha256: registration.historicalSha256,
++    prd: { path: prd.path, sha256: prd.sha256 }, spec: { path: spec.path, sha256: spec.sha256 },
++    result: { path: result.path, from: bytes.oldSha256, to: bytes.newSha256 },
++    continuityRevision: state.continuity.revision, requiredAuthority: "po",
++    approvalKind: "feature-package-reconcile",
++  };
++}
++
++function resultBootstrapCompletion(dir, state, packageBinding) {
++  const path = `${dirname(state.continuity.authority.prd.path).split(sep).join("/")}/lifecycle.json`;
++  if (packageBinding === null) {
++    try { lstatSync(resolve(dir, path)); }
++    catch (error) { if (error?.code === "ENOENT") return featureClosureProgress("review"); }
++  }
++  const manifest = packageBinding?.path ?? path;
++  if (validateFeaturePackage(dir, manifest).ok) {
++    try {
++      const value = JSON.parse(readFileSync(resolve(dir, manifest), "utf8"));
++      const bindings = [["prd", state.continuity.authority.prd], ["spec", state.continuity.authority.spec], ["result", state.continuity.authority.result]];
++      if (bindings.every(([kind, authority]) => {
++        const entries = value.artifacts.filter((entry) => entry.class === kind && entry.authority === true);
++        return entries.length === 1 && entries[0].path === authority.path && entries[0].sha256 === authority.sha256;
++      })) return featureClosureProgress("review");
++    } catch { /* A registered package with unreadable authority needs recovery. */ }
++  }
++  const ordinary = planFeaturePackageReconcile(dir, manifest, state.continuity.authority.result);
++  const preview = ordinary.status === "rejected" && ordinary.reason === "reconcile-result-metadata-only"
++    ? planLegacyResultRepair(dir, state, manifest) ?? ordinary : ordinary;
++  const pending = preview.status === "reconcile-preview" || preview.status === "legacy-repair-preview";
++  return {
++    scope: "feature-closure", state: pending ? "reconciliation-pending" : "authenticated-recovery-required", workflowTerminal: false,
++    manifest, preview,
++    planSha256: pending ? sha256CanonicalJson(preview) : null,
++    nextAction: preview.status === "legacy-repair-preview"
++      ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair"
++      : preview.status === "reconcile-preview" ? "obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it" : "resolve package drift through authenticated recovery",
++    ...(preview.status === "legacy-repair-preview" ? { repairAction: { executable: process.execPath,
++      argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", sha256CanonicalJson(preview)],
++      requiredInputs: ["by", "proof-request", "proof-authority", "proof"], approvalKind: "feature-package-reconcile", executionBoundary: "host-authorized-wsl" } } : {}),
++  };
++}
++
++function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt, packageBinding) {
+   const appendedFence = canonicalResultBootstrapBytes();
+   return {
+     schema: RESULT_BOOTSTRAP_PLAN_SCHEMA,
+@@ -5873,6 +6005,7 @@ function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, re
+       spec: { path: spec.path, sha256: spec.sha256, identity: spec.identity },
+       result: { path: resultPath.path, sha256: resultPath.sha256, identity: resultPath.identity },
+       historicalMarkdown: { sha256: sha256Bytes(resultPath.historicalBytes), bytesBase64: resultPath.historicalBytes.toString("base64") },
++      package: packageBinding,
+     },
+     append: { sha256: sha256Bytes(appendedFence), bytesBase64: appendedFence.toString("base64") },
+     result: { path: resultPath.path, sha256: sha256Bytes(resultBytes), bytesBase64: resultBytes.toString("base64") },
+@@ -5891,12 +6024,14 @@ function buildResultBootstrapPlan(dir, existing, updatedAt) {
+   if (state.activeFeature.planPath !== prd.path) return { ok: false, code: "PS-RESULT-BOOTSTRAP-FEATURE" };
+   const resultPath = observeCanonicalResultBootstrap(dir, resultBootstrapPath(dir, prd.path));
+   if (resultPath === null) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-PATH" };
++  const registration = resultBootstrapPackage(dir, state, prd, spec, resultPath);
++  if (!registration.ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-PACKAGE" };
+   const resultBytes = Buffer.concat([resultPath.historicalBytes, canonicalResultBootstrapBytes()]);
+   if (resultBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-SIZE" };
+   const result = { path: resultPath.path, sha256: sha256Bytes(resultBytes) };
+   const nextState = resultBootstrapNextState(state, result, updatedAt);
+   if (!validateContinuityState(nextState.continuity, nextState.activeFeature.id).ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-POSTIMAGE" };
+-  const payload = resultBootstrapPayload(realpathSync(resolve(dir)), existing.raw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt);
++  const payload = resultBootstrapPayload(realpathSync(resolve(dir)), existing.raw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt, registration.package);
+   return { ok: true, payload, planSha256: sha256Bytes(JSON.stringify(payload)), resultPath, resultBytes, nextState };
+ }
+ 
+@@ -5908,7 +6043,7 @@ function resultBootstrapPrivatePaths(dir, deps = {}) {
+     if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null;
+     const namespace = join(root, "agent-pipeline");
+     const base = join(namespace, "result-bootstrap");
+-    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") };
++    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal"), repairJournal: join(base, "legacy-repair-journal") };
+   } catch { return null; }
+ }
+ 
+@@ -6006,6 +6141,33 @@ function retireBootstrapJournal(paths, deps = {}) {
+   try { return ensureBootstrapPrivateDirectory(paths, deps) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
+ }
+ 
++function loadLegacyResultRepairJournal(paths, key, deps = {}) {
++  const raw = readPrivateBootstrap(paths.repairJournal, deps);
++  if (raw === null) {
++    try { lstatSync(paths.repairJournal); return { ok: false }; }
++    catch (error) { return error?.code === "ENOENT" ? { ok: true, record: null } : { ok: false }; }
++  }
++  if (key === null || key.byteLength !== 32) return { ok: false };
++  try {
++    const value = JSON.parse(raw.toString("utf8"));
++    if (!exactObjectKeys(value, ["schema", "planSha256", "oldStateSha256", "newStateSha256", "oldResultSha256", "newResultSha256", "manifestSha256", "updatedAt", "mac"])
++      || value.schema !== LEGACY_RESULT_REPAIR_SCHEMA
++      || ![value.planSha256, value.oldStateSha256, value.newStateSha256, value.oldResultSha256, value.newResultSha256, value.manifestSha256, value.mac].every((v) => SHA256_RE.test(v))
++      || !canonicalIso(value.updatedAt)) return { ok: false };
++    const { mac, ...core } = value;
++    return bootstrapJournalMac(key, core) === mac ? { ok: true, record: value } : { ok: false };
++  } catch { return { ok: false }; }
++}
++
++function publishLegacyResultRepairJournal(paths, key, core) {
++  return writePrivateBootstrap(paths.repairJournal, Buffer.from(JSON.stringify({ ...core, mac: bootstrapJournalMac(key, core) }) + "\n", "utf8"));
++}
++
++function retireLegacyResultRepairJournal(paths) {
++  sealSourceBootstrapRepairJournalRetirement(paths);
++  try { unlinkSync(paths.repairJournal); return syncDirectory(paths.base).ok; } catch { return false; }
++}
++
+ function parseResultBootstrapApply(argv) {
+   if (argv.length !== 13 || argv[0] !== "--feature-id" || isBlank(argv[1]) || argv[2] !== "--expected-revision" || !parseExpectedRevision(argv[3]).ok
+     || argv[4] !== "--expected-state-sha256" || !SHA256_RE.test(argv[5]) || argv[6] !== "--expected-post-state-sha256" || !SHA256_RE.test(argv[7])
+@@ -6013,6 +6175,120 @@ function parseResultBootstrapApply(argv) {
+   return { featureId: argv[1], expectedRevision: parseExpectedRevision(argv[3]).value, expectedStateSha256: argv[5], expectedPostStateSha256: argv[7], updatedAt: argv[9], planSha256: argv[11] };
+ }
+ 
++function legacyResultRepairObservation(observed, historicalSha256) {
++  if (observed === null) return null;
++  const old = LEGACY_RESULT_BOOTSTRAP_BYTES;
++  const fenced = canonicalResultBootstrapBytes();
++  const current = observed.bytes;
++  const isNew = current.subarray(-fenced.length).equals(fenced);
++  const isOld = !isNew && current.subarray(-old.length).equals(old);
++  if (!isOld && !isNew) return null;
++  const prefix = current.subarray(0, current.length - (isOld ? old.length : fenced.length));
++  if (sha256Bytes(prefix) !== historicalSha256) return null;
++  let historicalText;
++  try { historicalText = new TextDecoder("utf-8", { fatal: true }).decode(prefix); } catch { return null; }
++  if (!Buffer.from(historicalText, "utf8").equals(prefix) || historicalText.startsWith("\uFEFF")
++    || historicalText.includes("\r") || !historicalText.endsWith("\n")
++    || /^```pipeline-result(?:\n|$)/mu.test(historicalText)
++    || historicalText.includes(RESULT_RECONCILIATION_FENCE)) return null;
++  const oldBytes = Buffer.concat([prefix, old]);
++  const newBytes = Buffer.concat([prefix, fenced]);
++  if (newBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return null;
++  return { oldBytes, newBytes, oldSha256: sha256Bytes(oldBytes), newSha256: sha256Bytes(newBytes), isOld };
++}
++
++// Returns null when this is not an old journal. An applicable but unprovable
++// recovery is always handled as a refusal, so the ordinary writer never
++// interprets its pre-fence postimage as a fresh bootstrap.
++function recoverJournaledLegacyResultBootstrap(dir, current, apply, journal, lock, deps) {
++  const pending = journal.journal;
++  const repairLoaded = loadLegacyResultRepairJournal(journal.paths, journal.key, deps);
++  if (!repairLoaded.ok) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-JOURNAL" };
++  const repairing = repairLoaded.record;
++  if (pending === null && repairing === null) return null;
++  if (pending !== null && (pending.planSha256 !== apply.planSha256
++    || pending.stateSha256 !== apply.expectedStateSha256
++    || pending.postStateSha256 !== apply.expectedPostStateSha256)) return { status: 2, error: "PS-RESULT-LEGACY-JOURNAL-BINDING" };
++  if (repairing !== null && repairing.planSha256 !== apply.planSha256) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-BINDING" };
++  const state = current.state;
++  const prd = physicalRebindFile(dir, state?.continuity?.authority?.prd?.path);
++  const spec = physicalRebindFile(dir, state?.continuity?.authority?.spec?.path);
++  const resultPath = prd === null ? null : resultBootstrapPath(dir, prd.path);
++  const observed = resultPath === null ? null : physicalRebindFile(dir, resultPath);
++  if (prd === null || spec === null || observed === null
++    || prd.sha256 !== state.continuity.authority.prd.sha256
++    || spec.sha256 !== state.continuity.authority.spec.sha256
++    || state.activeFeature?.id !== apply.featureId || state.activeFeature.planPath !== prd.path)
++    return { status: 2, error: "PS-RESULT-LEGACY-AUTHORITY" };
++  const registration = legacyResultPackage(dir, state, prd, spec, observed);
++  const bytes = registration === null ? null : legacyResultRepairObservation(observed, registration.historicalSha256);
++  if (bytes === null) return { status: 2, error: "PS-RESULT-LEGACY-PREFIX" };
++  if (pending !== null && (pending.result.path !== observed.path || pending.result.sha256 !== bytes.oldSha256))
++    return { status: 2, error: "PS-RESULT-LEGACY-JOURNAL-RESULT" };
++  if (repairing === null && pending === null) return null;
++  const stateSha256 = sha256Bytes(current.raw);
++  let nextState = null;
++  let oldStateSha256;
++  let updatedAt;
++  if (repairing !== null) {
++    oldStateSha256 = repairing.oldStateSha256;
++    updatedAt = repairing.updatedAt;
++    if (repairing.oldResultSha256 !== bytes.oldSha256 || repairing.newResultSha256 !== bytes.newSha256
++      || repairing.manifestSha256 !== registration.sha256) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-DRIFT" };
++  } else {
++    oldStateSha256 = stateSha256;
++    updatedAt = stateSha256 === pending.stateSha256 ? apply.updatedAt : deps.now();
++  }
++  if (stateSha256 === oldStateSha256) {
++    if (state.continuity.authority.result === null) {
++      if (pending === null || stateSha256 !== pending.stateSha256 || !resultBootstrapEligible(state, prd, spec))
++        return { status: 2, error: "PS-RESULT-LEGACY-PRESTATE" };
++      const oldPost = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.oldSha256 }, apply.updatedAt);
++      if (sha256Bytes(Buffer.from(JSON.stringify(oldPost, null, 2) + "\n", "utf8")) !== pending.postStateSha256)
++        return { status: 2, error: "PS-RESULT-LEGACY-POSTSTATE-PROOF" };
++    } else if (stateSha256 !== pending?.postStateSha256 || state.continuity.authority.result.path !== observed.path
++      || state.continuity.authority.result.sha256 !== bytes.oldSha256)
++      return { status: 2, error: "PS-RESULT-LEGACY-STATE-BINDING" };
++    nextState = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.newSha256 }, updatedAt);
++    if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok)
++      return { status: 2, error: "PS-RESULT-LEGACY-POSTSTATE" };
++  } else if (repairing === null || stateSha256 !== repairing.newStateSha256
++    || state.continuity.authority.result?.path !== observed.path
++    || state.continuity.authority.result?.sha256 !== bytes.newSha256)
++    return { status: 2, error: "PS-RESULT-LEGACY-STATE-DRIFT" };
++  const newStateSha256 = nextState === null ? repairing.newStateSha256
++    : sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8"));
++  if (repairing !== null && newStateSha256 !== repairing.newStateSha256)
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-POSTSTATE" };
++  if (repairing === null) {
++    const core = { schema: LEGACY_RESULT_REPAIR_SCHEMA, planSha256: apply.planSha256,
++      oldStateSha256, newStateSha256, oldResultSha256: bytes.oldSha256,
++      newResultSha256: bytes.newSha256, manifestSha256: registration.sha256, updatedAt };
++    if (!publishLegacyResultRepairJournal(journal.paths, journal.key, core))
++      return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-PREPARE" };
++  }
++  if (deps.afterLegacyResultRepairJournal?.() === false) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-INTERRUPTED-JOURNAL" };
++  if (bytes.isOld && !atomicRepairLegacyResult({ ...observed, root: realpathSync(resolve(dir)), parent: dirname(observed.absolute) }, bytes.oldBytes, bytes.newBytes, lock, deps).ok)
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RESULT-WRITE" };
++  const resultReadback = physicalRebindFile(dir, observed.path);
++  if (resultReadback === null || !resultReadback.bytes.equals(bytes.newBytes))
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RESULT-READBACK" };
++  if (deps.afterLegacyResultRepairResult?.() === false) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-INTERRUPTED-RESULT" };
++  if (nextState !== null && !atomicWriteContinuityState(dir, nextState, lock, deps).ok)
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-STATE-WRITE" };
++  const persisted = readStateRaw(dir);
++  if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== newStateSha256
++    || persisted.state.continuity.authority.result?.sha256 !== bytes.newSha256)
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-STATE-READBACK" };
++  if (deps.afterLegacyResultRepairState?.() === false) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-INTERRUPTED-STATE" };
++  if (pending !== null && !retireBootstrapJournal(journal.paths, deps)) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RETIRE-BOOTSTRAP" };
++  if (!retireLegacyResultRepairJournal(journal.paths)) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RETIRE" };
++  return { status: 0, receipt: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "recovered-legacy", featureId: apply.featureId,
++    revision: persisted.state.continuity.revision, stateSha256: newStateSha256,
++    result: persisted.state.continuity.authority.result, mutated: nextState !== null,
++    completion: resultBootstrapCompletion(dir, persisted.state, registration) } };
++}
++
+ // NVA-R34-BLINDPUSHPATH: `queueAction` (not `nextAction`) -- this is the bare
+ // "review"/"close" queue-state label the item's own "Three separate
+ // defects" section named as one of the two non-protocol meanings the field
+@@ -6033,7 +6309,23 @@ function runResultBootstrapCommand(sub, rest, deps) {
+   if (sub === "continuity-result-bootstrap-plan") {
+     if (rest.length !== 0) { console.error("Error: Result bootstrap plan accepts no caller bindings."); return 2; }
+     const planned = buildResultBootstrapPlan(deps.dir, readStateRaw(deps.dir), deps.now());
+-    if (!planned.ok) { console.error(`Error: Result bootstrap plan refused (${planned.code}); zero mutation.`); return 2; }
++    if (!planned.ok) {
++      const current = readStateRaw(deps.dir);
++      if (current.status === "ok" && current.state.continuity?.authority?.result !== null) {
++        const completion = resultBootstrapCompletion(deps.dir, current.state, null);
++        if (completion.preview?.status === "legacy-repair-preview") {
++          const journal = loadBootstrapJournal(deps.dir, deps);
++          if (!journal.ok || journal.journal !== null) {
++            console.error("Error: Result bootstrap legacy journal is pending or unreadable; replay the original bootstrap action before signed repair."); return 2;
++          }
++          console.log(JSON.stringify({ schema: "pipeline.continuity-result-legacy-repair-plan.v1", status: "legacy-repair-preview",
++            preview: completion.preview, planSha256: completion.planSha256, applyAction: completion.repairAction,
++            nextAction: completion.nextAction }, null, 2));
++          return 0;
++        }
++      }
++      console.error(`Error: Result bootstrap plan refused (${planned.code}); zero mutation.`); return 2;
++    }
+     const writer = fileURLToPath(import.meta.url);
+     console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-bootstrap-apply", "--feature-id", planned.payload.featureId, "--expected-revision", String(planned.payload.expectedRevision), "--expected-state-sha256", planned.payload.preimage.stateSha256, "--expected-post-state-sha256", planned.payload.postimage.stateSha256, "--updated-at", planned.payload.postimage.updatedAt, "--plan-sha256", planned.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2));
+     return 0;
+@@ -6052,13 +6344,25 @@ function runResultBootstrapCommand(sub, rest, deps) {
+     const resultObserved = resultPath ? physicalRebindFile(deps.dir, resultPath) : null;
+     const prd = physicalRebindFile(deps.dir, current.state.continuity?.authority?.prd?.path);
+     const spec = physicalRebindFile(deps.dir, current.state.continuity?.authority?.spec?.path);
++    if (journal.paths && ((journal.journal !== null && resultObserved?.bytes.subarray(-LEGACY_RESULT_BOOTSTRAP_BYTES.length).equals(LEGACY_RESULT_BOOTSTRAP_BYTES)
++      && !resultObserved.bytes.includes(Buffer.from(RESULT_RECONCILIATION_FENCE)))
++      || existsSync(journal.paths.repairJournal))) {
++      const recovered = recoverJournaledLegacyResultBootstrap(deps.dir, current, apply, journal, lock, deps);
++      if (recovered !== null) {
++        if (recovered.status !== 0) console.error(`Error: Result bootstrap legacy recovery refused (${recovered.error}); recovery journal retained.`);
++        else console.log(JSON.stringify(recovered.receipt));
++        return recovered.status;
++      }
++    }
+     if (sha256Bytes(current.raw) === apply.expectedPostStateSha256) {
+       if (prd === null || spec === null
+         || !resultBootstrapEligible({ ...current.state, continuity: { ...current.state.continuity, authority: { ...current.state.continuity.authority, result: null }, revision: current.state.continuity.revision - 1, resume: { ...current.state.continuity.resume, sourceRevision: current.state.continuity.revision - 1 } } }, prd, spec)
+         || current.state.activeFeature.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity.authority.result?.path !== resultPath
+         || resultObserved === null || resultObserved.sha256 !== current.state.continuity.authority.result.sha256) { console.error("Error: Result bootstrap replay postimage is invalid; zero mutation."); return 2; }
++      const completion = resultBootstrapCompletion(deps.dir, current.state, null);
++      if (completion.state === "authenticated-recovery-required") { console.error(`Error: PS-RESULT-BOOTSTRAP-AUTHENTICATED-RECOVERY: ${completion.preview.reason}; journal retained if present.`); return 2; }
+       if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths, deps))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
+-      console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion: featureClosureProgress("review") })); return 0;
++      console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion })); return 0;
+     }
+     // A durable Result may legitimately exist while State is still at the exact
+     // preimage.  The authenticated journal is the only authority that may resume
+@@ -6079,6 +6383,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
+       }
+     }
+     if (sha256Bytes(current.raw) !== apply.expectedStateSha256 || !planned.ok || planned.payload.featureId !== apply.featureId || planned.planSha256 !== apply.planSha256 || planned.payload.postimage.stateSha256 !== apply.expectedPostStateSha256) { console.error("Error: Result bootstrap apply inputs are stale or conflicting; zero mutation."); return 2; }
++    if (planned.resultPath === null && resultBootstrapCompletion(deps.dir, planned.nextState, null).state === "authenticated-recovery-required") { console.error("Error: PS-RESULT-BOOTSTRAP-AUTHENTICATED-RECOVERY: historical journal cannot prove the required reconciliation fence; journal retained."); return 2; }
+     if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || journal.journal.stateSha256 !== apply.expectedStateSha256 || journal.journal.postStateSha256 !== apply.expectedPostStateSha256)) { console.error("Error: Result bootstrap journal conflicts; zero mutation."); return 2; }
+     if (journal.journal === null && !publishBootstrapJournal(deps.dir, planned, deps)) { console.error("Error: Result bootstrap journal prepare failed; zero mutation."); return 2; }
+     if (deps.afterResultBootstrapJournal?.() === false) { console.error("Error: Result bootstrap interrupted after journal preparation; recovery journal retained."); return 2; }
+@@ -6098,7 +6403,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
+     if (deps.afterResultBootstrapState?.() === false) { console.error("Error: Result bootstrap interrupted after State commit; recovery journal retained."); return 2; }
+     const recovered = loadBootstrapJournal(deps.dir, deps);
+     if (!recovered.ok || recovered.journal === null || recovered.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(recovered.paths, deps)) { console.error("Error: Result bootstrap journal retirement is unresolved."); return 2; }
+-    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: featureClosureProgress("review") })); return 0;
++    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: resultBootstrapCompletion(deps.dir, persisted.state, planned.payload.preimage?.package ?? null) })); return 0;
+   } finally { releaseContinuityLock(lock); }
+ }
+ 
+@@ -8516,6 +8821,76 @@ function computeFeaturePackageReconcilePostimage(root, manifest, planSha256, res
+   return { ok: true, preSha256: preFile.sha256, postBytes, postSha256, mode, changes: rebuilt.changes };
+ }
+ 
++function runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps) {
++  const privateState = loadBootstrapJournal(root, deps);
++  if (!privateState.ok || privateState.journal !== null) return { ok: false, code: "FTP-LEGACY-BOOTSTRAP-JOURNAL-PENDING" };
++  const loaded = loadLegacyResultRepairJournal(privateState.paths, privateState.key, deps);
++  if (!loaded.ok) return { ok: false, code: "FTP-LEGACY-REPAIR-JOURNAL" };
++  const repairing = loaded.record;
++  if (repairing !== null && repairing.planSha256 !== planSha256) return { ok: false, code: "FTP-LEGACY-REPAIR-PLAN-DRIFT" };
++  const current = readStateRaw(root);
++  if (current.status !== "ok") return { ok: false, code: "FTP-LEGACY-STATE" };
++  const state = current.state;
++  const prd = physicalRebindFile(root, state?.continuity?.authority?.prd?.path);
++  const spec = physicalRebindFile(root, state?.continuity?.authority?.spec?.path);
++  const observed = physicalRebindFile(root, state?.continuity?.authority?.result?.path);
++  if (prd === null || spec === null || observed === null || prd.sha256 !== state.continuity.authority.prd.sha256
++    || spec.sha256 !== state.continuity.authority.spec.sha256 || observed.path !== resultBootstrapPath(root, prd.path))
++    return { ok: false, code: "FTP-LEGACY-AUTHORITY" };
++  const registration = legacyResultPackage(root, state, prd, spec, observed);
++  const bytes = registration === null ? null : legacyResultRepairObservation(observed, registration.historicalSha256);
++  if (bytes === null || registration.path !== manifest) return { ok: false, code: "FTP-LEGACY-PREFIX" };
++  let oldStateSha256, newStateSha256, updatedAt, nextState = null;
++  const currentSha = sha256Bytes(current.raw);
++  if (repairing === null) {
++    const preview = planLegacyResultRepair(root, state, manifest);
++    if (preview === null || sha256CanonicalJson(preview) !== planSha256 || !bytes.isOld)
++      return { ok: false, code: "FTP-LEGACY-PLAN-DRIFT" };
++    oldStateSha256 = currentSha;
++    updatedAt = deps.now();
++    nextState = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.newSha256 }, updatedAt);
++    if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok)
++      return { ok: false, code: "FTP-LEGACY-POSTSTATE" };
++    newStateSha256 = sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8"));
++    const core = { schema: LEGACY_RESULT_REPAIR_SCHEMA, planSha256, oldStateSha256, newStateSha256,
++      oldResultSha256: bytes.oldSha256, newResultSha256: bytes.newSha256,
++      manifestSha256: registration.sha256, updatedAt };
++    if (privateState.key === null || privateState.key.byteLength !== 32
++      || !publishLegacyResultRepairJournal(privateState.paths, privateState.key, core))
++      return { ok: false, code: "FTP-LEGACY-REPAIR-PREPARE" };
++  } else {
++    ({ oldStateSha256, newStateSha256, updatedAt } = repairing);
++    if (repairing.oldResultSha256 !== bytes.oldSha256 || repairing.newResultSha256 !== bytes.newSha256
++      || repairing.manifestSha256 !== registration.sha256) return { ok: false, code: "FTP-LEGACY-REPAIR-DRIFT" };
++    if (currentSha === oldStateSha256) {
++      if (state.continuity.authority.result?.path !== observed.path || state.continuity.authority.result.sha256 !== bytes.oldSha256)
++        return { ok: false, code: "FTP-LEGACY-STATE-BINDING" };
++      nextState = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.newSha256 }, updatedAt);
++      if (sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8")) !== newStateSha256)
++        return { ok: false, code: "FTP-LEGACY-REPAIR-POSTSTATE" };
++    } else if (currentSha !== newStateSha256 || state.continuity.authority.result?.path !== observed.path
++      || state.continuity.authority.result.sha256 !== bytes.newSha256)
++      return { ok: false, code: "FTP-LEGACY-STATE-DRIFT" };
++  }
++  if (deps.afterLegacyResultRepairJournal?.() === false) return { ok: false, code: "FTP-LEGACY-INTERRUPTED-JOURNAL" };
++  if (bytes.isOld && !atomicRepairLegacyResult({ ...observed, root: realpathSync(resolve(root)), parent: dirname(observed.absolute) }, bytes.oldBytes, bytes.newBytes, lock, deps).ok)
++    return { ok: false, code: "FTP-LEGACY-RESULT-WRITE" };
++  const resultReadback = physicalRebindFile(root, observed.path);
++  if (resultReadback === null || !resultReadback.bytes.equals(bytes.newBytes)) return { ok: false, code: "FTP-LEGACY-RESULT-READBACK" };
++  if (deps.afterLegacyResultRepairResult?.() === false) return { ok: false, code: "FTP-LEGACY-INTERRUPTED-RESULT" };
++  if (nextState !== null && !atomicWriteContinuityState(root, nextState, lock, deps).ok)
++    return { ok: false, code: "FTP-LEGACY-STATE-WRITE" };
++  const persisted = readStateRaw(root);
++  if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== newStateSha256
++    || persisted.state.continuity.authority.result?.sha256 !== bytes.newSha256)
++    return { ok: false, code: "FTP-LEGACY-STATE-READBACK" };
++  if (deps.afterLegacyResultRepairState?.() === false) return { ok: false, code: "FTP-LEGACY-INTERRUPTED-STATE" };
++  if (!retireLegacyResultRepairJournal(privateState.paths)) return { ok: false, code: "FTP-LEGACY-REPAIR-RETIRE" };
++  return { ok: true, receipt: { schema: FEATURE_PACKAGE_RECONCILE_SCHEMA, status: "legacy-repaired", manifest,
++    planSha256, result: persisted.state.continuity.authority.result,
++    completion: resultBootstrapCompletion(root, persisted.state, registration) } };
++}
++
+ /**
+  * `feature-package-reconcile` -- the third plan kind's transactional half (PHX-WP-GATE,
+  * P-AC-08). Consumes `planFeaturePackageReconcile` under the identical `--plan-sha256`
+@@ -8552,8 +8927,26 @@ function runFeaturePackageReconcileCommand(argv, deps) {
+   try {
+     const stateNow = (deps.readStateRaw ?? readStateRaw)(root);
+     const resultAuthority = stateNow.status === "ok" ? (stateNow.state?.continuity?.authority?.result ?? null) : null;
+-    const plan = planFeaturePackageReconcile(root, manifest, resultAuthority);
+-    if (plan.status !== "reconcile-preview" || sha256CanonicalJson(plan) !== planSha256) {
++    const ordinaryPlan = planFeaturePackageReconcile(root, manifest, resultAuthority);
++    const bootstrapPaths = resultBootstrapPrivatePaths(root, deps);
++    const repairPending = bootstrapPaths !== null && existsSync(bootstrapPaths.repairJournal);
++    const needsLegacy = repairPending || ordinaryPlan.status === "rejected" && ordinaryPlan.reason === "reconcile-result-metadata-only";
++    const bootstrap = needsLegacy ? loadBootstrapJournal(root, deps) : { ok: true, journal: null };
++    const repairing = needsLegacy && bootstrap.ok ? loadLegacyResultRepairJournal(bootstrap.paths, bootstrap.key, deps) : { ok: true, record: null };
++    if (!bootstrap.ok || !repairing.ok) return refuseFeaturePackageRead(sub, "legacy Result repair journal is unreadable or tampered; zero mutation");
++    if (repairing.record !== null) {
++      if (repairing.record.planSha256 !== planSha256) return refuseFeaturePackageRead(sub, "legacy Result repair plan digest conflicts with pending journal; zero mutation");
++      const resumed = runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps);
++      if (!resumed.ok) return refuseFeaturePackageRead(sub, `legacy Result repair recovery refused (${resumed.code}); journal retained`);
++      console.log(JSON.stringify(resumed.receipt, null, 2)); return 0;
++    }
++    const legacyPlan = ordinaryPlan.status === "rejected" && ordinaryPlan.reason === "reconcile-result-metadata-only" && stateNow.status === "ok"
++      ? planLegacyResultRepair(root, stateNow.state, manifest) : null;
++    const plan = legacyPlan ?? ordinaryPlan;
++    if (bootstrap.journal !== null && legacyPlan !== null) return refuseFeaturePackageRead(sub, "legacy bootstrap journal is pending; replay its original bootstrap action before signed repair");
++    if (legacyPlan !== null && (bootstrap.key === null || bootstrap.key.byteLength !== 32))
++      return refuseFeaturePackageRead(sub, "legacy bootstrap journal key is unavailable or unsafe; zero approval consumption and zero artifact mutation");
++    if (!(plan.status === "reconcile-preview" || plan.status === "legacy-repair-preview") || sha256CanonicalJson(plan) !== planSha256) {
+       return refuseFeaturePackageRead(sub, `argument "--plan-sha256" does not match the freshly recomputed reconcile preview digest for ${manifest}; the manifest, an artifact, or the Continuity State Result binding drifted since the preview was taken`);
+     }
+ 
+@@ -8592,6 +8985,12 @@ function runFeaturePackageReconcileCommand(argv, deps) {
+       return refuseFeaturePackageRead(sub, message);
+     }
+ 
++    if (legacyPlan !== null) {
++      const repaired = runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps);
++      if (!repaired.ok) return refuseFeaturePackageRead(sub, `legacy Result repair refused (${repaired.code}); journal retained if prepared`);
++      console.log(JSON.stringify(repaired.receipt, null, 2)); return 0;
++    }
++
+     const pending = loadFeaturePackageApplyJournal(root, deps);
+     if (!pending.ok) return refuseFeaturePackageRead(sub, `a prior recovery journal is unreadable or tampered (${pending.code}); run feature-package-recover`);
+     if (pending.journal !== null) {
+@@ -10401,7 +10800,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+   // Routed ahead of readState() too: this transaction's authority is the --root
+   // repository's own topology and its own private journal, never the operator's
+   // local state file (PHX-0A-WRITE, P-AC-08).
+-  if (FEATURE_PACKAGE_WRITE_SUBCOMMANDS.has(sub)) return runFeaturePackageWriteCommand(sub, rest, deps);
++  if (FEATURE_PACKAGE_WRITE_SUBCOMMANDS.has(sub)) return runFeaturePackageWriteCommand(sub, rest, { ...deps, dir, now });
+ 
+   const existing = readState(dir);
+   if (existing.status === "malformed") {
+@@ -13522,7 +13921,8 @@ function prepareStateCompanion(frame, argv) {
+     }
+     sourceEffects=[sourceEffects[0],{scope:"repository",path:resultPath},
+       {scope:"common",path:"agent-pipeline/result-bootstrap/key"},
+-      {scope:"common",path:"agent-pipeline/result-bootstrap/journal"}];
++      {scope:"common",path:"agent-pipeline/result-bootstrap/journal"},
++      {scope:"common",path:"agent-pipeline/result-bootstrap/legacy-repair-journal"}];
+   }
+   if(frame.sub === "present-plan") {
+     const source=readState(frame.repository.primaryRoot);
+@@ -13588,7 +13988,7 @@ function sealSourceBootstrapPrivatePublication(path,bytes,replace) {
+   if(data.entry !== "continuity-result-bootstrap-apply" || replace)
+     stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-private-source-entry");
+   const relativePath=relative(data.repository.commonDir,path).split(sep).join("/");
+-  if(!["agent-pipeline/result-bootstrap/key","agent-pipeline/result-bootstrap/journal"].includes(relativePath)
++  if(!["agent-pipeline/result-bootstrap/key","agent-pipeline/result-bootstrap/journal","agent-pipeline/result-bootstrap/legacy-repair-journal"].includes(relativePath)
+     || resolve(data.repository.commonDir,relativePath)!==path)
+     stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-private-source-path");
+   sealStateCompanion("common",relativePath,bytes);
+@@ -13606,17 +14006,38 @@ function sealSourceBootstrapJournalRetirement(paths,deps) {
+   const key="common/agent-pipeline/result-bootstrap/journal",published=data.seals.get(key);
+   const state=readStateRaw(data.repository.primaryRoot);
+   const result=authenticated.journal && physicalRebindFile(data.repository.primaryRoot,authenticated.journal.result.path);
++  const repair=loadLegacyResultRepairJournal(paths,authenticated.key);
++  const repaired=repair.ok && repair.record
++    && repair.record.planSha256===apply?.planSha256
++    && repair.record.oldResultSha256===authenticated.journal?.result.sha256
++    && state.status==="ok" && sha256Bytes(state.raw)===repair.record.newStateSha256
++    && result?.sha256===repair.record.newResultSha256;
+   if(!apply || !authenticated.ok || !authenticated.journal || !physical.bytes
+     || authenticated.journal.planSha256!==apply.planSha256
+     || authenticated.journal.stateSha256!==apply.expectedStateSha256
+     || authenticated.journal.postStateSha256!==apply.expectedPostStateSha256
+-    || state.status!=="ok" || sha256Bytes(state.raw)!==apply.expectedPostStateSha256
+-    || !result || result.sha256!==authenticated.journal.result.sha256
++    || !(repaired || (state.status==="ok" && sha256Bytes(state.raw)===apply.expectedPostStateSha256
++      && result?.sha256===authenticated.journal.result.sha256))
+     || (published ? !physical.bytes.equals(published) : !statePushEqual(physical.image,effect.preimage)))
+     stateAuthorityFailure("SDC-AUTHORITY-HELD","companion-bootstrap-authenticated-retirement-unavailable");
+   if(data.bootstrapJournalRetired)stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-repeated-retirement");
+   data.bootstrapJournalRetired=true;
+ }
++function sealSourceBootstrapRepairJournalRetirement(paths) {
++  const data=stateAuthorityInvocation?.executingCompanion;
++  if(!data)return;
++  if(data.entry!=="continuity-result-bootstrap-apply" || paths.root!==data.repository.commonDir
++    || paths.repairJournal!==join(data.repository.commonDir,"agent-pipeline","result-bootstrap","legacy-repair-journal"))
++    stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-repair-retirement-path");
++  const key=readPrivateBootstrap(paths.key),repair=loadLegacyResultRepairJournal(paths,key);
++  const state=readStateRaw(data.repository.primaryRoot);
++  const result=state.status==="ok"?physicalRebindFile(data.repository.primaryRoot,state.state.continuity?.authority?.result?.path):null;
++  if(!repair.ok || !repair.record || state.status!=="ok"
++    || sha256Bytes(state.raw)!==repair.record.newStateSha256
++    || result?.sha256!==repair.record.newResultSha256)
++    stateAuthorityFailure("SDC-AUTHORITY-HELD","companion-bootstrap-repair-retirement-proof");
++  data.bootstrapRepairJournalRetired=true;
++}
+ export function executeStateAuthorityCompanionWrite(handle) {
+   const data = ownedStateCompanion(handle);
+   if (data.attempted || data.frame.executingCompanion) stateAuthorityFailure("SDC-AUTHORITY-CAS", "companion-already-attempted");
+@@ -13639,8 +14060,9 @@ export function executeStateAuthorityCompanionWrite(handle) {
+   const effects = data.effects.map((effect,index) => {
+     const actual=readbacks[index], seal=data.seals.get(effect.scope+"/"+effect.path);
+     const authenticatedRetirement=data.entry === "continuity-result-bootstrap-apply"
+-      && data.bootstrapJournalRetired === true && effect.scope === "common"
+-      && effect.path === "agent-pipeline/result-bootstrap/journal";
++      && effect.scope === "common" && (
++        data.bootstrapJournalRetired === true && effect.path === "agent-pipeline/result-bootstrap/journal"
++        || data.bootstrapRepairJournalRetired === true && effect.path === "agent-pipeline/result-bootstrap/legacy-repair-journal");
+     if (!unchanged && (authenticatedRetirement ? actual.image !== null
+       : seal ? !actual.bytes?.equals(seal) : !statePushEqual(actual.image,effect.preimage))) {
+       stateAuthorityFailure("SDC-AUTHORITY-HELD", "companion-partial-or-unsealed-postimage");

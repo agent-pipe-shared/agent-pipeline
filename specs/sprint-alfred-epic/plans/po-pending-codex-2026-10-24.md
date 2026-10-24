@@ -23,10 +23,11 @@ The G23 normal commit attempt was rejected for `lib/guard/command-catalogue.mjs`
 
 ## Still agent work before a PO decision
 
-- K150B/G31 v1: revise long-path presentation to preserve the existing compact UI property. The [held report](../evidence/verify-fixes/k150b-g31-report-v1.md) records the failed bound. Do not ask the PO to choose a regression against already accepted behavior.
+- K150B/G31 v2: the long-path regression is corrected and synthetic signing/proof checks passed; [current report](../evidence/verify-fixes/k150b-g31-report-v2.md). Source application/integration remains separate from the existing test evidence; no acceptance regression is proposed.
 - G17 v1: establish a working isolated actual launch/finalize route, independent mutation controls and custody compatibility. The [unqualified report](../evidence/verify-fixes/g17-critic-report-v1.md) names the limits. No application request yet.
-- G21 v1: finish executable journal-authenticated recovery for old pre-fence postimages. [Partial report](../evidence/verify-fixes/g21-result-report-v1.md). No application request yet.
+- G21 v2: retained and retired legacy journals now have exercised synthetic recovery paths; [current report](../evidence/verify-fixes/g21-result-report-v2.md). Source companion catalogue-present route and real signature/native qualification remain pending. No application request yet.
 - G20/K154, G19, G23 and the remaining intake: finish bounded proposals and source confirmation. Record material new architecture/authority choices here only when concrete evidence requires one.
+- G17: the actual bounded host fixture remains unqualified. Its proposed short `/tmp` home conflicts with the production strict ancestor rule; no fixture was created there in v3. A short private fixture parent and its sanctioned scope still need resolution. Do not weaken custody or probe denied external paths through another tool. Other repairs continue.
 
 ## Later terminal or native-host work
 
