@@ -92,3 +92,22 @@ test("DME09 a model id selector matches only exactly", () => {
   assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: "claude-sonnet-5-5", routeSource: source }).ok, true);
   assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: "claude-sonnet-5", routeSource: source }).findings[0].code, "DISPATCH-MODEL-UNROUTED");
 });
+
+test("DME10 Antigravity requires an explicit native Model enum on each entry", () => {
+  for (const model of [undefined, "", "inherit", "unknown", "Flash"]) {
+    const result = evaluateDispatchModel({ runner: "antigravity", subagentType: "goldfish-implementor", model, routeSource: routes() });
+    assert.equal(result.ok, false, String(model));
+    assert.match(dispatchModelRefusalText(result), /Subagents\[\]\.Model/u);
+  }
+  for (const model of ["flash_lite", "flash", "pro"]) {
+    assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "customer-researcher", model, routeSource: routes() }).ok, true);
+  }
+});
+
+test("DME11 a directly comparable Antigravity duty selector binds the role", () => {
+  const routeSource = { ok: true, taskRoutes: [{ taskRoute: "duty.implement", runner: "antigravity",
+    state: "opt-in", selector: { kind: "alias", value: "flash" } }] };
+  assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "goldfish-implementor", model: "flash", routeSource }).ok, true);
+  const mismatch = evaluateDispatchModel({ runner: "antigravity", subagentType: "goldfish-implementor", model: "pro", routeSource });
+  assert.equal(mismatch.findings[0].code, "DISPATCH-MODEL-DUTY-MISMATCH");
+});

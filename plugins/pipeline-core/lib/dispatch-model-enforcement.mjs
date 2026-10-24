@@ -12,6 +12,7 @@ import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 
 /** Runners whose dispatch tool carries a tool-layer `model` parameter this guard can observe. */
 const ENFORCED_RUNNERS = Object.freeze(["claude"]);
+const ANTIGRAVITY_MODELS = Object.freeze(["flash_lite", "flash", "pro"]);
 
 /** Plugin agent types that exist to serve exactly one configured duty. */
 const AGENT_TYPE_DUTIES = Object.freeze({
@@ -34,6 +35,31 @@ function selectorMatches(selector, model) {
 }
 
 export function evaluateDispatchModel({ runner, subagentType, model, routeSource = registeredFunctionalTaskRoutes() } = {}) {
+  if (runner === "antigravity") {
+    // Native invoke_subagent exposes a small Model enum per Subagents entry. V3 currently
+    // stores concrete Gemini IDs, which cannot be equated to that enum without an approved
+    // mapping. Only an exact enum selector in V3 is directly comparable.
+    if (!ANTIGRAVITY_MODELS.includes(model)) {
+      return { ok: false, skipped: null, findings: [{
+        code: model === undefined || model === null || model === "" || model === "inherit"
+          ? "DISPATCH-MODEL-MISSING" : "DISPATCH-MODEL-UNROUTED",
+        message: `Antigravity Subagents[].Model must be explicitly set to "flash_lite", "flash", or "pro" for each entry; "inherit" and omitted values inherit the session model. Re-issue the same invoke_subagent call with each entry's Model set explicitly.`,
+      }] };
+    }
+    const type = typeof subagentType === "string" && subagentType.startsWith("pipeline-core:")
+      ? subagentType : `pipeline-core:${subagentType}`;
+    const duties = AGENT_TYPE_DUTIES[type];
+    const routes = routeSource?.ok && Array.isArray(routeSource.taskRoutes) && duties
+      ? routeSource.taskRoutes.filter((route) => route.runner === "antigravity" && route.state !== "unavailable"
+        && duties.includes(route.taskRoute.slice("duty.".length))) : [];
+    const expected = [...new Set(routes.map((route) => route.selector?.value).filter((value) => ANTIGRAVITY_MODELS.includes(value)))];
+    if (expected.length > 0 && !expected.includes(model)) {
+      return { ok: false, skipped: null, findings: [{ code: "DISPATCH-MODEL-DUTY-MISMATCH",
+        message: `Antigravity Subagents[].Model for ${subagentType} must match its configured duty selector (${expected.map((value) => `"${value}"`).join(" or ")}). Re-issue that entry with Model set to the configured selector.`,
+      }] };
+    }
+    return { ok: true, findings: [], skipped: null };
+  }
   if (!ENFORCED_RUNNERS.includes(runner)) return { ok: true, findings: [], skipped: "runner-not-enforced" };
   if (!routeSource?.ok || !Array.isArray(routeSource.taskRoutes)) return { ok: true, findings: [], skipped: "route-source-unavailable" };
   const available = routeSource.taskRoutes.filter((route) => route.runner === runner && route.state !== "unavailable");
@@ -74,6 +100,7 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
 
 export function dispatchModelRefusalText(evaluation) {
   const lines = evaluation.findings.map((finding) => `${finding.code}: ${finding.message}`);
+  if (lines.some((line) => line.includes("Antigravity Subagents[].Model"))) return `BLOCKED (guard-dispatch): ${lines.join("\n")}\n`;
   return `BLOCKED (guard-dispatch): ${lines.join("\n")}\nTo repair: pass the tool-layer \`model\` parameter on the dispatch call (the briefing text alone does not set it; MP-29).\n`;
 }
 

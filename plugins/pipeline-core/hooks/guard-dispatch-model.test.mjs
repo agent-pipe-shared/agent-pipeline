@@ -57,9 +57,9 @@ register("D84 configured model passes its route check while K146 blocks a write-
   }
   const research = run({ tool_name: "spawn_agent", tool_input: { agent_type: "explorer", message: "find where X is defined" } });
   assert.equal(research.code, ALLOW, `read-only explorer must remain available: ${research.stderr.trim().slice(0, 200)}`);
-  const advisor = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt" }] } });
+  const advisor = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt", Model: "pro" }] } });
   assert.equal(advisor.code, ALLOW, `read-only Antigravity Advisor must reach its native preparation gate: ${advisor.stderr.trim().slice(0, 200)}`);
-  const unknown = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "customer-researcher", Role: "Researcher", Prompt: "inspect input.txt" }] } });
+  const unknown = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "customer-researcher", Role: "Researcher", Prompt: "inspect input.txt", Model: "flash" }] } });
   assert.equal(unknown.code, BLOCK, `unknown Antigravity carrier must not gain a prompt exemption: ${unknown.stderr.trim().slice(0, 200)}`);
   assert.ok(unknown.stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), `missing unknown-carrier refusal: ${unknown.stderr.trim().slice(0, 200)}`);
 });
@@ -69,15 +69,27 @@ register("D84 block a Claude dispatch that names a model no configured duty rout
   assert.ok(stderr.includes("DISPATCH-MODEL-UNROUTED"), `stderr missing "DISPATCH-MODEL-UNROUTED" -- ${stderr.trim().slice(0, 200)}`);
 });
 
-register("D84 leave an Antigravity native invoke_subagent dispatch without a model finding: that tool carries no tool-layer model", () => {
-  // The Antigravity adapter hands the hook a `Task` whose input keeps the capitalised `Subagents` array and no `model`;
-  // the model of each entry rides in its prompt text. Requiring `model` there refused every native Antigravity dispatch (K144).
+register("K152B refuse an Antigravity entry without an explicit native Model", () => {
   const subagents = [{ TypeName: "customer-researcher", Role: "Customer Researcher", Prompt: "Inspect the customer fixture." }];
-  const { stderr } = run({ tool_name: "Task", tool_input: { subagent_type: "customer-researcher", prompt: "Inspect the customer fixture.", Subagents: subagents } });
-  assert.ok(!stderr.includes("DISPATCH-MODEL"), `unexpected model finding on an Antigravity native dispatch -- ${stderr.trim().slice(0, 200)}`);
+  const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: subagents } });
+  assert.equal(code, BLOCK);
+  assert.ok(stderr.includes("Subagents[].Model"));
 });
 
-assert.equal(cases.length, 4, "the D84 dispatch-model hook corpus must register four cases");
+register("K152B check every native Model and preserve explicit model admission", () => {
+  const entry = (Model) => ({ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt", Model });
+  for (const Model of ["inherit", "unknown"]) {
+    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry("flash"), entry(Model)] } });
+    assert.equal(code, BLOCK);
+    assert.ok(stderr.includes("DISPATCH-MODEL"));
+  }
+  for (const Model of ["flash_lite", "flash", "pro"]) {
+    const { code, stderr } = run({ tool_name: "Task", tool_input: { Subagents: [entry(Model)] } });
+    assert.equal(code, ALLOW, `${Model}: ${stderr}`);
+  }
+});
+
+assert.equal(cases.length, 5, "the dispatch-model hook corpus must register five cases");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 const completionCases = cases.map((entry, index) => ({ ...entry, id: `GDM${String(index + 1).padStart(2, "0")}` }));
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
