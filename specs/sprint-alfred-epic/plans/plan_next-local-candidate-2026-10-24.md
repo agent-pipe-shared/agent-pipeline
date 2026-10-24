@@ -58,6 +58,20 @@ Five native-only rubric corrections are now counted with original scope/duties
 preserved:38 items remain below75. The pending27-path package and its separate
 qualification proposals are excluded from this snapshot.
 
+## Additional focused checkpoint
+
+The fixture-only isolation correction committed normally as `982e66c27`
+(original73/1 retained, final74/1; consumer9/9). The frozen27-path operator
+package remains unchanged and pending human readback. After that readback,
+apply the prepared G23 matrix proposal and four-path enrollment overlay in the
+[exact recorded order](../evidence/verify-fixes/parallel-followups-2026-10-24/g23-registration-final/prerequisite-bindings.json);
+real FD completion7/7 and candidate1108/376 registry are already qualified.
+The normal committed capability baseline is still RED until genuine source
+commits exist. Do not enlarge the already delivered operator pathspec. G6 has an
+actual matcher defect and an inert three-path correction; its three remaining
+controls stay explicit. See [follow-up custody](../evidence/verify-fixes/parallel-followups-2026-10-24/README.md).
+No Critic, native run, final Verify, stamp, install, push or acceptance is inferred.
+
 ## Historical completion matrix boundary
 
 The current formal 174-item measurement is the validated

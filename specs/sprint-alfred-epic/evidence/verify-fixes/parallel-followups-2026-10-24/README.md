@@ -25,8 +25,8 @@ plane and cleanup restores the environment. A valid owned contamination makes
 the original fixture69 pass/4 fail/1 skip; the corrected fixture passes in that
 same controlled environment. `original-controlled-red.txt` actually exits0
 under malformed synthetic input; its historical filename is not a RED claim.
-This one-path test correction is applied to Main separately from the frozen27;
-normal commit and integration readback remain pending at this cut.
+This one-path test correction committed normally as `982e66c27`, separately
+from the unchanged frozen27 operator package. No human repetition is needed.
 
 The [G23 enrollment finalization](g23-registration-final/report.md) has genuine
 inherited-FD7/7 receipts,1108-suite registration,376 completion entries and

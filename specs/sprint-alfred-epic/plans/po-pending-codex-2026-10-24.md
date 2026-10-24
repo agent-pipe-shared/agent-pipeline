@@ -1,5 +1,15 @@
 # Collected PO matters during the Codex fix wave
 
+**Follow-up readback:** `982e66c27` committed the isolated unsafe-options test
+fixture normally (74 pass/1 existing native skip, original assertions unchanged).
+It requires no operator repetition. The delivered27-path package remains exactly
+staged and byte-matched. The subsequent G23 passive-matrix recording overlay is
+fully prepared with real7/7 receipts and candidate1108/376 registration, but is
+inert until the27-path commit is read back. Its committed-baseline check remains
+RED; rebaseline only after genuine source/registration commits. The G6 matcher
+repair remains an inert partial proposal with three unqualified controls; no
+application/signature command is requested for it. [Exact follow-up evidence](../evidence/verify-fixes/parallel-followups-2026-10-24/README.md).
+
 **New complete operator package:** the remaining State fixture now passes3/3;
 composed K15619/19 and consumer paths9/9 pass, preserving all21 original
 assertions. The private-temp logical refusal/mutation additions also pass

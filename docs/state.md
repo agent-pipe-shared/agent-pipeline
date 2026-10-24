@@ -23,6 +23,8 @@ Five native-only rubric corrections are now counted with original scope/duties
 preserved:38 items remain below75. The pending27-path package and its separate
 qualification proposals are excluded from this snapshot.
 
+**Additional focused checkpoint:** fixture-only guard isolation committed normally as `982e66c27`: original73 pass/1 Windows skip unchanged, final74/1, controlled original contamination69/4/1; consumer9/9. [Parallel custody](../specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/README.md) retains exact failures, reports and hashes. G23 passive matrix and required FD completion7/7, candidate registration1108/completion376 and kernel/consumer18/18 are green but the four-path follow-up overlay remains inert until the frozen27 operator commit is read back. G6 installer matcher defect is reproduced and a three-path repair is inert; aggregate write-chain, source-script negatives and final-readback fault remain unqualified. No G6 promotion or host proof is claimed. Current matrix remains194/38 below75; no stamp/install/push. The exact27 operator paths and staged bytes remain unchanged.
+
 **Earlier session cut (2026-10-24, Claude tokens exhausted until Sunday 2026-10-25 21:00; the PO continues two days with Codex as the Elephant):**
 - Detailed state, queue, mechanics and standing rules: `specs/sprint-alfred-epic/plans/handover-codex-switch-2026-10-24.md`. Read `CLAUDE.md` in
   full first (Codex does not load it). Findings register: `specs/sprint-alfred-epic/plans/greenfield-findings-2026-10-23.md` (G1 to G16, V1 to V4).
