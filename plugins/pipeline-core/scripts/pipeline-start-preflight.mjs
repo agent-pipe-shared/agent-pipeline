@@ -36,6 +36,7 @@ import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedT
 import { readAntigravityPhysicalJson } from "../lib/antigravity-plugin-topology.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { observeNodeSandboxProbe } from "../lib/node-sandbox-probe.mjs";
+import { assessWindowsAuthorityReadiness } from "../lib/windows-authority-readiness.mjs";
 import { observeAgyStartHint } from "../lib/agy-start-hint.mjs";
 import {
   evaluateSelfApplicationAttestation,
@@ -49,6 +50,7 @@ import {
   retireRegisteredWorktrees,
 } from "../lib/session-cleanup-recovery.mjs";
 import {
+  discoverRepository,
   inspectSessionOwnerRuntime,
   listActiveSessionDescriptors,
 } from "../lib/worktree-lifecycle.mjs";
@@ -1124,6 +1126,8 @@ export function observePipelineStartPreflight({
   inspectEffectiveArchitectureDecisionsFn = inspectArchitectureDecisionContinuity,
   observeContinuityAuthorityDriftFn = observeContinuityAuthorityDrift,
   checkCloneProvisioningFn = checkCloneProvisioning,
+  assessWindowsAuthorityReadinessFn = assessWindowsAuthorityReadiness,
+  windowsAuthorityPlatform = process.platform,
   verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
   resolveCodexAttestationSourceFn = resolveCodexAttestationSourceForPreflight,
   antigravityPluginRegistries = () => [
@@ -1728,11 +1732,39 @@ export function observePipelineStartPreflight({
   });
   const resultStatus = hookRefresh.status;
   const refreshAction = hookRefresh.action;
+  // A native Windows authority refusal is an early closed prerequisite, before a
+  // requester, State writer or Verify process can bury its WIN-AUTH cause.
+  // The observer is read-only and also has an injected seam for pure fixtures.
+  let windowsAuthorityReadiness = null;
+  if (windowsAuthorityPlatform === "win32") {
+    const observationUnavailable = () => ({ schema: "pipeline.windows-authority-readiness.v1", status: "unavailable", causes: [{ pathClass: "observer", reason: "WIN-AUTH-OBSERVATION-UNAVAILABLE", nextAction: { kind: "operator-review", mutation: false, summary: "Rerun Windows authority readiness before dispatch." } }] });
+    try {
+      windowsAuthorityReadiness = assessWindowsAuthorityReadinessFn({
+        projectRoot: resolve(cwd),
+        pluginRoot,
+        // Worktrees have a .git FILE. The authority namespace lives under the
+        // primary checkout's common Git directory, not below that file.
+        privateRoot: resolve((() => {
+          try { return discoverRepository(resolve(cwd)).commonDir; }
+          catch { return resolve(cwd, ".git"); } // pre-Git onboarding
+        })(), "agent-pipeline"),
+      });
+    } catch {
+      windowsAuthorityReadiness = observationUnavailable();
+    }
+    if (windowsAuthorityReadiness?.schema !== "pipeline.windows-authority-readiness.v1"
+      || !["ready", "unavailable"].includes(windowsAuthorityReadiness.status)
+      || !Array.isArray(windowsAuthorityReadiness.causes)
+      || (windowsAuthorityReadiness.status === "ready" && windowsAuthorityReadiness.causes.length > 0)
+      || (windowsAuthorityReadiness.status === "unavailable" && windowsAuthorityReadiness.causes.length === 0))
+      windowsAuthorityReadiness = observationUnavailable();
+  }
+  const windowsAuthorityBlocked = windowsAuthorityReadiness?.status === "unavailable";
   const staleHookSnapshots = staleMandatoryHookSnapshots(cloneProvisioning);
   const result = {
     schema: SCHEMA,
-    status: resultStatus,
-    statusScope: STATUS_SCOPE,
+    status: windowsAuthorityBlocked ? "windows-authority-unavailable" : resultStatus,
+    statusScope: windowsAuthorityBlocked ? "windows-authority-readiness" : STATUS_SCOPE,
     version,
     installedVersion,
     installedSource: installedIdentity?.source ?? "unknown",
@@ -1751,7 +1783,10 @@ export function observePipelineStartPreflight({
     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
     ...(staleHookSnapshots.length > 0 ? { staleHookSnapshots } : {}),
     ...(sessionReadiness ? { sessionReadiness } : {}),
-    nextAction: resultStatus === "hook-provisioning-required"
+    ...(windowsAuthorityReadiness ? { windowsAuthorityReadiness } : {}),
+    nextAction: windowsAuthorityBlocked
+      ? { kind: "operator-review", mutation: false, requiresConfirmation: false, causes: windowsAuthorityReadiness.causes }
+      : resultStatus === "hook-provisioning-required"
       ? {
           kind: "command",
           executable: process.execPath,

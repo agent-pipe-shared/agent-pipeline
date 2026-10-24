@@ -259,6 +259,58 @@ function assertGuidedOnboardingAction(result, root, runner) {
     expected: { schema: "pipeline.onboarding-init.v1" },
   });
 }
+
+test('Windows authority refusal closes bootstrap before requester and Verify with all path-class causes', () => {
+  const causes = [
+    { pathClass: 'project', reason: 'WIN-AUTH-ANCESTOR-MUTATION', nextAction: { kind: 'operator-review', mutation: false } },
+    { pathClass: 'plugin', reason: 'WIN-AUTH-ANCESTOR-OWNER', nextAction: { kind: 'operator-review', mutation: false } },
+    { pathClass: 'private', reason: 'WIN-AUTH-DACL', nextAction: { kind: 'operator-review', mutation: false } },
+  ];
+  let calls = 0;
+  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
+    assessWindowsAuthorityReadinessFn(input) {
+      calls += 1;
+      assert.equal(input.projectRoot, ROOT_CURRENT);
+      return { schema: 'pipeline.windows-authority-readiness.v1', status: 'unavailable', causes };
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.status, 'windows-authority-unavailable');
+  assert.equal(pipelineStartPreflightExitCode(result), 2);
+  assert.deepEqual(result.windowsAuthorityReadiness.causes, causes);
+  assert.deepEqual(result.nextAction, { kind: 'operator-review', mutation: false, requiresConfirmation: false, causes });
+});
+
+test('Windows custody refusal also closes a pending hook action until reinspection', () => {
+  const causes = [{ pathClass: 'project', reason: 'WIN-AUTH-ANCESTOR-MUTATION',
+    nextAction: { kind: 'operator-review', mutation: false } }];
+  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
+    checkCloneProvisioningFn: () => ({ schema: 'pipeline.clone-provisioning-report.v1', status: 'provisioning-required', checks: [
+      { id: 'pre-commit-hook', status: 'install' }, { id: 'commit-msg-hook', status: 'install' },
+      { id: 'pre-push-hook', status: 'decline' },
+    ] }),
+    assessWindowsAuthorityReadinessFn: () => ({ schema: 'pipeline.windows-authority-readiness.v1', status: 'unavailable', causes }),
+  });
+  assert.equal(result.status, 'windows-authority-unavailable');
+  assert.equal(result.nextAction.mutation, false);
+  assert.deepEqual(result.nextAction.causes, causes);
+});
+
+test('trusted Windows custody leaves bootstrap ready', () => {
+  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
+    assessWindowsAuthorityReadinessFn: () => ({ schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [] }),
+  });
+  assert.equal(result.status, 'ready');
+  assert.equal(result.windowsAuthorityReadiness.status, 'ready');
+});
+
+test('malformed Windows observation cannot silently mark bootstrap ready', () => {
+  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
+    assessWindowsAuthorityReadinessFn: () => ({ schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [{ reason: 'WIN-AUTH-DACL' }] }),
+  });
+  assert.equal(result.status, 'windows-authority-unavailable');
+  assert.equal(result.windowsAuthorityReadiness.causes[0].reason, 'WIN-AUTH-OBSERVATION-UNAVAILABLE');
+});
 function assertRefreshAdvisory(result) {
   assert.deepEqual(result.nextAction, {
     kind: "advisory",

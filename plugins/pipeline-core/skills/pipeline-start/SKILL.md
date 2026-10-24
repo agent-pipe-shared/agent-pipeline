@@ -20,7 +20,7 @@ Resolve the plugin root, then run exactly:
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"`
 
 Accept only schema `pipeline.start-preflight.v1`, status `ready`,
-`pipeline-governance-inactive`, `plugin-refresh-required`, the hook statuses or the hard recovery status below, absolute matching `pluginRoot`, valid
+`pipeline-governance-inactive`, `plugin-refresh-required`, `windows-authority-unavailable`, the hook statuses or the hard recovery status below, absolute matching `pluginRoot`, valid
 version/source/boundary/handoff, and a read-only `nextAction` when ready.
 Goldfish/Critic validate but never execute onboarding; Elephant executes the
 returned action at its declared boundary. Resolve role before preflight:
@@ -36,6 +36,9 @@ carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply
 or `refresh-mandatory-hooks.mjs --root <root>`. Elephant executes that exact
 action once, then reruns the identical preflight and continues only on `ready`;
 a missing or failed action stops bootstrap. Goldfish and Critic never execute it.
+
+Status `windows-authority-unavailable` stops bootstrap. Present its closed
+causes using `references/onboarding-recovery.md`; never execute an ACL repair.
 
 Status `plugin-attestation-required` is a closed hard recovery, never the
 soft `plugin-refresh-required` advisory. For Codex, accept it only with

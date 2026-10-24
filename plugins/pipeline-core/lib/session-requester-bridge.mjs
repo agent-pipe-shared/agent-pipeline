@@ -1199,7 +1199,8 @@ export async function spawnSourceOwnedContinuityVerificationChild(input,runtimeP
         verificationAttemptHandle:data.verificationAttemptHandle,runtimePort:data.runtimePort,terminalExchangeHandle:failure});
       }catch{}finally{osvExchanges.get(failure).live=false;}
     }
-    return {status:'unavailable',code};
+    return {status:'unavailable',code,
+      ...(/^WIN-AUTH-[A-Z-]{1,64}$/u.test(error?.reason??'') ? {windowsAuthorityCause:error.reason} : {})};
   }finally{
     if(data){data.ended=true;data.secret=null;
       for(const c of data.children){const x=osvExchanges.get(c.exchange);if(x)x.live=false;c.wire?.revoke();

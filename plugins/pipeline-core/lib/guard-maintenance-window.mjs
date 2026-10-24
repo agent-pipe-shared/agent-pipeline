@@ -774,6 +774,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
   "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs",
   "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+  "plugins/pipeline-core/lib/critic-verify-readiness.mjs",
   "plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
   "plugins/pipeline-core/lib/design-decision-bindings.mjs",
   "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
@@ -792,6 +793,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/native-platform-process-observer.mjs",
   "plugins/pipeline-core/lib/owned-continuity-verification.mjs",
   "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+  "plugins/pipeline-core/lib/publication-review-requirement.mjs",
   "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
   // Closure additions 2026-10-21 (GMWKC01): first-party imports of kernel paths that were never listed.
   // lost-binding <- session-cleanup-recovery; observers <- native-goldfish-host-state; owned-files <- push/commit writers; orphan-member-step <- onboarding-continuity;
@@ -818,9 +820,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/verify-suite-registration.mjs",
   "plugins/pipeline-core/lib/windows-native-process-observer.mjs",
   "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+  "plugins/pipeline-core/lib/windows-authority-readiness.mjs",
   "plugins/pipeline-core/lib/windows-process-identity.mjs",
   "plugins/pipeline-core/lib/windows-requester-runtime.mjs",
   "plugins/pipeline-core/scripts/architecture-baseline.mjs",
+  "plugins/pipeline-core/scripts/check-critic-bound-verify.mjs",
   "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
   "plugins/pipeline-core/scripts/onboarding-init.mjs",
   "plugins/pipeline-core/scripts/owning-verification-controller.mjs",

@@ -72,3 +72,13 @@ not `ready` — run the read-only
 mutates, only inspects and reports the same typed JSON (`status`,
 `diagnostics[].repair`) that `project-onboarding-v3.mjs` consumes internally
 via `validateV3BootstrapAuthority`.
+
+## Windows custody prerequisite
+
+When start preflight reports `windows-authority-unavailable`, present every
+`windowsAuthorityReadiness.causes` entry before onboarding or dispatch. Its
+`pathClass`, `reason`, and `nextAction` identify the exact directory to review,
+including a SID based single directory ACL preview where applicable. The
+operator may instead relocate the project into a private user profile path.
+No action in this diagnostic writes an ACL. Rerun preflight after a reviewed
+repair; a WSL fixture cannot certify native Windows custody.
