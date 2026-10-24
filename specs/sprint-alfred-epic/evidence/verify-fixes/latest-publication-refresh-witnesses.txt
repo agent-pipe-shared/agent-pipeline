@@ -1,0 +1,27 @@
+command: node --test plugins/pipeline-core/lib/publication-review-requirement.test.mjs plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs
+label: latest-publication-refresh-witnesses
+exitCode: 0
+head: 47688e7f4f34b396f6ab912b28b4aba5b1f113e7
+tree: 7f8394a7f3bba5e36c71821706557d28f9dbd966
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ PRR001 a current approved mini with exact Plan and Spec source bytes has rank zero (8.947869ms)
+✔ PRR002 minimal, stale, and revoked mini submissions cannot waive review (1.690913ms)
+✔ PRR003 registered package rigor is distinct from mini rank and candidate source wins (1.626219ms)
+✔ PRR004 unavailable and malformed rigor never waive review (1.16331ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ MSH001 ready-session trusted source update refreshes only stale managed hooks and reads back current snapshot (666.212005ms)
+✔ MSH002 tampered hook and untrusted source refuse refresh while preserving original hook bytes (334.229852ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ PGC001 guard uses the proposed push commit for review, despite HEAD and dirty package changes (8288.443587ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9080.974529
+
+--- stderr ---

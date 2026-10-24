@@ -49,11 +49,25 @@ including its documentation, Source and tests; the closure delta and Verify reco
 additions must be included when preparing the final staged operator scope. Prepare the exact
 manual commit command only at the next terminal readback; no HEAD-bound
 operator/signing command is outstanding now. G24/G31/G32 and automatic G30
-retention and G27 committed normally and need no operator repetition.
+retention, G27, G20 `272d0f668` and the G30 regression `ee26907e9` committed
+normally and need no operator repetition. The complete currently staged scope is
+16 paths: the eight G28 paths plus its eight additional registration/recording
+paths (shared registry files also include G20/G30 metadata). Main registration
+is 1101 suites with zero exclusions/unregistered; completion and append-history
+pass, as do the seven G20/G30 focused witness cases. This is targeted evidence,
+not final candidate qualification. Do not retry the already known unchanged PB
+denial or issue a live HEAD-bound operator command while other repairs continue.
 
 The optional new model-role mapping requests attended confirmation after the
 plugin update. Collect it; the validated V3 fallback remains usable and no
 implementation work waits for this optional mapping. No signing command has
 been issued for it.
+
+**Intermediate candidate window:** the PO offered another terminal/install window
+in about ten minutes. Freeze main after the ordinary documentation commits and
+prepare the exact 16-path G28/registration operator commit. K156 and G17 proposals
+remain inert and excluded. After the operator commit is read back and the checkout
+is clean, use the existing all-runner stamp script; installation remains the PO's
+action. This intermediate build does not close any open P0/P1 or acceptance duty.
 
 Collect actual protected commit/signature requirements after ordinary guarded attempts identify them; do not presume every plugin path requires a signature. Any necessary signing plan is prepared only when the PO can consume it promptly and the candidate is stable. Native Windows/AGY/Codex qualification, integrated Verify, independent Critic, Reader round three and PO acceptance remain separate evidence duties. Stamp, installation, push, release and the scheduled Critic batch still require the PO's explicit call.

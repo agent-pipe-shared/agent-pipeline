@@ -33,7 +33,7 @@ removes their runner-specific regression and native qualification duties.
 | G27 | Claude P1.4 architecture portion; P1.5; P1.6 | Self-describing greenfield architecture path, editable design before binding, correct criterion examples; avoid repeated PO discard ceremonies | G2/G4 and bounded criterion producer correction | Criterion/parser correction committed `5815d42c9`; main renderer/consumer 12/12 and actual acknowledgement cases 3/3. Larger editable-design/early-binding route remains open |
 | G28 | Claude P1.7 | Portable sanitized approval/Verify/Security/review evidence index in the delivered branch; private keys and raw private state remain external | G14, existing audit-pack archive route | Applied eight-path historical-archive/CLI fix with explicit read-only Source kernel closure; combined main check exits 0. Earlier ordinary commit refused on two PB guard files; complete operator package collected, no bypass. Offline archive integrity never qualifies later commits |
 | G29 | Claude P1.8 | Public handover accurately follows lifecycle transitions | Lifecycle handover projection work | Report evidence; identify sanctioned writer and regression pin |
-| G30 | Claude P1.9 | Trusted hook snapshot refresh has a usable recovery during a session | Existing hook-refresh flow; G9b/K156 | Automatic view retention committed `7dddb672c`; main synthetic mid-session refresh and tamper refusal 2/2 using existing production code. Test registration in progress; native runtime and direct-prune limitations remain open |
+| G30 | Claude P1.9 | Trusted hook snapshot refresh has a usable recovery during a session | Existing hook-refresh flow; G9b/K156 | Automatic view retention committed `7dddb672c`; mid-session regression committed `ee26907e9`, main synthetic refresh/tamper refusal 2/2 using existing production code. Required registration applied; native runtime and direct-prune limitations remain open |
 | G31 | Claude P1.10 | Signing output points to an admissible external proof destination | K150B/G31 v2 | Integrated `7a6a58488`; main synthetic signing/proof 2/2 and original bounded UI 4/4. External-proof policy preserved; native acceptance pending |
 | G32 | Claude P1.11 | Security candidate identity works for the configured remote destination, without requiring the name `origin` | Effective push destination identity | Integrated `537d5c85d`; main remote/guard/consumer checks 11/11. Native push and full qualification pending |
 
@@ -194,7 +194,9 @@ refresh code. Trusted stale snapshots refresh to current; tampered hooks and an
 untrusted source refuse while preserving hook bytes. All writes are derived from
 and checked below a disposable Git common directory; hooks are rendered, never
 executed. Native installed-session qualification is still open. The new witness
-is applied and its Verify registration is in progress.
+is committed `ee26907e9`; its required Verify registration is applied. Final main
+registration covers 1101 suites with zero exclusions/unregistered, completion
+and append-history pass, and the seven new G20/G30 witness cases pass.
 
 K156 fresh-current-Source retry has 13/13 focused checks, but remains inert. Review
 found three candidate regressions requiring correction: legacy-only layout

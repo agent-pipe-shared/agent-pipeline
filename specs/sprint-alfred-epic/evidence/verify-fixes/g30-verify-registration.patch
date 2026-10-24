@@ -1,0 +1,81 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 2afbdd8cd..9ad0b3d06 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -557,6 +557,7 @@
+         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
+         "verify-phase:harness/scripts/verify.mjs:manual-check-logic-tests",
+         "verify-phase:harness/scripts/verify.mjs:measure-tofu-push-e2e-tests",
++        "verify-phase:harness/scripts/verify.mjs:mid-session-hook-refresh-tests",
+         "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
+         "verify-phase:harness/scripts/verify.mjs:model-family-acceptance-tests",
+         "verify-phase:harness/scripts/verify.mjs:model-family-antigravity-adapter-tests",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index 8b4f830de..2f2e22283 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -958,6 +958,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "mid-session-hook-refresh-tests",
++      "path": "plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "model-family-acceptance-tests",
+       "path": "plugins/pipeline-core/lib/model-family-acceptance.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 73ee6bc7b..6e9546c28 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3920,6 +3920,20 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "mid-session-hook-refresh-tests",
++      "file": "plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs",
++      "invariantPinned": "A ready session refreshes only stale managed hooks from trusted source and reads back current state; tampered hooks or untrusted source refuse without altering original hook bytes.",
++      "nonOverlapNote": "Unique G30 contained mid-session hook refresh witness; installer and clone readiness suites retain their own startup contracts.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "MSH001",
++          "MSH002"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs b/plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs
+index b3d046e8d..a74e401f2 100644
+--- a/plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs
++++ b/plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // G30: contained behavioral qualification of a refresh during an already-ready session.
+-import test from 'node:test';
++import { registerTestCaseCompletion } from '../lib/test-case-completion.mjs';
+ import assert from 'node:assert/strict';
+ import { spawnSync } from 'node:child_process';
+ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+@@ -18,6 +18,8 @@ const hooks = [
+ const ambient = ['HOME', 'XDG_CONFIG_HOME', 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_SYSTEM', 'GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE'];
+ const scratch = resolve('scratch');
+ mkdirSync(scratch, { recursive: true });
++const cases = [];
++function test(name, run) { cases.push({ id: `MSH${String(cases.length + 1).padStart(3, '0')}`, name, run }); }
+ 
+ function inside(root, path) {
+   const rel = relative(root, resolve(path));
+@@ -136,3 +138,6 @@ test('tampered hook and untrusted source refuse refresh while preserving origina
+   assert.deepEqual(refused.results.slice(1).map(row => row.status), ['failed', 'failed']);
+   for (const [index, hook] of hooks.entries()) assert.deepEqual(readFileSync(paths(f, hook).hook), before[index]);
+ }));
++
++if (cases.length !== 2) throw new Error('mid-session hook refresh case count drift');
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });

@@ -1,0 +1,10 @@
+command: node harness/scripts/check-verify-case-completion.mjs
+label: latest-completion
+exitCode: 0
+head: 47688e7f4f34b396f6ab912b28b4aba5b1f113e7
+tree: 7f8394a7f3bba5e36c71821706557d28f9dbd966
+dirty: true
+--- stdout ---
+Verify case-completion registry valid: 369 entries, 353 conservatively classified suites.
+
+--- stderr ---
