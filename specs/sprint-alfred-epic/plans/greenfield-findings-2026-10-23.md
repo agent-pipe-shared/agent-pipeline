@@ -41,6 +41,10 @@ Class A, not applied: `codex-isolated-critic-protected-preimage-tests`, six pinn
 
 CADH001 fixed in the clone by two changes (an async native driver runs after the BEGIN ticket closed in `model-family-host-store.mjs`; `session-authority-registry.mjs` opens a fresh boundary when the stored context's boundary is closed), no check weakened. NOT done: CCH136/CCH137 (cause is not the CADH001 one; `protectedChanged=["candidate"]` at `codex-critic-host.mjs` ~line 1988), the RED/GREEN proof of the new pin, the registry and store suites, the broader checks. Deliverables in `scratch/agent-out/K147-*` (untracked), not yet imported.
 
+## K149 results (CCH136/CCH137 cause measured; fix delegated to K151)
+
+Product defect, deterministic. `prepareNativeCritic` fixes the candidate fingerprint (`protectedBefore`); the native launch path (`launchHeldCriticFamilyRoute` / `invokeCodexNativeCriticHost`) then reserves model-family-host lifetimes and members under the candidate's `.git/agent-pipeline/` (catalogue, producer, 3 lifetimes, 3 members); `finalizeNativeCritic` (`codex-critic-host.mjs` ~1985-1988) compares the whole git-directory inventory and reads the product's own writes as a mutation during the Critic run. Not clock, not fixture, not the CADH001 cause. The file is in the sha256-pinned Critic set, so the fix is followed by the C28 re-pin. Decision (lead developer, PO delegated): Option C, take the comparison baseline immediately before the child starts; no path in the inventory is skipped (rejected: skip `agent-pipeline/**`, skip only the registry subtrees, both would let the child write there unnoticed). Dispatch K151. Evidence: `scratch/agent-out/K149-notes.md` (untracked).
+
 ## G1 fix questions (for the batch, not decided)
 
 - What does the family check protect on Claude (a dispatch must not silently run another family than the agent definition declares, MP-29)? A Codex dispatch has no Claude alias, so the check needs a runner-aware reading, not a removal.
