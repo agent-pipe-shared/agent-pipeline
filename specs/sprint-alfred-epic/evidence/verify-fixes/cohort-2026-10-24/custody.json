@@ -1,0 +1,199 @@
+{
+  "schema": "pipeline.fix-wave-artifact-custody.v1",
+  "date": "2026-10-24",
+  "copyMode": "exact capture/patch bytes; .log names become .txt; two Markdown reports redact only the machine-local repository prefix with both original and projection hashes recorded",
+  "artifacts": [
+    {
+      "source": "scratch/clones/k156-current-dependency-qualification/scratch/agent-out/k156-current-dependency-qualification/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/k156-current-dependency-qualification/report.md",
+      "bytes": 4125,
+      "sha256": "b6aed8c2bf66a5d3e0e85cb6e6fe53bfa07da984c46af426bc13490105c8e961",
+      "sourceBytes": 4165,
+      "sourceSha256": "a37cd18e97fc1571d1ba3d1a35357e55360bb7530e56d46b4b2c1371ac21e43a",
+      "transformation": "report-only machine-local repository prefix replaced with <repo>/; original retained in private scratch"
+    },
+    {
+      "source": "scratch/clones/k156-current-dependency-qualification/scratch/agent-out/k156-current-dependency-qualification/cumulative.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/k156-current-dependency-qualification/cumulative.patch",
+      "bytes": 110556,
+      "sha256": "3ccdf91b5113354c97971fecdcff49e0e306d64b50609e44d8f65672839f0e72"
+    },
+    {
+      "source": "scratch/clones/k156-current-dependency-qualification/scratch/agent-out/k156-current-dependency-qualification/state-1.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/k156-current-dependency-qualification/state-1.txt",
+      "bytes": 50818,
+      "sha256": "2fbe778dd8227da732ffa384ada2497fce9cf564f80110c0eeee366cf36e1559"
+    },
+    {
+      "source": "scratch/clones/k156-current-dependency-qualification/scratch/agent-out/k156-current-dependency-qualification/focused-1.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/k156-current-dependency-qualification/focused-1.txt",
+      "bytes": 20078,
+      "sha256": "ccf68a46a2bf4b2242318243af560db259765ad85fec28b021dc82359aebecf7"
+    },
+    {
+      "source": "scratch/clones/k156-current-dependency-qualification/scratch/agent-out/k156-current-dependency-qualification/consistency-1.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/k156-current-dependency-qualification/consistency-1.txt",
+      "bytes": 2825,
+      "sha256": "10fe69a5308c94565e4372ed3f82a4bc6d8654da81cfcb8e738243bda9ce99b0"
+    },
+    {
+      "source": "scratch/clones/k156-current-dependency-qualification/scratch/agent-out/k156-current-dependency-qualification/consumer-1.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/k156-current-dependency-qualification/consumer-1.txt",
+      "bytes": 1116,
+      "sha256": "0aa31f84bcf729708d1204f49eb5c77b6ab643d2ef985e228029c15573646d8b"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/g19-preflight-integration-report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/g19-preflight-integration-report.md",
+      "bytes": 5663,
+      "sha256": "a108e3a04d3f95a8b55f4848b08f37e56a5439015bed2d2c5ac56827f3e426b0",
+      "sourceBytes": 5703,
+      "sourceSha256": "ba37bab335f846d5944e192272606603450b9f7976d0b276a1141efe6c49d5ee",
+      "transformation": "report-only machine-local repository prefix replaced with <repo>/; original retained in private scratch"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/g19-preflight-integration.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/g19-preflight-integration.patch",
+      "bytes": 26891,
+      "sha256": "bc2685df1d48b6108123d37cabc8c88ad1123fa1dc12e1c062bf29770fad4829"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/readiness.log",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/readiness.txt",
+      "bytes": 1183,
+      "sha256": "8d2ca1193d296ed78a8059911267dfb761d40f73218537042385e2781fa8b457"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/preflight-windows.log",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/preflight-windows.txt",
+      "bytes": 775,
+      "sha256": "38bf11ae150ceb6004da157b24b0a4943c3eccb4cffcbc36699dca02c55cb6d0"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/kernel-closure.log",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/kernel-closure.txt",
+      "bytes": 3220,
+      "sha256": "4f19fef426ac99a886d6d2e4ab0141dc756053cf8800e35f1d7aa2685c5fda5a"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/kernel-closure-green.log",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/kernel-closure-green.txt",
+      "bytes": 1821,
+      "sha256": "eaef6b5b41f526f360f1494c5efbe078f592041c7cc2b074f8efb1db5d4efb4e"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/consumer-skill.log",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/consumer-skill.txt",
+      "bytes": 1955,
+      "sha256": "0340bed7debbd88b02423eb87710a7121e9974814ff418bafcd098a615f6ff58"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/syntax.log",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/syntax.txt",
+      "bytes": 244,
+      "sha256": "3166fd1fb21759aa3336f495aacd3387a36fba72b5664026d6c0c0156afffa60"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/preflight-syntax.log",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/preflight-syntax.txt",
+      "bytes": 258,
+      "sha256": "26b5d3c48fbea981e7877e993088612fd68ade9bb3d7aff3aae9df269933f350"
+    },
+    {
+      "source": "scratch/clones/g19-preflight-integration/scratch/agent-out/g19-preflight-integration/diffcheck.log",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g19-preflight-integration/diffcheck.txt",
+      "bytes": 196,
+      "sha256": "333e271e0e3caeb1f1ef255141c996e51a5c1a35acc7657cbba467d096466eb2"
+    },
+    {
+      "source": "scratch/agent-out/g22-portable-dependency-preparation/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g22-portable-dependency-preparation/report.md",
+      "bytes": 4416,
+      "sha256": "ac272516ee38922bcc377782abce74030736ea9738d6e962672132fb003dedca"
+    },
+    {
+      "source": "scratch/agent-out/g22-portable-dependency-preparation/change.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g22-portable-dependency-preparation/change.patch",
+      "bytes": 19890,
+      "sha256": "9d9aca20951b412ed0334fe3b69e0ff9186030361966f81d0004a680553538da"
+    },
+    {
+      "source": "scratch/agent-out/g22-portable-dependency-preparation/g22-portable-keyorder-red.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g22-portable-dependency-preparation/g22-portable-keyorder-red.json",
+      "bytes": 6101,
+      "sha256": "0be498950972bd389e40b0585734637f51ea96347c70e92749c2568a4b2ab183"
+    },
+    {
+      "source": "scratch/agent-out/g22-portable-dependency-preparation/g22-portable-producer-final.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g22-portable-dependency-preparation/g22-portable-producer-final.json",
+      "bytes": 158378,
+      "sha256": "17c2b54500d65ef034806a4ea0d04fe6f49a116158551924e1e0689dcd773e1e"
+    },
+    {
+      "source": "scratch/agent-out/g22-portable-dependency-preparation/g22-portable-consumer-safe.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g22-portable-dependency-preparation/g22-portable-consumer-safe.json",
+      "bytes": 1123,
+      "sha256": "f6e5d4991baf70ae3530b8eee5a88f8348f497b0db86172701e4a61e41bc4869"
+    },
+    {
+      "source": "scratch/agent-out/g22-portable-dependency-preparation/g22-portable-windows-planner.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g22-portable-dependency-preparation/g22-portable-windows-planner.json",
+      "bytes": 1881,
+      "sha256": "fddaa48863a4d427b07266d01ee644bdac3946d5b9891c4a789912d9aff22a9b"
+    },
+    {
+      "source": "scratch/agent-out/g22-portable-dependency-preparation/g22-original-40-case-green.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/g22-portable-dependency-preparation/g22-original-40-case-green.json",
+      "bytes": 158265,
+      "sha256": "23e45ebd3b03c1c0f01cdbef3822380ae0b4910f14e577ce3006035c81e6c940"
+    },
+    {
+      "source": "scratch/clones/fix-wave-cohort-registration/scratch/agent-out/fix-wave-cohort-registration/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/fix-wave-cohort-registration/report.md",
+      "bytes": 3260,
+      "sha256": "a8559ee4060c75baee467a10be670e116ed150c8d79bbd20f0b829fec9115893"
+    },
+    {
+      "source": "scratch/clones/fix-wave-cohort-registration/scratch/agent-out/fix-wave-cohort-registration/owned-registration.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/fix-wave-cohort-registration/owned-registration.patch",
+      "bytes": 8695,
+      "sha256": "82ae7daab61891a90676758332ada1fbf2190b1a03313ff9dc8c94564c08ad6a"
+    },
+    {
+      "source": "scratch/clones/fix-wave-cohort-registration/scratch/agent-out/fix-wave-cohort-registration/kernel-composed-before.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/fix-wave-cohort-registration/kernel-composed-before.json",
+      "bytes": 1819,
+      "sha256": "181886e3877149868b05398eb94d0b8baaebf5829244aa0985d6cacb89f0ea1c"
+    },
+    {
+      "source": "scratch/clones/fix-wave-cohort-registration/scratch/agent-out/fix-wave-cohort-registration/registration.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/fix-wave-cohort-registration/registration.json",
+      "bytes": 332,
+      "sha256": "1bc9de1c1e2143454805d7bccd0f4dd73bb2f6dde7f552d357f1f0d16b592ebc"
+    },
+    {
+      "source": "scratch/clones/fix-wave-cohort-registration/scratch/agent-out/fix-wave-cohort-registration/completion.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/fix-wave-cohort-registration/completion.json",
+      "bytes": 320,
+      "sha256": "0eab3e38140c661844a9f422dbe1e6d86a745c2d1ba73f666899604f235480f7"
+    },
+    {
+      "source": "scratch/clones/fix-wave-cohort-registration/scratch/agent-out/fix-wave-cohort-registration/append-history.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/fix-wave-cohort-registration/append-history.json",
+      "bytes": 310,
+      "sha256": "d9820649db0d581d7bd325611c9ce69ecbc30be89ce17b5097ae77ed7b9ebe89"
+    },
+    {
+      "source": "scratch/clones/fix-wave-cohort-registration/scratch/agent-out/fix-wave-cohort-registration/consumer-safe.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/fix-wave-cohort-registration/consumer-safe.json",
+      "bytes": 1110,
+      "sha256": "b24fcaf6f06b1b7af72853495a3bc76812565df49509f2cab92ed3fc6c51e659"
+    },
+    {
+      "source": "scratch/clones/fix-wave-cohort-registration/scratch/agent-out/fix-wave-cohort-registration/cohort-witnesses.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/fix-wave-cohort-registration/cohort-witnesses.json",
+      "bytes": 20780,
+      "sha256": "deacaee4c6dc3f8589dde71ebc15860af605dc21c59f6e4b9509cf06338dae28"
+    }
+  ]
+}

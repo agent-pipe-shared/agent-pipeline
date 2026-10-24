@@ -1,0 +1,47 @@
+command: node --test plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+label: g19-kernel-closure
+exitCode: 1
+head: 31db7853a71d3b9e72c864f5aced91a69a0ecee9
+tree: 388cccb98519df3d415e18f392f306ec4cc2c532
+dirty: true
+--- stdout ---
+FAIL GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports: AssertionError [ERR_ASSERTION]: NEVER_LIFTABLE_KERNEL_PATHS is not transitively closed (3 violation(s)):
+plugins/pipeline-core/scripts/push-prepare.mjs imports "./check-critic-bound-verify.mjs" -> plugins/pipeline-core/scripts/check-critic-bound-verify.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/push-prepare.mjs imports "../lib/publication-review-requirement.mjs" -> plugins/pipeline-core/lib/publication-review-requirement.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/check-critic-bound-verify.mjs imports "../lib/critic-verify-readiness.mjs" -> plugins/pipeline-core/lib/critic-verify-readiness.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+
+3 !== 0
+
+    at assertKernelClosed (file://<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:578:10)
+    at file://<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:586:3
+    at check (file://<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:528:5)
+    at file://<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:585:1
+PASS GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)
+PASS GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)
+PASS GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)
+PASS GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry
+PASS GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise
+PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)
+PASS GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher
+PASS GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents
+PASS GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots
+PASS GMWKC10 every FIXTURE_STRING_IMPORTS exemption names a target that does NOT exist on disk
+
+guard-maintenance-window-kernel-closure: 10 passed, 1 failed
+✖ plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs (1843.339022ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1860.083729
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:1:1
+✖ plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs (1843.339022ms)
+  'test failed'
+
+--- stderr ---

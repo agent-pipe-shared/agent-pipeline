@@ -6,10 +6,25 @@ The PO requested that decision needs and signature-dependent work be collected u
 composition are committed by the human operator as `355dba942`; stamp `f2aee4ec2`
 is installed and the new Codex build `20261024154452.355dba9` reads back ready after
 the exact hook refresh. The historical operator scope below is resolved, not a
-request to repeat it. No current signature or operator commit is outstanding.
+request to repeat it. A later actual K156 operator requirement is collected below;
+no live signing or terminal command has been issued.
 The PO explicitly chose to collect both optional model-role confirmation and
 the G17 short private fixture parent for later. Do not run either ceremony or
 probe that external parent; continue the independent fix wave.
+
+**New collected operator requirement:** K156's complete eight-path correction is
+applied after current-dependency qualification (State file 1/1, focused 16/16,
+consistency 3/3, consumer 9/9). The ordinary active-hook commit refused
+`plugins/pipeline-core/scripts/pipeline-state.mjs` with `PB-SANCTIONED-WRITER`
+and `PB-COMMIT-OVERRIDE-NONOVERRIDABLE`; nothing was seeded. Do not repeat that
+unchanged refusal or bypass it. Its dependent five-path Verify recording overlay
+is also applied and must remain coherent with the newly added K156 witness.
+One State/Result integration owner is reconciling the remaining G19/G21 hunks,
+so freeze the complete final package and issue a concrete operator command only
+at the next actual terminal window. G22 `3c43c8555` and G19 preflight `20392c08f`
+committed normally and need no operator repetition. This entry supersedes older
+historical paragraphs saying that K156 remains inert or that no operator work
+is outstanding; it requests no routine application approval.
 
 The PO corrected repeated routine application questions on 2026-10-24:
 approved-wave fixes, integration checks and ordinary active-hook commits

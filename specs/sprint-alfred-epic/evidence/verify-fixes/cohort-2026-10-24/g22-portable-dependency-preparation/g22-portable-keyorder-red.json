@@ -1,0 +1,43 @@
+command: node --test --test-name-pattern=prepares plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+label: g22-portable-keyorder-red
+exitCode: 1
+head: f2aee4ec2456b11db56e26bba0d5fba9690ed240
+tree: 9e2429ef2a5f3c870e91233c4ce3668ca70d00ec
+dirty: true
+--- stdout ---
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"baseline-calibration","index":1,"total":5,"state":"started","startedAt":"2026-10-24T16:39:10.185Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"baseline-manifest","index":2,"total":5,"state":"started","startedAt":"2026-10-24T16:39:10.207Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"baseline-repository","index":3,"total":5,"state":"started","startedAt":"2026-10-24T16:39:10.223Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"baseline-verify-contract","index":4,"total":5,"state":"started","startedAt":"2026-10-24T16:39:10.239Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"baseline-calibration","index":1,"total":5,"state":"completed","startedAt":"2026-10-24T16:39:10.185Z","completedAt":"2026-10-24T16:39:10.892Z","receiptSha256":"fd12833cd78397db08b021b87cf7bde3c1be23f22a46f384257d8c0168a824d7","diagnosticDigest":"f69d109134ee649766c47b8f207f5f6380df4a6785823f718f36eb474d2e2eaa"}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"baseline-manifest","index":2,"total":5,"state":"completed","startedAt":"2026-10-24T16:39:10.207Z","completedAt":"2026-10-24T16:39:10.906Z","receiptSha256":"bf0abda606a6f7181ad142c6f618a4ea8f4574263ed6655684bc1f2a713f827e","diagnosticDigest":"f69d109134ee649766c47b8f207f5f6380df4a6785823f718f36eb474d2e2eaa"}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"baseline-repository","index":3,"total":5,"state":"completed","startedAt":"2026-10-24T16:39:10.223Z","completedAt":"2026-10-24T16:39:10.925Z","receiptSha256":"72930beeb8bddfd29e62a6f43a65b1702d6ee1465e94b5d2ac7eaa78e913e853","diagnosticDigest":"f69d109134ee649766c47b8f207f5f6380df4a6785823f718f36eb474d2e2eaa"}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"baseline-verify-contract","index":4,"total":5,"state":"completed","startedAt":"2026-10-24T16:39:10.239Z","completedAt":"2026-10-24T16:39:10.946Z","receiptSha256":"a5febb67db0305d825255efb7df05789cd616fccf9d45101cc68cae50cf48d0c","diagnosticDigest":"f69d109134ee649766c47b8f207f5f6380df4a6785823f718f36eb474d2e2eaa"}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"configured-verify","index":5,"total":5,"state":"started","startedAt":"2026-10-24T16:39:10.955Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792859949826-161af716f4c9aa4d","candidate":{"commit":"6b5ab66bf3fd5c6459e31427ea654fad18570631","tree":"2c5943ec2216052660a4a80ccaf969d38cb82de8"},"suite":"configured-verify","index":5,"total":5,"state":"completed","startedAt":"2026-10-24T16:39:10.955Z","completedAt":"2026-10-24T16:39:11.625Z","receiptSha256":"8845b46e42f1fb6296ea1742cdec09e87f04f0537652ea58f317710d245cc17e","diagnosticDigest":"0bff73629ca2a6481ed2a60ad1a35f9d24ed6b9a197ccaa0d92fc88cb67954cd"}
+✖ a named candidate prepares committed npm dependencies before Verify without copying checkout packages (2437.521769ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3125.35339
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs:873:1
+✖ a named candidate prepares committed npm dependencies before Verify without copying checkout packages (2437.521769ms)
+  Error [VerifyEvidenceError]: Committed package-lock.json does not match package.json dependencies.
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.mjs:111:41)
+      at produceVerifyEvidenceForCommit (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.mjs:335:21)
+      at produceVerifyEvidence (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.mjs:361:18)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs:905:28)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    code: 'VEP-DEPENDENCY-LOCK'
+  }
+
+--- stderr ---

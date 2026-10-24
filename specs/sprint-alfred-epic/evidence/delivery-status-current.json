@@ -1,15 +1,15 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-23/snapshot.json",
-  "sha256": "b6e468024d4f5794e94e098aa37f687018611b65796daf9973bfad719e3fc9c8",
-  "measuredAt": "2026-10-23",
-  "head": "52953602b",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24/snapshot.json",
+  "sha256": "18d9d34968505ce3f72ea73b9eef03dea083476a2a22d563095d8283883a00a6",
+  "measuredAt": "2026-10-24",
+  "head": "31db7853a71d3b9e72c864f5aced91a69a0ecee9",
   "counts": {
     "25": 3,
-    "50": 56,
-    "75": 115,
+    "50": 25,
+    "75": 146,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 66.09
+  "index": 70.55
 }

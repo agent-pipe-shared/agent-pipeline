@@ -1,0 +1,28 @@
+command: node --test plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs
+label: g22-portable-windows-planner
+exitCode: 0
+head: f2aee4ec2456b11db56e26bba0d5fba9690ed240
+tree: 9e2429ef2a5f3c870e91233c4ce3668ca70d00ec
+dirty: true
+--- stdout ---
+✔ P1: bare `npm` on win32 resolves npm.cmd via PATH/PATHEXT and launches through cmd.exe /d /s /v:off /c (5.035847ms)
+✔ P1: `npm.cmd` selector and an explicit npm.cmd path both normalize to the same cmd.exe launch (3.019496ms)
+✔ P1: an npm.exe resolved from PATH is launched directly, not wrapped in cmd.exe (0.550977ms)
+✔ P2: a non-Windows host keeps the direct launch for npm (no normalization) (0.533795ms)
+✔ P2: a non-shim command on win32 keeps the direct launch (0.668249ms)
+✔ P3: an un-normalizable launch throws a typed CAPTURE-EVIDENCE-WINDOWS-* error, never a plan (4.310219ms)
+✔ P3: spawnEvidenceCommand passes the real child result through unchanged and spawns cmd.exe verbatim (0.786234ms)
+✔ P3: a launch failure happens before any child is spawned (spawn seam never called) (0.709698ms)
+✔ P2: spawnEvidenceCommand on a non-Windows host or non-shim command keeps historical options (no env/shell injection) (0.670354ms)
+﹣ P1 native win32 (stock host environment): bare `npm` is normalized under the host's own unmodified PATHEXT (0.429166ms) # host-limitation: native cmd/npm run needs a Windows host; owner Coordinator, due 2026-10-19 (Windows-only case; no Linux equivalent)
+﹣ P1/P3 native win32: real `npm.cmd` runs through the normalized launch with the real status and output (0.233754ms) # host-limitation: native cmd/npm run needs a Windows host; owner Coordinator, due 2026-10-19 (Windows-only case; no Linux equivalent)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 152.098796
+
+--- stderr ---

@@ -1,0 +1,221 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
+label: k156-current-focused
+exitCode: 0
+head: 31db7853a71d3b9e72c864f5aced91a69a0ecee9
+tree: 388cccb98519df3d415e18f392f306ec4cc2c532
+dirty: true
+--- stdout ---
+✔ the win32 forward-slash git common dir is not a CVCT-COMMON-DIR refusal (baseline-only twins) (173.958416ms)
+✔ identical configured twins read as configured with the command (169.721256ms)
+✔ an absent legacy peer leaves exactly the neutral tier (174.004704ms)
+✔ an absent neutral peer leaves exactly the original legacy tier (179.061112ms)
+✔ a non-repository root stays unavailable and is never read through the common-dir normalization (8.693515ms)
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:19.608Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:19.972Z; bound to submission c9deb3d62d6f....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:40:20.174Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: serialized state write failed before commit (SDC-AUTHORITY-UNAVAILABLE); zero mutation.
+Error: set-phase implementation requires an exact approved submission (SDC-AUTHORITY-UNAVAILABLE).
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:21.748Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:22.005Z; bound to submission 87f2c079c231....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:40:22.195Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:24.204Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:24.468Z; bound to submission 15de5a58744d....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:40:24.654Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+{
+  "schema": "pipeline.inspect.v1",
+  "generatedAt": "2026-10-24T16:40:25.378Z",
+  "status": "approved",
+  "activeFeature": {
+    "id": "unit",
+    "planPath": "specs/unit/prd_unit.md",
+    "phase": "design",
+    "phaseHistory": [
+      {
+        "phase": "implementation",
+        "at": "2026-10-24T16:40:24.831Z"
+      }
+    ]
+  },
+  "phase": "design",
+  "planApproved": true,
+  "lifecycle": {
+    "ok": true,
+    "code": "PLAN-LIFECYCLE-CURRENT",
+    "status": "approved"
+  },
+  "mixedPlanRecovery": null,
+  "pushApproval": {
+    "present": false,
+    "relevance": "absent"
+  },
+  "closedFeaturesCount": 0,
+  "phoenixEpicHistory": null,
+  "nextAction": {
+    "kind": "command",
+    "executable": "<home>/.local/lib/node-v24.15.0/bin/node",
+    "argv": [
+      "<repo-root>/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "set-phase",
+      "--phase",
+      "implementation"
+    ],
+    "mutation": true,
+    "requiresConfirmation": true
+  },
+  "nextActionText": "## Next action\n\nThe plan is approved. Switch the feature to implementation with\n`pipeline-state set-phase --phase implementation`, then proceed with the\napproved implementation packages.\n",
+  "continuityAuthorityDrift": {
+    "schema": "pipeline.continuity-authority-drift.v1",
+    "status": "current",
+    "featureId": "unit",
+    "revision": 1,
+    "artifacts": [
+      {
+        "role": "prd",
+        "path": "specs/unit/prd_unit.md",
+        "recordedSha256": "673a418c1c0858d8781e9330b59612cf2e8fadc4501396544019caecc9b34d97",
+        "observedSha256": "673a418c1c0858d8781e9330b59612cf2e8fadc4501396544019caecc9b34d97",
+        "state": "match"
+      },
+      {
+        "role": "spec",
+        "path": "specs/unit/spec.md",
+        "recordedSha256": "e2d5f02a8bb0c49cfb9ae4096858ec6f263cb8d2f34e73eaddaaa7b1e6aa66fd",
+        "observedSha256": "e2d5f02a8bb0c49cfb9ae4096858ec6f263cb8d2f34e73eaddaaa7b1e6aa66fd",
+        "state": "match"
+      }
+    ],
+    "recovery": null
+  }
+}
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:29.048Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:29.321Z; bound to submission 5921d2599c82....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:40:29.515Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: set-phase implementation refused calibration commit preflight (CVCT-TWIN-CAS); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:31.056Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:31.328Z; bound to submission 53f6af3c0b10....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:40:31.515Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: set-phase implementation refused calibration commit preflight (CVCT-APPROVAL-UNAVAILABLE); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:32.724Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:32.987Z; bound to submission ceea05289eb5....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:40:33.176Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: set-phase implementation refused calibration commit preflight (CVCT-TWIN-CAS); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:38.127Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:38.404Z; bound to submission 556a7bd10b42....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:40:38.594Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: state replacement did not commit (PS-CONTINUITY-WRITE-IO), but a companion mutation may have occurred; inspect persisted files before retrying.
+Error: set-phase implementation failed after possible calibration mutation (PS-CONTINUITY-WRITE-IO); State was not reported committed. Inspect both tiers before recovery. No configured commit is claimed.
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:42.666Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:42.943Z; bound to submission 6b0d4e2f6bad....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:40:43.137Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:51.245Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:51.525Z; bound to submission 843a7e355de8....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:40:51.729Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: set-phase rejected invalid lifecycle state (PLAN-LIFECYCLE-APPROVAL-CONTRADICTORY).
+Error: set-phase implementation refused calibration commit preflight (CVCT-TWIN-CAS); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase implementation refused calibration commit preflight (CVCT-TWIN-CAS); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:40:59.638Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:40:59.936Z; bound to submission 7ca277a380fb....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:41:00.143Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:41:08.147Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:41:08.442Z; bound to submission 5370d82344e4....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:41:08.664Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T16:41:17.038Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T16:41:17.306Z; bound to submission 8528a05d3149....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T16:41:17.501Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+✔ caller readiness injection cannot mint a calibration Source State witness (2229.985286ms)
+✔ a serialized old non-phase ready record remains admissible (2451.298462ms)
+✔ set-phase produces a sanctioned commit-ready verify transition (4844.582947ms)
+✔ set-phase refuses uncommitted calibration before State mutation (2013.342273ms)
+✔ set-phase refuses lost approval without modifying calibration (1676.087657ms)
+✔ partial calibration I/O reports incomplete recovery without claiming success (5385.867548ms)
+✔ State replacement failure rolls back the exact configured companions (4476.599666ms)
+✔ dead post-State owner recovers through a fresh current Source command (8638.80222ms)
+✔ fresh pre-State retry ignores forged journal and refuses stale or dirty Source inputs (8294.210773ms)
+✔ configure-verify retries exact current output after twin and ready crashes (17500.178387ms)
+✔ live Source serialization refuses concurrent same and different commands (17298.963969ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75582.247862
+
+--- stderr ---

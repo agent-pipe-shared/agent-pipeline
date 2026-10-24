@@ -1,0 +1,43 @@
+command: node --test plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+label: k156-current-consistency
+exitCode: 0
+head: 31db7853a71d3b9e72c864f5aced91a69a0ecee9
+tree: 388cccb98519df3d415e18f392f306ec4cc2c532
+dirty: true
+--- stdout ---
+Feature "atomic-feature" set. Plan path: specs/atomic-feature/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-29T09:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/atomic-feature/prd.md(fbdff394ff44...)+specs/atomic-feature/spec.md(cad99a3c61c3...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-29T09:00:00.000Z; bound to submission 866bc79bff53....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approval was committed, but aggregate design binding recheck is incomplete (DDB-PROJECT-AUTHORITY); no aggregate authority is inferred.
+Plan approved by "po-test" on 2026-08-29T09:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/atomic-feature/prd.md(fbdff394ff44...)+specs/atomic-feature/spec.md(cad99a3c61c3...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+✔ checkStatePhaseConsistency reports the design-vs-implementation drift class as blocked (28.906605ms)
+✔ checkStatePhaseConsistency reports consistent when the marker agrees with the machine phase (23.810134ms)
+✔ the marker stays atomic with a real design -> implementation transition (826.814586ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1626.516588
+
+--- stderr ---

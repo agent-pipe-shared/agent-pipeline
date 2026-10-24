@@ -1,0 +1,26 @@
+command: node --test plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+label: g19-readiness
+exitCode: 0
+head: 31db7853a71d3b9e72c864f5aced91a69a0ecee9
+tree: 388cccb98519df3d415e18f392f306ec4cc2c532
+dirty: true
+--- stdout ---
+✔ foreign inherited Modify at the repository root remains refused with bounded recovery (4.380391ms)
+✔ trusted project, plugin and private path observations stay ready without mutation (4.603134ms)
+✔ project, plugin and private failures are aggregated from one read-only pass (1.552669ms)
+✔ a writable plugin ancestor is observed and refused before dispatch (0.876325ms)
+✔ missing private namespace does not manufacture an ACL failure, while its parent is inspected (0.883398ms)
+✔ missing plugin prerequisite remains unavailable (0.674551ms)
+✔ unknown native failures close without copying arbitrary exception text (1.276225ms)
+✔ a pristine project can inspect existing roots before Git creates its private namespace (0.672617ms)
+✔ direct consumers receive only closed native causes (0.494058ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 169.445623
+
+--- stderr ---

@@ -19,13 +19,17 @@ The lower-priority Antigravity findings already admitted to the working plan,
 including G10/K156, also remain in scope. Combining duplicate findings never
 removes their runner-specific regression and native qualification duties.
 
+The current parallel write reservations, formal-matrix boundary and next local
+candidate sequence are in
+[next local candidate plan](plan_next-local-candidate-2026-10-24.md).
+
 | ID | Report finding | Required outcome | Existing work / owner | State |
 |---|---|---|---|---|
 | G18 | Codex P0-1; Claude P0.2 | Diagnose and qualify dispatch through return, source binding and integration before expensive implementation; report every unavailable authority with a usable recovery | G1/K142, K146; G19 Windows prerequisite | K146 source integrated at `a0feac3a4`, safe main checks pass; native host qualification and Windows prerequisite remain open |
-| G19 | Claude P0.1 | Early Windows project/plugin/private-state ACL diagnostics, preserving ancestor safety; explain SID-based repair without recursive ACL rewriting | New Windows readiness work | Report evidence; current source and native Windows reproduction pending |
+| G19 | Claude P0.1 | Early Windows project/plugin/private-state ACL diagnostics, preserving ancestor safety; explain SID-based repair without recursive ACL rewriting | Nine-path preflight committed; shared State/Result integration owner handles the excluded two hunks | Source `20392c08f`, readiness 9/9, injected preflight 4/4, closure 11/11, consumer/skill 17/17. Two State/calibration hunks in active integration; native Windows open |
 | G20 | Codex P0-2 | Publication qualification must bind required independent review and Verify to the actual candidate; checkpoint and authorized exception claims remain distinct | G8/K154 | Source committed `272d0f668`; main synthetic checks 105/105. Production positive publication proof and independent design-review provenance remain open; signature alone never establishes qualification |
 | G21 | Codex P0-3 | Official result bootstrap/reconcile preserves package, continuity and result consistency; real package validation participates in close qualification | New result transaction repair | Report includes an independently reproduced manifest/result hash mismatch and missing reconciliation fence; current source confirmation pending |
-| G22 | Claude P0.3 | Reachable honest close after unavailable item dispatch, including test-dependency preparation and required Critic qualification | K146, G17, G21; close preparation work | Open; do not implement a silent no-Critic success route |
+| G22 | Claude P0.3 | Reachable honest close after unavailable item dispatch, including test-dependency preparation and required Critic qualification | Dependency slice committed; K146/G17/G21 close prerequisites remain | Source `3c43c8555`, producer 41/41, consumer 9/9, portable planner 9 passed/2 native skips. No silent no-Critic close; native/full qualification open |
 | G23 | Codex P1-1; Claude P1.4 read-help portion | Harmless scoped reads/help use ordinary read-only admission and actionable errors; preserve credential, external-path and symlink boundaries | Read grammar/help recovery work | Operator committed complete package `6db0d31f8`; included in installed intermediate build; focused checks pass, native qualification open |
 | G24 | Codex P1-2 | Evidence writers cannot overwrite another schema's valid result; bind immutable run records and separate capture/function outputs | Shared writer and consumer ownership separated | Shared capture fix committed `18d8f3c83`; integrated controls green. Current consumer already separates paths; immutable run/index proposal retained, no global arbitrary-writer claim |
 | G25 | Codex P1-3 | Validate HEAD, criterion rendering and source closure before submission mutation; retain already answered intake values | Design submission/intake work | Open; no late approval or fabricated identity |

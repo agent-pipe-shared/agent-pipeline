@@ -1,0 +1,259 @@
+diff --git a/plugins/pipeline-core/lib/commit-worktree-dependencies.mjs b/plugins/pipeline-core/lib/commit-worktree-dependencies.mjs
+new file mode 100644
+index 000000000..ef975692e
+--- /dev/null
++++ b/plugins/pipeline-core/lib/commit-worktree-dependencies.mjs
+@@ -0,0 +1,104 @@
++// SPDX-License-Identifier: SUL-1.0
++/** Prepare only committed npm prerequisites in an exact candidate worktree. */
++import { spawnSync } from "node:child_process";
++import { existsSync, lstatSync, readFileSync } from "node:fs";
++import { dirname, join } from "node:path";
++import { planEvidenceCommandLaunch } from "../scripts/capture-evidence.mjs";
++
++export class CommitDependencyError extends Error {
++  constructor(code, message) { super(message); this.code = code; }
++}
++const refuse = (code, message) => { throw new CommitDependencyError(code, message); };
++const exactNpmVersion = /^npm@([0-9]+\.[0-9]+\.[0-9]+)$/u;
++
++function git(root, args) {
++  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 10_000 });
++  return result.status === 0 ? String(result.stdout).trim() : null;
++}
++function committedFile(root, path) {
++  return git(root, ["ls-files", "--error-unmatch", "--", path]) === path;
++}
++function ordinaryFile(root, name) {
++  const path = join(root, name);
++  return existsSync(path) && lstatSync(path).isFile() && !lstatSync(path).isSymbolicLink();
++}
++
++function sameDependencyMap(left, right) {
++  const entries = (value) => {
++    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
++    const pairs = Object.entries(value);
++    if (pairs.some(([name, version]) => name.length === 0 || typeof version !== "string" || version.length === 0)) return null;
++    return pairs.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
++  };
++  const a = entries(left ?? {});
++  const b = entries(right ?? {});
++  return a !== null && b !== null && JSON.stringify(a) === JSON.stringify(b);
++}
++
++/** Reuse the shipped Windows npm shim planner; resolve away from the candidate checkout. */
++export function planCommitNpmInvocation(args, {
++  root, npmExecutable = "npm", npmPrefixArgs = [], platform = process.platform,
++  environment = process.env, lstatSyncFn = lstatSync,
++  resolutionCwd = dirname(process.execPath),
++} = {}) {
++  const command = [npmExecutable, ...npmPrefixArgs, ...args];
++  const plan = planEvidenceCommandLaunch(command, { cwd: resolutionCwd, platform, environment, lstatSyncFn });
++  return { executable: plan.executable, args: plan.args, options: {
++    cwd: root, env: environment, shell: false, windowsHide: true,
++    ...(plan.windowsBatch ? { windowsVerbatimArguments: true } : {}),
++  } };
++}
++
++export function prepareCommitWorktreeDependencies({ root, commit, npmExecutable = "npm", npmPrefixArgs = [] }) {
++  if (git(root, ["rev-parse", "HEAD"]) !== commit || git(root, ["status", "--porcelain=v1"]) !== "") {
++    refuse("VEP-DEPENDENCY-CANDIDATE", "Dependency preparation requires the clean exact candidate worktree.");
++  }
++  if (!committedFile(root, "package.json")) return { status: "not-required" };
++  if (!ordinaryFile(root, "package.json")) refuse("VEP-DEPENDENCY-CONFIG", "Committed package.json must be an ordinary file.");
++  let manifest;
++  try { manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")); }
++  catch { refuse("VEP-DEPENDENCY-CONFIG", "Committed package.json is invalid JSON."); }
++  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) refuse("VEP-DEPENDENCY-CONFIG", "Committed package.json is invalid.");
++  const dependencyGroups = [manifest.dependencies, manifest.devDependencies, manifest.optionalDependencies];
++  if (dependencyGroups.some(group => group !== undefined && (!group || typeof group !== "object" || Array.isArray(group)))) {
++    refuse("VEP-DEPENDENCY-CONFIG", "Committed package.json has invalid dependency declarations.");
++  }
++  if (!dependencyGroups.some(group => group && Object.keys(group).length > 0)) return { status: "not-required" };
++  if (!committedFile(root, "package-lock.json") || !ordinaryFile(root, "package-lock.json")) {
++    refuse("VEP-DEPENDENCY-LOCK", "Commit package-lock.json for this candidate before --commit Verify.");
++  }
++  let lock;
++  try { lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8")); }
++  catch { refuse("VEP-DEPENDENCY-LOCK", "Committed package-lock.json is invalid JSON."); }
++  if (![2, 3].includes(lock?.lockfileVersion) || !lock.packages?.[""] || typeof lock.packages[""] !== "object") {
++    refuse("VEP-DEPENDENCY-LOCK", "Committed package-lock.json needs npm lockfile version 2 or 3 and a root package entry.");
++  }
++  for (const name of ["dependencies", "devDependencies", "optionalDependencies"]) {
++    if (!sameDependencyMap(manifest[name], lock.packages[""][name])) {
++      refuse("VEP-DEPENDENCY-LOCK", `Committed package-lock.json does not match package.json ${name}.`);
++    }
++  }
++  const version = exactNpmVersion.exec(manifest.packageManager ?? "")?.[1];
++  if (!version) refuse("VEP-DEPENDENCY-MANAGER", "Commit packageManager: npm@<exact-version> in package.json before --commit Verify.");
++  if (existsSync(join(root, "node_modules"))) refuse("VEP-DEPENDENCY-EXISTING", "Candidate worktree already contains node_modules; refuse mutable dependency reuse.");
++  const environment = Object.freeze({ ...process.env });
++  let versionPlan; let installPlan;
++  try {
++    versionPlan = planCommitNpmInvocation(["--version"], { root, npmExecutable, npmPrefixArgs, environment });
++    installPlan = planCommitNpmInvocation(["ci", "--ignore-scripts", "--no-audit", "--no-fund"], { root, npmExecutable, npmPrefixArgs, environment });
++  } catch (error) {
++    refuse("VEP-DEPENDENCY-LAUNCH", `npm cannot be launched safely on this platform (${error.code ?? "unknown"}); select a supported npm executable and retry. Verify did not run.`);
++  }
++  const installed = spawnSync(versionPlan.executable, versionPlan.args, { ...versionPlan.options, encoding: "utf8", timeout: 30_000 });
++  if (installed.status !== 0 || String(installed.stdout).trim() !== version) {
++    refuse("VEP-DEPENDENCY-MANAGER", `The available npm must be exactly ${version}; install/select that version and retry.`);
++  }
++  const result = spawnSync(installPlan.executable, installPlan.args, {
++    ...installPlan.options, stdio: "inherit", timeout: 300_000,
++  });
++  if (result.status !== 0) refuse("VEP-DEPENDENCY-SETUP", "npm ci failed in the candidate worktree; resolve the committed lockfile or package source and retry. Verify did not run.");
++  if (git(root, ["rev-parse", "HEAD"]) !== commit || git(root, ["status", "--porcelain=v1"]) !== "") {
++    refuse("VEP-DEPENDENCY-CANDIDATE", "Dependency setup changed the candidate worktree; no Verify evidence was written.");
++  }
++  return { status: "prepared", manager: `npm@${version}` };
++}
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index d4b2936b6..3db04db59 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -83,6 +83,7 @@ import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
+ import { planVerifySelection } from "../lib/verify-selection.mjs";
+ import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify, readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
+ import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
++import { prepareCommitWorktreeDependencies } from "../lib/commit-worktree-dependencies.mjs";
+ import {
+   GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA,
+   buildGovernanceVerificationAction,
+@@ -305,7 +306,7 @@ function removeCommitWorktree(root, container) {
+  * Critic-bound options and an action event are bound to the checkout itself and are refused
+  * (VEP-COMMIT-MODE) rather than silently producing evidence bound to something else.
+  */
+-async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
++async function produceVerifyEvidenceForCommit({ root, commit, prepareDependencies, ...options }) {
+   const { outPath, eventOutPath, mode, criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId } = options;
+   if (["release", "push"].includes(mode) || eventOutPath !== null || criticPacketId !== null || criticReverifyReceiptId !== null || criticEvidenceFeatureId !== null) {
+     fail("VEP-COMMIT-MODE", "A named-commit run (--commit) produces work, critic or candidate evidence for that commit alone; the release and push lanes, the Critic-bound options and an action event bind the checkout itself. Run those without --commit in the checkout.");
+@@ -330,6 +331,8 @@ async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
+     // An empty hooks directory: a post-checkout hook of the shared repository must not run for this plumbing.
+     try { git(root, ["-c", `core.hooksPath=${hooks}`, "worktree", "add", "--detach", "--quiet", commitWorktreePath(root, container), sha], COMMIT_WORKTREE_TIMEOUT_MS); }
+     catch { fail("VEP-COMMIT-WORKTREE", `Could not create the temporary worktree for commit ${sha}.`); }
++    try { prepareDependencies({ root: commitWorktreePath(root, container), commit: sha }); }
++    catch (error) { fail(error.code ?? "VEP-DEPENDENCY-SETUP", error.message ?? "Candidate dependency preparation failed."); }
+     const produced = await produceVerifyEvidence({ ...options, rootDir: commitWorktreePath(root, container), commit: null });
+     // The run above wrote into the temporary worktree; publish the evidence into the requested path of the checkout.
+     writeEvidence(root, target, produced.evidence);
+@@ -352,10 +355,10 @@ async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
+  * worktree and the shared checkout stays untouched (see
+  * `produceVerifyEvidenceForCommit`).
+  */
+-export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null, criticEvidenceFeatureId = null, commit = null, assessPushHookBackstop = realAssessPushHookBackstop }) {
++export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null, criticEvidenceFeatureId = null, commit = null, assessPushHookBackstop = realAssessPushHookBackstop, prepareDependencies = prepareCommitWorktreeDependencies }) {
+   const root = resolve(rootDir);
+   if (commit !== null) {
+-    return await produceVerifyEvidenceForCommit({ root, commit, outPath, eventOutPath, mode, base, reuseReceipts, criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId, assessPushHookBackstop });
++    return await produceVerifyEvidenceForCommit({ root, commit, outPath, eventOutPath, mode, base, reuseReceipts, criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId, assessPushHookBackstop, prepareDependencies });
+   }
+   if (criticEvidenceFeatureId !== null && (criticPacketId === null || !["candidate", "release"].includes(mode))) {
+     fail("VEP-CRITIC-CARRY-INPUT", "Evidence-only carry-forward requires a Critic-bound candidate or release Verify.");
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index b7e099eff..a8cade3ac 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -23,6 +23,7 @@ import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
+ import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
++import { planCommitNpmInvocation, prepareCommitWorktreeDependencies } from "../lib/commit-worktree-dependencies.mjs";
+ 
+ function run(executable, args, options = {}) {
+   const result = spawnSync(executable, args, { encoding: "utf8", ...options });
+@@ -868,3 +869,93 @@ test("the CLI accepts --commit and reports the named commit", async () => {
+     assert.match(spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" }).stdout, /--commit <sha>/u);
+   });
+ });
++
++test("a named candidate prepares committed npm dependencies before Verify without copying checkout packages", async () => {
++  const scratch = join(process.cwd(), "scratch");
++  mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "g22-project-"));
++  const bin = mkdtempSync(join(scratch, "g22-bin-"));
++  try {
++    mkdirSync(join(root, ".claude"));
++    writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: basename(root), verify: "node -e \"process.exit(require('fs').existsSync('node_modules/.g22-ready')?0:9)\"" }));
++    writeFileSync(join(root, ".gitignore"), "/evidence/\n/node_modules/\n");
++    writeFileSync(join(root, "README.md"), "first\n");
++    prepareConsumerVerify({ rootDir: root });
++    git(root, ["init", "-q"]);
++    commitFile(root, [".claude/pipeline.json", ".gitignore", "README.md", "project/consumer-verify.mjs"], "first");
++    const first = git(root, ["rev-parse", "HEAD"]);
++    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "g22", version: "1.0.0", packageManager: "npm@10.0.0", dependencies: { dep: "1.0.0", other: "2.0.0" } }));
++    writeFileSync(join(root, "package-lock.json"), JSON.stringify({ name: "g22", version: "1.0.0", lockfileVersion: 3, packages: { "": { dependencies: { other: "2.0.0", dep: "1.0.0" } }, "node_modules/dep": { version: "1.0.0" }, "node_modules/other": { version: "2.0.0" } } }));
++    const candidate = commitFile(root, ["package.json", "package-lock.json"], "candidate with dependencies");
++    writeFileSync(join(root, "README.md"), "later\n");
++    commitFile(root, ["README.md"], "later head");
++    mkdirSync(join(root, "node_modules"));
++    writeFileSync(join(root, "node_modules", ".g22-ready"), "host package");
++    const fake = join(bin, "fake-npm.mjs");
++    const log = join(bin, "calls.jsonl");
++    writeFileSync(fake, `#!/usr/bin/env node\nimport { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\nappendFileSync(process.env.G22_NPM_LOG, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }) + '\\n');\nif (process.argv[2] === '--version') console.log('10.0.0');\nelse if (process.env.G22_NPM_FAIL === '1') process.exitCode = 7;\nelse { mkdirSync('node_modules'); writeFileSync(join('node_modules', '.g22-ready'), 'prepared'); }\n`);
++    chmodSync(fake, 0o755);
++    const priorLog = process.env.G22_NPM_LOG;
++    process.env.G22_NPM_LOG = log;
++    const prepareDependencies = ({ root: worktree, commit }) => prepareCommitWorktreeDependencies({ root: worktree, commit, npmExecutable: process.execPath, npmPrefixArgs: [fake] });
++    try {
++      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies: () => ({ status: "not-required" }) }),
++        error => error.code === "VEP-VERIFY-FAILED", "the original unprepared worktree must fail its configured test");
++      assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
++      const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies });
++      assert.equal(result.status, "passed");
++      assert.equal(result.evidence.commit, candidate);
++      assert.equal(readFileSync(join(root, "node_modules", ".g22-ready"), "utf8"), "host package");
++      const calls = readFileSync(log, "utf8").trim().split("\n").map(JSON.parse);
++      assert.deepEqual(calls.map(call => call.argv), [["--version"], ["ci", "--ignore-scripts", "--no-audit", "--no-fund"]]);
++      assert.equal(calls[0].cwd, calls[1].cwd);
++      assert.notEqual(calls[0].cwd, root);
++      assertNoCommitWorktree(root);
++      process.env.G22_NPM_FAIL = "1";
++      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies }),
++        error => error.code === "VEP-DEPENDENCY-SETUP");
++      assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
++      assertNoCommitWorktree(root);
++      assert.throws(() => prepareCommitWorktreeDependencies({ root, commit: candidate, npmExecutable: process.execPath, npmPrefixArgs: [fake] }),
++        error => error.code === "VEP-DEPENDENCY-CANDIDATE");
++      unlinkSync(join(root, "package-lock.json"));
++      const missingLock = commitFile(root, ["package-lock.json"], "missing lock");
++      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: missingLock, prepareDependencies }),
++        error => error.code === "VEP-DEPENDENCY-LOCK");
++      assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
++      assertNoCommitWorktree(root);
++      writeFileSync(join(root, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": { dependencies: { dep: "2.0.0" } } } }));
++      const staleLock = commitFile(root, ["package-lock.json"], "stale lock");
++      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: staleLock, prepareDependencies }),
++        error => error.code === "VEP-DEPENDENCY-LOCK");
++      assertNoCommitWorktree(root);
++    } finally {
++      if (priorLog === undefined) delete process.env.G22_NPM_LOG; else process.env.G22_NPM_LOG = priorLog;
++      delete process.env.G22_NPM_FAIL;
++    }
++  } finally { rmSync(root, { recursive: true, force: true }); rmSync(bin, { recursive: true, force: true }); }
++});
++
++test("candidate npm preparation uses the existing closed Windows shim vector outside the worktree", () => {
++  const nodeDirectory = "C:\\tools\\node";
++  const candidate = "C:\\project\\candidate";
++  const cmd = "C:\\Windows\\System32\\cmd.exe";
++  const npm = `${nodeDirectory}\\npm.CMD`;
++  const files = new Set([npm.toLowerCase(), cmd.toLowerCase(), `${candidate}\\npm.CMD`.toLowerCase()]);
++  const lstatSyncFn = (path) => {
++    if (!files.has(path.toLowerCase())) { const error = new Error("ENOENT"); error.code = "ENOENT"; throw error; }
++    return { isFile: () => true, isSymbolicLink: () => false };
++  };
++  const options = { root: candidate, resolutionCwd: nodeDirectory, platform: "win32",
++    environment: { PATH: nodeDirectory, PATHEXT: ".CMD", SystemRoot: "C:\\Windows" }, lstatSyncFn };
++  const version = planCommitNpmInvocation(["--version"], options);
++  const install = planCommitNpmInvocation(["ci", "--ignore-scripts", "--no-audit", "--no-fund"], options);
++  assert.equal(version.executable, cmd);
++  assert.deepEqual(version.args.slice(0, 4), ["/d", "/s", "/v:off", "/c"]);
++  assert.match(version.args[4], /^""C:\\tools\\node\\npm\.CMD" "--version""$/u);
++  assert.match(install.args[4], /^""C:\\tools\\node\\npm\.CMD" "ci" "--ignore-scripts" "--no-audit" "--no-fund""$/u);
++  assert.equal(install.options.cwd, candidate);
++  assert.equal(install.options.shell, false);
++  assert.equal(install.options.windowsVerbatimArguments, true);
++  assert.throws(() => planCommitNpmInvocation(["a&b"], options), error => error.code === "CAPTURE-EVIDENCE-WINDOWS-NPM-ARGUMENT-UNSUPPORTED");
++});

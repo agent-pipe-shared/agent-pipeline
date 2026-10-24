@@ -1,0 +1,21 @@
+command: node --test --test-name-pattern=Windows plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+label: g19-preflight-windows
+exitCode: 0
+head: 31db7853a71d3b9e72c864f5aced91a69a0ecee9
+tree: 388cccb98519df3d415e18f392f306ec4cc2c532
+dirty: true
+--- stdout ---
+✔ Windows authority refusal closes bootstrap before requester and Verify with all path-class causes (2883.690626ms)
+✔ Windows custody refusal also closes a pending hook action until reinspection (2645.186928ms)
+✔ trusted Windows custody leaves bootstrap ready (2580.96202ms)
+✔ malformed Windows observation cannot silently mark bootstrap ready (2632.21309ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11627.074757
+
+--- stderr ---

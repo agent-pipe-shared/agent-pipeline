@@ -1,0 +1,15 @@
+{
+  "schema": "pipeline.delivery-reader-output-validation.v1",
+  "head": "31db7853a71d3b9e72c864f5aced91a69a0ecee9",
+  "total": 174,
+  "counts": {
+    "25": 3,
+    "50": 25,
+    "75": 146,
+    "100": 0,
+    "UNKNOWN": 0
+  },
+  "index": 70.55,
+  "errors": [],
+  "status": "valid"
+}

@@ -1,0 +1,738 @@
+[
+  {
+    "itemId": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Pin file recounted GREEN 8 of 8, 0 skip on fbaec36bc (specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md), after the guard-lane commits of 2026-10-22; no commit since touches the env-dump lane.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.advertised-git-to-head-pipeline-is-refused",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "The baseline 174/174 counted GREEN pin still qualifies the bounded command forms; f5c00e20a adds cases for admitted and refused forms. Independent review and PO acceptance remain open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-b.md",
+      "d1b94383a",
+      "037cd7619",
+      "f5c00e20a"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Pin file recounted GREEN 15 of 15, 0 skip on fbaec36bc (pin-counted-results-2026-10-22b.md); only a backlog text commit (d24f5ac31) touches the item since base.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "d24f5ac31"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "The clause missing at baseline (non-authoritative cause under the DWP2-PHYSICAL-OR-GIT relabel) is now pinned by d11a0b266, whose message states pin file 10 cases, 10 pass with a mutation check; the PO decision is on record as D65 / AC-104 and the item's Reconciled 2026-10-23 section says the ancestor predicate (dev/ino/mode) landed in d02409a8a. Recount 10 of 10 on fbaec36bc.",
+    "evidence": [
+      "d11a0b266",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "d24f5ac31",
+      "037cd7619"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "D65 requires a security read of the ancestor-predicate change in the Critic batch; not done."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Pin file recounted GREEN 19 of 19, 0 skip on fbaec36bc (pin-counted-results-2026-10-22b.md); 71ab3eda7 (answered-receipt verifier now compares the candidate tree) adds cases without changing the item.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "71ab3eda7"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Commit f85846c3d states the counted result: generate-agent-obligations.test.mjs 13 cases, 13 pass, 0 fail, 0 skipped, with three contract cases driving the recommended -F spelling through guard-push, guard-git and guard-lifecycle-ready plus a negative control per guard; this is the Proposal's required agreement pin. The item's Reconciled 2026-10-23 section confirms the cheap option landed.",
+    "evidence": [
+      "f85846c3d",
+      "afe6b7f61",
+      "80c5a9922",
+      "a34415842",
+      "037cd7619"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "The 0.7.0 candidate host checklist that the Triage names as the closing condition has not run."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Pin file recounted GREEN 9 of 9, 0 skip on fbaec36bc (pin-counted-results-2026-10-22b.md; 7 at baseline, AP8/AP9 added); generator derives the bound from the guard export (8c9597e04); no later commit changes it.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "8c9597e04",
+      "7b1b4083b"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "The 0.7.0 candidate host checklist that the Triage names as the closing condition has not run."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The route pin has a committed serial recount of 14/14 GREEN after d80719e5f. The original first acceptance requires a real Antigravity greenfield happy path; the newer report describes blocked subagent dispatch on an older build, and no qualifying installed-host completion is recorded for this candidate. Under PO decision tile batch 10, the 14/14 counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "aa9b85443",
+      "d80719e5f",
+      "baa39a399",
+      "7ca466eef",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md",
+      "specs/sprint-alfred-epic/plans/greenfield-findings-2026-10-23.md"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "An Antigravity greenfield run must complete the happy path on an installed candidate."
+      },
+      {
+        "owner": "native-host",
+        "what": "F-05 parallel writes need a live Antigravity run to confirm the hook race is real or fixed."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.agy-el01-write-authorization-gap",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Commit 892cc7dc6 (D86, EL-01 tripwire fails closed) states the pin agy-el01-write-authorization-gap at 27/27 and guard-el01-tripwire.test at 20/20; 752e618ca added the fail-closed cases (20 RED then green) and feb6a3724 records the AC-109 disposition (D63 closes it as not reconstructable, so no carrier or worker-scope behaviour is owed). The 3 of 3 count at fbaec36bc predates these.",
+    "evidence": [
+      "892cc7dc6",
+      "752e618ca",
+      "feb6a3724",
+      "972a5f769",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md"
+    ],
+    "open": [
+      {
+        "owner": "agent",
+        "what": "Three fail-open conditions are reported open and unchanged: unparseable hook input, a spec with no Risk class row, an open dispatch record not bound to the caller."
+      },
+      {
+        "owner": "critic",
+        "what": "D86 orders a Critic security read of the tripwire change; not done."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The baseline fixture pin is 19/19 GREEN, and the installed intermediate candidate does not supply the original real Antigravity S1-S6 loaded-root and version-correct acceptance run. Under PO decision tile batch 10, the 19/19 counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "844ddec0c",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-b.md",
+      "7ca466eef",
+      "f2aee4ec2",
+      "specs/sprint-alfred-epic/plans/sitting-preparation-index-2026-10-23.md"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "Spike S1-S6 on the real agy CLI and the loaded-root proof in a new session are not done."
+      },
+      {
+        "owner": "native-host",
+        "what": "Whether the real Antigravity host resolves a relative entries[].path against the workspace is unverified."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "Pin file unchanged and recounted 12 cases, 11 pass, 1 skip on fbaec36bc; the skipped case is the native fresh-runner observation the acceptance names, and a typed skip does not qualify it. Only a backlog text commit (d24f5ac31) touches the item since base. Under PO decision tile batch 10, the 11 pass, 1 native skip counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "d24f5ac31"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "The native fresh-runner first-start observation (the skipped case) needs a real Antigravity run."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The baseline fixture pins cover version admission, and f2aee4ec2 supplies a freshly stamped intermediate build. The original real Agy global update and first greenfield preflight are still unmeasured. Under PO decision tile batch 10, the 33/33 and 5/5 counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "d24f5ac31",
+      "f2aee4ec2",
+      "specs/sprint-alfred-epic/plans/sitting-preparation-index-2026-10-23.md"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "Real Agy global update and first greenfield preflight on a freshly stamped candidate."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Pin file recounted GREEN 11 of 11 on fbaec36bc covering all four Proposal points; 0c36f26dc adds device-switch survival cases in rebind-approval.test.mjs (counted 10 cases, 9 pass, 1 todo on abb58235e) and the K29 fix 8e2a83190 landed, so the recurrence clause gained coverage.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "0c36f26dc",
+      "8e2a83190",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-b.md"
+    ],
+    "open": [
+      {
+        "owner": "agent",
+        "what": "One todo case in rebind-approval.test.mjs (inspect of an unverifiable approval lists rebind-approval) still fails on the fixture clone."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Pin file recounted GREEN 9 of 9, 0 skip on fbaec36bc (pin-counted-results-2026-10-22b.md); only a backlog text commit (d24f5ac31) touches the item since base.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "d24f5ac31"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "The baseline skipped link-escape stub now has a real body (8998a5299: pin file 5 cases, 5 pass, 0 skip) and the recount is GREEN 5 of 5 on fbaec36bc; guard-devplan is now 86 of 86 on 905fb7568, so the devplan-lane opaque-perl gap no longer shows as a whole-file failure (5710ea06d refuses perl/ruby/php/lua like node).",
+    "evidence": [
+      "8998a5299",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-c.md",
+      "5710ea06d"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Pin file recounted GREEN 6 of 6, 0 skip on fbaec36bc (pin-counted-results-2026-10-22b.md); no commit since base changes the item.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "The baseline 18/18 pin remains counted GREEN; 57c12ecc0 adds installer refresh of stale mandatory hook snapshots, and ee26907e9 adds a committed 2/2 mid-session trusted-refresh witness. Independent review and PO acceptance remain open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-d.md",
+      "d24f5ac31",
+      "57c12ecc0",
+      "ee26907e9",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/g30-integrated-midsession.txt"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.bounded-reader-terminal-binding",
+    "stage": "50",
+    "baselineStage": "50",
+    "reason": "The bounded terminal checker and historical-course pin are now committed, with K140 counted 21/21 GREEN at 9b915ddd1. The original actual Alfred 2+1 Reader terminal record and owner acceptance remain absent.",
+    "evidence": [
+      "49a68658a",
+      "a8c5492a1",
+      "509a1e568",
+      "0c15bf602",
+      "037cd7619",
+      "e4bdffdb2",
+      "2a2fbad15",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "9b915ddd1",
+      "specs/sprint-alfred-epic/plans/sitting-preparation-index-2026-10-23.md"
+    ],
+    "open": [
+      {
+        "owner": "agent",
+        "what": "Run the planned 2+1 Reader course on the content-frozen state and write the terminal record with the adjudicated form."
+      },
+      {
+        "owner": "po-decision",
+        "what": "Owner acceptance and the policy-transition field are unset for the PO."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Commit 5f1b1a573 adds the two missing Proposal cases (project-onboarding-v3 consumer, win32 dialect) and states pin file 12 cases, 12 pass (was 9); recount 12 of 12 on fbaec36bc. The model gap is decided in D66 and rides with the AC-9 adoption, whose signed decision is recorded in 213497dca / f9ad83077.",
+    "evidence": [
+      "5f1b1a573",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "213497dca",
+      "f9ad83077",
+      "21fee38d1"
+    ],
+    "open": [
+      {
+        "owner": "agent",
+        "what": "Confirm that the established-with-ratchet state of D66 is covered by the signed AC-9 adoption or pin it; no committed test names it."
+      },
+      {
+        "owner": "native-host",
+        "what": "The 0.7.0 candidate host checklist that the Triage names as the closing condition has not run."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Pin file recounted GREEN 10 of 10 on fbaec36bc, and guard-dispatch-budget-checkpoint.test.mjs is GREEN 15 of 15 and the grant-notice suite 5 of 5 on abb58235e after the D75 wording commits; 829fe66fd pins the continuation card.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-b.md",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "829fe66fd",
+      "1f3fc1b96"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.capability-inventory-checker-is-red-at-head",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "The original inventory pin was counted 17/17 GREEN. The formerly held C27 inventory and suite registration changes are committed in the sitting, and the post-sitting capability-inventory check reports PASS on f4eff0f7b; the prior signature application entry is closed.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23.md",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "specs/sprint-alfred-epic/evidence/sitting/post-sitting-results-2026-10-23.md",
+      "f4eff0f7b"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "PO tile batch 11 confirmed the reconstructed AC-122 text, and the item file is committed. The original native win32 cmd/npm launch clauses remain typed skips in the counted 9 pass, 2 skip suite; G24 commit 18d8f3c83 repairs cross-schema output collision, not this launcher acceptance. Under PO decision tile batch 10, the 9 pass, 2 native skips counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-d.md",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md",
+      "18d8f3c83"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "The native win32 cmd/npm launch cases need a native Windows run."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "The pin catalogue-admit-prescribed-lifecycle-verbs is GREEN 19 of 19, 0 skip on abb58235e (the receipt-alias stub got a real body in 2ab34a064) and the canonical D64 integration pin, lifecycle-coordination-commands-refused-as-implementation-writes, is 30 pass + 1 skip on the same commit; both pin the absolute node executable spelling. The D64 case 'from a fresh repository to the first implementation dispatch with zero overrides' is in that canonical pin, and the Reconciled 2026-10-23 section confirms it.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-b.md",
+      "2ab34a064",
+      "2c637751f",
+      "e144dc3c8",
+      "aa59a94b4"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "Re-run the Codex WSL greenfield on an installed candidate and reach the first implementation dispatch with no chat overrides."
+      },
+      {
+        "owner": "native-host",
+        "what": "The native Windows Git Bash walk (AC-207 point 5) is a typed skip and is not claimed."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.claude-design-readiness-cannot-start-on-windows",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "Pin file GREEN 10 of 10 on fbaec36bc and on 756248e0d, 0 skip, but the acceptance's typed sub-reasons (R4-9, R4-10) are deliberately not revived under D63 / ADR-0085 and no native Windows run exists; nothing since base changes that. Under PO decision tile batch 10, the 10/10 counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-d.md",
+      "f42759c92",
+      "d24f5ac31"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "A native Windows run of Claude design readiness."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "aac9e262f adds real-apply cases (e) and (f) for a Claude-only and an Antigravity-only project plus later Codex activation; pin recounted GREEN 12 of 12 on fbaec36bc, but the acceptance 'verify across all three runners and supported host platforms' still lacks the Codex-enrolling native walk, Windows and macOS hosts. Under PO decision tile batch 10, the 12/12 counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "aac9e262f",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "d24f5ac31"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "Codex-enrolling and Antigravity native walks on real installed hosts, Windows and macOS."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+    "stage": "75",
+    "baselineStage": "75",
+    "reason": "Pin file GREEN 13 of 13, 0 skip, on fbaec36bc and again on 756248e0d (pin-counted-results-2026-10-23-d.md); codex-session-start-hint is 9 of 9 on 905fb7568.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-d.md",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-c.md"
+    ],
+    "open": [
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The sitting committed the C17 POSIX-path test repair, and 928aaf07a restated the V-10 header against the PO ruling. The original live two-approval Claude/Windows path is still skipped and the reported CAS/missing failure is not located. Under PO decision tile batch 10, the 41 pass, 1 native skip counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-d.md",
+      "c080a1e22",
+      "10d12d897",
+      "f294d0fa3",
+      "dc7b8273c",
+      "c4b2a66bd",
+      "38e94a0ef",
+      "aa59a94b4",
+      "770d82311",
+      "928aaf07a",
+      "specs/sprint-alfred-epic/plans/sitting-preparation-index-2026-10-23.md"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "Live interactive Claude/Windows run reaching implementation and push within the two-approval happy path."
+      },
+      {
+        "owner": "native-host",
+        "what": "Locate the PO's CAS/missing failure on a Windows run of the new candidate."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The baseline suite counted 14 pass and one native win32 AP5 skip. G23 6db0d31f8 improves bounded read/help admission, but no committed native Windows AP5 case-differing-root result qualifies the original clause. Under PO decision tile batch 10, the 14 pass, 1 native skip counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-d.md",
+      "6171ea5c6",
+      "d24f5ac31",
+      "6db0d31f8"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "AP5 case-differing session root needs a native Windows run."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  },
+  {
+    "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+    "stage": "75",
+    "baselineStage": "50",
+    "reason": "The baseline pin and custody suite are counted GREEN for source behavior. The affected installed-build greenfield design-package replay remains unrecorded; the newer Codex report and K147 scratch proposal do not qualify the original host clause at this candidate. Under PO decision tile batch 10, the 9/9 and 12/12 counted GREEN Linux-reachable coverage supports stage 75; native host acceptance remains open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22b.md",
+      "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-d.md",
+      "d24f5ac31",
+      "specs/sprint-alfred-epic/plans/greenfield-findings-2026-10-23.md"
+    ],
+    "open": [
+      {
+        "owner": "native-host",
+        "what": "Installed-build replay of the affected greenfield design package on a real Codex host."
+      },
+      {
+        "owner": "critic",
+        "what": "Independent Critic review of the batch has not finished."
+      },
+      {
+        "owner": "po-acceptance",
+        "what": "PO acceptance is missing."
+      }
+    ]
+  }
+]

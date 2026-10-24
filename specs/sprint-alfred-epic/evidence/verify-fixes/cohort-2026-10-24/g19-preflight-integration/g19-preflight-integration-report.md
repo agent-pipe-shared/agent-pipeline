@@ -1,0 +1,36 @@
+# G19-PREFLIGHT-INTEGRATION — nine-path custody report
+
+Base: `31db7853a71d3b9e72c864f5aced91a69a0ecee9`. Candidate: exactly nine paths staged, uncommitted, in `scratch/clones/g19-preflight-integration`. Import: `node scripts/apply-diff.mjs <repo>/scratch/g19-preflight-only-v2.patch`, exit 0. Cumulative patch: `scratch/agent-out/g19-preflight-integration/g19-preflight-integration.patch` (26,891 bytes), exported from the exact staged paths. No native Windows or host-commit claim.
+
+## 1. DoD results and evidence
+
+- Passed — pure readiness, including strict ancestor and writable plugin negatives: `node --test plugins/pipeline-core/lib/windows-authority-readiness.test.mjs`, exit 0, 9/9. Machine capture: `scratch/agent-out/g19-preflight-integration/readiness.log`.
+- Passed — injected early Windows preflight behavior: `node --test --test-name-pattern=Windows plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs`, exit 0, 4/4. Machine capture: `scratch/agent-out/g19-preflight-integration/preflight-windows.log`.
+- Passed after an owned inventory correction — `node --test plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs`, exit 0, 11/11 internal checks. Initial run exited 1 with three missing current G28 transitive imports. Machine captures: `scratch/agent-out/g19-preflight-integration/kernel-closure.log` and `kernel-closure-green.log`.
+- Passed — `node --test harness/scripts/check-consumer-safe-paths.test.mjs plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs`, exit 0, 17/17. Machine capture: `scratch/agent-out/g19-preflight-integration/consumer-skill.log`.
+- Passed — `node --check plugins/pipeline-core/lib/session-requester-bridge.mjs`, `node --check plugins/pipeline-core/scripts/pipeline-start-preflight.mjs`, and `git diff --check`, each exit 0. Machine captures: `syntax.log`, `preflight-syntax.log`, `diffcheck.log` in the same output directory.
+- Not verifiable — native Windows ACL/SID behavior, real requester/Verify behavior, and installed plugin qualification. No configured quick route exists. Integrated Full Verify and independent Critic review belong to the parent. Project resource criterion and candidate-bound measurement were not supplied; headroom is unknown, with no compliance claim.
+
+## 2. Changed files
+
+- `plugins/pipeline-core/lib/windows-authority-readiness.mjs` and `.test.mjs`: aggregate project, plugin and private causes through injected read-only probes; preserve strict ancestor refusal and bounded SID-based repair preview.
+- `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` and `.test.mjs`: surface the closed Windows readiness status before requester/Verify; preserve worktree common-Git-directory discovery and trusted success.
+- `plugins/pipeline-core/lib/session-requester-bridge.mjs`: retain a closed `WIN-AUTH-*` cause on unavailable verification-child results.
+- `plugins/pipeline-core/lib/guard-maintenance-window.mjs` and `docs/guard-maintenance-window-threat-model.md`: include readiness in the never-liftable kernel inventory; add three current G28 transitive imports identified by the kernel examiner.
+- `plugins/pipeline-core/skills/pipeline-start/SKILL.md` and `references/onboarding-recovery.md`: describe the closed status and operator-reviewed recovery without automatic ACL mutation.
+
+## 3. Deliberately not changed
+
+K156-owned `plugins/pipeline-core/scripts/pipeline-state.mjs` and `plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs`; native PowerShell ACL policy; PRD/Spec; acceptance examiners; live account, home, ACL, State, Result and approval stores; main checkout; Verify pins. The excluded State/calibration hunks remain only in the old G19v2 proposal.
+
+## 4. Deviations and custody
+
+The original nine-path patch applied cleanly. The current G28 base exposed three kernel inventory omissions; only the two owned inventory files were extended. The initial failing capture was retained. The generated commit flow staged exactly nine paths. Its relative message path was refused by GIT-03 because the guard resolved it in the main checkout; an absolute message path reached Git, which exited 128 for missing author identity. No identity was configured or invented, and no commit was created. The old eleven-path G19v2 evidence, attempts and costs remain intact. The PO-approved no-opening-record exception was followed.
+
+## 5. Open items
+
+Commit: blocked by absent clone-local Git author identity; parent has a legitimate identity for ordinary integration. Native Windows qualification and operator-reviewed SID/path repair, if indicated: pending. Integrated Verify: pending. Independent frozen-batch review: pending. PO acceptance: open. Targeted delivery: green for this pure early diagnostic slice only.
+
+## 6. Recovery pointer and call custody
+
+Import the exact cumulative patch through `scripts/apply-diff.mjs` or use the staged clone diff, preserving the nine-path boundary and current G28 inventory entries. Then run integrated checks and native Windows qualification without treating injected results as native PASS. No commit, reset, stamp, install, push or Critic was performed here. The dispatch used 38 tool calls through the original final handoff, counting yielded waits and parent messages; the procedural patch export and this report followed the parent's completion request. Denials/refusals retained: clone-relative evidence read (`GUARD-READ-TARGET-MISSING`), brace-expanded evidence read and `ls` (`GUARD-READ-COMMAND-UNSUPPORTED`), relative commit-message path (`GIT-03-UNREADABLE-MESSAGE-FILE`), and Git author identity (exit 128). No refused action was bypassed.
