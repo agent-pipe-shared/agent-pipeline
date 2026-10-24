@@ -8,9 +8,11 @@
 - The PO supplied both additional Greenfield reports and mandated every P0/P1 finding in the approved fix wave. Complete intake G18-G32 and source confirmations: `specs/sprint-alfred-epic/plans/plan_greenfield-followup-2026-10-24.md`. Existing G6/G7/G10/G17 and the remaining Verify reds stay in scope.
 - PO direction: extend existing delivery machinery, use existing accepted ACs, no new design course. PRD and Spec must not change without explicit PO permission; neither has changed. Signature-dependent work is collected until the PO is at a terminal; questions may be answered from mobile.
 - The PO extended the one-task K146 methodological exception to the approved fix wave: fresh workers, owned inert clones, focused tests and truthful patch reports. No native host integration was observed for these Codex workers; no native receipts or automatic commits are claimed.
-- Committed proposal packages: K146 carrier/generated-briefing repair (`evidence/verify-fixes/k146-protected-proposal.patch`, report beside it), and K152A Antigravity native file-tool coverage (`evidence/verify-fixes/k152a-native-tools.diff`, focused proposal check and report beside it), relative to the Alfred spec directory. The PO separately approved K146 application and ordinary checks/commit with hooks enabled; source commit `a0feac3a4` succeeded through ordinary hooks. Main generator 76/76 and synthetic carrier/model 4/4 pass. K152A remains inert, its proposal regression RED 0/3 to GREEN 3/3. Broader native qualification, Full Verify, independent Critic, and PO acceptance remain open.
-- Fresh proposal workers are preparing K150B/G31 signing disclosure/proof handoff, G17 Codex Critic baseline, and K152B Antigravity model enforcement. They do not own main tracked source. No stamp, install, push, release, Critic batch or C28 re-pin has been performed.
+- Source integrated through ordinary active hooks after specific PO approvals: K146 `a0feac3a4`, K152A native file tools `43e04b207`, K152B explicit native models `eac1d2dc8`. Combined model/read checks 39/39, selected QP4 2/2, native file-tool synthetic integration 3/3, generator 76/76, consumer 9/9 and regenerated documentation contracts 76/76 pass. No native host integration or qualification is inferred.
+- The PO also approved G23 scoped reads/help. Its seven-path source patch is applied, but the normal commit was refused on three `PB-GUARD-HOOKS` files with `PB-COMMIT-OVERRIDE-NONOVERRIDABLE`. No bypass; source remains pending a collected manual operator commit. No signature capability or HEAD-bound signing command is outstanding. Decision/operator queue: `specs/sprint-alfred-epic/plans/po-pending-codex-2026-10-24.md`.
+- Further packages are inert: K150B/G31 v2 focused correction is green; G32 remote identity repair is green; G19 Windows readiness v2 has pure source checks green but native Windows unrun. G17 actual launch qualification, G21 authenticated legacy Result recovery and G20 independent review/rigor completion have bounded continuation owners. G25/G27 has a partial source proposal; remaining intake stays open. The detailed plan table owns exact status. No stamp, install, push, release, Critic batch or C28 re-pin has been performed.
 - Automatic approval review initially rejected live K146 application under the inert-only scope. After a specific PO tile explicitly authorized this exact patch, the sanctioned import helper applied it successfully. No rejection was bypassed, and no signature command is outstanding. The PO requests decision needs be collected until available; do not block unrelated repair work or repeatedly send decisions while the PO is away.
+- The PO proposed a later intermediate stamp and installation after operator commits. Prepare that candidate after passing integration checks and verifying the new dispatch gate supports the approved working route; do not stamp now on the question alone. The PO installs; actual loaded-source readback follows installation. Open P0/P1, native qualification, integrated Verify, Critic, Reader round three and acceptance remain explicit.
 
 **Earlier session cut (2026-10-24, Claude tokens exhausted until Sunday 2026-10-25 21:00; the PO continues two days with Codex as the Elephant):**
 - Detailed state, queue, mechanics and standing rules: `specs/sprint-alfred-epic/plans/handover-codex-switch-2026-10-24.md`. Read `CLAUDE.md` in
@@ -239,6 +241,12 @@ This is a transfer checkpoint, not release, installation readiness or acceptance
 Claude continuation ledger (batches, collected patches, PO topics):
 [claude-session-2026-10-12](../specs/sprint-alfred-epic/plans/claude-session-2026-10-12.md).
 
+## Archived history
+
+| Date range | Summary | Archive |
+|---|---|---|
+| 2026-10-24 | Historical October 12 integration and runtime cut; current continuation stays in state | [docs/state-archive/2026-10-24--codex-greenfield-history.md](state-archive/2026-10-24--codex-greenfield-history.md) |
+
 ## Scope and measurable progress
 
 The delivery scope remains 174 original backlog items, 37 ACs and four incident
@@ -287,71 +295,6 @@ Retained Sentinel Epic authority (`governance/spec-retention.json`, archive
 [recovery](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md),
 [platform support](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md),
 [Windows blockers](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
-
-## Commits and genuine remaining gates
-
-Item commit `5422e4b6e` normalizes three open schemas and records the candidate
-admission defect. The official reconciler then recorded five initial open events;
-the strict backlog checker passed, with 22 accepted historical DRIFT findings.
-Ledger/projection commit: `7530c94fc`. No item closure was asserted.
-
-The live Main Alfred changes are now committed at
-`d02409a8a7e63067f3cc2964b98e7d39e6ab57b6`: 317 public files, parent
-`8d87a95bcb04a9edfad3998fd34ed7d827039156` (portable documentation/evidence).
-The human signed intent
-`ee0b27b272019a22e935c85ccc4efebb713f2577fe6245ead641d3e6f36d1aae`;
-the installed official authorizer verified the exact staged package and the
-native Commit hook accepted its integration binding. The earlier 144-path
-proof was not reused. Working tracked Source was unchanged after commit.
-The [transparent composition helper](../specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/README.md)
-records the explicit scope, real strict check outside every Git repository,
-and exact 317-blob staged readback. Both PowerShell blobs retain matching LF
-bytes. Its request, public proof and actual signing review material are retained
-with canonical artifact hashes. This is packaging evidence, not functional
-test, independent Critic or Full Verify evidence.
-
-A feature checkpoint push supports honest WIP without claiming Critic/Full Verify
-PASS. It still requires a clean final HEAD, one Checkpoint-Intent trailer and the
-exact separate push signature. No commit may follow that final push approval.
-
-## Runtime, reviews and continuation
-
-This ready session retains Coordinator authority, implementation phase,
-`sprint-alfred-epic`, continuity revision 32. Main State is current but governed
-delivery queue admission remains `SQ-DELIVERY-STATE-UNAVAILABLE`; do not fabricate
-a queue, requester, host identity or native dispatch. A fresh runtime must follow
-AGENTS/map/decisions and the installed pipeline-start entry before productive work.
-
-The installed C2 lineage is `2137b756448606516528697a12945af18bb96943`,
-tree `517f1b1733164b9d34355db3dcfd60597f0ebee0`, parent
-`a7a9b3cfa2dd32407f8e7b1d80959f1090c77859`.
-[C2 handover](../specs/sprint-alfred-epic/plans/handover-2026-10-11-egm-local-stamped-candidate.md)
-preserves the distinction from Main; do not transplant private lifecycle state.
-Codex plugin version observed here was `0.7.0+codex.20261011202443.a7a9b3cf`;
-another PC must independently observe its own installation and model.
-
-No technical batch Critic or Full Verify PASS exists. C2 Full Verify stopped
-before suites at augmentation registration. Critic target provenance,
-committed membership/Main relationship and genuine current inputs remain held.
-The PO selected an additional authenticated review-before-Main course; its seven
-code proposals and 17 controlled negative checks are preserved, while genuine
-positive admission, original-budget/membership, M4-positive and correction-carrier
-evidence remain absent. The selection joins the common design package, not a
-self-approved architecture exception or runtime activation.
-
-The whole-item operating contract remains: one Goldfish performs item analysis,
-test cases, code and targeted fixes; reserve overlapping files and run disjoint
-items concurrently. Elephant consumes matched evidence instead of routinely
-rerunning targeted tests. Coherent batches use one FULL Critic plus at most three
-DIFFs; one fresh Correction Goldfish owns follow-up fixes. Independent work must
-continue during Main review/Verify. Feature work is temporarily frozen only to
-make this transfer checkpoint stable.
-
-Optional model evidence absence under an otherwise ready preflight is not a new
-lifecycle gate. Unsupported read spelling can follow the guard's admitted
-grammar guidance; actual path, role, authority and mutation refusals stay binding.
-`/tmp/.git` was present on this host; use explicitly reviewed owned throwaway
-directories outside every repository, never global deletion or fake environments.
 
 ## Historical detail
 
