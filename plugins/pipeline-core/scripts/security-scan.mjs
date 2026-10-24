@@ -111,6 +111,7 @@ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 // SHARED absent-key default both consumers use) -- see that function's own doc comment for
 // why "blocking" was chosen and why it moved rather than staying duplicated here.
 import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
+import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
 import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
 
 import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
@@ -355,7 +356,7 @@ function inspectInventory(bytes) {
  * and after scanner execution. A missing or dirty Git materialization is typed
  * uncertainty, never a clean security subject.
  */
-function observeCandidate(rootDir) {
+function observeCandidate(rootDir, remoteName = null) {
   const commit = gitText(rootDir, ["rev-parse", "HEAD"]);
   const tree = gitText(rootDir, ["rev-parse", "HEAD^{tree}"]);
   const status = gitText(rootDir, ["status", "--porcelain=v1", "--untracked-files=all"]);
@@ -368,15 +369,19 @@ function observeCandidate(rootDir) {
     inventory: null, reason: inspected.reason,
   };
   const clean = status.length === 0;
-  const remote = gitText(rootDir, ["config", "--get", "remote.origin.url"]);
-  const repositorySha256 = remote && remote.length > 0
-    ? createHash("sha256").update(remote.toString("utf8").trim()).digest("hex") : null;
+  const remote = resolveSecurityRemoteIdentity(rootDir, remoteName);
+  if (!remote.ok) return {
+    status: "unsupported", commit: commit.toString("utf8").trim(), tree: tree.toString("utf8").trim(),
+    inputSha256: createHash("sha256").update(inventory).digest("hex"), repositorySha256: null,
+    inventory: { entries: inspected.entries, symlinkPolicy: "reject", submodulePolicy: "reject" },
+    reason: remote.reason,
+  };
   return {
     status: clean ? "clean" : "dirty",
     commit: commit.toString("utf8").trim(),
     tree: tree.toString("utf8").trim(),
     inputSha256: createHash("sha256").update(inventory).digest("hex"),
-    repositorySha256,
+    repositorySha256: remote.repositorySha256,
     inventory: { entries: inspected.entries, symlinkPolicy: "reject", submodulePolicy: "reject" },
     reason: clean ? null : "working-tree-not-clean",
   };
@@ -434,7 +439,7 @@ function securityPolicyBinding(scanRoot, authority, manifest, blockOn, mode) {
  * root whose bytes cannot be shadowed by this process's mutable worktree. The
  * detached worktree is disposable and is never used for the evidence output.
  */
-function materializeCandidate(rootDir, candidate) {
+function materializeCandidate(rootDir, candidate, remoteName = null) {
   if (candidate.status !== "clean") return { ok: false, reason: candidate.reason ?? `candidate-${candidate.status}` };
   let parent;
   try { parent = mkdtempSync(join(tmpdir(), "pipeline-security-candidate-")); } catch { return { ok: false, reason: "snapshot-temp-unavailable" }; }
@@ -444,7 +449,7 @@ function materializeCandidate(rootDir, candidate) {
     try { rmdirSync(parent); } catch { /* bounded scratch cleanup */ }
     return { ok: false, reason: "snapshot-materialization-failed" };
   }
-  const observed = observeCandidate(snapshotRoot);
+  const observed = observeCandidate(snapshotRoot, remoteName);
   if (!sameCandidate(candidate, observed)) {
     gitResult(rootDir, ["worktree", "remove", "--force", snapshotRoot]);
     try { rmdirSync(parent); } catch { /* bounded scratch cleanup */ }
@@ -869,6 +874,7 @@ function buildSecurityEvidenceV2({ rootDir, evidence, exitCode, scanners, findin
  */
 export async function runSecurityScan({
   rootDir,
+  remoteName = null,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   env = process.env,
   spawnFn,
@@ -889,13 +895,13 @@ export async function runSecurityScan({
   // In snapshot mode the dirt of the caller's tree is not part of the scanned subject, so it
   // must not make the candidate uncertain either; every other status stays as observed.
   const observeSubject = (root) => {
-    const observed = observeCandidate(root);
+    const observed = observeCandidate(root, remoteName);
     return snapshotMode && observed.status === "dirty"
       ? { ...observed, status: "clean", reason: null, worktreeDirty: true }
       : observed;
   };
   const candidateBefore = observeSubject(rootDir);
-  const snapshot = materializeCandidate(rootDir, candidateBefore);
+  const snapshot = materializeCandidate(rootDir, candidateBefore, remoteName);
   // Non-Git callers retain a diagnostic-only compatibility report. Such
   // evidence can never satisfy an exact-candidate consumer. A Git candidate
   // that is dirty, unsupported, or cannot be materialized is stricter: do not
@@ -1012,7 +1018,7 @@ export async function runSecurityScan({
   const blockOnSet = new Set(blockOn);
   const hasErrorClass = scanners.some((s) => s.status === "ERROR");
   const hasBlockingFinding = findings.some((f) => blockOnSet.has(f.severity));
-  const snapshotAfter = scanRoot ? observeCandidate(scanRoot) : null;
+  const snapshotAfter = scanRoot ? observeCandidate(scanRoot, remoteName) : null;
   const candidateAfter = observeSubject(rootDir);
   const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
     && sameCandidate(candidateBefore, snapshotAfter);
@@ -1154,6 +1160,9 @@ function parseArgs(argv) {
       if (opts.scanMode !== "snapshot" && opts.scanMode !== "shared-tree") {
         throw new Error(`--scan-mode must be "snapshot" or "shared-tree", got: ${opts.scanMode}`);
       }
+    } else if (a === "--remote") {
+      opts.remoteName = argv[++i];
+      if (!opts.remoteName || opts.remoteName.startsWith("-")) throw new Error("--remote requires a configured remote name");
     } else {
       throw new Error(`unknown argument: ${a}`);
     }
@@ -1184,6 +1193,7 @@ export async function main(argv = process.argv.slice(2)) {
   const { evidence, exitCode, evidenceV2, verdictV2 } = await runSecurityScan({
     rootDir,
     timeoutMs: opts.timeoutMs,
+    remoteName: opts.remoteName ?? null,
     ...(opts.scanMode ? { scanMode: opts.scanMode } : {}),
   });
   printSummary(evidence);

@@ -177,6 +177,7 @@ function projectCalibrationRelPath(rootDir) {
   return projectAuthorityRelPath(rootDir, "calibration", NEUTRAL_CALIBRATION, LEGACY_CALIBRATION);
 }
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
+import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
@@ -2379,6 +2380,12 @@ function checkSecurityEvidenceBinding() {
   if (!sourceTree || candidate?.tree !== sourceTree) failures.push("evidence/security-latest.json: candidate tree does not match the pushed source");
   if (!validSha256(candidate?.inputSha256)) failures.push("evidence/security-latest.json: candidate input digest is invalid");
   if (!validSha256(candidate?.repositorySha256)) failures.push("evidence/security-latest.json: candidate repository identity is invalid");
+  const remoteIdentity = resolveSecurityRemoteIdentity(evidenceProjectDir, pushBinding.remote);
+  if (!remoteIdentity.ok) {
+    failures.push("evidence/security-latest.json: push remote identity is unavailable or ambiguous; configure one push URL and rerun security-scan.mjs --remote <push remote>");
+  } else if (candidate?.repositorySha256 !== remoteIdentity.repositorySha256) {
+    failures.push("evidence/security-latest.json: candidate repository identity does not match the effective push destination; rerun security-scan.mjs --remote <push remote>");
+  }
   if (!Number.isSafeInteger(candidate?.inventory?.entries) || candidate.inventory.entries < 0
     || candidate.inventory.symlinkPolicy !== "reject" || candidate.inventory.submodulePolicy !== "reject") {
     failures.push("evidence/security-latest.json: candidate inventory policy is invalid");
