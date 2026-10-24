@@ -58,7 +58,15 @@ register("D84 block a Claude dispatch that names a model no configured duty rout
   assert.ok(stderr.includes("DISPATCH-MODEL-UNROUTED"), `stderr missing "DISPATCH-MODEL-UNROUTED" -- ${stderr.trim().slice(0, 200)}`);
 });
 
-assert.equal(cases.length, 3, "the D84 dispatch-model hook corpus must register three cases");
+register("D84 leave an Antigravity native invoke_subagent dispatch without a model finding: that tool carries no tool-layer model", () => {
+  // The Antigravity adapter hands the hook a `Task` whose input keeps the capitalised `Subagents` array and no `model`;
+  // the model of each entry rides in its prompt text. Requiring `model` there refused every native Antigravity dispatch (K144).
+  const subagents = [{ TypeName: "customer-researcher", Role: "Customer Researcher", Prompt: "Inspect the customer fixture." }];
+  const { stderr } = run({ tool_name: "Task", tool_input: { subagent_type: "customer-researcher", prompt: "Inspect the customer fixture.", Subagents: subagents } });
+  assert.ok(!stderr.includes("DISPATCH-MODEL"), `unexpected model finding on an Antigravity native dispatch -- ${stderr.trim().slice(0, 200)}`);
+});
+
+assert.equal(cases.length, 4, "the D84 dispatch-model hook corpus must register four cases");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 const completionCases = cases.map((entry, index) => ({ ...entry, id: `GDM${String(index + 1).padStart(2, "0")}` }));
 registerTestCaseCompletion({ cases: completionCases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

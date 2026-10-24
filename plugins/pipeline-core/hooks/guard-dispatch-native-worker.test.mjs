@@ -177,9 +177,29 @@ check("GD15k block a marked Codex worker when its native type differs from the b
 check("GD15l block a marked Codex worker binding with an unknown field", {
   tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt({ unexpected: true }) },
 }, BLOCK, { stderrIncludes: ["NGHR-BRIEFING-SHAPE"], projectDir: repoRoot });
-check("GD15m check a marked worker packet against the functional Goldfish briefing", {
-  tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt() },
-}, BLOCK, { stderrIncludes: ["DISPATCH-INCOMPLETE-BRIEFING"], projectDir: repoRoot });
+// GD15m runs in its own governed fixture with no active feature, not in `repoRoot`: the live repository's State
+// carries an approved feature, and the guard then demands that feature's untracked, gitignored slice-queue.json
+// (SQ-DELIVERY-COURSE-ABSENT) before it reaches the briefing check, so the case was green only in the one checkout
+// that owns that file and red in every fresh clone (K144).
+manualCheck("GD15m check a marked worker packet against the functional Goldfish briefing", () => {
+  const fixture = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-native-incomplete-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: fixture });
+    execFileSync("git", ["config", "user.name", "Pipeline Fixture"], { cwd: fixture });
+    execFileSync("git", ["config", "user.email", "pipeline-fixture@example.invalid"], { cwd: fixture });
+    recordConsentGiven({ rootDir: fixture });
+    assert.equal(observeGovernanceScope({ rootDir: fixture }).requiresEnforcement, true,
+      "native fixture must be admitted through canonical governance enrollment");
+    mkdirSync(join(fixture, ".claude"), { recursive: true });
+    writeFileSync(join(fixture, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    writeFileSync(join(fixture, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0" })}\n`);
+    execFileSync("git", ["add", "--", ".agent-pipeline/onboarding-consent.json", ".claude/pipeline.yaml", ".claude/pipeline-state.json"], { cwd: fixture });
+    execFileSync("git", ["commit", "-q", "-m", "fixture candidate"], { cwd: fixture });
+    const { code, stderr } = run({ tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt() } }, fixture);
+    assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 200)}`);
+    assert.ok(stderr.includes("DISPATCH-INCOMPLETE-BRIEFING"), `stderr missing "DISPATCH-INCOMPLETE-BRIEFING" -- ${stderr.trim().slice(0, 200)}`);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
 
 assert.equal(cases.length, 4, "the native-worker dispatch regression corpus must register four cases");
 

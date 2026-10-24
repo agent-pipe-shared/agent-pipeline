@@ -731,9 +731,9 @@ if (isDirectInvocation(import.meta.url)) {
   const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? toolInput.agent_type ?? (codexDispatch ? "default" : "");
   const prompt = toolInput.prompt ?? toolInput.message ?? "";
 
-  // D84: the model of a Claude subagent dispatch comes from the configured routing, never from inheritance.
+  // D84: the model of a Claude subagent dispatch comes from the configured routing, never from inheritance. The Antigravity adapter relabels its native invoke_subagent as a `Task` keeping the capitalised `Subagents` array; that tool has no tool-layer `model` (each entry's model rides in its prompt), so the runner is "antigravity", which evaluateDispatchModel leaves without an opinion (K144).
   if (["Task", "Agent"].includes(input?.tool_name)) {
-    const modelCheck = evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model });
+    const modelCheck = evaluateDispatchModel({ runner: Array.isArray(toolInput.Subagents) ? "antigravity" : "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model });
     const modelWarnings = dispatchModelWarningText(modelCheck);
     if (modelWarnings !== "") process.stderr.write(modelWarnings);
     if (!modelCheck.ok) {
