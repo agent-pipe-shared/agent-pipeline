@@ -20,6 +20,7 @@ import { requiresPublicationReview } from "../lib/publication-review-requirement
 import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
 import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
 import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
+import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import {
   assertPrivateRegularFile,
   ensurePrivateDirectory,
@@ -492,6 +493,26 @@ async function transitionPlan(values) {
     const observed = authorityFromState(root, snapshot, { requireResult: true });
     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
+    const registeredManifest = `${dirname(observed.feature.planPath).split(sep).join("/")}/lifecycle.json`;
+    let hasRegisteredManifest = false;
+    try { lstatSync(join(root, registeredManifest)); hasRegisteredManifest = true; }
+    catch (error) { if (error?.code !== "ENOENT") fail("CLOSE-PACKAGE", "registered feature package path is unreadable"); }
+    if (hasRegisteredManifest) {
+      const checked = validateFeaturePackage(root, registeredManifest);
+      if (!checked.ok) fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}`);
+      const packageValue = readJsonFile(root, registeredManifest, "feature package").value;
+      for (const [kind, path, digest] of [
+        ["prd", observed.feature.planPath, observed.authority.prdSha256],
+        ["spec", snapshot.state.planApproval?.poGateAuthority?.specPath, observed.authority.specSha256],
+        ["result", snapshot.state.continuity?.authority?.result?.path, observed.authority.implementationResultSha256],
+      ]) {
+        // Result is a required package artifact even when its metadata marks it
+        // non-authoritative; Continuity State still binds its exact current bytes.
+        const entries = packageValue.artifacts?.filter((item) => item?.class === kind
+          && (kind === "result" || item.authority === true)) ?? [];
+        if (entries.length !== 1 || entries[0].path !== path || entries[0].sha256 !== digest) fail("CLOSE-PACKAGE-AUTHORITY", `registered package ${kind} does not bind current State authority`);
+      }
+    }
     courseAuthorship = assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined });
     // A missing slice queue says nothing about whether the whole candidate
     // received independent review. Resolve the State and package contracts.

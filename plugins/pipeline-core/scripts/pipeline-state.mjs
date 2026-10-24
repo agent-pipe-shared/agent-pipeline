@@ -468,6 +468,7 @@ import {
   validPlanSubmission,
 } from "../lib/plan-spec-state-v2.mjs";
 import {
+  RESULT_RECONCILIATION_FENCE,
   inventoryFeaturePackages,
   planFeaturePackageBootstrap,
   planFeaturePackageReconcile,
@@ -554,6 +555,8 @@ import {
   syncStateMdNextAction,
 } from "../lib/onboarding-continuity.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { inspectWindowsOwnedAuthorityPath } from "../lib/windows-owned-authority-backend.mjs";
+import { windowsAuthorityCause } from "../lib/windows-authority-readiness.mjs";
 import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
 import { reopenDesignNextActionText } from "../lib/authority-restore.mjs";
 
@@ -5851,7 +5854,36 @@ function resultBootstrapPath(dir, prdPath) {
 }
 
 function canonicalResultBootstrapBytes() {
-  return Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n", "utf8");
+  return Buffer.from(`${RESULT_RECONCILIATION_FENCE}\`\`\`pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n\`\`\`\n`, "utf8");
+}
+
+// The exact postimage emitted before the reconciliation fence was introduced.
+// It is useful only with an authenticated bootstrap journal and a registered
+// package whose stale Result digest binds the bytes preceding this suffix.
+const LEGACY_RESULT_BOOTSTRAP_BYTES = Buffer.from('```pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n```\n', "utf8");
+const LEGACY_RESULT_REPAIR_SCHEMA = "pipeline.continuity-result-legacy-repair-journal.v1";
+
+function legacyResultPackage(dir, state, prd, spec, observed) {
+  const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
+  const manifest = physicalRebindFile(dir, path);
+  if (manifest === null) return null;
+  let value;
+  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return null; }
+  if (value?.feature?.id !== state.activeFeature?.id || !Array.isArray(value.artifacts)) return null;
+  const bindings = {};
+  for (const kind of ["prd", "spec", "result"]) {
+    const entries = value.artifacts.filter((entry) => entry?.class === kind && entry.authority === true);
+    if (entries.length !== 1) return null;
+    bindings[kind] = entries[0];
+  }
+  if (bindings.prd.path !== prd.path || bindings.prd.sha256 !== prd.sha256
+    || bindings.spec.path !== spec.path || bindings.spec.sha256 !== spec.sha256
+    || bindings.result.path !== observed.path) return null;
+  const checked = validateFeaturePackage(dir, path);
+  const resultIndex = value.artifacts.indexOf(bindings.result);
+  if (checked.receipt?.manifestSha256 !== manifest.sha256 || checked.findings.length !== 1
+    || checked.findings[0] !== `FTP-ARTIFACT-${resultIndex}: digest does not bind file bytes`) return null;
+  return { path, sha256: manifest.sha256, historicalSha256: bindings.result.sha256 };
 }
 
 function observeCanonicalResultBootstrap(dir, relativePath) {
@@ -5894,6 +5926,29 @@ function atomicAppendResultBootstrap(result, bytes, lock, deps = {}) {
   finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
 }
 
+function atomicRepairLegacyResult(result, oldBytes, newBytes, lock, deps = {}) {
+  const tmp = `${result.absolute}.tmp.${lock.ownerNonce}`;
+  let fd;
+  try {
+    const before = physicalRebindFile(result.root, result.path);
+    if (before === null || !before.bytes.equals(oldBytes) || !sameJson(before.identity, result.identity))
+      return { ok: false, code: "PS-RESULT-LEGACY-REPAIR-RACE" };
+    fd = openSync(tmp, "wx", 0o600);
+    (deps.replaceResultFdContents ?? replaceFdContents)(fd, newBytes);
+    fsyncSync(fd); closeSync(fd); fd = undefined;
+    const rechecked = physicalRebindFile(result.root, result.path);
+    if (rechecked === null || !rechecked.bytes.equals(oldBytes) || !sameJson(rechecked.identity, result.identity))
+      return { ok: false, code: "PS-RESULT-LEGACY-REPAIR-RACE" };
+    sealStateCompanion("repository", result.path, newBytes);
+    (deps.renameResultSync ?? renameSync)(tmp, result.absolute);
+    const synced = deps.syncResultDirectory?.(result.parent) ?? syncDirectory(result.parent);
+    const observed = physicalRebindFile(result.root, result.path);
+    return synced.ok && observed !== null && observed.bytes.equals(newBytes)
+      ? { ok: true } : { ok: false, code: "PS-RESULT-LEGACY-REPAIR-READBACK" };
+  } catch { return { ok: false, code: "PS-RESULT-LEGACY-REPAIR-IO" }; }
+  finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
+}
+
 function resultBootstrapEligible(state, prd, spec) {
   const continuity = state?.continuity;
   const lifecycle = derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 });
@@ -5917,7 +5972,86 @@ function resultBootstrapNextState(state, result, updatedAt) {
   return next;
 }
 
-function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt) {
+function resultBootstrapPackage(dir, state, prd, spec, resultPath) {
+  const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
+  const manifest = physicalRebindFile(dir, path);
+  if (manifest === null) {
+    // A missing manifest is the legacy unregistered course. An unsafe present
+    // manifest must never be mistaken for that course.
+    try { lstatSync(resolve(dir, path)); return { ok: false }; }
+    catch (error) { return error?.code === "ENOENT" ? { ok: true, package: null } : { ok: false }; }
+  }
+  const checked = validateFeaturePackage(dir, path);
+  if (!checked.ok || checked.receipt?.featureId !== state.activeFeature.id) return { ok: false };
+  let value;
+  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return { ok: false }; }
+  for (const [kind, observed] of [["prd", prd], ["spec", spec], ["result", resultPath]]) {
+    const entries = value.artifacts.filter((entry) => entry.class === kind && entry.authority === true);
+    if (entries.length !== 1 || entries[0].path !== observed.path || entries[0].sha256 !== observed.sha256) return { ok: false };
+  }
+  return { ok: true, package: { path, sha256: manifest.sha256, resultSha256: resultPath.sha256 } };
+}
+
+function planLegacyResultRepair(dir, state, manifestPath) {
+  const authority = state?.continuity?.authority;
+  const prd = physicalRebindFile(dir, authority?.prd?.path);
+  const spec = physicalRebindFile(dir, authority?.spec?.path);
+  const result = physicalRebindFile(dir, authority?.result?.path);
+  if (prd === null || spec === null || result === null
+    || prd.sha256 !== authority.prd.sha256 || spec.sha256 !== authority.spec.sha256
+    || result.sha256 !== authority.result.sha256 || result.path !== resultBootstrapPath(dir, prd.path)
+    || state.activeFeature?.planPath !== prd.path
+    || !validateContinuityState(state.continuity, state.activeFeature.id).ok
+    || derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 }).status !== "implementing") return null;
+  const registration = legacyResultPackage(dir, state, prd, spec, result);
+  const bytes = registration === null ? null : legacyResultRepairObservation(result, registration.historicalSha256);
+  if (bytes === null || !bytes.isOld || registration.path !== manifestPath) return null;
+  return {
+    schema: "pipeline.result-legacy-repair-preview.v1", status: "legacy-repair-preview",
+    featureId: state.activeFeature.id, manifest: registration.path, manifestSha256: registration.sha256,
+    historicalPrefixSha256: registration.historicalSha256,
+    prd: { path: prd.path, sha256: prd.sha256 }, spec: { path: spec.path, sha256: spec.sha256 },
+    result: { path: result.path, from: bytes.oldSha256, to: bytes.newSha256 },
+    continuityRevision: state.continuity.revision, requiredAuthority: "po",
+    approvalKind: "feature-package-reconcile",
+  };
+}
+
+function resultBootstrapCompletion(dir, state, packageBinding) {
+  const path = `${dirname(state.continuity.authority.prd.path).split(sep).join("/")}/lifecycle.json`;
+  if (packageBinding === null) {
+    try { lstatSync(resolve(dir, path)); }
+    catch (error) { if (error?.code === "ENOENT") return featureClosureProgress("review"); }
+  }
+  const manifest = packageBinding?.path ?? path;
+  if (validateFeaturePackage(dir, manifest).ok) {
+    try {
+      const value = JSON.parse(readFileSync(resolve(dir, manifest), "utf8"));
+      const bindings = [["prd", state.continuity.authority.prd], ["spec", state.continuity.authority.spec], ["result", state.continuity.authority.result]];
+      if (bindings.every(([kind, authority]) => {
+        const entries = value.artifacts.filter((entry) => entry.class === kind && entry.authority === true);
+        return entries.length === 1 && entries[0].path === authority.path && entries[0].sha256 === authority.sha256;
+      })) return featureClosureProgress("review");
+    } catch { /* A registered package with unreadable authority needs recovery. */ }
+  }
+  const ordinary = planFeaturePackageReconcile(dir, manifest, state.continuity.authority.result);
+  const preview = ordinary.status === "rejected" && ordinary.reason === "reconcile-result-metadata-only"
+    ? planLegacyResultRepair(dir, state, manifest) ?? ordinary : ordinary;
+  const pending = preview.status === "reconcile-preview" || preview.status === "legacy-repair-preview";
+  return {
+    scope: "feature-closure", state: pending ? "reconciliation-pending" : "authenticated-recovery-required", workflowTerminal: false,
+    manifest, preview,
+    planSha256: pending ? sha256CanonicalJson(preview) : null,
+    nextAction: preview.status === "legacy-repair-preview"
+      ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair"
+      : preview.status === "reconcile-preview" ? "obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it" : "resolve package drift through authenticated recovery",
+    ...(preview.status === "legacy-repair-preview" ? { repairAction: { executable: process.execPath,
+      argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", sha256CanonicalJson(preview)],
+      requiredInputs: ["by", "proof-request", "proof-authority", "proof"], approvalKind: "feature-package-reconcile", executionBoundary: "host-authorized-wsl" } } : {}),
+  };
+}
+
+function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt, packageBinding) {
   const appendedFence = canonicalResultBootstrapBytes();
   return {
     schema: RESULT_BOOTSTRAP_PLAN_SCHEMA,
@@ -5931,6 +6065,7 @@ function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, re
       spec: { path: spec.path, sha256: spec.sha256, identity: spec.identity },
       result: { path: resultPath.path, sha256: resultPath.sha256, identity: resultPath.identity },
       historicalMarkdown: { sha256: sha256Bytes(resultPath.historicalBytes), bytesBase64: resultPath.historicalBytes.toString("base64") },
+      package: packageBinding,
     },
     append: { sha256: sha256Bytes(appendedFence), bytesBase64: appendedFence.toString("base64") },
     result: { path: resultPath.path, sha256: sha256Bytes(resultBytes), bytesBase64: resultBytes.toString("base64") },
@@ -5949,12 +6084,14 @@ function buildResultBootstrapPlan(dir, existing, updatedAt) {
   if (state.activeFeature.planPath !== prd.path) return { ok: false, code: "PS-RESULT-BOOTSTRAP-FEATURE" };
   const resultPath = observeCanonicalResultBootstrap(dir, resultBootstrapPath(dir, prd.path));
   if (resultPath === null) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-PATH" };
+  const registration = resultBootstrapPackage(dir, state, prd, spec, resultPath);
+  if (!registration.ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-PACKAGE" };
   const resultBytes = Buffer.concat([resultPath.historicalBytes, canonicalResultBootstrapBytes()]);
   if (resultBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-SIZE" };
   const result = { path: resultPath.path, sha256: sha256Bytes(resultBytes) };
   const nextState = resultBootstrapNextState(state, result, updatedAt);
   if (!validateContinuityState(nextState.continuity, nextState.activeFeature.id).ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-POSTIMAGE" };
-  const payload = resultBootstrapPayload(realpathSync(resolve(dir)), existing.raw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt);
+  const payload = resultBootstrapPayload(realpathSync(resolve(dir)), existing.raw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt, registration.package);
   return { ok: true, payload, planSha256: sha256Bytes(JSON.stringify(payload)), resultPath, resultBytes, nextState };
 }
 
@@ -5966,7 +6103,7 @@ function resultBootstrapPrivatePaths(dir, deps = {}) {
     if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null;
     const namespace = join(root, "agent-pipeline");
     const base = join(namespace, "result-bootstrap");
-    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") };
+    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal"), repairJournal: join(base, "legacy-repair-journal") };
   } catch { return null; }
 }
 
@@ -6064,11 +6201,152 @@ function retireBootstrapJournal(paths, deps = {}) {
   try { return ensureBootstrapPrivateDirectory(paths, deps) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
 }
 
+function loadLegacyResultRepairJournal(paths, key, deps = {}) {
+  const raw = readPrivateBootstrap(paths.repairJournal, deps);
+  if (raw === null) {
+    try { lstatSync(paths.repairJournal); return { ok: false }; }
+    catch (error) { return error?.code === "ENOENT" ? { ok: true, record: null } : { ok: false }; }
+  }
+  if (key === null || key.byteLength !== 32) return { ok: false };
+  try {
+    const value = JSON.parse(raw.toString("utf8"));
+    if (!exactObjectKeys(value, ["schema", "planSha256", "oldStateSha256", "newStateSha256", "oldResultSha256", "newResultSha256", "manifestSha256", "updatedAt", "mac"])
+      || value.schema !== LEGACY_RESULT_REPAIR_SCHEMA
+      || ![value.planSha256, value.oldStateSha256, value.newStateSha256, value.oldResultSha256, value.newResultSha256, value.manifestSha256, value.mac].every((v) => SHA256_RE.test(v))
+      || !canonicalIso(value.updatedAt)) return { ok: false };
+    const { mac, ...core } = value;
+    return bootstrapJournalMac(key, core) === mac ? { ok: true, record: value } : { ok: false };
+  } catch { return { ok: false }; }
+}
+
+function publishLegacyResultRepairJournal(paths, key, core) {
+  return writePrivateBootstrap(paths.repairJournal, Buffer.from(JSON.stringify({ ...core, mac: bootstrapJournalMac(key, core) }) + "\n", "utf8"));
+}
+
+function retireLegacyResultRepairJournal(paths) {
+  sealSourceBootstrapRepairJournalRetirement(paths);
+  try { unlinkSync(paths.repairJournal); return syncDirectory(paths.base).ok; } catch { return false; }
+}
+
 function parseResultBootstrapApply(argv) {
   if (argv.length !== 13 || argv[0] !== "--feature-id" || isBlank(argv[1]) || argv[2] !== "--expected-revision" || !parseExpectedRevision(argv[3]).ok
     || argv[4] !== "--expected-state-sha256" || !SHA256_RE.test(argv[5]) || argv[6] !== "--expected-post-state-sha256" || !SHA256_RE.test(argv[7])
     || argv[8] !== "--updated-at" || !canonicalIso(argv[9]) || argv[10] !== "--plan-sha256" || !SHA256_RE.test(argv[11]) || argv[12] !== "--activate") return null;
   return { featureId: argv[1], expectedRevision: parseExpectedRevision(argv[3]).value, expectedStateSha256: argv[5], expectedPostStateSha256: argv[7], updatedAt: argv[9], planSha256: argv[11] };
+}
+
+function legacyResultRepairObservation(observed, historicalSha256) {
+  if (observed === null) return null;
+  const old = LEGACY_RESULT_BOOTSTRAP_BYTES;
+  const fenced = canonicalResultBootstrapBytes();
+  const current = observed.bytes;
+  const isNew = current.subarray(-fenced.length).equals(fenced);
+  const isOld = !isNew && current.subarray(-old.length).equals(old);
+  if (!isOld && !isNew) return null;
+  const prefix = current.subarray(0, current.length - (isOld ? old.length : fenced.length));
+  if (sha256Bytes(prefix) !== historicalSha256) return null;
+  let historicalText;
+  try { historicalText = new TextDecoder("utf-8", { fatal: true }).decode(prefix); } catch { return null; }
+  if (!Buffer.from(historicalText, "utf8").equals(prefix) || historicalText.startsWith("\uFEFF")
+    || historicalText.includes("\r") || !historicalText.endsWith("\n")
+    || /^```pipeline-result(?:\n|$)/mu.test(historicalText)
+    || historicalText.includes(RESULT_RECONCILIATION_FENCE)) return null;
+  const oldBytes = Buffer.concat([prefix, old]);
+  const newBytes = Buffer.concat([prefix, fenced]);
+  if (newBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return null;
+  return { oldBytes, newBytes, oldSha256: sha256Bytes(oldBytes), newSha256: sha256Bytes(newBytes), isOld };
+}
+
+// Returns null when this is not an old journal. An applicable but unprovable
+// recovery is always handled as a refusal, so the ordinary writer never
+// interprets its pre-fence postimage as a fresh bootstrap.
+function recoverJournaledLegacyResultBootstrap(dir, current, apply, journal, lock, deps) {
+  const pending = journal.journal;
+  const repairLoaded = loadLegacyResultRepairJournal(journal.paths, journal.key, deps);
+  if (!repairLoaded.ok) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-JOURNAL" };
+  const repairing = repairLoaded.record;
+  if (pending === null && repairing === null) return null;
+  if (pending !== null && (pending.planSha256 !== apply.planSha256
+    || pending.stateSha256 !== apply.expectedStateSha256
+    || pending.postStateSha256 !== apply.expectedPostStateSha256)) return { status: 2, error: "PS-RESULT-LEGACY-JOURNAL-BINDING" };
+  if (repairing !== null && repairing.planSha256 !== apply.planSha256) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-BINDING" };
+  const state = current.state;
+  const prd = physicalRebindFile(dir, state?.continuity?.authority?.prd?.path);
+  const spec = physicalRebindFile(dir, state?.continuity?.authority?.spec?.path);
+  const resultPath = prd === null ? null : resultBootstrapPath(dir, prd.path);
+  const observed = resultPath === null ? null : physicalRebindFile(dir, resultPath);
+  if (prd === null || spec === null || observed === null
+    || prd.sha256 !== state.continuity.authority.prd.sha256
+    || spec.sha256 !== state.continuity.authority.spec.sha256
+    || state.activeFeature?.id !== apply.featureId || state.activeFeature.planPath !== prd.path)
+    return { status: 2, error: "PS-RESULT-LEGACY-AUTHORITY" };
+  const registration = legacyResultPackage(dir, state, prd, spec, observed);
+  const bytes = registration === null ? null : legacyResultRepairObservation(observed, registration.historicalSha256);
+  if (bytes === null) return { status: 2, error: "PS-RESULT-LEGACY-PREFIX" };
+  if (pending !== null && (pending.result.path !== observed.path || pending.result.sha256 !== bytes.oldSha256))
+    return { status: 2, error: "PS-RESULT-LEGACY-JOURNAL-RESULT" };
+  if (repairing === null && pending === null) return null;
+  const stateSha256 = sha256Bytes(current.raw);
+  let nextState = null;
+  let oldStateSha256;
+  let updatedAt;
+  if (repairing !== null) {
+    oldStateSha256 = repairing.oldStateSha256;
+    updatedAt = repairing.updatedAt;
+    if (repairing.oldResultSha256 !== bytes.oldSha256 || repairing.newResultSha256 !== bytes.newSha256
+      || repairing.manifestSha256 !== registration.sha256) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-DRIFT" };
+  } else {
+    oldStateSha256 = stateSha256;
+    updatedAt = stateSha256 === pending.stateSha256 ? apply.updatedAt : deps.now();
+  }
+  if (stateSha256 === oldStateSha256) {
+    if (state.continuity.authority.result === null) {
+      if (pending === null || stateSha256 !== pending.stateSha256 || !resultBootstrapEligible(state, prd, spec))
+        return { status: 2, error: "PS-RESULT-LEGACY-PRESTATE" };
+      const oldPost = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.oldSha256 }, apply.updatedAt);
+      if (sha256Bytes(Buffer.from(JSON.stringify(oldPost, null, 2) + "\n", "utf8")) !== pending.postStateSha256)
+        return { status: 2, error: "PS-RESULT-LEGACY-POSTSTATE-PROOF" };
+    } else if (stateSha256 !== pending?.postStateSha256 || state.continuity.authority.result.path !== observed.path
+      || state.continuity.authority.result.sha256 !== bytes.oldSha256)
+      return { status: 2, error: "PS-RESULT-LEGACY-STATE-BINDING" };
+    nextState = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.newSha256 }, updatedAt);
+    if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok)
+      return { status: 2, error: "PS-RESULT-LEGACY-POSTSTATE" };
+  } else if (repairing === null || stateSha256 !== repairing.newStateSha256
+    || state.continuity.authority.result?.path !== observed.path
+    || state.continuity.authority.result?.sha256 !== bytes.newSha256)
+    return { status: 2, error: "PS-RESULT-LEGACY-STATE-DRIFT" };
+  const newStateSha256 = nextState === null ? repairing.newStateSha256
+    : sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8"));
+  if (repairing !== null && newStateSha256 !== repairing.newStateSha256)
+    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-POSTSTATE" };
+  if (repairing === null) {
+    const core = { schema: LEGACY_RESULT_REPAIR_SCHEMA, planSha256: apply.planSha256,
+      oldStateSha256, newStateSha256, oldResultSha256: bytes.oldSha256,
+      newResultSha256: bytes.newSha256, manifestSha256: registration.sha256, updatedAt };
+    if (!publishLegacyResultRepairJournal(journal.paths, journal.key, core))
+      return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-PREPARE" };
+  }
+  if (deps.afterLegacyResultRepairJournal?.() === false) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-INTERRUPTED-JOURNAL" };
+  if (bytes.isOld && !atomicRepairLegacyResult({ ...observed, root: realpathSync(resolve(dir)), parent: dirname(observed.absolute) }, bytes.oldBytes, bytes.newBytes, lock, deps).ok)
+    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RESULT-WRITE" };
+  const resultReadback = physicalRebindFile(dir, observed.path);
+  if (resultReadback === null || !resultReadback.bytes.equals(bytes.newBytes))
+    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RESULT-READBACK" };
+  if (deps.afterLegacyResultRepairResult?.() === false) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-INTERRUPTED-RESULT" };
+  if (nextState !== null && !atomicWriteContinuityState(dir, nextState, lock, deps).ok)
+    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-STATE-WRITE" };
+  const persisted = readStateRaw(dir);
+  if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== newStateSha256
+    || persisted.state.continuity.authority.result?.sha256 !== bytes.newSha256)
+    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-STATE-READBACK" };
+  if (deps.afterLegacyResultRepairState?.() === false) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-INTERRUPTED-STATE" };
+  if (pending !== null && !retireBootstrapJournal(journal.paths, deps)) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RETIRE-BOOTSTRAP" };
+  if (!retireLegacyResultRepairJournal(journal.paths)) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RETIRE" };
+  return { status: 0, receipt: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "recovered-legacy", featureId: apply.featureId,
+    revision: persisted.state.continuity.revision, stateSha256: newStateSha256,
+    result: persisted.state.continuity.authority.result, mutated: nextState !== null,
+    completion: resultBootstrapCompletion(dir, persisted.state, registration) } };
 }
 
 // NVA-R34-BLINDPUSHPATH: `queueAction` (not `nextAction`) -- this is the bare
@@ -6091,7 +6369,23 @@ function runResultBootstrapCommand(sub, rest, deps) {
   if (sub === "continuity-result-bootstrap-plan") {
     if (rest.length !== 0) { console.error("Error: Result bootstrap plan accepts no caller bindings."); return 2; }
     const planned = buildResultBootstrapPlan(deps.dir, readStateRaw(deps.dir), deps.now());
-    if (!planned.ok) { console.error(`Error: Result bootstrap plan refused (${planned.code}); zero mutation.`); return 2; }
+    if (!planned.ok) {
+      const current = readStateRaw(deps.dir);
+      if (current.status === "ok" && current.state.continuity?.authority?.result !== null) {
+        const completion = resultBootstrapCompletion(deps.dir, current.state, null);
+        if (completion.preview?.status === "legacy-repair-preview") {
+          const journal = loadBootstrapJournal(deps.dir, deps);
+          if (!journal.ok || journal.journal !== null) {
+            console.error("Error: Result bootstrap legacy journal is pending or unreadable; replay the original bootstrap action before signed repair."); return 2;
+          }
+          console.log(JSON.stringify({ schema: "pipeline.continuity-result-legacy-repair-plan.v1", status: "legacy-repair-preview",
+            preview: completion.preview, planSha256: completion.planSha256, applyAction: completion.repairAction,
+            nextAction: completion.nextAction }, null, 2));
+          return 0;
+        }
+      }
+      console.error(`Error: Result bootstrap plan refused (${planned.code}); zero mutation.`); return 2;
+    }
     const writer = fileURLToPath(import.meta.url);
     console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-bootstrap-apply", "--feature-id", planned.payload.featureId, "--expected-revision", String(planned.payload.expectedRevision), "--expected-state-sha256", planned.payload.preimage.stateSha256, "--expected-post-state-sha256", planned.payload.postimage.stateSha256, "--updated-at", planned.payload.postimage.updatedAt, "--plan-sha256", planned.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2));
     return 0;
@@ -6110,13 +6404,25 @@ function runResultBootstrapCommand(sub, rest, deps) {
     const resultObserved = resultPath ? physicalRebindFile(deps.dir, resultPath) : null;
     const prd = physicalRebindFile(deps.dir, current.state.continuity?.authority?.prd?.path);
     const spec = physicalRebindFile(deps.dir, current.state.continuity?.authority?.spec?.path);
+    if (journal.paths && ((journal.journal !== null && resultObserved?.bytes.subarray(-LEGACY_RESULT_BOOTSTRAP_BYTES.length).equals(LEGACY_RESULT_BOOTSTRAP_BYTES)
+      && !resultObserved.bytes.includes(Buffer.from(RESULT_RECONCILIATION_FENCE)))
+      || existsSync(journal.paths.repairJournal))) {
+      const recovered = recoverJournaledLegacyResultBootstrap(deps.dir, current, apply, journal, lock, deps);
+      if (recovered !== null) {
+        if (recovered.status !== 0) console.error(`Error: Result bootstrap legacy recovery refused (${recovered.error}); recovery journal retained.`);
+        else console.log(JSON.stringify(recovered.receipt));
+        return recovered.status;
+      }
+    }
     if (sha256Bytes(current.raw) === apply.expectedPostStateSha256) {
       if (prd === null || spec === null
         || !resultBootstrapEligible({ ...current.state, continuity: { ...current.state.continuity, authority: { ...current.state.continuity.authority, result: null }, revision: current.state.continuity.revision - 1, resume: { ...current.state.continuity.resume, sourceRevision: current.state.continuity.revision - 1 } } }, prd, spec)
         || current.state.activeFeature.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity.authority.result?.path !== resultPath
         || resultObserved === null || resultObserved.sha256 !== current.state.continuity.authority.result.sha256) { console.error("Error: Result bootstrap replay postimage is invalid; zero mutation."); return 2; }
+      const completion = resultBootstrapCompletion(deps.dir, current.state, null);
+      if (completion.state === "authenticated-recovery-required") { console.error(`Error: PS-RESULT-BOOTSTRAP-AUTHENTICATED-RECOVERY: ${completion.preview.reason}; journal retained if present.`); return 2; }
       if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths, deps))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
-      console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion: featureClosureProgress("review") })); return 0;
+      console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion })); return 0;
     }
     // A durable Result may legitimately exist while State is still at the exact
     // preimage.  The authenticated journal is the only authority that may resume
@@ -6137,6 +6443,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
       }
     }
     if (sha256Bytes(current.raw) !== apply.expectedStateSha256 || !planned.ok || planned.payload.featureId !== apply.featureId || planned.planSha256 !== apply.planSha256 || planned.payload.postimage.stateSha256 !== apply.expectedPostStateSha256) { console.error("Error: Result bootstrap apply inputs are stale or conflicting; zero mutation."); return 2; }
+    if (planned.resultPath === null && resultBootstrapCompletion(deps.dir, planned.nextState, null).state === "authenticated-recovery-required") { console.error("Error: PS-RESULT-BOOTSTRAP-AUTHENTICATED-RECOVERY: historical journal cannot prove the required reconciliation fence; journal retained."); return 2; }
     if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || journal.journal.stateSha256 !== apply.expectedStateSha256 || journal.journal.postStateSha256 !== apply.expectedPostStateSha256)) { console.error("Error: Result bootstrap journal conflicts; zero mutation."); return 2; }
     if (journal.journal === null && !publishBootstrapJournal(deps.dir, planned, deps)) { console.error("Error: Result bootstrap journal prepare failed; zero mutation."); return 2; }
     if (deps.afterResultBootstrapJournal?.() === false) { console.error("Error: Result bootstrap interrupted after journal preparation; recovery journal retained."); return 2; }
@@ -6156,7 +6463,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
     if (deps.afterResultBootstrapState?.() === false) { console.error("Error: Result bootstrap interrupted after State commit; recovery journal retained."); return 2; }
     const recovered = loadBootstrapJournal(deps.dir, deps);
     if (!recovered.ok || recovered.journal === null || recovered.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(recovered.paths, deps)) { console.error("Error: Result bootstrap journal retirement is unresolved."); return 2; }
-    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: featureClosureProgress("review") })); return 0;
+    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: resultBootstrapCompletion(deps.dir, persisted.state, planned.payload.preimage?.package ?? null) })); return 0;
   } finally { releaseContinuityLock(lock); }
 }
 
@@ -8574,6 +8881,76 @@ function computeFeaturePackageReconcilePostimage(root, manifest, planSha256, res
   return { ok: true, preSha256: preFile.sha256, postBytes, postSha256, mode, changes: rebuilt.changes };
 }
 
+function runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps) {
+  const privateState = loadBootstrapJournal(root, deps);
+  if (!privateState.ok || privateState.journal !== null) return { ok: false, code: "FTP-LEGACY-BOOTSTRAP-JOURNAL-PENDING" };
+  const loaded = loadLegacyResultRepairJournal(privateState.paths, privateState.key, deps);
+  if (!loaded.ok) return { ok: false, code: "FTP-LEGACY-REPAIR-JOURNAL" };
+  const repairing = loaded.record;
+  if (repairing !== null && repairing.planSha256 !== planSha256) return { ok: false, code: "FTP-LEGACY-REPAIR-PLAN-DRIFT" };
+  const current = readStateRaw(root);
+  if (current.status !== "ok") return { ok: false, code: "FTP-LEGACY-STATE" };
+  const state = current.state;
+  const prd = physicalRebindFile(root, state?.continuity?.authority?.prd?.path);
+  const spec = physicalRebindFile(root, state?.continuity?.authority?.spec?.path);
+  const observed = physicalRebindFile(root, state?.continuity?.authority?.result?.path);
+  if (prd === null || spec === null || observed === null || prd.sha256 !== state.continuity.authority.prd.sha256
+    || spec.sha256 !== state.continuity.authority.spec.sha256 || observed.path !== resultBootstrapPath(root, prd.path))
+    return { ok: false, code: "FTP-LEGACY-AUTHORITY" };
+  const registration = legacyResultPackage(root, state, prd, spec, observed);
+  const bytes = registration === null ? null : legacyResultRepairObservation(observed, registration.historicalSha256);
+  if (bytes === null || registration.path !== manifest) return { ok: false, code: "FTP-LEGACY-PREFIX" };
+  let oldStateSha256, newStateSha256, updatedAt, nextState = null;
+  const currentSha = sha256Bytes(current.raw);
+  if (repairing === null) {
+    const preview = planLegacyResultRepair(root, state, manifest);
+    if (preview === null || sha256CanonicalJson(preview) !== planSha256 || !bytes.isOld)
+      return { ok: false, code: "FTP-LEGACY-PLAN-DRIFT" };
+    oldStateSha256 = currentSha;
+    updatedAt = deps.now();
+    nextState = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.newSha256 }, updatedAt);
+    if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok)
+      return { ok: false, code: "FTP-LEGACY-POSTSTATE" };
+    newStateSha256 = sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8"));
+    const core = { schema: LEGACY_RESULT_REPAIR_SCHEMA, planSha256, oldStateSha256, newStateSha256,
+      oldResultSha256: bytes.oldSha256, newResultSha256: bytes.newSha256,
+      manifestSha256: registration.sha256, updatedAt };
+    if (privateState.key === null || privateState.key.byteLength !== 32
+      || !publishLegacyResultRepairJournal(privateState.paths, privateState.key, core))
+      return { ok: false, code: "FTP-LEGACY-REPAIR-PREPARE" };
+  } else {
+    ({ oldStateSha256, newStateSha256, updatedAt } = repairing);
+    if (repairing.oldResultSha256 !== bytes.oldSha256 || repairing.newResultSha256 !== bytes.newSha256
+      || repairing.manifestSha256 !== registration.sha256) return { ok: false, code: "FTP-LEGACY-REPAIR-DRIFT" };
+    if (currentSha === oldStateSha256) {
+      if (state.continuity.authority.result?.path !== observed.path || state.continuity.authority.result.sha256 !== bytes.oldSha256)
+        return { ok: false, code: "FTP-LEGACY-STATE-BINDING" };
+      nextState = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.newSha256 }, updatedAt);
+      if (sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8")) !== newStateSha256)
+        return { ok: false, code: "FTP-LEGACY-REPAIR-POSTSTATE" };
+    } else if (currentSha !== newStateSha256 || state.continuity.authority.result?.path !== observed.path
+      || state.continuity.authority.result.sha256 !== bytes.newSha256)
+      return { ok: false, code: "FTP-LEGACY-STATE-DRIFT" };
+  }
+  if (deps.afterLegacyResultRepairJournal?.() === false) return { ok: false, code: "FTP-LEGACY-INTERRUPTED-JOURNAL" };
+  if (bytes.isOld && !atomicRepairLegacyResult({ ...observed, root: realpathSync(resolve(root)), parent: dirname(observed.absolute) }, bytes.oldBytes, bytes.newBytes, lock, deps).ok)
+    return { ok: false, code: "FTP-LEGACY-RESULT-WRITE" };
+  const resultReadback = physicalRebindFile(root, observed.path);
+  if (resultReadback === null || !resultReadback.bytes.equals(bytes.newBytes)) return { ok: false, code: "FTP-LEGACY-RESULT-READBACK" };
+  if (deps.afterLegacyResultRepairResult?.() === false) return { ok: false, code: "FTP-LEGACY-INTERRUPTED-RESULT" };
+  if (nextState !== null && !atomicWriteContinuityState(root, nextState, lock, deps).ok)
+    return { ok: false, code: "FTP-LEGACY-STATE-WRITE" };
+  const persisted = readStateRaw(root);
+  if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== newStateSha256
+    || persisted.state.continuity.authority.result?.sha256 !== bytes.newSha256)
+    return { ok: false, code: "FTP-LEGACY-STATE-READBACK" };
+  if (deps.afterLegacyResultRepairState?.() === false) return { ok: false, code: "FTP-LEGACY-INTERRUPTED-STATE" };
+  if (!retireLegacyResultRepairJournal(privateState.paths)) return { ok: false, code: "FTP-LEGACY-REPAIR-RETIRE" };
+  return { ok: true, receipt: { schema: FEATURE_PACKAGE_RECONCILE_SCHEMA, status: "legacy-repaired", manifest,
+    planSha256, result: persisted.state.continuity.authority.result,
+    completion: resultBootstrapCompletion(root, persisted.state, registration) } };
+}
+
 /**
  * `feature-package-reconcile` -- the third plan kind's transactional half (PHX-WP-GATE,
  * P-AC-08). Consumes `planFeaturePackageReconcile` under the identical `--plan-sha256`
@@ -8610,8 +8987,26 @@ function runFeaturePackageReconcileCommand(argv, deps) {
   try {
     const stateNow = (deps.readStateRaw ?? readStateRaw)(root);
     const resultAuthority = stateNow.status === "ok" ? (stateNow.state?.continuity?.authority?.result ?? null) : null;
-    const plan = planFeaturePackageReconcile(root, manifest, resultAuthority);
-    if (plan.status !== "reconcile-preview" || sha256CanonicalJson(plan) !== planSha256) {
+    const ordinaryPlan = planFeaturePackageReconcile(root, manifest, resultAuthority);
+    const bootstrapPaths = resultBootstrapPrivatePaths(root, deps);
+    const repairPending = bootstrapPaths !== null && existsSync(bootstrapPaths.repairJournal);
+    const needsLegacy = repairPending || ordinaryPlan.status === "rejected" && ordinaryPlan.reason === "reconcile-result-metadata-only";
+    const bootstrap = needsLegacy ? loadBootstrapJournal(root, deps) : { ok: true, journal: null };
+    const repairing = needsLegacy && bootstrap.ok ? loadLegacyResultRepairJournal(bootstrap.paths, bootstrap.key, deps) : { ok: true, record: null };
+    if (!bootstrap.ok || !repairing.ok) return refuseFeaturePackageRead(sub, "legacy Result repair journal is unreadable or tampered; zero mutation");
+    if (repairing.record !== null) {
+      if (repairing.record.planSha256 !== planSha256) return refuseFeaturePackageRead(sub, "legacy Result repair plan digest conflicts with pending journal; zero mutation");
+      const resumed = runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps);
+      if (!resumed.ok) return refuseFeaturePackageRead(sub, `legacy Result repair recovery refused (${resumed.code}); journal retained`);
+      console.log(JSON.stringify(resumed.receipt, null, 2)); return 0;
+    }
+    const legacyPlan = ordinaryPlan.status === "rejected" && ordinaryPlan.reason === "reconcile-result-metadata-only" && stateNow.status === "ok"
+      ? planLegacyResultRepair(root, stateNow.state, manifest) : null;
+    const plan = legacyPlan ?? ordinaryPlan;
+    if (bootstrap.journal !== null && legacyPlan !== null) return refuseFeaturePackageRead(sub, "legacy bootstrap journal is pending; replay its original bootstrap action before signed repair");
+    if (legacyPlan !== null && (bootstrap.key === null || bootstrap.key.byteLength !== 32))
+      return refuseFeaturePackageRead(sub, "legacy bootstrap journal key is unavailable or unsafe; zero approval consumption and zero artifact mutation");
+    if (!(plan.status === "reconcile-preview" || plan.status === "legacy-repair-preview") || sha256CanonicalJson(plan) !== planSha256) {
       return refuseFeaturePackageRead(sub, `argument "--plan-sha256" does not match the freshly recomputed reconcile preview digest for ${manifest}; the manifest, an artifact, or the Continuity State Result binding drifted since the preview was taken`);
     }
 
@@ -8648,6 +9043,12 @@ function runFeaturePackageReconcileCommand(argv, deps) {
         ? "external proof was already consumed (CRITICAL-PROOF-REPLAY); zero mutation"
         : "PO-bound approval was not confirmed for this exact candidate and plan digest (FTP-RECONCILE-APPROVAL-REJECTED); zero mutation";
       return refuseFeaturePackageRead(sub, message);
+    }
+
+    if (legacyPlan !== null) {
+      const repaired = runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps);
+      if (!repaired.ok) return refuseFeaturePackageRead(sub, `legacy Result repair refused (${repaired.code}); journal retained if prepared`);
+      console.log(JSON.stringify(repaired.receipt, null, 2)); return 0;
     }
 
     const pending = loadFeaturePackageApplyJournal(root, deps);
@@ -10459,7 +10860,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
   // Routed ahead of readState() too: this transaction's authority is the --root
   // repository's own topology and its own private journal, never the operator's
   // local state file (PHX-0A-WRITE, P-AC-08).
-  if (FEATURE_PACKAGE_WRITE_SUBCOMMANDS.has(sub)) return runFeaturePackageWriteCommand(sub, rest, deps);
+  if (FEATURE_PACKAGE_WRITE_SUBCOMMANDS.has(sub)) return runFeaturePackageWriteCommand(sub, rest, { ...deps, dir, now });
 
   const existing = readState(dir);
   if (existing.status === "malformed") {
@@ -13654,7 +14055,8 @@ function prepareStateCompanion(frame, argv) {
     }
     sourceEffects=[sourceEffects[0],{scope:"repository",path:resultPath},
       {scope:"common",path:"agent-pipeline/result-bootstrap/key"},
-      {scope:"common",path:"agent-pipeline/result-bootstrap/journal"}];
+      {scope:"common",path:"agent-pipeline/result-bootstrap/journal"},
+      {scope:"common",path:"agent-pipeline/result-bootstrap/legacy-repair-journal"}];
   }
   if(frame.sub === "present-plan") {
     const source=readState(frame.repository.primaryRoot);
@@ -13720,7 +14122,7 @@ function sealSourceBootstrapPrivatePublication(path,bytes,replace) {
   if(data.entry !== "continuity-result-bootstrap-apply" || replace)
     stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-private-source-entry");
   const relativePath=relative(data.repository.commonDir,path).split(sep).join("/");
-  if(!["agent-pipeline/result-bootstrap/key","agent-pipeline/result-bootstrap/journal"].includes(relativePath)
+  if(!["agent-pipeline/result-bootstrap/key","agent-pipeline/result-bootstrap/journal","agent-pipeline/result-bootstrap/legacy-repair-journal"].includes(relativePath)
     || resolve(data.repository.commonDir,relativePath)!==path)
     stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-private-source-path");
   sealStateCompanion("common",relativePath,bytes);
@@ -13738,16 +14140,37 @@ function sealSourceBootstrapJournalRetirement(paths,deps) {
   const key="common/agent-pipeline/result-bootstrap/journal",published=data.seals.get(key);
   const state=readStateRaw(data.repository.primaryRoot);
   const result=authenticated.journal && physicalRebindFile(data.repository.primaryRoot,authenticated.journal.result.path);
+  const repair=loadLegacyResultRepairJournal(paths,authenticated.key);
+  const repaired=repair.ok && repair.record
+    && repair.record.planSha256===apply?.planSha256
+    && repair.record.oldResultSha256===authenticated.journal?.result.sha256
+    && state.status==="ok" && sha256Bytes(state.raw)===repair.record.newStateSha256
+    && result?.sha256===repair.record.newResultSha256;
   if(!apply || !authenticated.ok || !authenticated.journal || !physical.bytes
     || authenticated.journal.planSha256!==apply.planSha256
     || authenticated.journal.stateSha256!==apply.expectedStateSha256
     || authenticated.journal.postStateSha256!==apply.expectedPostStateSha256
-    || state.status!=="ok" || sha256Bytes(state.raw)!==apply.expectedPostStateSha256
-    || !result || result.sha256!==authenticated.journal.result.sha256
+    || !(repaired || (state.status==="ok" && sha256Bytes(state.raw)===apply.expectedPostStateSha256
+      && result?.sha256===authenticated.journal.result.sha256))
     || (published ? !physical.bytes.equals(published) : !statePushEqual(physical.image,effect.preimage)))
     stateAuthorityFailure("SDC-AUTHORITY-HELD","companion-bootstrap-authenticated-retirement-unavailable");
   if(data.bootstrapJournalRetired)stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-repeated-retirement");
   data.bootstrapJournalRetired=true;
+}
+function sealSourceBootstrapRepairJournalRetirement(paths) {
+  const data=stateAuthorityInvocation?.executingCompanion;
+  if(!data)return;
+  if(data.entry!=="continuity-result-bootstrap-apply" || paths.root!==data.repository.commonDir
+    || paths.repairJournal!==join(data.repository.commonDir,"agent-pipeline","result-bootstrap","legacy-repair-journal"))
+    stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-repair-retirement-path");
+  const key=readPrivateBootstrap(paths.key),repair=loadLegacyResultRepairJournal(paths,key);
+  const state=readStateRaw(data.repository.primaryRoot);
+  const result=state.status==="ok"?physicalRebindFile(data.repository.primaryRoot,state.state.continuity?.authority?.result?.path):null;
+  if(!repair.ok || !repair.record || state.status!=="ok"
+    || sha256Bytes(state.raw)!==repair.record.newStateSha256
+    || result?.sha256!==repair.record.newResultSha256)
+    stateAuthorityFailure("SDC-AUTHORITY-HELD","companion-bootstrap-repair-retirement-proof");
+  data.bootstrapRepairJournalRetired=true;
 }
 export function executeStateAuthorityCompanionWrite(handle) {
   const data = ownedStateCompanion(handle);
@@ -13771,8 +14194,9 @@ export function executeStateAuthorityCompanionWrite(handle) {
   const effects = data.effects.map((effect,index) => {
     const actual=readbacks[index], seal=data.seals.get(effect.scope+"/"+effect.path);
     const authenticatedRetirement=data.entry === "continuity-result-bootstrap-apply"
-      && data.bootstrapJournalRetired === true && effect.scope === "common"
-      && effect.path === "agent-pipeline/result-bootstrap/journal";
+      && effect.scope === "common" && (
+        data.bootstrapJournalRetired === true && effect.path === "agent-pipeline/result-bootstrap/journal"
+        || data.bootstrapRepairJournalRetired === true && effect.path === "agent-pipeline/result-bootstrap/legacy-repair-journal");
     if (!unchanged && (authenticatedRetirement ? actual.image !== null
       : seal ? !actual.bytes?.equals(seal) : !statePushEqual(actual.image,effect.preimage))) {
       stateAuthorityFailure("SDC-AUTHORITY-HELD", "companion-partial-or-unsealed-postimage");
@@ -13885,7 +14309,12 @@ function calibrationApprovalFile(root, path, {privateState = false} = {}) {
   if (!before.isFile() || before.nlink !== 1 || before.size < 1 || before.size > 1048576
     || (typeof process.getuid === "function" && before.uid !== process.getuid())
     || (privateState && process.platform !== "win32" && (before.mode & 0o077) !== 0)) throw Error("CVCT-FILE");
-  if (privateState && process.platform === "win32" && assessWindowsPrivatePath(target).status !== "secure") throw Error("CVCT-FILE");
+  if (privateState && process.platform === "win32" && assessWindowsPrivatePath(target).status !== "secure") {
+    const error = Error("CVCT-FILE");
+    try { inspectWindowsOwnedAuthorityPath({ path: target, directory: false }); }
+    catch (nativeError) { error.windowsAuthorityCause = windowsAuthorityCause(nativeError); }
+    throw error;
+  }
   const same = info => info.isFile() && info.dev === before.dev && info.ino === before.ino
     && info.mode === before.mode && info.nlink === 1 && info.size === before.size;
   const fd = openSync(target, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -13901,7 +14330,8 @@ function calibrationApprovalFile(root, path, {privateState = false} = {}) {
 }
 
 export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry = false} = {}) {
-  const unavailable = code => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable."});
+  const unavailable = (code, windowsAuthorityCause = null) => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable.",
+    ...(windowsAuthorityCause ? {windowsAuthorityCause} : {})});
   try {
     const root = resolve(rootDir);
     if (realpathSync(root) !== root || !lstatSync(root).isDirectory()) return unavailable("CVCT-ROOT");
@@ -13981,5 +14411,5 @@ export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry = 
       submissionSha256:sha256CanonicalJson(state.planSubmission),approvalSha256:sha256CanonicalJson(state.planApproval),
       authoritySha256:sha256CanonicalJson(authority.value),approvalBasis,
       sourceRefs:Object.freeze([...new Map(refs.map(ref=>[ref.path,ref])).values()].sort((a,b)=>a.path.localeCompare(b.path)))});
-  } catch (error) { return unavailable(/^CVCT-[A-Z0-9-]+$/u.test(error?.message ?? "") ? error.message : error?.code === "ENOENT" ? "CVCT-SOURCE-MISSING" : "CVCT-APPROVAL-UNAVAILABLE"); } // AC-140: keep the typed source failure
+  } catch (error) { return unavailable(/^CVCT-[A-Z0-9-]+$/u.test(error?.message ?? "") ? error.message : error?.code === "ENOENT" ? "CVCT-SOURCE-MISSING" : "CVCT-APPROVAL-UNAVAILABLE", error?.windowsAuthorityCause); } // AC-140: keep the typed source failure
 }

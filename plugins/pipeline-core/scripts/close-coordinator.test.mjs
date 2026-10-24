@@ -26,6 +26,7 @@ import {
   syncPublicationCloseDirectory,
 } from "./publication-close-journal.mjs";
 import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 
 const h = (c, n = 64) => c.repeat(n);
 const CLI = fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url));
@@ -273,7 +274,7 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function processFixture(name) {
+function processFixture(name, options = {}) {
   const root = mkdtempSync(join(tmpdir(), `h5-${name}-`));
   mkdirSync(join(root, ".claude"), { recursive: true });
   mkdirSync(join(root, "specs", "feature"), { recursive: true });
@@ -297,12 +298,26 @@ function processFixture(name) {
   const resultSha256 = digest(readFileSync(join(root, paths.result)));
   const closeEvidenceSha256 = digest(readFileSync(join(root, paths.closeEvidence)));
   const activeFeature = { id: "feature", planPath: paths.prd, phase: "implementation" };
+  // These process cases exercise close mechanics for a current mini course.
+  // Registered rigor-1 packages still require the real Critic/Verify audit.
+  const profileSha256 = h("a");
+  const planSubmission = { schema: PLAN_SUBMISSION_SCHEMA, featureId: activeFeature.id,
+    planPath: paths.prd, planSha256: prdSha256, specPath: paths.spec, specSha256,
+    profile: "mini", profileSha256, submittedBy: "fixture", submittedAt: "2026-10-24T00:00:00.000Z" };
   const state = {
     schema: "pipeline.state.v0",
     activeFeature,
     planApproved: true,
+    planSubmission,
     planApproval: {
+      schema: CURRENT_APPROVAL_SCHEMA,
+      approvedBy: "fixture", approvedAt: "2026-10-24T00:01:00.000Z",
+      submissionSha256: sha256CanonicalJson(planSubmission), profileSha256,
+      priorInvalidationSha256: null, designApprovalBinding: null, designApproval: null,
       poGateAuthority: {
+        schema: "pipeline.po-gate-authority.v2", humanFacing: "en",
+        sourceSha256: h("b"), runtimeSha256: h("c"), receiptSha256: h("d"), repositoryFingerprint: h("e"),
+        planPath: paths.prd,
         planSha256: prdSha256,
         specPath: paths.spec,
         specSha256,
@@ -362,6 +377,16 @@ function processFixture(name) {
     result: state.continuity.authority.result,
     closeEvidence: { path: paths.closeEvidence, sha256: closeEvidenceSha256 },
   });
+  if (options.beforePrepared) options.beforePrepared({ root, paths, state, lifecycle });
+  if (options.expectPreparedRefusal) {
+    const refused = invoke([
+      "plan-transition", "--root", root, "--lifecycle", lifecycle, "--actor", "PO",
+      "--phase", "feature-close-prepared", "--architecture-impact", "architecture-conforms",
+      "--continuity-close-request", paths.closeRequest,
+    ], 2);
+    assert.equal(refused.code, options.expectPreparedRefusal);
+    return { root, lifecycle, refused };
+  }
   const prepared = transition("feature-close-prepared", [
     "--continuity-close-request", paths.closeRequest,
   ]);
@@ -431,6 +456,26 @@ function processFixture(name) {
     trackedPath: join(root, paths.tracked),
   };
 }
+
+test("process: registered package digest drift blocks close preparation before any transition", () => {
+  const f = processFixture("package-drift", {
+    beforePrepared({ root, paths }) {
+      for (const name of ["acceptance.md", "candidate-evidence.md"]) writeFileSync(join(root, "specs/feature", name), `${name}\n`);
+      const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: digest(readFileSync(join(root, path))), authority, mutability, retention: "active" });
+      writeJson(join(root, "specs/feature/lifecycle.json"), {
+        schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
+        artifacts: [
+          artifact("prd", paths.prd, true, "mutable"), artifact("spec", paths.spec, true, "immutable"),
+          artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
+          { ...artifact("result", paths.result, true, "append-only"), sha256: h("f") },
+          artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
+        ], candidate: null, supersedes: null,
+      });
+    },
+    expectPreparedRefusal: "CLOSE-PACKAGE",
+  });
+  assert.equal(f.refused.code, "CLOSE-PACKAGE");
+});
 
 test("process: local close is read-only planned, replay-safe, candidate-bound and never pushes", () => {
   const fixture = processFixture("local");

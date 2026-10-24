@@ -3,12 +3,18 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { afterEach, test } from "node:test";
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "./pipeline-state.mjs";
+import { planFeaturePackageReconcile, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
+import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+import { observeSessionCleanupState } from "../lib/onboarding-continuity.mjs";
+import { initializeSessionAuthorityRegistry, reserveSessionAuthorityMember, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
 
 const roots = [];
 const NOW = "2026-07-31T12:00:00.000Z";
@@ -40,8 +46,8 @@ function initRepo(dir) {
   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
 }
 
-function fixture(name = "case") {
-  const root = mkdtempSync(join(tmpdir(), `pipeline-result-bootstrap-${name}-`)); roots.push(root); initRepo(root);
+function fixture(name = "case", parent = tmpdir()) {
+  const root = mkdtempSync(join(parent, `pipeline-result-bootstrap-${name}-`)); roots.push(root); initRepo(root);
   mkdirSync(join(root, ".claude")); mkdirSync(join(root, "specs", "feature"), { recursive: true });
   writeFileSync(join(root, "specs/feature/prd_feature.md"), "prd\n"); writeFileSync(join(root, "specs/feature/spec.md"), "spec\n");
   const historical = Buffer.from("# Feature result\n\nExisting canonical Markdown must survive intact.\n", "utf8");
@@ -69,6 +75,188 @@ function plan(f) {
   const before = readFileSync(f.statePath); const value = invoke(f.root, ["continuity-result-bootstrap-plan"]);
   assert.equal(value.status, 0, value.err); assert.deepEqual(readFileSync(f.statePath), before); return JSON.parse(value.out);
 }
+
+function registerPackage(f) {
+  for (const name of ["acceptance.md", "candidate-evidence.md"]) writeFileSync(join(f.root, "specs/feature", name), `${name}\n`);
+  const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: hash(readFileSync(join(f.root, path))), authority, mutability, retention: "active" });
+  const manifest = {
+    schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
+    artifacts: [
+      artifact("prd", "specs/feature/prd_feature.md", true, "mutable"),
+      artifact("spec", "specs/feature/spec.md", true, "immutable"),
+      artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
+      artifact("result", "specs/feature/result.md", true, "append-only"),
+      artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
+    ], candidate: null, supersedes: null,
+  };
+  const manifestPath = "specs/feature/lifecycle.json";
+  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
+  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
+  return { manifestPath, manifest };
+}
+
+function legacyJournalFixture(name, stage = "post-state") {
+  const f = fixture(name);
+  const { manifestPath } = registerPackage(f);
+  const oldSuffix = Buffer.from('```pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n```\n');
+  const oldBytes = Buffer.concat([f.historical, oldSuffix]);
+  const preState = readFileSync(f.statePath);
+  const postState = structuredClone(f.value);
+  postState.continuity.revision = 8;
+  postState.continuity.resume.sourceRevision = 8;
+  postState.continuity.authority.result = { path: "specs/feature/result.md", sha256: hash(oldBytes) };
+  postState.updatedAt = NOW;
+  const postStateBytes = Buffer.from(JSON.stringify(postState, null, 2) + "\n");
+  writeFileSync(f.resultPath, oldBytes);
+  if (stage === "post-state") writeFileSync(f.statePath, postStateBytes);
+  const key = Buffer.alloc(32, 11);
+  mkdirSync(join(f.commonDir, "agent-pipeline", "result-bootstrap"), { recursive: true, mode: 0o700 });
+  writeFileSync(join(f.commonDir, "agent-pipeline", "result-bootstrap", "key"), key, { mode: 0o600 });
+  const core = { schema: "pipeline.continuity-result-bootstrap-journal.v1", planSha256: h("a"),
+    stateSha256: hash(preState), postStateSha256: hash(postStateBytes),
+    result: { path: "specs/feature/result.md", sha256: hash(oldBytes) } };
+  const mac = createHmac("sha256", key).update(JSON.stringify(core)).digest("hex");
+  writeFileSync(f.journalPath, JSON.stringify({ ...core, mac }) + "\n", { mode: 0o600 });
+  const action = ["continuity-result-bootstrap-apply", "--feature-id", "feature", "--expected-revision", "7",
+    "--expected-state-sha256", core.stateSha256, "--expected-post-state-sha256", core.postStateSha256,
+    "--updated-at", NOW, "--plan-sha256", core.planSha256, "--activate"];
+  return { ...f, manifestPath, oldBytes, oldSuffix, action };
+}
+
+test("legacy MAC journal recovers the exact pre-fence postimage and yields the signed package preview", () => {
+  const f = legacyJournalFixture("legacy-post");
+  const manifestBefore = readFileSync(join(f.root, f.manifestPath));
+  const result = invoke(f.root, f.action);
+  assert.equal(result.status, 0, result.err);
+  const receipt = JSON.parse(result.out);
+  assert.equal(receipt.status, "recovered-legacy");
+  assert.equal(receipt.completion.state, "reconciliation-pending");
+  assert.equal(receipt.completion.preview.status, "reconcile-preview");
+  assert.deepEqual(readFileSync(join(f.root, f.manifestPath)), manifestBefore);
+  assert.deepEqual(readFileSync(f.resultPath).subarray(0, f.historical.length), f.historical);
+  assert.equal(readFileSync(f.resultPath).includes(Buffer.from("pipeline.result-reconciliation-fence.v1")), true);
+  assert.equal(JSON.parse(readFileSync(f.statePath)).continuity.authority.result.sha256, hash(readFileSync(f.resultPath)));
+  assert.equal(existsSync(f.journalPath), false);
+});
+
+test("legacy journal repairs Result-before-State and replays each interrupted repair phase", () => {
+  for (const [name, stage, seam] of [
+    ["prestate", "pre-state", "afterLegacyResultRepairJournal"],
+    ["after-result", "post-state", "afterLegacyResultRepairResult"],
+    ["after-state", "post-state", "afterLegacyResultRepairState"],
+  ]) {
+    const f = legacyJournalFixture(name, stage);
+    const stopped = invoke(f.root, f.action, { [seam]: () => false });
+    assert.equal(stopped.status, 2, name);
+    assert.equal(existsSync(f.journalPath), true, name);
+    const resumed = invoke(f.root, f.action);
+    assert.equal(resumed.status, 0, `${name}: ${resumed.err}`);
+    assert.equal(JSON.parse(resumed.out).completion.preview.status, "reconcile-preview", name);
+    assert.equal(existsSync(f.journalPath), false, name);
+  }
+});
+
+test("legacy journal refuses forged proof, altered historical prefix and PRD drift without writing", () => {
+  for (const kind of ["forged-mac", "prefix", "prd"]) {
+    const f = legacyJournalFixture(`legacy-${kind}`);
+    if (kind === "forged-mac") {
+      const value = JSON.parse(readFileSync(f.journalPath)); value.mac = h("f");
+      writeFileSync(f.journalPath, JSON.stringify(value) + "\n", { mode: 0o600 });
+    }
+    if (kind === "prefix") writeFileSync(f.resultPath, Buffer.concat([Buffer.from("tampered\n"), f.oldBytes]));
+    if (kind === "prd") writeFileSync(join(f.root, "specs/feature/prd_feature.md"), "drift\n");
+    const stateBefore = readFileSync(f.statePath);
+    const resultBefore = readFileSync(f.resultPath);
+    const manifestBefore = readFileSync(join(f.root, f.manifestPath));
+    const refused = invoke(f.root, f.action);
+    assert.equal(refused.status, 2, kind);
+    assert.deepEqual(readFileSync(f.statePath), stateBefore, kind);
+    assert.deepEqual(readFileSync(f.resultPath), resultBefore, kind);
+    assert.deepEqual(readFileSync(join(f.root, f.manifestPath)), manifestBefore, kind);
+  }
+});
+
+test("retired legacy journal exposes one exact signed repair preview and then the existing package reconcile", () => {
+  const f = legacyJournalFixture("legacy-retired");
+  rmSync(f.journalPath);
+  const manifestBefore = readFileSync(join(f.root, f.manifestPath));
+  const previewRun = invoke(f.root, ["continuity-result-bootstrap-plan"]);
+  assert.equal(previewRun.status, 0, previewRun.err);
+  const preview = JSON.parse(previewRun.out);
+  assert.equal(preview.status, "legacy-repair-preview");
+  assert.equal(preview.preview.result.from, hash(f.oldBytes));
+  assert.equal(preview.applyAction.approvalKind, "feature-package-reconcile");
+  const args = ["feature-package-reconcile", "--root", f.root, "--manifest", f.manifestPath, "--plan-sha256", preview.planSha256];
+  const stateBefore = readFileSync(f.statePath); const resultBefore = readFileSync(f.resultPath);
+  const defaultAbsent = invoke(f.root, args, { gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
+  assert.equal(defaultAbsent.status, 2); assert.deepEqual(readFileSync(f.statePath), stateBefore);
+  assert.deepEqual(readFileSync(f.resultPath), resultBefore);
+  const absent = invoke(f.root, args, { featurePackageReconcileApproval: () => ({ ok: false }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
+  assert.equal(absent.status, 2); assert.deepEqual(readFileSync(f.statePath), stateBefore);
+  assert.deepEqual(readFileSync(f.resultPath), resultBefore);
+  const repaired = invoke(f.root, args, { now: undefined, featurePackageReconcileApproval: () => ({ ok: true }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
+  assert.equal(repaired.status, 0, repaired.err);
+  const receipt = JSON.parse(repaired.out);
+  assert.equal(receipt.status, "legacy-repaired");
+  assert.equal(receipt.completion.preview.status, "reconcile-preview");
+  assert.deepEqual(readFileSync(join(f.root, f.manifestPath)), manifestBefore);
+  const reconciled = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", f.manifestPath,
+    "--plan-sha256", receipt.completion.planSha256], {
+    featurePackageReconcileApproval: () => ({ ok: true }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }),
+  });
+  assert.equal(reconciled.status, 0, reconciled.err);
+  assert.equal(validateFeaturePackage(f.root, f.manifestPath).ok, true);
+});
+
+test("signed legacy repair replays after interruption without consuming another approval", () => {
+  const f = legacyJournalFixture("legacy-signed-replay"); rmSync(f.journalPath);
+  const preview = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"]).out);
+  const args = ["feature-package-reconcile", "--root", f.root, "--manifest", f.manifestPath, "--plan-sha256", preview.planSha256];
+  const stopped = invoke(f.root, args, { featurePackageReconcileApproval: () => ({ ok: true }),
+    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }), afterLegacyResultRepairResult: () => false });
+  assert.equal(stopped.status, 2);
+  const resumed = invoke(f.root, args, { featurePackageReconcileApproval: () => ({ ok: false }) });
+  assert.equal(resumed.status, 0, resumed.err);
+  assert.equal(JSON.parse(resumed.out).completion.preview.status, "reconcile-preview");
+});
+
+test("signed legacy preview refuses source drift and forged repair replay without new writes", () => {
+  const drift = legacyJournalFixture("legacy-signed-drift"); rmSync(drift.journalPath);
+  const preview = JSON.parse(invoke(drift.root, ["continuity-result-bootstrap-plan"]).out);
+  writeFileSync(join(drift.root, "specs/feature/spec.md"), "drift\n");
+  const args = ["feature-package-reconcile", "--root", drift.root, "--manifest", drift.manifestPath, "--plan-sha256", preview.planSha256];
+  const stateBefore = readFileSync(drift.statePath); const resultBefore = readFileSync(drift.resultPath);
+  const refused = invoke(drift.root, args, { featurePackageReconcileApproval: () => ({ ok: true }),
+    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
+  assert.equal(refused.status, 2);
+  assert.deepEqual(readFileSync(drift.statePath), stateBefore);
+  assert.deepEqual(readFileSync(drift.resultPath), resultBefore);
+
+  const keyless = legacyJournalFixture("legacy-signed-keyless"); rmSync(keyless.journalPath);
+  const keylessPlan = JSON.parse(invoke(keyless.root, ["continuity-result-bootstrap-plan"]).out);
+  rmSync(join(keyless.commonDir, "agent-pipeline", "result-bootstrap", "key"));
+  let approvals = 0;
+  const keylessResult = invoke(keyless.root, ["feature-package-reconcile", "--root", keyless.root, "--manifest", keyless.manifestPath,
+    "--plan-sha256", keylessPlan.planSha256], { featurePackageReconcileApproval: () => { approvals++; return { ok: true }; },
+    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
+  assert.equal(keylessResult.status, 2); assert.equal(approvals, 0);
+  assert.deepEqual(readFileSync(keyless.resultPath), keyless.oldBytes);
+
+  const forged = legacyJournalFixture("legacy-signed-forged"); rmSync(forged.journalPath);
+  const signedPlan = JSON.parse(invoke(forged.root, ["continuity-result-bootstrap-plan"]).out);
+  const signedArgs = ["feature-package-reconcile", "--root", forged.root, "--manifest", forged.manifestPath, "--plan-sha256", signedPlan.planSha256];
+  const stopped = invoke(forged.root, signedArgs, { featurePackageReconcileApproval: () => ({ ok: true }),
+    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }), afterLegacyResultRepairJournal: () => false });
+  assert.equal(stopped.status, 2);
+  const repairPath = join(forged.commonDir, "agent-pipeline", "result-bootstrap", "legacy-repair-journal");
+  const record = JSON.parse(readFileSync(repairPath)); record.mac = h("f");
+  writeFileSync(repairPath, JSON.stringify(record) + "\n", { mode: 0o600 });
+  const oldState = readFileSync(forged.statePath); const oldResult = readFileSync(forged.resultPath);
+  const replay = invoke(forged.root, signedArgs, { featurePackageReconcileApproval: () => ({ ok: true }) });
+  assert.equal(replay.status, 2);
+  assert.deepEqual(readFileSync(forged.statePath), oldState);
+  assert.deepEqual(readFileSync(forged.resultPath), oldResult);
+});
 
 // Windows: Node synthesizes `.mode` on native Windows from the read-only
 // attribute alone, so the bare `(info.mode & 0o077)` comparison in
@@ -99,7 +287,7 @@ test("win32: an insecure DACL assessment on the private result-bootstrap directo
 
 test("AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence", () => {
   const f = fixture("success"); const p = plan(f);
-  const fence = Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n");
+  const fence = Buffer.from("\n<!-- pipeline.result-reconciliation-fence.v1 -->\n```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n");
   assert.equal(p.schema, "pipeline.continuity-result-bootstrap-plan.v1"); assert.equal(p.preimage.result.path, "specs/feature/result.md"); assert.equal(p.preimage.result.sha256, hash(f.historical));
   assert.deepEqual(Buffer.from(p.preimage.historicalMarkdown.bytesBase64, "base64"), f.historical); assert.deepEqual(Buffer.from(p.append.bytesBase64, "base64"), fence);
   assert.deepEqual(Buffer.from(p.result.bytesBase64, "base64"), Buffer.concat([f.historical, fence])); assert.equal(existsSync(f.journalPath), false);
@@ -113,6 +301,62 @@ test("AC-047-143--146: readonly plan binds existing lowercase canonical Result p
   assert.deepEqual(after, expected); assert.deepEqual(readFileSync(f.resultPath), Buffer.from(p.result.bytesBase64, "base64")); assert.deepEqual(readFileSync(f.resultPath).subarray(0, f.historical.length), f.historical);
   assert.equal(existsSync(join(f.root, "specs/feature/Result.md")), false);
   assert.equal(existsSync(join(f.root, ".claude", ".pipeline-result-bootstrap-private")), false); assert.equal(existsSync(f.journalPath), false);
+});
+
+test("registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview", () => {
+  const f = fixture("registered"); const { manifestPath } = registerPackage(f);
+  const manifestBytes = readFileSync(join(f.root, manifestPath));
+  const p = plan(f);
+  assert.equal(p.preimage.package.path, manifestPath);
+  const applied = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(applied.status, 0, applied.err);
+  const completion = JSON.parse(applied.out).completion;
+  assert.equal(completion.state, "reconciliation-pending");
+  assert.equal(completion.preview.status, "reconcile-preview");
+  assert.equal(completion.preview.changes.length, 1);
+  assert.equal(completion.preview.changes[0].class, "result");
+  assert.equal(completion.preview.changes[0].from, hash(f.historical));
+  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
+  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, false);
+  assert.equal(planFeaturePackageReconcile(f.root, manifestPath, JSON.parse(readFileSync(f.statePath)).continuity.authority.result).status, "reconcile-preview");
+  const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
+  assert.equal(JSON.parse(replay.out).completion.planSha256, completion.planSha256);
+  const reconciled = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", manifestPath, "--plan-sha256", completion.planSha256], {
+    featurePackageReconcileApproval: () => ({ ok: true }),
+    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }),
+  });
+  assert.equal(reconciled.status, 0, reconciled.err);
+  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
+  const afterReconcileReplay = invoke(f.root, p.applyAction.argv.slice(1));
+  assert.equal(afterReconcileReplay.status, 0, afterReconcileReplay.err);
+  assert.equal(JSON.parse(afterReconcileReplay.out).completion.queueAction, "review");
+});
+
+test("registered bootstrap interruption and replay retain a single provable reconciliation plan", () => {
+  for (const [name, seam] of [["result", "afterResultBootstrapResult"], ["state", "afterResultBootstrapState"]]) {
+    const f = fixture(`registered-${name}`); const { manifestPath } = registerPackage(f); const p = plan(f);
+    const manifestBytes = readFileSync(join(f.root, manifestPath));
+    assert.equal(invoke(f.root, p.applyAction.argv.slice(1), { [seam]: () => false }).status, 2);
+    assert.equal(existsSync(f.journalPath), true);
+    assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
+    const resumed = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(resumed.status, 0, resumed.err);
+    const receipt = JSON.parse(resumed.out);
+    assert.equal(receipt.completion.preview.status, "reconcile-preview");
+    assert.equal(receipt.completion.preview.changes.length, 1);
+    assert.equal(existsSync(f.journalPath), false);
+    const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
+    assert.equal(JSON.parse(replay.out).completion.planSha256, receipt.completion.planSha256);
+  }
+});
+
+test("registered package authority drift refuses bootstrap before Result, State or manifest mutation", () => {
+  const f = fixture("package-drift"); const { manifestPath, manifest } = registerPackage(f);
+  manifest.artifacts.find((entry) => entry.class === "result").sha256 = h("f");
+  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
+  const stateBytes = readFileSync(f.statePath); const resultBytes = readFileSync(f.resultPath); const manifestBytes = readFileSync(join(f.root, manifestPath));
+  const refused = invoke(f.root, ["continuity-result-bootstrap-plan"]);
+  assert.equal(refused.status, 2); assert.match(refused.err, /PS-RESULT-BOOTSTRAP-PACKAGE/);
+  assert.deepEqual(readFileSync(f.statePath), stateBytes); assert.deepEqual(readFileSync(f.resultPath), resultBytes);
+  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes); assert.equal(existsSync(f.journalPath), false);
 });
 
 test("AC-047-147: journal and Result-before-State interruptions resume once and exact replay is zero-mutation", () => {
@@ -172,4 +416,93 @@ test("AC-047-149: bootstrap requires a current implementing Plan lifecycle befor
     assert.deepEqual(readFileSync(f.statePath), beforeState, kind); assert.deepEqual(readFileSync(f.resultPath), beforeResult, kind);
     assert.equal(existsSync(f.journalPath), false, kind);
   }
+});
+
+test("controlled METHOD: catalogue-present Source companion closes exact Result bootstrap effects", async () => {
+  const parent = join(process.cwd(), "scratch", "test-tmp");
+  mkdirSync(parent, { recursive: true });
+  const f = fixture("source-catalogue", parent);
+  mkdirSync(join(f.root, "project"), { mode: 0o700 });
+  const neutralStatePath = join(f.root, "project", "pipeline-state.json");
+  writeFileSync(neutralStatePath, readFileSync(f.statePath), { mode: 0o600 });
+  rmSync(f.statePath);
+  f.statePath = neutralStatePath;
+  chmodSync(f.statePath, 0o600);
+  registerPackage(f);
+  const repository = inspectSignedDescriptorCustodyRepository(f.root);
+  const runtime = createControlledMethodRuntimeFixture({ repository,
+    fixtureRoot: join(repository.commonDir, "agent-pipeline", "controlled-method-fixtures", "result-bootstrap"),
+    sessionId: "result-bootstrap" });
+  const ports = createSessionAuthorityParticipantPorts({ repository });
+  assert.equal(initializeSessionAuthorityRegistry({ repository }, ports).status, "initialized");
+  const port = ports.find(row => row.producerId === "onboarding-continuity").port;
+  let operationHandle, executionHandle, memberHandle, memberPath;
+  const member = () => {
+    const bytes = readFileSync(join(repository.commonDir, memberPath.slice(5)));
+    return { path: memberPath, sha256: hash(bytes), size: bytes.length };
+  };
+  await runtime.run(async () => {
+    const state = observeSessionCleanupState(f.root);
+    const prepared = port.prepareOperation({ requesterHandle: runtime.requesterHandle, entry: "bind",
+      input: { expectedStateSha256: state.stateSha256, expectedRevision: state.revision } });
+    assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
+    operationHandle = prepared.operationHandle;
+    const observed = port.observeOperation(operationHandle);
+    const reserved = withSessionAuthorityBoundary({ repository }, boundary =>
+      reserveSessionAuthorityMember({ boundary, producerPort: port, association: observed.association, operationHandle }));
+    memberHandle = reserved.memberHandle; memberPath = reserved.memberRef.path;
+    const executed = await port.executeOperation({ operationHandle, memberHandle, expectedMemberRef: reserved.memberRef });
+    assert.equal(executed.status, "executed", JSON.stringify(executed));
+    executionHandle = executed.executionHandle;
+  });
+  const sourceCall = async (argv, overrides = {}) => {
+    const out = []; const log = console.log;
+    console.log = (...parts) => out.push(parts.join(" "));
+    try {
+      const result = await runtime.run(() => port.executeCompanionOperation({ operationHandle, executionHandle,
+        expectedMemberRef: member(), expectedStateSha256: hash(readFileSync(f.statePath)), entry: argv[0], argv, ...overrides }));
+      return { result, out: out.join("\n") };
+    } finally { console.log = log; }
+  };
+  const beforeState = readFileSync(f.statePath), beforeResult = readFileSync(f.resultPath);
+  const missingErrors = [], originalError = console.error;
+  console.error = (...parts) => missingErrors.push(parts.join(" "));
+  let missingContext;
+  try { missingContext = run(["continuity-result-bootstrap-plan"], { dir: f.root }); }
+  finally { console.error = originalError; }
+  assert.equal(missingContext, 2);
+  assert.match(missingErrors.join("\n"), /companion-owning-lifecycle-context-required/);
+  assert.deepEqual(readFileSync(f.statePath), beforeState);
+  assert.deepEqual(readFileSync(f.resultPath), beforeResult);
+  const forged = await sourceCall(["continuity-result-bootstrap-plan"], { expectedStateSha256: h("f") });
+  assert.equal(forged.result.status, "unavailable");
+  assert.equal(forged.result.attempted, false);
+  assert.deepEqual(readFileSync(f.statePath), beforeState);
+  assert.deepEqual(readFileSync(f.resultPath), beforeResult);
+  const planned = await sourceCall(["continuity-result-bootstrap-plan"]);
+  assert.equal(planned.result.status, "completed", JSON.stringify(planned.result));
+  assert.equal(planned.result.exitCode, 0);
+  const plan = JSON.parse(planned.out);
+  const prdPath = join(f.root, "specs/feature/prd_feature.md");
+  const prdBytes = readFileSync(prdPath);
+  writeFileSync(prdPath, "drift\n");
+  const drifted = await sourceCall(plan.applyAction.argv.slice(1));
+  assert.notEqual(drifted.result.exitCode, 0);
+  assert.deepEqual(readFileSync(f.statePath), beforeState);
+  assert.deepEqual(readFileSync(f.resultPath), beforeResult);
+  writeFileSync(prdPath, prdBytes);
+  // Restored bytes have a new physical identity, so the old plan stays stale.
+  const refreshed = await sourceCall(["continuity-result-bootstrap-plan"]);
+  assert.equal(refreshed.result.exitCode, 0);
+  const applied = await sourceCall(JSON.parse(refreshed.out).applyAction.argv.slice(1));
+  assert.equal(applied.result.status, "completed", JSON.stringify(applied.result));
+  assert.equal(applied.result.exitCode, 0);
+  assert.equal(applied.result.assurance, "controlled-unit-method");
+  const receipt = JSON.parse(applied.out);
+  assert.equal(receipt.status, "applied");
+  assert.equal(receipt.completion.preview.status, "reconcile-preview");
+  assert.deepEqual(readFileSync(f.resultPath).subarray(0, f.historical.length), f.historical);
+  assert.equal(existsSync(join(repository.commonDir, "agent-pipeline", "result-bootstrap", "journal")), false);
+  assert.equal(validateFeaturePackage(f.root, "specs/feature/lifecycle.json").ok, false);
+  await runtime.dispose();
 });
