@@ -1,0 +1,10 @@
+fix(pipeline): bind criterion fix waves and enforce dispatch carriers
+
+Guide fix-wave dispatches to the applicable accepted criterion and preserve its source binding.
+
+Require generated Goldfish briefings and carrier-based admission while retaining read-only research routes.
+
+Restate the prior model examiner under PO decision batch 17 and cover Antigravity Advisor transport.
+
+Dispatch: K146-FIX-WAVE (goldfish)
+AI-Assisted: true
