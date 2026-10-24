@@ -13,7 +13,8 @@ const proposal = join(repo, "specs/sprint-alfred-epic/evidence/verify-fixes/k152
 const scratch = join(repo, "scratch", `k152a-proposal-check-${process.pid}`);
 const plugin = join(scratch, "plugins/pipeline-core");
 const fixture = join(scratch, "fixture");
-const phase = process.env.K152A_PROPOSAL_PHASE === "red" ? "red" : "green";
+const phase = process.env.K152A_PROPOSAL_PHASE ?? "green";
+assert.ok(["red", "green", "integrated"].includes(phase), `unknown K152A proposal phase: ${phase}`);
 const sourcePaths = [
   "plugins/pipeline-core/hooks.json",
   "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
@@ -54,6 +55,20 @@ test.before(() => {
       const before = readFileSync(join(repo, path));
       const after = readFileSync(join(scratch, path));
       assert.notEqual(createHash("sha256").update(before).digest("hex"), createHash("sha256").update(after).digest("hex"));
+    }
+  } else if (phase === "integrated") {
+    // Git's diff index records abbreviated blob IDs. Match each copied source
+    // blob against the proposal's declared postimage ID, never against itself.
+    const patch = readFileSync(proposal, "utf8");
+    const declared = [...patch.matchAll(/^diff --git a\/(.+?) b\/(.+)\nindex ([0-9a-f]{9,40})\.\.([0-9a-f]{9,40}) 100644$/gm)];
+    assert.deepEqual(declared.map((m) => m[1]).sort(), [...sourcePaths].sort());
+    for (const [, source, destination, , postimage] of declared) {
+      assert.equal(source, destination);
+      const result = spawnSync("git", ["hash-object", "--", join(scratch, source)], {
+        cwd: scratch, encoding: "utf8", timeout: 10_000,
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.stdout.trim().slice(0, postimage.length), postimage, `integrated blob differs from K152A postimage: ${source}`);
     }
   }
 });
