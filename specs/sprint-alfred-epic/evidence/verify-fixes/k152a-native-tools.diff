@@ -1,0 +1,80 @@
+diff --git a/plugins/pipeline-core/hooks.json b/plugins/pipeline-core/hooks.json
+index 893410f8d..8ab0e0556 100644
+--- a/plugins/pipeline-core/hooks.json
++++ b/plugins/pipeline-core/hooks.json
+@@ -3,7 +3,7 @@
+     "enabled": true,
+     "PreToolUse": [
+       {
+-        "matcher": "run_command|write_to_file|replace_file_content|invoke_subagent",
++        "matcher": "run_command|write_to_file|replace_file_content|write_file|edit_file|read_file|invoke_subagent",
+         "hooks": [
+           {
+             "type": "command",
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 58fc085b3..805ca0ed7 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -226,33 +226,42 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
+         isReadOnly: false,
+       };
+     }
+-    if (name === "write_to_file") {
+-      const filePath = String(args.TargetFile ?? args.file_path ?? "");
++    if (name === "write_to_file" || name === "write_file") {
++      const filePath = String((name === "write_file" ? args.Path : args.TargetFile) ?? args.file_path ?? "");
+       return {
+         toolName: "Write",
+         toolInput: {
+           file_path: filePath,
+-          content: args.CodeContent ?? args.content ?? "",
++          content: (name === "write_file" ? args.Content : args.CodeContent) ?? args.content ?? "",
+         },
+         filePath,
+         command: "",
+         isReadOnly: false,
+       };
+     }
+-    if (name === "replace_file_content") {
+-      const filePath = String(args.TargetFile ?? args.file_path ?? "");
++    if (name === "replace_file_content" || name === "edit_file") {
++      const filePath = String((name === "edit_file" ? args.Path : args.TargetFile) ?? args.file_path ?? "");
+       return {
+         toolName: "Edit",
+         toolInput: {
+           file_path: filePath,
+-          old_string: args.TargetContent ?? args.old_string ?? "",
+-          new_string: args.ReplacementContent ?? args.new_string ?? "",
++          old_string: (name === "edit_file" ? args.Target : args.TargetContent) ?? args.old_string ?? "",
++          new_string: (name === "edit_file" ? args.Replacement : args.ReplacementContent) ?? args.new_string ?? "",
+         },
+         filePath,
+         command: "",
+         isReadOnly: false,
+       };
+     }
++    if (name === "read_file") {
++      return {
++        toolName: "Read",
++        toolInput: { file_path: args.Path },
++        filePath: null,
++        command: "",
++        isReadOnly: true,
++      };
++    }
+     if (name === "invoke_subagent") {
+       const subagentsRaw = Array.isArray(args.Subagents) ? args.Subagents : [];
+       // D3 fix: carry every entry's type+prompt, not only index 0, so the Contamination Rule
+diff --git a/plugins/pipeline-core/lib/tool-write-target.mjs b/plugins/pipeline-core/lib/tool-write-target.mjs
+index 01b474dae..b274ac85e 100644
+--- a/plugins/pipeline-core/lib/tool-write-target.mjs
++++ b/plugins/pipeline-core/lib/tool-write-target.mjs
+@@ -38,6 +38,7 @@ export function writeTargetPath(toolInput, toolName) {
+   };
+   if (toolName === "NotebookEdit") return read("notebook_path");
+   if (toolName === "Edit" || toolName === "Write") return read("file_path");
++  if (toolName === "write_file" || toolName === "edit_file") return read("Path");
+   if (toolName === "write_to_file" || toolName === "replace_file_content") return read("TargetFile") || read("file_path");
+-  return read("file_path") || read("notebook_path") || read("TargetFile");
++  return read("file_path") || read("notebook_path") || read("TargetFile") || read("Path");
+ }
