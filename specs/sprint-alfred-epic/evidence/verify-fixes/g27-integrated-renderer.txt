@@ -1,0 +1,31 @@
+command: node --test plugins/pipeline-core/lib/design-authoring.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: g27-integrated-renderer
+exitCode: 0
+head: 89b40fb15a6dd442dc2ff4e7063df3e89600f416
+tree: 27b5bf2b1f4249313d0c20cfb479217c83a5ab99
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (2.318745ms)
+✔ a clean fixture passes (1.399169ms)
+✔ an allowlisted occurrence passes (0.511642ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.58423ms)
+✔ multiple prefix hits on one line each produce a finding (0.358481ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.43187ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.277478ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (305.811381ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (22.858758ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ DAU001 authoring skeleton uses the actual architecture contract and remains visibly draft (7.004938ms)
+✔ DAU002 compact readback retains executable recovery and digests without copying design contents (4.643657ms)
+✔ DAU003 generated criterion uses the accepted parser shape while draft and legacy ids remain unapproved (13.999387ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 686.155694
+
+--- stderr ---

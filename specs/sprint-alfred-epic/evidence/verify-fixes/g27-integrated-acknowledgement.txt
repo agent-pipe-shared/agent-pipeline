@@ -1,0 +1,21 @@
+command: node --test --test-name-pattern=greenfield.walk.F9|quoting.the.criterion.example.only.in.Notes|titled.nested.acceptance.requirements plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+label: g27-integrated-acknowledgement
+exitCode: 0
+head: 89b40fb15a6dd442dc2ff4e7063df3e89600f416
+tree: 27b5bf2b1f4249313d0c20cfb479217c83a5ab99
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ OBC301 planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding generated-draft markers is refused with BOOTSTRAP-ACK-PLACEHOLDER-CONTENT and writes no request (greenfield walk F9) (466.833952ms)
+✔ OBC307 planOnboardingBootstrapAcknowledgementChat accepts an authored spec quoting the criterion example only in Notes (806.379521ms)
+✔ OBC308 planOnboardingBootstrapAcknowledgementChat refuses a placeholder under titled nested acceptance requirements (809.311201ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2860.485282
+
+--- stderr ---

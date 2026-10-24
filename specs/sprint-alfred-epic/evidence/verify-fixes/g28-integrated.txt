@@ -1,0 +1,38 @@
+command: node --test plugins/pipeline-core/scripts/audit-pack.test.mjs plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs plugins/pipeline-core/lib/guard/g23-read-help.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: g28-integrated
+exitCode: 0
+head: 537d5c85d4f5ca4a460b61e461c7fc4fadc23f6e
+tree: cefe1e68524e9e511745dd485acecbd69131d815
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (2.412985ms)
+✔ a clean fixture passes (1.432711ms)
+✔ an allowlisted occurrence passes (0.530348ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.549133ms)
+✔ multiple prefix hits on one line each produce a finding (0.454915ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.395181ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.209588ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (301.705667ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (23.49109ms)
+✔ native Windows request separators normalize within the exact scratch boundary (1.985202ms)
+✔ audit-pack exact read and publication verbs retain separate guard routes (23.691662ms)
+✔ G23 bounded repeated rg globs preserve hidden and credential exclusions (120.435113ms)
+✔ G23 exact source-owned PO help is a pure CLI route (1187.491469ms)
+✔ G23 missing local targets are distinct from unknown grammar and protected paths (99.680953ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ AUDPK001 completed candidate audit pack is candidate-bound, partial on missing review proofs, and offline tamper-evident (331.119019ms)
+✔ AUDPK002 populated Critic summary loses local packet correlation in the public projection (152.088441ms)
+✔ AUDPK003 public archive preserves signed bytes and reports historical integrity after a fresh clone (1245.489649ms)
+✔ AUDPK004 audit pack refuses public-proof references outside the candidate evidence boundary (153.323066ms)
+✔ AUDPK005 audit pack verifies and copies exact public PO intent and proof bytes without exporting local authority metadata (313.047585ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2873.061599
+
+--- stderr ---
