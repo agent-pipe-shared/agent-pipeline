@@ -1,15 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24/snapshot.json",
-  "sha256": "18d9d34968505ce3f72ea73b9eef03dea083476a2a22d563095d8283883a00a6",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-scope-0.7.0/snapshot.json",
+  "sha256": "2d51838c4bb114534c6857c009f11290061e39422c261bc3e66d7663fd872119",
   "measuredAt": "2026-10-24",
-  "head": "31db7853a71d3b9e72c864f5aced91a69a0ecee9",
+  "head": "daaf074b17b79f471e67651494bc59957e7c85f9",
   "counts": {
-    "25": 3,
-    "50": 25,
-    "75": 146,
+    "25": 2,
+    "50": 41,
+    "75": 151,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 70.55
+  "index": 69.2,
+  "total": 194,
+  "scope": "0.7.0 active release; post-0.7.0 deferrals excluded; GreenfieldP0/P1 included"
 }

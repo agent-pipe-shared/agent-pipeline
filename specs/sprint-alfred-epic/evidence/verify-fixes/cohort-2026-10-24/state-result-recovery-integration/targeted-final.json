@@ -1,0 +1,878 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs plugins/pipeline-core/scripts/close-coordinator.test.mjs plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs plugins/pipeline-core/scripts/pipeline-state.test.mjs plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: state-result-final-targeted
+exitCode: 0
+head: 20392c08f1648356783b362e238f63500af2662f
+tree: c11dc524b0929d460bda43e10e4b9c626ab329fe
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.65837ms)
+✔ a clean fixture passes (1.017593ms)
+✔ an allowlisted occurrence passes (0.44746ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.445316ms)
+✔ multiple prefix hits on one line each produce a finding (0.251758ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.276735ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (0.766917ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (208.1721ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (20.31764ms)
+✔ the win32 forward-slash git common dir is not a CVCT-COMMON-DIR refusal (baseline-only twins) (102.50938ms)
+✔ identical configured twins read as configured with the command (101.846641ms)
+✔ an absent legacy peer leaves exactly the neutral tier (97.731163ms)
+✔ an absent neutral peer leaves exactly the original legacy tier (102.720777ms)
+✔ a non-repository root stays unavailable and is never read through the common-dir normalization (4.620942ms)
+Feature "atomic-feature" set. Plan path: specs/atomic-feature/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-29T09:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/atomic-feature/prd.md(fbdff394ff44...)+specs/atomic-feature/spec.md(cad99a3c61c3...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-29T09:00:00.000Z; bound to submission 866bc79bff53....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approval was committed, but aggregate design binding recheck is incomplete (DDB-PROJECT-AUTHORITY); no aggregate authority is inferred.
+Plan approved by "po-test" on 2026-08-29T09:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/atomic-feature/prd.md(fbdff394ff44...)+specs/atomic-feature/spec.md(cad99a3c61c3...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+✔ checkStatePhaseConsistency reports the design-vs-implementation drift class as blocked (19.646389ms)
+✔ checkStatePhaseConsistency reports consistent when the marker agrees with the machine phase (13.507307ms)
+✔ the marker stays atomic with a real design -> implementation transition (521.40511ms)
+✔ active checkpoint preserves activeFeature (3.76361ms)
+✔ completion separates closure completion from workflow terminality (857.271659ms)
+✔ ordered phase 0 (1.895311ms)
+✔ ordered phase 1 (0.810389ms)
+✔ ordered phase 2 (4.491342ms)
+✔ ordered phase 3 (2.262357ms)
+✔ candidate required (1.032953ms)
+✔ candidate replacement denied (0.840948ms)
+✔ publication authorization required (0.954293ms)
+✔ publication exact candidate (1.370203ms)
+✔ cleanup uncertainty recoverable (1.263691ms)
+✔ local terminal (1.315289ms)
+✔ release/promotion descendants require independent authorization (2.459132ms)
+✔ delivery requires exact publication and readback receipts (1.80569ms)
+✔ authority and active-feature identities are closed (0.493948ms)
+✔ architecture impact is required at feature-close preparation and remains durable (0.658471ms)
+✔ published close-coordinator schema tracks the executable phase contract (0.363551ms)
+✔ durable replay (4.466856ms)
+✔ publication-close directory durability is typed only for native Windows limitations (0.457509ms)
+✔ CLI rejects missing activate (31.436604ms)
+✔ CLI rejects wrong digest (27.845753ms)
+✔ CLI rejects unknown phase (26.104464ms)
+✔ replay/CAS guard 0 (0.353572ms)
+✔ replay/CAS guard 1 (0.176195ms)
+✔ replay/CAS guard 2 (0.132221ms)
+✔ replay/CAS guard 3 (0.127372ms)
+✔ replay/CAS guard 4 (0.125728ms)
+✔ replay/CAS guard 5 (0.156658ms)
+✔ replay/CAS guard 6 (0.157238ms)
+✔ replay/CAS guard 7 (0.127903ms)
+✔ replay/CAS guard 8 (0.164222ms)
+✔ replay/CAS guard 9 (0.125749ms)
+✔ process: registered package digest drift blocks close preparation before any transition (2817.502445ms)
+✔ process: local close is read-only planned, replay-safe, candidate-bound and never pushes (11180.717033ms)
+✔ process: authorization, failed publication, exact readback and cleanup stay distinct (9513.378504ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:26.702Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:26.906Z; bound to submission 77caaa1acef8....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:27.023Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: serialized state write failed before commit (SDC-AUTHORITY-UNAVAILABLE); zero mutation.
+Error: set-phase implementation requires an exact approved submission (SDC-AUTHORITY-UNAVAILABLE).
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:28.106Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:28.292Z; bound to submission 8ce5569ebdf7....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:28.402Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:29.635Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:29.801Z; bound to submission 6d070859f30b....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:29.922Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+{
+  "schema": "pipeline.inspect.v1",
+  "generatedAt": "2026-10-24T18:53:30.397Z",
+  "status": "approved",
+  "activeFeature": {
+    "id": "unit",
+    "planPath": "specs/unit/prd_unit.md",
+    "phase": "design",
+    "phaseHistory": [
+      {
+        "phase": "implementation",
+        "at": "2026-10-24T18:53:30.044Z"
+      }
+    ]
+  },
+  "phase": "design",
+  "planApproved": true,
+  "lifecycle": {
+    "ok": true,
+    "code": "PLAN-LIFECYCLE-CURRENT",
+    "status": "approved"
+  },
+  "mixedPlanRecovery": null,
+  "pushApproval": {
+    "present": false,
+    "relevance": "absent"
+  },
+  "closedFeaturesCount": 0,
+  "phoenixEpicHistory": null,
+  "nextAction": {
+    "kind": "command",
+    "executable": "<home>/.local/lib/node-v24.15.0/bin/node",
+    "argv": [
+      "<repo-root>/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "set-phase",
+      "--phase",
+      "implementation"
+    ],
+    "mutation": true,
+    "requiresConfirmation": true
+  },
+  "nextActionText": "## Next action\n\nThe plan is approved. Switch the feature to implementation with\n`pipeline-state set-phase --phase implementation`, then proceed with the\napproved implementation packages.\n",
+  "continuityAuthorityDrift": {
+    "schema": "pipeline.continuity-authority-drift.v1",
+    "status": "current",
+    "featureId": "unit",
+    "revision": 1,
+    "artifacts": [
+      {
+        "role": "prd",
+        "path": "specs/unit/prd_unit.md",
+        "recordedSha256": "673a418c1c0858d8781e9330b59612cf2e8fadc4501396544019caecc9b34d97",
+        "observedSha256": "673a418c1c0858d8781e9330b59612cf2e8fadc4501396544019caecc9b34d97",
+        "state": "match"
+      },
+      {
+        "role": "spec",
+        "path": "specs/unit/spec.md",
+        "recordedSha256": "e2d5f02a8bb0c49cfb9ae4096858ec6f263cb8d2f34e73eaddaaa7b1e6aa66fd",
+        "observedSha256": "e2d5f02a8bb0c49cfb9ae4096858ec6f263cb8d2f34e73eaddaaa7b1e6aa66fd",
+        "state": "match"
+      }
+    ],
+    "recovery": null
+  }
+}
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:32.800Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:32.958Z; bound to submission 108d6f513bd1....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:33.071Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: set-phase implementation refused calibration commit preflight (CVCT-TWIN-CAS); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:34.028Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:34.311Z; bound to submission 9196a2c53627....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:34.525Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: set-phase implementation refused calibration commit preflight (CVCT-APPROVAL-UNAVAILABLE); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:35.376Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:35.540Z; bound to submission e08ab946f9ed....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:35.652Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: set-phase implementation refused calibration commit preflight (CVCT-TWIN-CAS); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:38.427Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:38.587Z; bound to submission e6ef445a6c67....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:38.697Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: state replacement did not commit (PS-CONTINUITY-WRITE-IO), but a companion mutation may have occurred; inspect persisted files before retrying.
+Error: set-phase implementation failed after possible calibration mutation (PS-CONTINUITY-WRITE-IO); State was not reported committed. Inspect both tiers before recovery. No configured commit is claimed.
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:40.929Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:41.078Z; bound to submission 7f92462a6eaf....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:41.189Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:45.279Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:45.431Z; bound to submission fc455c89aa2f....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:45.540Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: set-phase rejected invalid lifecycle state (PLAN-LIFECYCLE-APPROVAL-CONTRADICTORY).
+Error: set-phase implementation refused calibration commit preflight (CVCT-TWIN-CAS); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase implementation refused calibration commit preflight (CVCT-TWIN-CAS); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:49.485Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:49.646Z; bound to submission afe11860ead6....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:49.754Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:53.749Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:53.890Z; bound to submission 4ead569bae4a....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:53.996Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:58.131Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:58.272Z; bound to submission 91cfb03f0b87....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:58.374Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+✔ KCR001 caller readiness injection cannot mint a calibration Source State witness (1393.727529ms)
+✔ KCR002 a serialized old non-phase ready record remains admissible (1593.911894ms)
+✔ KCR003 set-phase produces a sanctioned commit-ready verify transition (3160.925276ms)
+✔ KCR004 set-phase refuses uncommitted calibration before State mutation (1160.105206ms)
+✔ KCR005 set-phase refuses lost approval without modifying calibration (1423.086593ms)
+✔ KCR006 partial calibration I/O reports incomplete recovery without claiming success (3048.715857ms)
+✔ KCR007 State replacement failure rolls back the exact configured companions (2510.981391ms)
+✔ KCR008 dead post-State owner recovers through a fresh current Source command (4350.137561ms)
+✔ KCR009 fresh pre-State retry ignores forged journal and refuses stale or dirty Source inputs (4187.355929ms)
+✔ KCR010 configure-verify retries exact current output after twin and ready crashes (8672.84951ms)
+✔ KCR011 live Source serialization refuses concurrent same and different commands (14606.597224ms)
+✔ legacy MAC journal recovers the exact pre-fence postimage and yields the signed package preview (104.363477ms)
+✔ legacy journal repairs Result-before-State and replays each interrupted repair phase (367.002948ms)
+✔ legacy journal refuses forged proof, altered historical prefix and PRD drift without writing (162.447352ms)
+✔ retired legacy journal exposes one exact signed repair preview and then the existing package reconcile (271.734309ms)
+✔ signed legacy repair replays after interruption without consuming another approval (220.839417ms)
+✔ signed legacy preview refuses source drift and forged repair replay without new writes (471.716605ms)
+✔ win32: a POSIX-insecure private result-bootstrap directory is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (148.967548ms)
+✔ win32: an insecure DACL assessment on the private result-bootstrap directory still fails closed (90.509592ms)
+✔ AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence (92.354678ms)
+✔ registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview (249.90677ms)
+✔ registered bootstrap interruption and replay retain a single provable reconciliation plan (395.601274ms)
+✔ registered package authority drift refuses bootstrap before Result, State or manifest mutation (53.371978ms)
+✔ AC-047-147: journal and Result-before-State interruptions resume once and exact replay is zero-mutation (472.919365ms)
+✔ AC-047-143/148: active work, nonnull authority, State/document drift, absent/fenced and unsafe Result targets fail closed (601.797893ms)
+✔ AC-047-149: bootstrap requires a current implementing Plan lifecycle before any Result or State mutation (331.939287ms)
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit dee5ef2bcf1b97694bff8d3bf43831bf3b5c577f (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit d30c2fc7c96602b1cca2c4d3225da49d9e9c9497 (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit afb0663cc1855ee159f824512a6f4282ad9b06c1 (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-08-08T18:40:00.000Z).
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/stagingbolt-ordinary/prd_stagingbolt-ordinary.md(32ae22050f77...)+specs/stagingbolt-ordinary/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/global-chat-plan-approval/prd_global-chat-plan-approval.md(fcfef1996ea9...)+specs/global-chat-plan-approval/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-no-presentation/prd_planshown-no-presentation.md(a3fd44d67654...)+specs/planshown-no-presentation/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Design reopened by "po-test" on 2026-08-27T10:00:00.000Z; lifecycle="draft".
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T11:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/prdframing-success/prd_prdframing-success.md(ecca622cacee...)+specs/prdframing-success/spec.md(1b355baa3076...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-no-presentation/prd_planshown-no-presentation.md(a3fd44d67654...)+specs/planshown-no-presentation/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Design reopened by "po-test" on 2026-08-27T10:00:00.000Z; lifecycle="draft".
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T11:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/advisor-early-refusal/prd.md(d19c20cdbc32...)+specs/advisor-early-refusal/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/mini-advisor-unavailable/prd.md(2cbecd2b881b...)+specs/mini-advisor-unavailable/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 08b277cb65ad....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Feature "marker-check" set. Plan path: specs/marker-check/prd.md. planApproved=false, phase="design".
+Error: set-phase implementation refused calibration commit preflight (CVCT-GIT-READ); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase rejected invalid lifecycle state (PLAN-LIFECYCLE-INACTIVE).
+Error: set-phase implementation refused calibration commit preflight (CVCT-GIT-READ); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase implementation refused calibration commit preflight (CVCT-GIT-READ); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase implementation refused calibration commit preflight (CVCT-GIT-READ); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase implementation refused calibration commit preflight (CVCT-GIT-READ); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:36.684Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:36.853Z; bound to submission 7f3217255d27....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:36.978Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:38.464Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:38.628Z; bound to submission a36cec6af3fc....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:38.737Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:40.185Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:40.352Z; bound to submission 02ee37b2f8b0....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:40.468Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Error: set-phase implementation refused calibration commit preflight (CVCT-GIT-READ); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:41.927Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:42.092Z; bound to submission eacae8640deb....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:42.215Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:43.498Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:43.649Z; bound to submission cf15c685009f....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:43.755Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(673a418c1c08...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Error: --verify-command must be a real, non-blank verification command -- not the plugin's UNCONFIGURED_VERIFY placeholder text.
+Error: --verify-command must be a real, non-blank verification command -- not the plugin's UNCONFIGURED_VERIFY placeholder text.
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"advisory","areas":[],"unresolvedPaths":["src/change.mjs"]}
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:45.813Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:45.966Z; bound to submission c30eaa66edc8....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:46.078Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Verify command configured for the established implementation lifecycle.
+Commit exactly the selected verification tiers through the normal hooks:
+git add -- project/pipeline.json .claude/pipeline.json
+git commit -m "chore: configure project verification"
+Keep the private State untracked; the normal hook rechecks this exact transition at commit time.
+Verify command already configured; exact zero-write replay accepted.
+Plan submitted by "Synthetic fixture" on 2026-10-24T18:53:47.463Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-24T18:53:47.629Z; bound to submission 776dcda09b7c....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-24T18:53:47.749Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+pipeline-state.test.mjs (CB-1a): all checks passed
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-09-20T13:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/receipt-boundary-a/prd.md(924f1c947079...)+specs/receipt-boundary-a/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Submitted plan cancelled by "PO" on 2026-09-20T13:00:00.000Z; lifecycle="draft".
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-09-20T13:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/receipt-boundary-a/prd.md(924f1c947079...)+specs/receipt-boundary-a/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Mixed plan state cancelled by "PO" on 2026-09-20T13:00:00.000Z; lifecycle="draft".
+Feature "receipt-boundary-a" discarded by "PO" (commit ffffffffffffffffffffffffffffffffffffffff, 2026-09-20T13:00:00.000Z). Reason: Feature A retired after recovery. activeFeature removed, planApproved=false.
+Feature "receipt-boundary-b" set. Plan path: specs/receipt-boundary-b/prd.md. planApproved=false, phase="design".
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-09-19T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/nva-g19-cancellation/prd_nva-g19-cancellation.md(4bc32099f283...)+specs/nva-g19-cancellation/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Submitted plan cancelled by "PO" on 2026-09-19T12:00:00.000Z; lifecycle="draft".
+Submitted plan is already cancelled; exact zero-write replay accepted.
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-09-19T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/nva-g19-cancellation/prd_nva-g19-cancellation.md(4bc32099f283...)+specs/nva-g19-cancellation/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+Plan submitted by "coordinator" on 2026-09-20T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/b91-mixed-plan-state/prd_b91-mixed-plan-state.md(98ed94ed7e35...)+specs/b91-mixed-plan-state/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Mixed plan state cancelled by "PO" on 2026-09-20T12:00:00.000Z; lifecycle="draft".
+Mixed plan state is already cancelled; exact zero-write replay accepted.
+PASS canonical feature -> mini denial and zero mutation
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+PASS same-profile Draft contract and exact approved-state preservation
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+PASS initial selection survives cancellation without intake
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+PASS conflicting choice blocks submission/approval/implementation
+PASS malformed intake cannot reset selection
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+PASS existing attended apply, real pipe/wrong/unattended denial, audit and one-use replay
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+PASS legacy submission-only choice survives cancellation
+PASS exact profile/reason grammar and bound actor/runner/choice/reason refusal
+PASS pre-confirmation state/revision/PRD/Spec/intake/candidate drift
+PASS lock/journal prepared and immediately-before-State-write CAS refusal
+PASS exact postimage candidate/Spec and existing V4 failure rollback
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+PASS committed global chat never bypasses attended profile confirmation
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+PROFILE R3 focused regressions complete.
+PASS R1 an ungoverned project is skipped before the Spec is even read (PLR-NO-GOVERNANCE)
+PASS R2 a governed Spec with n / R-n German table rows and .test.js checks is ready; absent greenfield checks are admitted
+PASS R3 a governed Spec with no admitted criterion row is refused (PLR-HANDOFF-NO-CRITERION)
+PASS R4 an unreadable, drifted, symlinked or non-UTF-8 Spec is refused (PLR-HANDOFF-SPEC-UNREADABLE)
+PASS R5 a check path that cannot be delivered is refused: bad shape (UNADMITTED) and git-ignored (NOT-TRACKABLE)
+PASS R6 the inspection fails closed, and the criterion scan is exported by the host parser module
+AC-264 plan-readiness hand-off R1-R6 complete.
+✔ plugins/pipeline-core/scripts/pipeline-state.test.mjs (31898.551485ms)
+ℹ tests 79
+ℹ suites 0
+ℹ pass 79
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46534.51612
+
+--- stderr ---

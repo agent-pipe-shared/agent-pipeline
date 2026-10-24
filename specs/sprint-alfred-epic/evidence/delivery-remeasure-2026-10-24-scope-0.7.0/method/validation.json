@@ -1,0 +1,32 @@
+{
+  "schema": "pipeline.release-matrix-merge-validation.v1",
+  "status": "valid",
+  "original174": 174,
+  "excluded": 5,
+  "retained": 169,
+  "greenfieldCanonical": 28,
+  "greenfieldAliases": 3,
+  "newGreenfield": 25,
+  "total": 194,
+  "counts": {
+    "25": 2,
+    "50": 41,
+    "75": 151,
+    "100": 0,
+    "UNKNOWN": 0
+  },
+  "index": 69.2,
+  "greenfieldCounts": {
+    "25": 1,
+    "50": 18,
+    "75": 9,
+    "100": 0,
+    "UNKNOWN": 0
+  },
+  "futureRaw": 110,
+  "futureActiveOverlap": 20,
+  "futureCandidates": 78,
+  "futureClosed": 12,
+  "no100": true,
+  "originalSnapshotUnchanged": true
+}

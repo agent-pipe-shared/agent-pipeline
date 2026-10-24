@@ -1,0 +1,39 @@
+command: node --test --test-name-pattern=controlled plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+label: source-catalogue-negatives
+exitCode: 1
+head: 20392c08f1648356783b362e238f63500af2662f
+tree: c11dc524b0929d460bda43e10e4b9c626ab329fe
+dirty: true
+--- stdout ---
+Error: Result bootstrap apply inputs are stale or conflicting; zero mutation.
+Error: Result bootstrap apply inputs are stale or conflicting; zero mutation.
+✖ controlled METHOD: catalogue-present Source companion closes exact Result bootstrap effects (25421.596677ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25742.155955
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs:421:1
+✖ controlled METHOD: catalogue-present Source companion closes exact Result bootstrap effects (25421.596677ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs:487:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

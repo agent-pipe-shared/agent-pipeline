@@ -1,5 +1,26 @@
 # Next local test candidate: parallel Greenfield fix slices
 
+**Operative runner-neutral sequence:** follow the
+[0.7.0 completion and Greenfield plan](plan_0.7.0-completion-and-greenfield-2026-10-24.md).
+It supersedes older ordering below: content/Greenfield stabilization, preparatory
+full Verify and fixes, freeze, one Critic batch with at most three correction-diff
+reviews, then final release Full Verify/Security on the reviewed candidate.
+
+**Current 0.7.0 matrix scope:** 194 distinct items: 2 at25,41 at50,151 at75,
+none at100 orUNKNOWN, index69.20%. Five explicit post-0.7.0 deferrals are excluded;
+25 new Greenfield identities are added and three exact aliases counted once.
+The Greenfield cohort has28 rows:1 at25,18 at50,9 at75. Original retained
+evidence binds31db7853a; Greenfield assessments binddaaf074b1. The older174-row
+measurement below is historical. No native/acceptance credit is inferred.
+
+**Latest integration:** K156 and cohort recording are operator-committed
+`0fb6fe6d9`; G19/G21 are operator-committed `daaf074b1`. Controlled G21 Source
+and Result/consumer qualification passed25/25; earlier composed79/79 and
+close/kernel9/9 remain. G17v4 is STOP/NOT MAIN-READY: a settlement-gap negative
+accepts an unowned Git-admin write, and the ephemeral custody seal has no proved
+cross-process CLI route. Do not import its patch. G25/G27 and G26/G29 helper
+proposals remain partial/inert pending coherent lifecycle integration.
+
 This is the continuation of the approved three-runner fix wave. It changes no
 PRD, Spec, original acceptance criterion, approval posture or review budget.
 The currently installed intermediate build is stamp `f2aee4ec2`, version

@@ -1,0 +1,221 @@
+command: node --test plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+label: close-gate-kernel
+exitCode: 1
+head: 20392c08f1648356783b362e238f63500af2662f
+tree: c11dc524b0929d460bda43e10e4b9c626ab329fe
+dirty: true
+--- stdout ---
+PASS GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports
+PASS GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)
+PASS GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)
+PASS GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)
+PASS GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry
+PASS GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise
+PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)
+PASS GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher
+PASS GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents
+PASS GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots
+PASS GMWKC10 every FIXTURE_STRING_IMPORTS exemption names a target that does NOT exist on disk
+
+guard-maintenance-window-kernel-closure: 11 passed, 0 failed
+✔ plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs (814.668416ms)
+✖ coordinator builds the README audit bundle and forwards only a readback-bound Critic/Verify ID (2586.162091ms)
+✖ forged private lifecycle Critic fields cannot qualify feature close (2674.765137ms)
+✖ finish-feature drives the real coordinator and State writer through verified bundle readback (2562.858868ms)
+✖ finish-feature resumes a prepared real close without duplicating the audit bundle (2551.967341ms)
+✖ finish-feature recovers a lost final response from real closed State without duplicating effects (2529.487636ms)
+✖ altered public Verify bytes after preparation refuse the final State close without mutation (2565.349569ms)
+✖ the exact prepared transition is replayable only after its private audit and Critic/Verify readback still match (2871.17544ms)
+✖ a new candidate after preparation refuses final State close without mutation (2600.730063ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 1
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21276.249295
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:124:1
+✖ coordinator builds the README audit bundle and forwards only a readback-bound Critic/Verify ID (2586.162091ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.close-coordinator.error.v1","status":"refused","code":"CLOSE-PACKAGE-AUTHORITY","message":"registered package result does not bind current State authority"}
+  
+  
+  2 !== 0
+  
+      at invoke (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:27:10)
+      at prepare (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:120:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:125:13)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:133:1
+✖ forged private lifecycle Critic fields cannot qualify feature close (2674.765137ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'CLOSE-PACKAGE-AUTHORITY'
+  - 'CVL-CRITIC-DRIFT'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:152:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'CLOSE-PACKAGE-AUTHORITY',
+    expected: 'CVL-CRITIC-DRIFT',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:155:1
+✖ finish-feature drives the real coordinator and State writer through verified bundle readback (2562.858868ms)
+  AssertionError [ERR_ASSERTION]: finish-feature: FINISH-PREPARE-PLAN: Command failed. (lifecycle-id: audit-feature-658df04e289f2034c3cab0cf)
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:163:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:171:1
+✖ finish-feature resumes a prepared real close without duplicating the audit bundle (2551.967341ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.close-coordinator.error.v1","status":"refused","code":"CLOSE-PACKAGE-AUTHORITY","message":"registered package result does not bind current State authority"}
+  
+  
+  2 !== 0
+  
+      at invoke (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:27:10)
+      at prepare (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:120:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:172:13)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:182:1
+✖ finish-feature recovers a lost final response from real closed State without duplicating effects (2529.487636ms)
+  Error: Command failed.
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/finish-feature.mjs:23:46)
+      at parseJsonOutput (file://<repo-root>/plugins/pipeline-core/scripts/finish-feature.mjs:25:29)
+      at command (file://<repo-root>/plugins/pipeline-core/scripts/finish-feature.mjs:35:59)
+      at invokeCoordinator (file://<repo-root>/plugins/pipeline-core/scripts/finish-feature.mjs:67:59)
+      at finishFeature (file://<repo-root>/plugins/pipeline-core/scripts/finish-feature.mjs:131:24)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:187:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'FINISH-PREPARE-PLAN',
+    lifecycleId: 'close-audit'
+  }
+
+test at plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:210:1
+✖ altered public Verify bytes after preparation refuse the final State close without mutation (2565.349569ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.close-coordinator.error.v1","status":"refused","code":"CLOSE-PACKAGE-AUTHORITY","message":"registered package result does not bind current State authority"}
+  
+  
+  2 !== 0
+  
+      at invoke (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:27:10)
+      at prepare (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:120:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:211:13)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:217:1
+✖ the exact prepared transition is replayable only after its private audit and Critic/Verify readback still match (2871.17544ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.close-coordinator.error.v1","status":"refused","code":"CLOSE-PACKAGE-AUTHORITY","message":"registered package result does not bind current State authority"}
+  
+  
+  2 !== 0
+  
+      at invoke (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:27:10)
+      at prepare (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:120:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:218:13)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:224:1
+✖ a new candidate after preparation refuses final State close without mutation (2600.730063ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.close-coordinator.error.v1","status":"refused","code":"CLOSE-PACKAGE-AUTHORITY","message":"registered package result does not bind current State authority"}
+  
+  
+  2 !== 0
+  
+      at invoke (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:27:10)
+      at prepare (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:120:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs:225:13)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

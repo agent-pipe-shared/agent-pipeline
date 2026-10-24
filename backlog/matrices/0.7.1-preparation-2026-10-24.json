@@ -1,0 +1,1538 @@
+{
+  "schema": "pipeline.release-review-preparation.v1",
+  "release": "0.7.1",
+  "status": "prepared-locked",
+  "workStarted": false,
+  "lock": {
+    "status": "locked",
+    "requiresAll": [
+      "0.7.0 release completed",
+      "close-block completed"
+    ],
+    "activationPerformed": false
+  },
+  "sourceIndexSha256": "eb5fe17d25e79502a96a550e4422e661c13286a8d4c9d0f8830c0154d7e15bd7",
+  "counts": {
+    "total": 110,
+    "byStatus": {
+      "open": 98,
+      "closed": 12
+    },
+    "current070RetainedOverlap": 20,
+    "partitions": {
+      "active070Overlap": 20,
+      "currentNoneFuture": 78,
+      "closedHistory": 12
+    }
+  },
+  "unassignedCandidates": [
+    {
+      "itemId": "pipeline.a-checkpoint-fold-lands-above-the-checkpoint-commit",
+      "path": "backlog/items/2026-10-20-a-checkpoint-fold-lands-above-the-checkpoint-commit.md",
+      "status": "open",
+      "source": "Push of the 0.7.0 Alfred candidate 0913fa941 on 2026-10-20: one PO push signature spent on a refused push",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "53535c3a80105465b641491d0bf530fa6e1c8848f729c514217e2bb374479ea4",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.a-dispatch-without-a-model-parameter-inherits-the-session-model",
+      "path": "backlog/items/2026-10-21-a-dispatch-without-a-model-parameter-inherits-the-session-model.md",
+      "status": "open",
+      "source": "PO decision D84 (2026-10-21): the dispatch model comes from the pipeline.user.yaml routing, is enforced, and ships in 0.7.0",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "1d24609cc5abcfd60f98ec864b9fa6230ca4b64c1810d1c34d72c1e6c1019fce",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.a-divergent-adr-body-is-invisible-to-the-parity-comparison-while-unadopted",
+      "path": "backlog/items/2026-10-21-a-divergent-adr-body-is-invisible-to-the-parity-comparison-while-unadopted.md",
+      "status": "open",
+      "source": "PO decision D81 (2026-10-21, K3 c): file an item, no 0.7.0 change",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "a05b9404985039dba4c64e44f2c14e0d687b67912cb4c32aa33e092e9c664268",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.a-feature-closes-over-a-slice-with-no-delivery-evidence",
+      "path": "backlog/items/2026-10-20-a-feature-closes-over-a-slice-with-no-delivery-evidence.md",
+      "status": "open",
+      "source": "Elephant observation while building D27/D55 (Q1), 2026-10-20: the close route's authorship classification names slices with neither a dispatch record nor commit evidence, and does not gate them",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "fdf47caecfe8920ea623c7eb90788a3b0ea79725e571aecfdefeaaa04c61a0d5",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.a-member-reserved-by-another-process-is-refused-as-unowned",
+      "path": "backlog/items/2026-10-19-a-member-reserved-by-another-process-is-refused-as-unowned.md",
+      "status": "open",
+      "source": "Elephant decision E30 (2026-10-19): MFHS028 measurement by ALF-B10-MFH",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "03735a261a896fa6ac19ddd8f87c7d3158f9b18d89651f10093b887965d1268b",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.a-push-leaves-the-next-item-dispatch-refused",
+      "path": "backlog/items/2026-10-19-a-push-leaves-the-next-item-dispatch-refused.md",
+      "status": "open",
+      "source": "Live dispatch of ALF-F7B-PRETOOL-PARITY on this repository, right after the c27576438 checkpoint push (2026-10-19)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "c67c6560384574476f0c89ac59b229c70eb063a47beedf9c92ec1d25e7d3594b",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.a-restore-of-a-protected-file-to-its-committed-bytes-is-refused",
+      "path": "backlog/items/2026-10-19-a-restore-of-a-protected-file-to-its-committed-bytes-is-refused.md",
+      "status": "open",
+      "source": "Elephant decision E25 (2026-10-19, under PO decision D26): TR-L-F (toil-resolution-2026-10-08 row T84, section 5 row 9) leaves 0.7.0",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "a01f456c611a3e2595728b3783cc2c5d7912b92e6ceebf5995baf41e0fa72e18",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.a-running-batch-has-no-admissible-critic-route",
+      "path": "backlog/items/2026-10-20-a-running-batch-has-no-admissible-critic-route.md",
+      "status": "open",
+      "source": "PO report scratch/pipeline-feedback-03.md, finding PF-34; the same refusal on this repository (CCA-REVIEW-UNIT-REQUIRED, Critic of e6fec04a0, 2026-10-19)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "de518c3330a2ee5b76ced122e21670db8ab99f889e60bad8beb13543adbc6de6",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.a-same-candidate-critic-rerun-after-a-failed-review-can-no-longer-be-compiled",
+      "path": "backlog/items/2026-10-21-a-same-candidate-critic-rerun-after-a-failed-review-can-no-longer-be-compiled.md",
+      "status": "open",
+      "source": "repair of lib/critic-review-lineage.test.mjs (2026-10-21): the test fixtures were stale, and the repair exposed a product-side inconsistency",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "80d8be55834676c8e13a75348f8327664c83fd29e16b1e1d2abab92cdbd0bf59",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.a-symlinked-project-root-is-refused-by-the-state-authority-route",
+      "path": "backlog/items/2026-10-19-a-symlinked-project-root-is-refused-by-the-state-authority-route.md",
+      "status": "open",
+      "source": "Elephant decision E18 (2026-10-19): the RGt block of harness/scripts/pipeline-state.test.mjs, ceremony C4 c-3",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "d49e0ef7afbec1d479d8c187c2cf4c900389a309acccd9c80f3b002f2728beb3",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 34,
+          "text": "## Triage\n\nMedium (D6/D10): the refusal is fail-closed, and no 0.7.0 flow is known to\nneed a symlinked root.\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.agy-greenfield-report-residuals",
+      "path": "backlog/items/2026-10-20-agy-greenfield-report-residuals.md",
+      "status": "open",
+      "source": "PO report scratch/pipeline-analyse-greenfield_agy_20261020.md (a greenfield run on Antigravity, 2026-10-17/18, manifest version 0.6.2); checked read-only against the 0.7.0 candidate on 2026-10-20; deferred by the PO (not in this candidate)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "b9cd496359ca3cf663f2b75967241794a6b39e8bd071232410f21edace28016a",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.an-elephant-cannot-dispatch-a-small-fix-during-implementation",
+      "path": "backlog/items/2026-10-20-an-elephant-cannot-dispatch-a-small-fix-during-implementation.md",
+      "status": "open",
+      "source": "PO decision D60, 2026-10-20 (Q16): the fixes found while finishing the 0.7.0 Alfred test candidate had no admitted Goldfish route",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "599b9b5ddbd17790158b87356b1e770cada4ce28c4fdadc398e48cff9b862ed1",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.an-orphaned-registry-lock-blocks-every-dispatch",
+      "path": "backlog/items/2026-10-20-an-orphaned-registry-lock-blocks-every-dispatch.md",
+      "status": "open",
+      "source": "PO report scratch/pipeline-feedback-03.md, finding PF-55 (named FB3-PF-55 here, D56); PO again 2026-10-20: blocked hard by registry.lock, no repair, recovered only by moving the file by hand",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "433f357263f9e8af070eb18a8217fcce228da352982e9378dded9883a0148d04",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.antigravity-rejects-the-claude-model-tiers-in-shared-agent-files",
+      "path": "backlog/items/2026-10-18-antigravity-rejects-the-claude-model-tiers-in-shared-agent-files.md",
+      "status": "open",
+      "source": "PO Antigravity topology refresh on CLI 1.4.2, 2026-10-18",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "c0730fb61948f0982e9100f4dc0e61620feb2c214e6274074670490c5aad063b",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.approve-plan-does-not-register-the-accepted-delivery-contract-in-a-feature-package",
+      "path": "backlog/items/2026-10-18-approve-plan-does-not-register-the-accepted-delivery-contract-in-a-feature-package.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-25)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "dc7322564f472e5c7e8c204e7127f7ec12803d6af96c4c1537b54c52087a36f2",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.architecture-continuity-advisory-shows-a-count-without-codes",
+      "path": "backlog/items/2026-10-19-architecture-continuity-advisory-shows-a-count-without-codes.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-19 (PF-22)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2e6817dfd29dd8c978aaec06973d50c0602ddbc06cd1ebaa2b10d9cebba618ef",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.architecture-deferral-records-no-net-new-baseline",
+      "path": "backlog/items/2026-10-16-architecture-deferral-records-no-net-new-baseline.md",
+      "status": "open",
+      "source": "PO decision #14, 2026-10-16 (AC-119): recording the net-new baseline commit in the architecture deferral record is a backlog item after 0.7.0.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "6b5255d1212beca1d72d8b9a9bab11aa70272260cd2b656ce9dd89c33e6dcbca",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.bootstrap-bind-plan-reference-claims-signature-is-plan-approval",
+      "path": "backlog/items/2026-10-18-bootstrap-bind-plan-reference-claims-signature-is-plan-approval.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-11)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "8b31303794721b647033c80af034fbc52abb2337c115c37aec03beedab2a1650",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.checkpoint-push-policy-is-checked-too-late",
+      "path": "backlog/items/2026-10-20-checkpoint-push-policy-is-checked-too-late.md",
+      "status": "open",
+      "source": "PO report scratch/pipeline-feedback-03.md, findings PF-32 and PF-33; PO decision D56 (3)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "d5a4d0d008b197768fe959b309bbf13d37c0550939abb284526acb41b4128d9f",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn",
+      "path": "backlog/items/2026-08-30-codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn.md",
+      "status": "open",
+      "source": "PO, 2026-08-30: 'das hatten wir ja schon bei vielen themen mit codex und da sollte dann aber immer automatisch als folge schritt eine anweisung sein, dass bei diesen fehler eine andere art der sandbox nötig ist! dazu hatten wir eigentlich schon mal ein extra profil konfiguriert aber das muss halt auch im bootstrap abgefragt werden und dann anders starten.'",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "c34ca4ecc6626862aabd593d452481953b2a56f09eb39c10154c7dca0b8542a9",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 123,
+          "text": "## Triage\n\n- **Decision:** deferred — the Nova A quick fix remains the supported path;\n  native Codex sandbox-profile reconstruction and acceptance move to a\n  dedicated Windows-host work package outside Nova B.\n- **Rationale:** On 2026-09-11 the PO confirmed that native Codex sandboxing is\n  technically unreliable under WSL and must not hold the Nova B candidate\n  open. Revisit only on native Windows, where the sandbox profile can be\n  exercised and evidenced on its intended host. WSL results must not be used\n  to claim native-sandbox readiness.\n- **Assignment:** future native-Windows Codex sandbox hardening\n- **Review expiry:** 2026-12-15 — re-triage date, not a delivery promise\n- **Date:** 2026-09-11\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.correction-critic-reuses-the-full-review-context",
+      "path": "backlog/items/2026-10-12-correction-critic-reuses-the-full-review-context.md",
+      "status": "open",
+      "source": "PO request 2026-10-12 (Claude × native Windows × own repo), after the T10 design review: a delta review on a two-file diff took about 15 minutes after a full review of the same object.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "53ed5650717fe4d3f8e7eeeccbd7c0c9c75654297c9dda6b02b5e323e8dcd3c5",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.correction-review-bindings-are-built-by-hand",
+      "path": "backlog/items/2026-10-20-correction-review-bindings-are-built-by-hand.md",
+      "status": "open",
+      "source": "Ordinal-2 delta Critic of e6fec04a0..f62b5143a, 2026-10-20: the first dispatch stopped at the reference boundary because its briefing called the correction input bindings not applicable although the range added a retained Critic result",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "500415e08e1805dcb6a486647fb98aa1cbbfff975395a588df51f198b2691b16",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.declared-system-skill-read-requires-human-override",
+      "path": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+      "status": "open",
+      "source": "Codex candidate preparation, 2026-09-28: installed lifecycle guard refuses the runtime-declared skill-creator SKILL.md read with GUARD-READ-SCOPE-OUTSIDE-ROOT and offers only a signed override.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "be5cdba2880b8333f8b52dec5c5d82951f2cf2a7eb9df99bfde1478451af18e0",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": {
+        "classification": "excluded",
+        "stage": "75"
+      },
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 52,
+          "text": "## Triage\n\nThe installed denial is reproduced. No repair or release acceptance is claimed.\n\n2026-10-17: deferred past the 0.7.0 candidate together with\n`lifecycle-read-scope-blocks-host-declared-system-skill` (AC-209) by PO\ndecision of 2026-10-16. The item stays open; AC-147 is not counted against the\n0.7.0 local test candidate.\n"
+        },
+        {
+          "line": 121,
+          "text": "## Reconciled 2026-10-23\n\nText sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:\n\n- Description (\"The installed lifecycle guard refuses the ordinary read-only `cat` with `GUARD-READ-SCOPE-OUTSIDE-ROOT`\n  ... its only offered route requires a human signature\") and Proposal (\"Bind the exact physically verified skill\n  instruction files from the active host catalog into the session's read authorities\"): the reading-outside-the-repository\n  premise changed after the 2026-10-17 triage. PO decision D96 (2026-10-22) makes reads outside the repository generally\n  allowed except credentials, runner-neutral; D108 keeps a private exception only for RECURSIVE directory searches over\n  `.codex/skills`, `.codex/sessions` and `.claude/projects` (\"single files there read like any other file outside\").\n  Built in commit `5b3990a37` (`passive-read-policy.mjs`, with the restated pins `passive-read-policy.test.mjs` and\n  `guard-lifecycle-ready.test.mjs`). So a single read of a declared `SKILL.md` outside the root is no longer a\n  `GUARD-READ-SCOPE-OUTSIDE-ROOT` refusal by policy; the pin case ALF-B8-AC147 in\n  `plugins/pipeline-core/lib/passive-read-policy.test.mjs` holds the skill file readable by its own physical name and\n  refused through a project-local or host alias. The catalog-bound authority described in the Proposal is therefore no\n  longer the only route to the read.\n- Triage \"No repair or release acceptance is claimed\": still true for the installed-host proof. Acceptance bullet 4\n  (installed host readback of the actual route) and the catalog-identity bullet 3 are not evidenced by D96 and stay\n  with the deferred Codex-host half (D57 Q3: native-host item after 0.7.0; D63 deferral of the catalog half of AC-147).\n  The item stays open on that basis; no status change is made here.\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.design-course-does-not-name-the-criterion-renderings-the-delivery-course-admits",
+      "path": "backlog/items/2026-10-18-design-course-does-not-name-the-criterion-renderings-the-delivery-course-admits.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-23 diagnosis)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "465fea05e46c182ab941d03bbf8ebc66d47914c464dd8a1de7a4f5babc7877f5",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.design-course-telemetry-is-deferred",
+      "path": "backlog/items/2026-10-16-design-course-telemetry-is-deferred.md",
+      "status": "open",
+      "source": "PO decision 2026-10-16 #2 on pipeline.greenfield-design-course-cost-and-proportionality (AC-160)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "38b2bb780bcead2d7da29f9c0aa45d941057f92e3c962abf3614a74a21c56b56",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 52,
+          "text": "## Triage (filled in by the Elephant of the next Pipeline session)\n\n- **Decision:** deferred.\n- **Rationale:** PO decision 2026-10-16 #2 defers design-course telemetry; it is outside 0.7.0.\n- **Assignment (if accepted):** post-0.7.0; owner Coordinator for the deferral, pipeline for the work.\n- **Date:** 2026-10-16\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.draft-phase-blocks-commit-and-unstage-of-po-concept-files",
+      "path": "backlog/items/2026-10-18-draft-phase-blocks-commit-and-unstage-of-po-concept-files.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-13)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "089ec3c3e893bb83f42a267f7659e7786016e2114ad0a7761758201985cbcbe9",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.fitness-denial-names-no-finding-and-inspect-recommends-the-refused-transition",
+      "path": "backlog/items/2026-10-18-fitness-denial-names-no-finding-and-inspect-recommends-the-refused-transition.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (unnumbered finding from the same run)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "a85b7f1e2c1dd6a7d0cb145578648c772a6d2a151ab5f0be3241aed2a49ecfb9",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.gg20-refuses-reading-the-hooks-path",
+      "path": "backlog/items/2026-10-20-gg20-refuses-reading-the-hooks-path.md",
+      "status": "open",
+      "source": "Elephant observation, 2026-10-20: `git config --get core.hooksPath` was refused with GG-20 while checking which commit-msg hook a PO terminal commit meets",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "1c17307ed1a6b8e607afeefb160ff0e1730e46fbe99f81bd89758543232e81bd",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.gh-commands-blocked-before-binding-though-design-phase-requests-a-repo",
+      "path": "backlog/items/2026-10-18-gh-commands-blocked-before-binding-though-design-phase-requests-a-repo.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-07)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "94f83445debb873f475bf6e9be0b75a76b2e2c597fb7695ea94595ae76587106",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.gh-repo-create-has-no-typed-route-in-guard-push",
+      "path": "backlog/items/2026-10-18-gh-repo-create-has-no-typed-route-in-guard-push.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-12)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "3fe613c487c66491910a5862a9e3b300874c6ec2bea4b0001dc6a706ff9b9770",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.git-03-forbids-provider-trailers-the-runner-environment-demands",
+      "path": "backlog/items/2026-10-18-git-03-forbids-provider-trailers-the-runner-environment-demands.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-08)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "c36e4a0c737cec8d10e50c3bb9cd3145a28d6d6ff1657cc48c530525212c5a71",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.goldfish-allowed-paths-naming-derived-backlog-views-are-refused-without-a-diagnostic",
+      "path": "backlog/items/2026-10-18-goldfish-allowed-paths-naming-derived-backlog-views-are-refused-without-a-diagnostic.md",
+      "status": "open",
+      "source": "Alfred self-application, backlog dispatches BL1-BL4, 2026-10-18",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "43129246754a24c9fa2542220f31155c7d51a81f09985f41cfaa997fa4681217",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.goldfish-mechanic-is-not-routed-to-the-haiku-tier",
+      "path": "backlog/items/2026-10-19-goldfish-mechanic-is-not-routed-to-the-haiku-tier.md",
+      "status": "open",
+      "source": "Elephant decision E7 (2026-10-19, under PO decision D26): point (e) MECH-HAIKU of opus-critic-only-batched-for-architecture-and-security leaves 0.7.0",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "efa4033f9ec681c9886edf01d2c4d34141b1208b4d7874d52c096509aadcfcf2",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.goldfish-quick-field-has-no-emitter",
+      "path": "backlog/items/2026-10-16-goldfish-quick-field-has-no-emitter.md",
+      "status": "open",
+      "source": "PO decision #27, 2026-10-16: an emitter/consumer for the Goldfish briefing 'quick' field is a backlog item after 0.7.0; the template field is the 0.7.0 delivery.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "67d7ce08ed1c33ef49465e66e7c891fdc857aadc0878db430db1043759f62445",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+      "path": "backlog/items/2026-10-19-greenfield-comparisons-need-reproducible-public-evidence.md",
+      "status": "open",
+      "source": "PO decision D21 (2026-10-18): moves after 0.7.0; the Alfred inventory had no public original for this item (AC-190)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "17035569f1434ef2ba27d4173541f68a65acf08cb502408c68234f2e1b332be4",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": {
+        "classification": "excluded",
+        "stage": "25"
+      },
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.hgo-audit-ledger-segment-checkpoint",
+      "path": "backlog/items/2026-10-19-hgo-audit-ledger-segment-checkpoint.md",
+      "status": "open",
+      "source": "PO decision D47 (2026-10-19): PF-51, found by the live item dispatch on build 677f8ec",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "764176746fae7c32f57c0dab84947576e3a2a3368b4f321ef21841d7003806d5",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.hooks-enforce-available-parallel-dispatch",
+      "path": "backlog/items/2026-10-01-hooks-enforce-available-parallel-dispatch.md",
+      "status": "open",
+      "source": "Explicit PO direction: hooks must detect missed parallelization and require the Elephant to dispatch independent work in parallel.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "f78fdad63cd4efe5480324ea4a7a155b07e5256f25ad7000316c4f3475d7fcaf",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.initial-answers-guidance-claims-git-author-recorded-but-config-is-empty",
+      "path": "backlog/items/2026-10-18-initial-answers-guidance-claims-git-author-recorded-but-config-is-empty.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-04)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "7688a7c72bbbc8a5525bda9e676f09d3f56c6dbed2bc6aad3ee27e9a254fd350",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.intake-capture-apply-closes-collecting-after-one-material-input",
+      "path": "backlog/items/2026-10-18-intake-capture-apply-closes-collecting-after-one-material-input.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-03)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "0986c718d7a8500b8159ce35bd5085e4b158f5c9850af82048a48bf09f7f0274",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.large-files-are-too-complex-for-agents-to-change-safely",
+      "path": "backlog/items/2026-10-19-large-files-are-too-complex-for-agents-to-change-safely.md",
+      "status": "open",
+      "source": "PO request (2026-10-19): find the large files that are too complex for agents and split them later",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2151119e23936ff2bc5cab29aeb61fde135fcdbe9f1522bd7bf0521a6323a3a0",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.licensing-outlook-states-a-zero-price-today",
+      "path": "backlog/items/2026-10-16-licensing-outlook-states-a-zero-price-today.md",
+      "status": "open",
+      "source": "PO decision 2026-10-16 (licensing tile): before the 0.7.0 release, replace the vague 'future commercial use may require payment' outlook with an explicit 0 EUR price today, including internal use inside a commercial company; keep the option of different terms for future versions. Not part of the local Alfred candidate.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2591fb23309437185a4ccf1b6b4ed1181d56aff6e3438cf80798514a7661480e",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 51,
+          "text": "## Triage (filled in by the Elephant of the next Pipeline session)\n\n- **Decision:** accepted into the local 0.7.0 candidate (PO decision D36, 2026-10-19).\n- **Rationale:** a documentation-only change that matches the current SUL-1.0 terms; the PO chose to take it now rather than just before the release.\n- **Assignment (if accepted):** the Elephant drafted the wording in `README.md` (English and its German reader aid) and `docs/licensing.md`; the final wording is the PO's, at acceptance.\n- **Date:** 2026-10-19\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.loaded-ruleset-identity-is-unavailable-for-claude-local-dev-and-consumers",
+      "path": "backlog/items/2026-10-18-loaded-ruleset-identity-is-unavailable-for-claude-local-dev-and-consumers.md",
+      "status": "open",
+      "source": "PF-23 binding generator work, 2026-10-18",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "a1037be0350d27a02b32e67771d8ed446116c5616e4b45fa78062122970234d8",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.materialize-architecture-leaves-inventory-json-as-the-empty-scaffold",
+      "path": "backlog/items/2026-10-18-materialize-architecture-leaves-inventory-json-as-the-empty-scaffold.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (unnumbered finding from the same run)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "313a341e795f39b90d52b58bc624f42f0a3b8cef30300e10280e57e813647a64",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.model-family-async-effects-need-a-settled-journal-phase",
+      "path": "backlog/items/2026-10-19-model-family-async-effects-need-a-settled-journal-phase.md",
+      "status": "open",
+      "source": "Elephant decisions E23 and E24 (2026-10-19, under PO decision D26): the model-family async-lifetime defect is latent and is not fixed in 0.7.0",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "71ebf4442a0c4b9760d2522e0ddb565ea53bedcc33d6b9d7248c810c2dee09d5",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.model-role-bootstrap-ignores-version-bumps-within-a-family",
+      "path": "backlog/items/2026-10-16-model-role-bootstrap-ignores-version-bumps-within-a-family.md",
+      "status": "open",
+      "source": "PO decision #22, 2026-10-16: the model-role bootstrap should detect a newly available model of a known family and actively propose it; a version bump within a known family is apparently ignored.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2b91f26808c59187a35a493b1e423f3881bbd863872d52134bdbda64db0489ae",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.model-role-dispatch-select-has-no-route-for-the-consumer-implementation-duties",
+      "path": "backlog/items/2026-10-18-model-role-dispatch-select-has-no-route-for-the-consumer-implementation-duties.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-25 side finding)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "ac81126d8259675afb7ed82e2e8f1d1b8ccaf1e5412b8b6acaf7bc2f00985ba9",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.outside-root-read-scope-denies-ls-and-rg-o-on-po-named-folders",
+      "path": "backlog/items/2026-10-18-outside-root-read-scope-denies-ls-and-rg-o-on-po-named-folders.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-18 (PF-02)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "b676fa4ed245f0d399225f98639e820fadfb6862c5fa65d8d93c7ab19733a931",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 39,
+          "text": "## Triage\n\nPO decision D96 (2026-10-22, status: implemented in the Antigravity adapter's test pin; the protected guard\nchanges are handed to the operator): reading outside the repository is allowed except for credentials, on every\nrunner; writing is a different rule and is untouched. This item's two shapes follow from it: `ls <folder>` and\n`rg -n -o <pattern> <directory>` outside the repository are admitted unless the target is a credential root, a secret\nfile, a system pseudo root of the single credential list, or a directory holding a secret file. The item stays open\nuntil the operator applies the protected diff and the pins named in `docs/adr/draft-read-scope-containment-boundary.md`\n(section \"PO decision D96\") run green on the applied tree. Two residual refusals are deliberate and listed there\nas findings: listing an ancestor of a credential root (`ls ~`) and recursive search over a runner session or skill collection.\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.owned-gitignore-without-evidence-breaks-every-item-governed-host-commit",
+      "path": "backlog/items/2026-10-19-owned-gitignore-without-evidence-breaks-every-item-governed-host-commit.md",
+      "status": "open",
+      "source": "PF-26C diagnosis (2026-10-19): the second PF-26 cause in the end-to-end pin fixture",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "74fb4f402c1863b7e179dd52ecd74d069fe71318c81ac64380e1cac27e06f88c",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.pin-location-and-generator-for-user-repositories",
+      "path": "backlog/items/2026-10-16-pin-location-and-generator-for-user-repositories.md",
+      "status": "open",
+      "source": "PO decision 2026-10-16 (Alfred night session): criterion-bound regression tests become canon for 0.7.0 as documentation only; the product surface below is deferred because it needs design scope.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2da53654e9585bf28eef76b02164b326de89d53aee09c06246552f0b90b6a299",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 47,
+          "text": "## Triage\n\nDeferred after 0.7.0 by PO decision 2026-10-16: new product surface that would\nreopen the Alfred design.\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.pipeline-owned-files-dirty-the-push-tree",
+      "path": "backlog/items/2026-10-20-pipeline-owned-files-dirty-the-push-tree.md",
+      "status": "open",
+      "source": "PO report scratch/pipeline-feedback-03.md, findings PF-31, PF-36 and PF-40; PO decision D56 (2)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "8e93a6de2f32eb74824c50101a04ae07f4eb11fc010f34c7a8bd1b7d96b52b14",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.pipeline-state-is-a-13810-line-monolith",
+      "path": "backlog/items/2026-10-21-pipeline-state-is-a-13810-line-monolith.md",
+      "status": "open",
+      "source": "PO question 2026-10-21 while patch 13 (AC-140 typed configure-verify repair) had to be made line-neutral",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "c6e685e5dca65c96afd9cdd0bcffbb52afc309c2005bfe838ba63a94eeef6781",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.project-uninstall-refuses-a-tracked-relative-antigravity-registry-entry",
+      "path": "backlog/items/2026-10-22-project-uninstall-refuses-a-tracked-relative-antigravity-registry-entry.md",
+      "status": "open",
+      "source": "D79 installer path fix (2026-10-21): the installer now writes a repo-relative path into the tracked .agents/plugins.json; the uninstall observer predates that shape",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "39d3ccba3480463e3e299f93a1bdf2ecb87a3e35c8a4d411103755c42f49446c",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 38,
+          "text": "## Triage\n\n- **Agent work (2026-10-22):** implemented. `observeAntigravityWorkspaceBindings` takes `trackedRelative`\n  (uninstall callers only): a repo-relative entry that resolves strictly inside the workspace to a readable plugin\n  directory is classified by its manifest name like an absolute one; a relative entry that resolves elsewhere or is\n  unreadable stays unavailable, and `PU-WORKSPACE-UNVERIFIABLE` now carries a typed `instructions` repair. The refresh\n  paths keep their rule (a tracked entry is never owned or removed). RED-first pins: `UC02C018` to `UC02C020` in\n  `plugins/pipeline-core/lib/project-uninstall.test.mjs` (the plan refused with `PU-WORKSPACE-UNVERIFIABLE` before the\n  change). The native-host check of the relative `entries[].path` resolution stays open and is not an agent task.\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.protected-file-set-audit-after-0-7-0",
+      "path": "backlog/items/2026-10-21-protected-file-set-audit-after-0-7-0.md",
+      "status": "open",
+      "source": "PO decision 2026-10-21, follow-up of pipeline.protected-guard-imports-unprotected-grammar-and-classifier",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "1a4de04dc2a5d3ac3f79fabe63684e8162d8f9837e4b34320cda404efe3666d1",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 39,
+          "text": "## Triage (filled in by the Elephant of the next Pipeline session)\n\n- **Decision:** accepted for 0.7.x (PO 2026-10-21).\n- **Rationale:** the 0.7.0 fix closes the two known gaps; the full audit is larger.\n- **Assignment (if accepted):** post-0.7.0 guard hardening.\n- **Date:** 2026-10-21\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.read-only-npm-registry-queries-have-no-admitted-route",
+      "path": "backlog/items/2026-10-19-read-only-npm-registry-queries-have-no-admitted-route.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-19 (PF-24)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "e8a86b1e80482463eb672bf40b28daca76e9835c9fe32bebbae3f67bd63572b7",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.refused-read-flags-cost-goldfish-budget-and-are-not-listed-for-agents",
+      "path": "backlog/items/2026-10-19-refused-read-flags-cost-goldfish-budget-and-are-not-listed-for-agents.md",
+      "status": "open",
+      "source": "real greenfield project report 2026-10-19 (PF-28)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2076e2c339c403d83774937d0ec86cce9b818aa0687e0ee030193ea03a6bb61d",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.registry-source-migration-gaps-after-a-plugin-update",
+      "path": "backlog/items/2026-10-19-registry-source-migration-gaps-after-a-plugin-update.md",
+      "status": "open",
+      "source": "PO decisions D46/D48 (2026-10-19): PF-50, PF-52; Critic review of 823dbb754/677f8ec93 (partial, minor F1-F4)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "4c7b5ad9be47c5c647ffa1f3e3a14964eddb36fad292f306f8f785e92f687ed1",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.report-03-later-findings",
+      "path": "backlog/items/2026-10-20-report-03-later-findings.md",
+      "status": "open",
+      "source": "PO report scratch/pipeline-feedback-03.md, findings PF-30, PF-35, PF-37, PF-38, PF-39, PF-43; deferred per D56",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "f34d9c8b4dc4e177935468eaeb8c0020bdb9f0151ae8da5d517d8731b8e436a4",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.retired-design-route-admit-tails-are-not-re-expressed-on-the-review-receipt-route",
+      "path": "backlog/items/2026-10-19-retired-design-route-admit-tails-are-not-re-expressed-on-the-review-receipt-route.md",
+      "status": "open",
+      "source": "Elephant decision E15 (2026-10-19): the admit-side tails that ceremony C4 leaves dormant in pipeline-state.test.mjs",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "83e33fa69972c70ad649365dae627b374a69768cebc03cd70525d6a959a40014",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 45,
+          "text": "## Triage\n\nMedium (D6/D10): not blocking for 0.7.0, because the live happy path is\ncovered and the old assertions are preserved.\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.scanner-diagnostics-keep-no-finding-provenance-before-suppression",
+      "path": "backlog/items/2026-10-21-scanner-diagnostics-keep-no-finding-provenance-before-suppression.md",
+      "status": "open",
+      "source": "PO decision D77 2026-10-21 (AC-249 Oct 10 suffix deferred), specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "9d096bfe76d4d4759aa20cf48d3e7df21d984273c495a9cfc44b23906c60f072",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.second-writer-check-skips-a-worktree-isolation-that-may-not-be-granted",
+      "path": "backlog/items/2026-10-22-second-writer-check-skips-a-worktree-isolation-that-may-not-be-granted.md",
+      "status": "open",
+      "source": "K39 delivery (guard-side second-writer refusal, D110) and CLAUDE.md note of 2026-08-25 on worktree isolation that was not granted.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "65893998ee9118fc1d8ff249b4df23835b85bb6cc99b6dbbbf46d41e229e20b4",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.selected-critic-lane-contracts-unpinned",
+      "path": "backlog/items/2026-09-06-the-selected-critic-lane-briefs-contract-files-it-neither-pins-nor-binds.md",
+      "status": "open",
+      "source": "T1 Critic finding F3 on aefe0e9c/6ca241f1, 2026-09-06, on the NVA-B-CRITICXPORT-1 transport. Filed late: the round-1 registry dispositioned it as 'filed, not fixed here' and no item existed; the closing round tested that claim and found nothing -- this item is the correction.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2e08b1b26894fe785f0b6a380f08188c6e1912611bae7296049a75bc4c241d87",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 91,
+          "text": "## Triage\n\n- **Decision:** deferred — retain the completed source-checkout hardening, but\n  move installed-package activation and native App-Server/sandbox acceptance\n  to the dedicated native-Windows Codex work package outside Nova B.\n- **Rationale:** The PO confirmed on 2026-09-11 that native Codex sandboxing is\n  not a reliable acceptance environment under WSL. The special Selected route\n  already fails closed, while the ordinary fresh-session Critic remains the\n  supported autonomous route. Revisit when the lane can be exercised on\n  native Windows without treating WSL behavior as proof.\n- **Assignment:** future native-Windows Codex sandbox hardening\n- **Review expiry:** 2026-12-15 — re-triage date, not a delivery promise\n- **Date:** 2026-09-11\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.session-authority-repair-gaps-after-pf55",
+      "path": "backlog/items/2026-10-19-session-authority-repair-gaps-after-pf55.md",
+      "status": "open",
+      "source": "PF-55 / D52 Tier 1 build on this repository (2026-10-19); measured gaps the build does not close",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "61465cdee419fd8fd27503e6847e7770d7f23b103f882278168454d23e015e3b",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.session-scratch-binding-stays-unbound",
+      "path": "backlog/items/2026-10-19-session-scratch-binding-stays-unbound.md",
+      "status": "open",
+      "source": "PO test of e6fec04a0 in the main project (D54); measured on this repository, 2026-10-19",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "17bbf052d6474531d5a6c941b8c799785ff7b1534e1e53d558faa6cddbdafda9",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.state-routes-refused-once-a-registry-catalogue-exists",
+      "path": "backlog/items/2026-10-19-state-routes-refused-once-a-registry-catalogue-exists.md",
+      "status": "open",
+      "source": "Live run on this repository after the c27576438 push (2026-10-19), PF-54",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "6bc6ef04a83bf3f0b6f00116ce489509a3207edbf7df154a240594968603325a",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.suites-red-on-this-checkout-before-pf55",
+      "path": "backlog/items/2026-10-19-suites-red-on-this-checkout-before-pf55.md",
+      "status": "open",
+      "source": "PF-55 baseline comparison: each case below fails identically on an export of d769449e8 (before PF-55) and on the PF-55 tree (2026-10-19)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "26abc8d3ab2508ce92784de56d79cac0705415b9146b0e5e9c6be86bc0d53b8f",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.the-architecture-adoption-gate-is-unconditional-for-projects-without-design-approval",
+      "path": "backlog/items/2026-10-21-the-architecture-adoption-gate-is-unconditional-for-projects-without-design-approval.md",
+      "status": "open",
+      "source": "PO decision D81 (2026-10-21, K3 a): the adoption gate becomes conditional in 0.7.x",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2a386e2e88af4e749d0be53a397c6b830fb4df25a77f6d3a01f19cad6369b16d",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.the-architecture-map-is-not-enforced",
+      "path": "backlog/items/2026-10-20-the-architecture-map-is-not-enforced.md",
+      "status": "open",
+      "source": "PO report scratch/pipeline-feedback-03.md, finding PF-54 (named FB3-PF-54 here), PO class major; scope D56 (1)",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "066d8af9464ee3412188841a0ffacc10f37137549a15c6f7442ec2121e059948",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.the-critic-diagnostic-runs-nested-test-suites-in-a-shared-test-context",
+      "path": "backlog/items/2026-10-20-the-critic-diagnostic-runs-nested-test-suites-in-a-shared-test-context.md",
+      "status": "open",
+      "source": "Elephant observation, 2026-10-20: the ordinal-3 Critic diagnostic produced environment-caused reds until each suite ran through a wrapper that clears the test context and moves TMPDIR out of the checkout",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2a2e0835a91bd5804f24e86cf27f89b62da549d25432d5fd38b7e2885d5d9aa6",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.the-elephant-fast-path-excludes-the-small-test-first-fix",
+      "path": "backlog/items/2026-10-21-the-elephant-fast-path-excludes-the-small-test-first-fix.md",
+      "status": "open",
+      "source": "PO question 2026-10-21: 'gibt es einen Grund alles im Elephant zu machen? ... wenn es zu kleine Sachen sind, sollte der Elephant die selber machen'; PO: create the item",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "2e60a90b74c5fb1de14372962c9996fe63def405ceeb557b9a9b74a7e7fb114a",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.the-guard-git-test-is-past-its-line-bound",
+      "path": "backlog/items/2026-10-20-the-guard-git-test-is-past-its-line-bound.md",
+      "status": "open",
+      "source": "architecture-boundary-check.mjs --root . after ceremony C13 (7a7ccceae); PO question Q15",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "f19dd8b531fd351cce663d0417fb982dc78a673ffa83912e5419fe64306c8862",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.the-opus-critic-admission-needs-a-word-the-template-does-not-carry",
+      "path": "backlog/items/2026-10-20-the-opus-critic-admission-needs-a-word-the-template-does-not-carry.md",
+      "status": "open",
+      "source": "Ordinal-2 Critic dispatch, 2026-10-20: a template-faithful fill was refused with DISPATCH-OPUS-NO-BATCH-RATIONALE",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "7f4459af87bfaa7836f80125340a9ecd4d49554e20916c90200a1b02d784df91",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.the-stage-0-verifier-bound-is-not-the-stage-0-criterion",
+      "path": "backlog/items/2026-10-20-the-stage-0-verifier-bound-is-not-the-stage-0-criterion.md",
+      "status": "open",
+      "source": "Ordinal-2 delta Critic of e6fec04a0..f62b5143a, finding F-A, 2026-10-20",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "7c7570cdde43cefb20b1b124cdc3454270f44e66541fb57b1406ed3c68a9f438",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.the-t1-fallback-waits-for-failure-codes-the-route-collapses",
+      "path": "backlog/items/2026-09-06-the-t1-fallback-waits-for-failure-codes-the-route-collapses-before-they-arrive.md",
+      "status": "open",
+      "source": "NVA-B-T1WIRE-1 orientation findings, verified independently by the dispatcher: codex-sandbox-select.mjs:240 preflightFailure() and codex-critic-selected-host.mjs:236 runSelectedCriticHost(). The dispatch delivered the CLI (b3b7cb7e) and stopped before the consumer rather than wiring a path that cannot fire.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "78cf68ad8d2c57f75f17c96818c3bffd69c9cd63a2af3c6104ffb1c121e268c3",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 99,
+          "text": "## Triage (filled in by the Elephant of the next Pipeline session)\n\n- **Decision:** deferred — decide and exercise this native Selected-Critic\n  fallback in the dedicated native-Windows Codex work package outside Nova B.\n- **Rationale:** The PO confirmed on 2026-09-11 that native Codex sandboxing is\n  technically unreliable under WSL. This fallback changes assurance class and\n  depends on that native route, so a WSL-only implementation or acceptance\n  claim would be misleading. The ordinary fresh-session Critic remains the\n  supported autonomous route meanwhile.\n- **Assignment (if accepted):** future native-Windows Codex sandbox hardening\n- **Review expiry:** 2026-12-15 — re-triage date, not a delivery promise\n- **Date:** 2026-09-11\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.unified-runner-launcher-for-empty-folders",
+      "path": "backlog/items/2026-10-16-unified-runner-launcher-for-empty-folders.md",
+      "status": "open",
+      "source": "PO decision #21, 2026-10-16: the unified empty-folder launcher pattern for every runner is a backlog item after 0.7.0 (Antigravity first now).",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "4d7faa6412e932f6019f627a249bf663319b986a8acc1026437b80eb10bccb61",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.universal-batch-scope-for-every-full-critic",
+      "path": "backlog/items/2026-10-16-universal-batch-scope-for-every-full-critic.md",
+      "status": "open",
+      "source": "PO decision #32, 2026-10-16: a universal 'batch scope required for every full Critic' duty with the needed fixture updates is a backlog item after 0.7.0; the re-critic marker goes into the Critic dispatch template now.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "1340178991158fa4718842b6a38451bfbe37536d99736e51ce44640b16d76a93",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.unverifiable-approval-should-degrade-to-advisory",
+      "path": "backlog/items/2026-10-16-unverifiable-approval-should-degrade-to-advisory.md",
+      "status": "open",
+      "source": "PO decision #24 ('PO decision BI'), 2026-10-16: an approved feature whose approval can no longer be re-verified degrades to advisory instead of locking all execution; backlog item after 0.7.0.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "e92353f082c201cfa7b338c003a3f0e570b93cc3cf0a5f6038ee1c30af21ed0b",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.verify-does-not-run-the-observation-governance-checker",
+      "path": "backlog/items/2026-10-16-verify-does-not-run-the-observation-governance-checker.md",
+      "status": "open",
+      "source": "PO decision 2026-10-16 (AC-198 D1 tile): hook-only governance classification of staged documents is accepted for 0.7.0; a Verify second line is a backlog item after 0.7.0. Evidence: ALF-C-P1-11B.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "0e67477a278e18b9d52c6782b512ebbfca4494326e50fee28fee59ec336eacb4",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 39,
+          "text": "## Triage (filled in by the Elephant of the next Pipeline session)\n\n- **Decision:**\n- **Rationale:**\n- **Assignment (if accepted):**\n- **Date:**\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.verify-test-economy-rebuild",
+      "path": "backlog/items/2026-10-20-verify-test-economy-rebuild.md",
+      "status": "open",
+      "source": "PO decision D69 (2026-10-20) and ADR-0088, after the Full Verify measurement of c1771bc98 (138 red steps, about 13 000 cases, 5 h).",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "open",
+      "itemSha256": "705658b8f5b9dbbabd36ca25753ceafe92b9ac96038376360def0f9e31e1b148",
+      "historyGroup": "open-inprogress-or-deferred-review",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    }
+  ],
+  "active070Excluded": [
+    "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+    "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+    "pipeline.agy-managed-copy-first-start-lacks-attestation",
+    "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+    "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+    "pipeline.codex-readiness-private-receipt-omits-output-custody",
+    "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+    "pipeline.design-generator-repeats-large-source-material",
+    "pipeline.design-package-parent-metadata-false-drift",
+    "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+    "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+    "pipeline.hgo-stale-capability-shadows-current-authorization",
+    "pipeline.implementation-without-dispatch-escapes-review-coverage",
+    "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+    "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+    "pipeline.plan-submission-must-not-require-separate-po-approval",
+    "pipeline.readiness-input-omits-current-advisor-observation",
+    "pipeline.security-scanner-failure-provenance",
+    "pipeline.semgrep-offline-default-version-check",
+    "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error"
+  ],
+  "closedHistory": [
+    {
+      "itemId": "pipeline.advisor-evidence-read-enforces-size-limit-after-allocation",
+      "path": "backlog/items/2026-09-28-advisor-evidence-read-enforces-size-limit-after-allocation.md",
+      "status": "closed",
+      "source": "Independent read-only source audit of canonical advisory-lifecycle-v2.mjs and Scratch Codex Advisor binding, source 98e752a9. Physical reads are unbounded before declared limits; no large or private operator file was read.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "426cf08e38ef5e56f2a036e0491804b7abe461f7132e26f191e80983aa459f8a",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 65,
+          "text": "## Triage\n\n- **Decision:** closed — fixed in source\n- **Rationale:** fixed at 26fef9e7d: lib/advisory-lifecycle-v2.mjs descriptor-bound read (fstat before read); test: advisory-lifecycle-v2.test.mjs 'advisory read bounds: declared sparse oversize rejects before open, content read or allocation'.\n- **Assignment (if accepted):** n/a\n- **Date:** 2026-10-07\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.architecture-design-errors-omit-field-paths",
+      "path": "backlog/items/2026-09-27-architecture-design-errors-omit-field-paths.md",
+      "status": "closed",
+      "source": "Codex/WSL greenfield review B7; source verification of architecture-design.mjs error sites on 2026-09-27.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "5796fe9723bd6d17978908aea67e09ae25b6d3369296a18bf91c42f5360e89db",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 50,
+          "text": "## Triage\n\n- **Decision:** closed — fixed in source\n- **Rationale:** fixed at 26fef9e7d: lib/architecture-design.mjs field-bearing errors (e.g. modules[i].ownedPaths[j]); test: architecture-design.test.mjs 'field-local diagnostics identify the single invalid architecture input'.\n- **Assignment (if accepted):** n/a\n- **Date:** 2026-10-07\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.architecture-fitness-model-repeats-module-fields",
+      "path": "backlog/items/2026-09-27-architecture-fitness-model-repeats-module-fields.md",
+      "status": "closed",
+      "source": "Claude/Windows greenfield review F-08, 2026-09-27; architecture-design.mjs source inspection confirms module and fitness-model fields are compared for identical values.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "77b352503e186dc8a815349b97b6d6c96f784430bcabf3a4eb1378a7385ab8bb",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 46,
+          "text": "## Triage\n\n- **Decision:** closed — fixed in source\n- **Rationale:** fixed at 26fef9e7d: lib/architecture-design.mjs derives fitnessModel.modules and baseline; test: architecture-design.test.mjs 'compact greenfield package derives redundant fitness rows and zero baseline'.\n- **Assignment (if accepted):** n/a\n- **Date:** 2026-10-07\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.ci-topology-preflight-cannot-pass-on-this-branch",
+      "path": "backlog/items/2026-08-28-the-ci-topology-preflight-cannot-pass-on-this-branch.md",
+      "status": "closed",
+      "source": "Measured live, 2026-08-28, by running verify-topology-preflight.mjs at HEAD after an unrelated change and then isolating each rejecting sub-check with a controlled probe.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "a9a54b023a846d8e69520fadd3e8f78b8be3736258b0b030f87ccecbc82916d2",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 180,
+          "text": "## Triage (filled in by the Elephant of the next Pipeline session)\n\n- **Decision:** accepted\n- **Rationale:** Every claim here was executed, not inferred: the failing exit at\n  HEAD, both drifted inventory values, the 398 intervening commits, the 1604-path\n  candidate window, the per-sub-check probe isolating `integrity` and `review`,\n  and the workflow read confirming the reviewer variable is never forwarded. The\n  urgency is structural rather than stylistic — this is the gate the 0.6.0 push\n  meets first, and it currently cannot pass.\n- **Assignment (if accepted):** `sprint: none`. By subject this is Alfred's\n  (mechanical governance, control integrity), and Alfred is in flight and closed\n  to new scope (PO, 2026-08-28); neither Nightwing (product experience) nor\n  Batman (optional capabilities) describes a CI gate's own satisfiability.\n  **Raised to the PO separately** rather than left to a window, because it blocks\n  the release push and the release push is a PO-gated act — the scheduling call\n  is theirs, not the next sprint's.\n  **Condition for picking it up:** before the 0.6.0 push is attempted, or by\n  Alfred's successor, whichever comes first. Third item on `none`; that queue is\n  now a visible signal, not a parking lot.\n- **Date:** 2026-08-28\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.design-course-phase-telemetry-is-not-recorded",
+      "path": "backlog/items/2026-10-19-design-course-phase-telemetry-is-not-recorded.md",
+      "status": "closed",
+      "source": "PO decision D25 (2026-10-18): the telemetry clause of greenfield-design-course-cost-and-proportionality leaves the 0.7.0 acceptance",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "3fcc784927b748aaf795bf0657f16d1f94836670f8899dafd38f693e601e0725",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": []
+    },
+    {
+      "itemId": "pipeline.fresh-preflight-hides-onboarding-action",
+      "path": "backlog/items/2026-09-27-fresh-preflight-hides-onboarding-action.md",
+      "status": "closed",
+      "source": "Claude/Windows greenfield review F-05, 2026-09-27; reported preflight plugin-refresh-required with advisory nextAction in a fresh self-application project.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "fcfab21c27b0c1d1cde8e72e20f15b666d7d0d5a3785497a0610b944320fb7cd",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 47,
+          "text": "## Triage\n\n- **Decision:** closed — fixed in source\n- **Rationale:** Fix: `scripts/pipeline-start-preflight.mjs` line 1594. Test: `scripts/pipeline-start-preflight.test.mjs` lines 566-594.\n- **Assignment:** n/a\n- **Date:** 2026-10-07\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.greenfield-handover-claims-absent-supersession-marker",
+      "path": "backlog/items/2026-09-27-greenfield-handover-claims-absent-supersession-marker.md",
+      "status": "closed",
+      "source": "Codex/WSL greenfield review B9; current consumer docs/state.md claims SUPERSEDED.md, tracked tree has none, and onboarding-continuity.mjs emits the sentence unconditionally.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "0654f900b67dd666ca6e86b178eccde96d92215ad6e44a2c7da39f673104421f",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 50,
+          "text": "## Triage\n\n- **Decision:** closed — fixed in source\n- **Rationale:** fixed at 26fef9e7d: lib/onboarding-continuity.mjs handover content no longer names SUPERSEDED.md for direct intake; test: onboarding-continuity.test.mjs assertion 'direct intake has no provisional kickoff package to supersede'.\n- **Assignment (if accepted):** n/a\n- **Date:** 2026-10-07\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory",
+      "path": "backlog/items/2026-08-27-registering-a-verify-suite-silently-invalidates-the-capability-inventory.md",
+      "status": "closed",
+      "source": "Measured live, 2026-08-27 session: two more product-capability-inventory breakages within the same evening, the second within the hour of a session that had just repaired the first — following two prior instances on 2026-08-19.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "c018b4a490e7898ce4ea5ff708e43dd03537402d2137d0fb7f4a8cae4fc9a7e3",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 72,
+          "text": "## Triage (filled in by the Elephant of the next Pipeline session)\n\n- **Decision:** accepted, option 1 (derive the `verify-phase` surfaces from\n  `verify.mjs`'s own arrays); options 2 and 3 rejected as the fix\n- **Rationale:** Four occurrences, the last two within one evening and the second\n  of those by the very session that had just repaired the first. That is the\n  finding, and it is decisive: each previous fix added the missing entries and\n  none removed the reason they go missing, so an instance fix on this coupling\n  buys exactly one commit of quiet. Option 2 shortens the feedback loop and\n  option 3 documents the trap — both leave the duplication that causes it. The\n  data already exists in one place; a derived value cannot drift, and that is the\n  only shape that ends the class.\n  Cost note for whoever picks it up: the inventory also demands that every\n  surface belong to exactly one capability, which is a judgement the arrays do\n  not carry. Deriving the surface set does not automatically derive its\n  categorization, so the fix is \"derive the set, keep categorization declared,\n  fail only on an uncategorized derived surface\" rather than a straight deletion\n  of the declared block.\n- **Assignment (if accepted):** `sprint: none` — reassigned off Alfred. By scope\n  this is Alfred's (\"mechanical governance, measurable rigor\"), Alfred is in\n  flight and closed to new scope (PO, 2026-08-28), and neither Nightwing\n  (product experience) nor Batman (optional capabilities) describes an internal\n  verify-harness coupling. It carries the explicit \"no planning window\"\n  declaration rather than a mis-assignment.\n  **Condition for picking it up:** the next window that touches `verify.mjs`'s\n  suite registration or `check-product-capability-inventory.mjs`, or Alfred's\n  successor whenever control-integrity scope reopens. It is the second item to\n  land on `none` for this reason (with\n  `pipeline.three-independent-copies-of-the-wsl-windows-path-normalization`);\n  two is a signal that Alfred's successor has a waiting queue, not that `none` is\n  a parking lot.\n- **Date:** 2026-08-28\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.repeated-lifecycle-denials-are-not-counted",
+      "path": "backlog/items/2026-09-27-repeated-lifecycle-denials-are-not-counted.md",
+      "status": "closed",
+      "source": "Claude/Windows greenfield review F-11, 2026-09-27; reported seven lifecycle refusals but denial-class telemetry contained only the outside-root read class; source says lifecycle denials remain outside that recorder.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "c25bce49032c453e67fd83f976aed6786dd09b47597461a706793e1cff55b850",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 46,
+          "text": "## Triage\n\n- **Decision:** closed — fixed in source\n- **Rationale:** fixed at 26fef9e7d: lib/lifecycle-denial-loop.mjs observeReturnedActionDenial/resetLifecycleDenial; tests: lifecycle-denial-loop.test.mjs and hooks/lifecycle-denial-loop-guard.test.mjs.\n- **Assignment (if accepted):** n/a\n- **Date:** 2026-10-07\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.restart-barrier-can-precede-verbatim-intake-capture",
+      "path": "backlog/items/2026-09-27-restart-barrier-can-precede-verbatim-intake-capture.md",
+      "status": "closed",
+      "source": "Codex/WSL greenfield review B5, 2026-09-27: a restart card summarized the original input while the intake checkpoint's materialInput was reported empty.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "7c411be8182e6bbc685f728853ac961bef759cdb14690824de8b96ed75273a33",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 55,
+          "text": "## Triage\n\n- **Decision:** closed — fixed in source\n- **Rationale:** fixed at 26fef9e7d: lib/onboarding-continuity.mjs / project-onboarding-v3.mjs first-restart intake gating; test: onboarding-first-restart-intake.test.mjs 'proposed first runtime restart withholds plan and direct apply until explicit original-input capture'.\n- **Assignment (if accepted):** n/a\n- **Date:** 2026-10-07\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.standing-critic-consent-reprompts-host-approval",
+      "path": "backlog/items/2026-09-09-standing-critic-consent-reprompts-host-approval.md",
+      "status": "closed",
+      "source": "PO-requested investigation, 2026-09-09; durable standing-consent and reprompt observations in backlog/evidence/2026-09-09-local-candidate-po-decisions.md and backlog/evidence/2026-09-09-standing-critic-consent-reprompt.md.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "4fca2e980c4ba5110a71ca0625a695d63690a30ae5f38ba5f1170d2fcee40130",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 75,
+          "text": "## Triage (filled in by the Elephant of the next Pipeline session)\n\n- **Decision:** pending.\n- **Rationale:** Future scheduling and the host capability are unconfirmed.\n- **Assignment (if accepted):**\n- **Date:**\n"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.three-independent-copies-of-the-wsl-windows-path-normalization",
+      "path": "backlog/items/2026-08-27-three-independent-copies-of-the-wsl-windows-path-normalization.md",
+      "status": "closed",
+      "source": "Noted while fixing the third instance of the WSL/Windows path-identity defect, commit d96e14c5, 2026-08-27.",
+      "sprint": "none",
+      "frontmatterSprint": "none",
+      "frontmatterStatus": "closed",
+      "itemSha256": "c35e801811c04d6cbd6625c8661674c5c3225e2d5a6202e34fb734f6b6d3cfd1",
+      "historyGroup": "closed-or-rejected-history",
+      "current070Matrix": null,
+      "assignment": "unassigned; no0.7.1qualification inferred",
+      "latestDisposition": [
+        {
+          "line": 73,
+          "text": "## Triage (filled in by the Elephant of the next Pipeline session)\n\n- **Decision:** accepted\n- **Rationale:** Three copies of a predicate whose entire purpose is deciding\n  that two things are equal, where a disagreement between them fires or fails to\n  fire a guard, and where the failure mode is silent. The defect class has been\n  fixed three times in three places — that repetition is the finding. Option 2\n  (one shared test table over all three implementations) is accepted as the\n  floor regardless of whether option 1 (single module, three importers) is\n  chosen later, because it converts a silent divergence into a loud one for\n  roughly an hour of work.\n- **Assignment (if accepted):** `sprint: none` — reassigned off Alfred. By scope\n  this is Alfred's (\"mechanical governance, control integrity\", ADR-0043\n  Amendment), but Alfred is in flight and closed to new scope (PO, 2026-08-28),\n  and neither Nightwing (product experience) nor Batman (optional capabilities)\n  describes it. Forcing it into a window whose scope statement does not cover it\n  would make the assignment field lie, so it carries the explicit \"belongs to no\n  planning window\" declaration instead of a mis-assignment or a silent omission.\n  **Condition for picking it up:** the next window that touches\n  `guard-maintenance-window.mjs` or the path-identity code takes it along, or it\n  moves into Alfred's successor whenever control-integrity scope reopens.\n- **Date:** 2026-08-28\n"
+        }
+      ]
+    }
+  ],
+  "deferredAlfredPendingReview": [
+    {
+      "itemId": "pipeline.codex-own-session-audit-export-missing",
+      "path": "backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+      "status": "open",
+      "actualSprint": "alfred",
+      "originalStage": "75",
+      "disposition": "deferred beyond0.7.0; future planning pending, not sprint:none and not active0.7.1",
+      "deferralDecisionDate": "2026-10-20",
+      "decisionEvidence": [
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 90,
+          "text": "| D63 (2026-10-20, PO, by question tiles on the per-item re-verification `specs/sprint-alfred-epic/evidence/scope-verify-2026-10-20/`) | **Deferrals:** (a) the earlier deferrals past 0.7.0 stand and narrow D61: AC-175 (forensics export), AC-190 (D21), the AC-191 telemetry clause, AC-209 and the catalog half of AC-147 (D29, Q3), AC-181's sed target detection, AC-224's AGY parallel worktrees, AC-264's plan-readiness clause (D55); they are re-triaged out of 0.7.0, which AC-13 accepts. **Reconstructed acceptance:** (a) the Elephant's reconstructions of AC-122 (R2), AC-204 (R4, report-only), AC-211 and AC-232 (S1-S8) are released as their acceptance; AC-109 closes as not reconstructable. **Superseded list:** (a) confirmed: AC-131 and AC-132 (E12, ADR-0085) and AC-143 (decision L) close as superseded; only the named clauses drop in AC-124 (R4-7, R4-9, R4-10), AC-134 (point 6), AC-151 (v2 run), AC-191 (v2 test clauses), AC-244 (child course, export), AC-245 (end-to-end course), AC-141 (Bash notes write), AC-137 (alternative fix) and AC-195 (nested shell, Q12 B). **Small design calls:** (a) the Elephant writes each with facts, options and a recommendation into `po-ceremonies-pending.md` and puts the ones that matter to the PO as tiles in one batch; meanwhile the uncontested content work is built. | D61 |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 91,
+          "text": "| D64 (2026-10-20, PO, in chat on the Codex WSL greenfield report `scratch/pipeline-analyse-greenfield_codex2_20261020.md`: \"wichtige befunde codex zum happy path die auch fixed werden müssen! der läuft gerade nicht rund\"; \"aus dem bericht sind aber nur majors und blocker relevant\") | The report's blockers (P0) and majors (P1) go into the next candidate, folded into owning Spec items (D60 Q16): prescribed preparation refused as opaque execution, four chat overrides, into AC-123; the review-receipt provenance, the criterion-format check before `present-plan` and the review-chain consistency into AC-155; the unstage recovery loop into AC-207; the Git author lost over the restart and serial actor questions into AC-264. Its audit-export major stays with AC-175, deferred by D63. The report's single table rows count only as evidence for these findings. The criterion check before `present-plan` overlaps AC-264's plan-readiness clause that D55 deferred; only the criterion-locator part is pulled in. | D60, D63 |"
+        },
+        {
+          "path": "backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+          "line": 57,
+          "text": "  This is AC-175 (forensics export): D63 (2026-10-20, po-decisions-2026-10-18.md line 90) lists it among the deferrals past 0.7.0, and D64 repeats that the audit-export major stays with AC-175, deferred by D63."
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "path": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "status": "open",
+      "actualSprint": "alfred",
+      "originalStage": "25",
+      "disposition": "deferred beyond0.7.0; future planning pending, not sprint:none and not active0.7.1",
+      "deferralDecisionDate": "2026-10-16",
+      "decisionEvidence": [
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 90,
+          "text": "| D63 (2026-10-20, PO, by question tiles on the per-item re-verification `specs/sprint-alfred-epic/evidence/scope-verify-2026-10-20/`) | **Deferrals:** (a) the earlier deferrals past 0.7.0 stand and narrow D61: AC-175 (forensics export), AC-190 (D21), the AC-191 telemetry clause, AC-209 and the catalog half of AC-147 (D29, Q3), AC-181's sed target detection, AC-224's AGY parallel worktrees, AC-264's plan-readiness clause (D55); they are re-triaged out of 0.7.0, which AC-13 accepts. **Reconstructed acceptance:** (a) the Elephant's reconstructions of AC-122 (R2), AC-204 (R4, report-only), AC-211 and AC-232 (S1-S8) are released as their acceptance; AC-109 closes as not reconstructable. **Superseded list:** (a) confirmed: AC-131 and AC-132 (E12, ADR-0085) and AC-143 (decision L) close as superseded; only the named clauses drop in AC-124 (R4-7, R4-9, R4-10), AC-134 (point 6), AC-151 (v2 run), AC-191 (v2 test clauses), AC-244 (child course, export), AC-245 (end-to-end course), AC-141 (Bash notes write), AC-137 (alternative fix) and AC-195 (nested shell, Q12 B). **Small design calls:** (a) the Elephant writes each with facts, options and a recommendation into `po-ceremonies-pending.md` and puts the ones that matter to the PO as tiles in one batch; meanwhile the uncontested content work is built. | D61 |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 25,
+          "text": "| 5 | 33 | Deferrals: forensics (AC-175), greenfield-comparisons (AC-190), lifecycle-read-scope (AC-209) | Confirm all three as deferred past 0.7.0 (D63 a / D21) | The matrix rows are carried as deferred; the built forensics parts stay documented |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 55,
+          "text": "| 10 | Index scope | Items deferred past 0.7.0 (forensics AC-175, greenfield-comparisons AC-190, lifecycle-read-scope duplicate) and the four stale rows | Out of the 0.7.0 index, reported separately | The 0.7.0 index counts only rows promised for 0.7.0; a \"deferred past 0.7.0\" table shows the rest with their stage |"
+        },
+        {
+          "path": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+          "line": 76,
+          "text": "  index) is not built. The whole item stays deferred past 0.7.0 by the PO decision of 2026-10-16 (Triage, dated"
+        }
+      ]
+    },
+    {
+      "itemId": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+      "path": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+      "status": "closed",
+      "actualSprint": "alfred",
+      "originalStage": "50",
+      "disposition": "deferred beyond0.7.0; future planning pending, not sprint:none and not active0.7.1",
+      "deferralDecisionDate": "2026-10-16",
+      "decisionEvidence": [
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 90,
+          "text": "| D63 (2026-10-20, PO, by question tiles on the per-item re-verification `specs/sprint-alfred-epic/evidence/scope-verify-2026-10-20/`) | **Deferrals:** (a) the earlier deferrals past 0.7.0 stand and narrow D61: AC-175 (forensics export), AC-190 (D21), the AC-191 telemetry clause, AC-209 and the catalog half of AC-147 (D29, Q3), AC-181's sed target detection, AC-224's AGY parallel worktrees, AC-264's plan-readiness clause (D55); they are re-triaged out of 0.7.0, which AC-13 accepts. **Reconstructed acceptance:** (a) the Elephant's reconstructions of AC-122 (R2), AC-204 (R4, report-only), AC-211 and AC-232 (S1-S8) are released as their acceptance; AC-109 closes as not reconstructable. **Superseded list:** (a) confirmed: AC-131 and AC-132 (E12, ADR-0085) and AC-143 (decision L) close as superseded; only the named clauses drop in AC-124 (R4-7, R4-9, R4-10), AC-134 (point 6), AC-151 (v2 run), AC-191 (v2 test clauses), AC-244 (child course, export), AC-245 (end-to-end course), AC-141 (Bash notes write), AC-137 (alternative fix) and AC-195 (nested shell, Q12 B). **Small design calls:** (a) the Elephant writes each with facts, options and a recommendation into `po-ceremonies-pending.md` and puts the ones that matter to the PO as tiles in one batch; meanwhile the uncontested content work is built. | D61 |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 25,
+          "text": "| 5 | 33 | Deferrals: forensics (AC-175), greenfield-comparisons (AC-190), lifecycle-read-scope (AC-209) | Confirm all three as deferred past 0.7.0 (D63 a / D21) | The matrix rows are carried as deferred; the built forensics parts stay documented |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 55,
+          "text": "| 10 | Index scope | Items deferred past 0.7.0 (forensics AC-175, greenfield-comparisons AC-190, lifecycle-read-scope duplicate) and the four stale rows | Out of the 0.7.0 index, reported separately | The 0.7.0 index counts only rows promised for 0.7.0; a \"deferred past 0.7.0\" table shows the rest with their stage |"
+        },
+        {
+          "path": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+          "line": 59,
+          "text": "  The item is closed as a duplicate (2026-10-22) and merged into 2026-09-28-declared-system-skill-read-requires-human-override.md; both were deferred past the 0.7.0 candidate by PO decision of 2026-10-16 (AC-147 and AC-209 not counted; item Deferral line 2026-10-17). The pin's declared-skill cases are intentionally skipped as NATIVE_HOLD."
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "No0.7.1scope/priority/acceptance/implementation decision has been made.",
+    "Final semantic cross-check of new Greenfield0.7.0 reporting identities against this provisional none inventory remains explicit; no implementation starts before release and close-block."
+  ]
+}

@@ -1,0 +1,33 @@
+command: node scripts/apply-diff.mjs <home>/src/agent-pipeline-shared_alfred/specs/sprint-alfred-epic/evidence/verify-fixes/g21-result-proposal-v2.patch
+label: g21-apply-check
+exitCode: 1
+head: 20392c08f1648356783b362e238f63500af2662f
+tree: c11dc524b0929d460bda43e10e4b9c626ab329fe
+dirty: true
+--- stdout ---
+
+--- stderr ---
+error: patch failed: plugins/pipeline-core/scripts/close-coordinator.mjs:490
+error: plugins/pipeline-core/scripts/close-coordinator.mjs: patch does not apply
+node:internal/errors:985
+  const err = new Error(message);
+              ^
+
+Error: Command failed: git apply --check <home>/src/agent-pipeline-shared_alfred/specs/sprint-alfred-epic/evidence/verify-fixes/g21-result-proposal-v2.patch
+    at genericNodeError (node:internal/errors:985:15)
+    at wrappedFn (node:internal/errors:539:14)
+    at checkExecSyncError (node:child_process:925:11)
+    at execFileSync (node:child_process:961:15)
+    at file://<repo-root>/scripts/apply-diff.mjs:25:3
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  status: 1,
+  signal: null,
+  output: [ null, null, null ],
+  pid: 515083,
+  stdout: null,
+  stderr: null
+}
+
+Node.js v24.15.0

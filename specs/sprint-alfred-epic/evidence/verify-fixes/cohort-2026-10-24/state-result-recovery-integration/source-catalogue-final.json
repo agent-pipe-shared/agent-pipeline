@@ -1,0 +1,19 @@
+command: node --test --test-name-pattern=controlled plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+label: source-catalogue-final
+exitCode: 0
+head: 20392c08f1648356783b362e238f63500af2662f
+tree: c11dc524b0929d460bda43e10e4b9c626ab329fe
+dirty: true
+--- stdout ---
+Error: Result bootstrap apply inputs are stale or conflicting; zero mutation.
+✔ controlled METHOD: catalogue-present Source companion closes exact Result bootstrap effects (33537.838519ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33866.456906
+
+--- stderr ---

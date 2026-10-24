@@ -1,5 +1,23 @@
 # Collected PO matters during the Codex fix wave
 
+**Current terminal window resolved (2026-10-24; supersedes historical queue
+entries below):** the PO committed K156/registration as `0fb6fe6d9` and the
+five-path G19/G21 composition as `daaf074b1`. Both are read back in Git. The
+attended model ceremony returned `MODEL-ROLE-BOOTSTRAP-READY`: new frontier
+requests use the approved `gpt-6.1-sol` mapping; existing attempts retain their
+original declared provenance. The PO created and reported
+`/run/user/1000/ap-g17`, owner `skar667`, mode0700. Its bounded fixture ran and
+found a genuine remaining G17 settlement/cross-process custody fault; the
+proposal is explicitly not Main-ready. No new operator/signature command is
+outstanding. Do not repeat the resolved commits or ceremonies.
+
+The PO requests the next contact when a concrete complete terminal/signature
+package is prepared, or when all43 currently sub75 active matrix items reach75.
+Collect genuine decision needs and continue disjoint work. Prefer the exact
+supported signature route. The misleading pre-commit `NONOVERRIDABLE` wording
+for an unselected author-source root needs a specific diagnostic fix; it does
+not authorize changing proof eligibility or inventing a signature.
+
 The PO requested that decision needs and signature-dependent work be collected until available, without blocking independent repairs. This is a queue, not an approval record. No HEAD/tree-bound signing command has been handed out; no signature ceremony is active. PRD and Spec changes are forbidden without separate explicit PO permission and are not requested by these packages.
 
 **Current readback after the next installation:** G28 and the complete registration

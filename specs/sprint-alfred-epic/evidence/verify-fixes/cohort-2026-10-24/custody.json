@@ -4,6 +4,102 @@
   "copyMode": "exact capture/patch bytes; .log names become .txt; two Markdown reports redact only the machine-local repository prefix with both original and projection hashes recorded",
   "artifacts": [
     {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/report.md",
+      "bytes": 4469,
+      "sha256": "d9bbfc43938c07e04efd4408e689296c7df2df22a91145cc26d35b4e4b8ec89b"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/report-source-catalogue.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/report-source-catalogue.md",
+      "bytes": 4094,
+      "sha256": "8987f961b446ca007c8ee8f862034aedca6a566d91f98511652e86aa21361a0a"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/owned-incremental.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/owned-incremental.patch",
+      "bytes": 82317,
+      "sha256": "b4e4edc42c52a3947027a201a49b830589fb00c73d8b3a3daddecd46eb681e17"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/owned-incremental-v2.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/owned-incremental-v2.patch",
+      "bytes": 89524,
+      "sha256": "69490bd3445a0f8c187b89562e038ecc4fdb576d2f0579726f2c88c06a771302"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/g19-apply-conflict.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/g19-apply-conflict.json",
+      "bytes": 1415,
+      "sha256": "5a6ee4ab37887816cdb6747a915ada20e3b0095a8266714a70dcaf77fa492bb2"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/g21-apply-conflict.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/g21-apply-conflict.json",
+      "bytes": 1306,
+      "sha256": "2156e2f8a602c3c7e44f9338040adaf720eac7c14c50cce50ee785e87b23dca5"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/targeted-composed.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/targeted-composed.json",
+      "bytes": 80730,
+      "sha256": "47c230b3b5e7ef0807c76cbf8cba8d0c23968a51315e5de213c190e9c182ce3f"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/targeted-final.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/targeted-final.json",
+      "bytes": 77910,
+      "sha256": "42998ca508e26822a85f69b862d031c5e7c9bc3636a9c2edf3eede14a2e16b64"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/close-composed.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/close-composed.json",
+      "bytes": 2262,
+      "sha256": "5a7332a4f5cc04c886dc9a98bb64e0065137d78d1a5fb9dd5908fb796c0c44f5"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/close-gate-kernel.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/close-gate-kernel.json",
+      "bytes": 12571,
+      "sha256": "3ca7259723f8c554d6e20960bd50722f114c24137b39e794ad0651ed3f367165"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/close-gate-kernel-final.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/close-gate-kernel-final.json",
+      "bytes": 2769,
+      "sha256": "b4f9908faef842b0c9cb86849bb661b43ff13871a5d48925413e26ac72e6e634"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/source-catalogue-first.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/source-catalogue-first.json",
+      "bytes": 1567,
+      "sha256": "97a131dab19103a13a96ab45faa193873a2314c051184f7bd44f3806589c73ec"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/source-catalogue-second.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/source-catalogue-second.json",
+      "bytes": 533,
+      "sha256": "c7b9760b8a11b500093151ff7ff8bd1c72334e3e123b7a054028f5422fb5385f"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/source-catalogue-negatives.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/source-catalogue-negatives.json",
+      "bytes": 1420,
+      "sha256": "0d9f4ae472ba587a0656772fc90fd00e4de0678949cb74bdc768367d0cd8f0b9"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/source-catalogue-final.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/source-catalogue-final.json",
+      "bytes": 610,
+      "sha256": "3e0c5eb7366ada095e3a4bd71dba0ce3b4f4ad0b7e95f618458132eb396c1244"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/source-catalogue-suite.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/state-result-recovery-integration/source-catalogue-suite.json",
+      "bytes": 3193,
+      "sha256": "cf58df94ad000d05c20f06e4c5ebfef17542041e127fc1576907f35c8f3686d5"
+    },
+    {
       "source": "scratch/clones/k156-current-dependency-qualification/scratch/agent-out/k156-current-dependency-qualification/report.md",
       "artifact": "specs/sprint-alfred-epic/evidence/verify-fixes/cohort-2026-10-24/k156-current-dependency-qualification/report.md",
       "bytes": 4125,

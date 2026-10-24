@@ -1,0 +1,427 @@
+{
+  "schema": "pipeline.greenfield-original-clause-coverage.v1",
+  "sources": [
+    {
+      "runner": "codex",
+      "report": "AP_test_vox_codex_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_codex_070_1.md",
+      "sha256": "3bc8b4fe8eb899298c7692c17652d95438147dccc81e118dc3d1d6128637fae3"
+    },
+    {
+      "runner": "claude",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "sha256": "e01a1f371e9113765b13fcc5cc8d8b031bfe381970ccca291b0216bf979b15bb"
+    },
+    {
+      "runner": "agy",
+      "report": "AP_test_vox_agy_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_agy_070_1.md",
+      "sha256": "83807618e4fb92999ceeb8c0f785bf9f42796514ef8f06fd8221dc8c62c3a399"
+    }
+  ],
+  "originals": [
+    {
+      "id": "codex.P0-1",
+      "runner": "codex",
+      "priority": "P0",
+      "section": "### P0-1 — Integrationsautorität muss vor teurer Umsetzung funktionieren",
+      "report": "AP_test_vox_codex_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_codex_070_1.md",
+      "startLine": 153,
+      "endLine": 172,
+      "originalBytesSha256": "d956cefab3deb90e86e6eb1900c19aa3aa6743e70bd51c014d0dd19f24d1b8a3",
+      "clauses": [
+        {
+          "id": "codex.P0-1.clause1",
+          "canonicalId": "G18",
+          "content": "Generator runner/model path, unsupported flag, delivery/requester readiness, full smoke through reviewer admission, real identity conflict negative."
+        }
+      ]
+    },
+    {
+      "id": "codex.P0-2",
+      "runner": "codex",
+      "priority": "P0",
+      "section": "### P0-2 — Veröffentlichungsautorität und Qualitätsqualifikation sind entkoppelt",
+      "report": "AP_test_vox_codex_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_codex_070_1.md",
+      "startLine": 173,
+      "endLine": 198,
+      "originalBytesSha256": "e8eaacdfc2963f303e2fd3264e753815b542d1a4f21b9cede7d9ef733afd13bc",
+      "clauses": [
+        {
+          "id": "codex.P0-2.clause1",
+          "canonicalId": "G20",
+          "content": "Push authority separate from candidate quality, required independent review/Verify lineage and transparent exception route."
+        }
+      ]
+    },
+    {
+      "id": "codex.P0-3",
+      "runner": "codex",
+      "priority": "P0",
+      "section": "### P0-3 — Result, Paket und Abschluss müssen transaktional konsistent bleiben",
+      "report": "AP_test_vox_codex_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_codex_070_1.md",
+      "startLine": 199,
+      "endLine": 227,
+      "originalBytesSha256": "b1d7df4f9f272b68b830776b28888c7ed0bac40edabb5f16dc73ad8563c18c1e",
+      "clauses": [
+        {
+          "id": "codex.P0-3.clause1",
+          "canonicalId": "G21",
+          "content": "Result writer/continuity/package hash consistency, missing reconcile fence, actual package validator in close/Verify, journal/postimage and signed repair roundtrip."
+        }
+      ]
+    },
+    {
+      "id": "codex.P1-1",
+      "runner": "codex",
+      "priority": "P1",
+      "section": "### P1-1 — Ein nutzbarer Read-only- und Forensikpfad fehlt",
+      "report": "AP_test_vox_codex_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_codex_070_1.md",
+      "startLine": 228,
+      "endLine": 244,
+      "originalBytesSha256": "a3d781dc7e0daa2d2d13fbc75ed71ff3571eeb7d0730ef549382794813ab6e21",
+      "clauses": [
+        {
+          "id": "codex.P1-1.clause1",
+          "canonicalId": "G23.reads",
+          "content": "Harmless cat/ls/rg-g and structured Read/Glob/Grep, truthful missing versus denied errors, external/symlink/credential/restart cross-runner controls."
+        },
+        {
+          "id": "codex.P1-1.clause2",
+          "canonicalId": "G23.forensics",
+          "content": "Narrow transcript export and real host identity conflict/completeness."
+        }
+      ]
+    },
+    {
+      "id": "codex.P1-2",
+      "runner": "codex",
+      "priority": "P1",
+      "section": "### P1-2 — Prüfartefakte dürfen einander nicht überschreiben",
+      "report": "AP_test_vox_codex_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_codex_070_1.md",
+      "startLine": 245,
+      "endLine": 259,
+      "originalBytesSha256": "f349d48eadd56bf529dd2bba51e43d14f7bb0b26364e8c684c01b3629895fc67",
+      "clauses": [
+        {
+          "id": "codex.P1-2.clause1",
+          "canonicalId": "G24",
+          "content": "Schema-separated screenshot/function paths, atomic output, immutable run index/hash/viewport/latest pointer and preserving existing evidence."
+        }
+      ]
+    },
+    {
+      "id": "codex.P1-3",
+      "runner": "codex",
+      "priority": "P1",
+      "section": "### P1-3 — Vorabvalidierung und persistierte Eingaben statt PO-Recovery",
+      "report": "AP_test_vox_codex_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_codex_070_1.md",
+      "startLine": 260,
+      "endLine": 277,
+      "originalBytesSha256": "182ee575223818dbaacde5a69f7092b01f1b7e2f8a58d3737a688e1932306c9f",
+      "clauses": [
+        {
+          "id": "codex.P1-3.clause1",
+          "canonicalId": "G25",
+          "content": "HEAD/first commit, criterion schema/rendering, review-source closure before submission mutation; persist prior identity/mode/commit answers."
+        }
+      ]
+    },
+    {
+      "id": "codex.P1-4",
+      "runner": "codex",
+      "priority": "P1",
+      "section": "### P1-4 — Tatsächliche Architekturprüfung braucht eine wirksame Disposition",
+      "report": "AP_test_vox_codex_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_codex_070_1.md",
+      "startLine": 278,
+      "endLine": 294,
+      "originalBytesSha256": "8be587b1c4c17fc26cbe1ae1ef00096559329c78626bf8bd4477bf644812e574",
+      "clauses": [
+        {
+          "id": "codex.P1-4.clause1",
+          "canonicalId": "G26",
+          "content": "Disposition of ownership findings and unavailable classes; conformance semantics agree with report-only observations."
+        }
+      ]
+    },
+    {
+      "id": "claude.P0.1",
+      "runner": "claude",
+      "priority": "P0",
+      "section": "§2 numbered finding 1",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 16,
+      "endLine": 16,
+      "originalBytesSha256": "74ac84a59227594dcf20bc332963b57e5b3ab0f16dae6741b46002eacf5a668a",
+      "clauses": [
+        {
+          "id": "claude.P0.1.clause1",
+          "canonicalId": "G19",
+          "content": "Project/plugin/private-state inherited ACL and ancestor diagnostics, CVCT causal property, SID nonrecursive repair/profile alternative."
+        }
+      ]
+    },
+    {
+      "id": "claude.P0.2",
+      "runner": "claude",
+      "priority": "P0",
+      "section": "§2 numbered finding 2",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 17,
+      "endLine": 17,
+      "originalBytesSha256": "da60843a32a45e54f68e398a6089f1ac60d0cb4d74f4c0f7293622d5700f1a9b",
+      "clauses": [
+        {
+          "id": "claude.P0.2.clause1",
+          "canonicalId": "G18",
+          "content": "Windows aggregate ready diagnosis before repeated dispatch; actual Goldfish/host-commit/record/course/reviewer chain."
+        }
+      ]
+    },
+    {
+      "id": "claude.P0.3",
+      "runner": "claude",
+      "priority": "P0",
+      "section": "§2 numbered finding 3",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 18,
+      "endLine": 18,
+      "originalBytesSha256": "ce37c3b38be69dfb1722236c1ba3ee6642f1ac771906167a9879bc747998f4fc",
+      "clauses": [
+        {
+          "id": "claude.P0.3.clause1",
+          "canonicalId": "G22",
+          "content": "Honest close path, missing item course, Critic evidence/worktree/node_modules and bounded dependency preparation; no silent gate weakening."
+        }
+      ]
+    },
+    {
+      "id": "claude.P1.4",
+      "runner": "claude",
+      "priority": "P1",
+      "section": "§2 numbered finding 4",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 19,
+      "endLine": 19,
+      "originalBytesSha256": "83f732bf849a5cbf6b2d2af5a257d5c2b0d2d65f711b2f30c07fbfa6a1c5b59d",
+      "clauses": [
+        {
+          "id": "claude.P1.4.clause1",
+          "canonicalId": "G23.help",
+          "content": "Read-only approval help and discard refusal name useful nextAction."
+        },
+        {
+          "id": "claude.P1.4.clause2",
+          "canonicalId": "G27.architecture",
+          "content": "Greenfield materialize-architecture instead of destructive false adoption course."
+        }
+      ]
+    },
+    {
+      "id": "claude.P1.5",
+      "runner": "claude",
+      "priority": "P1",
+      "section": "§2 numbered finding 5",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 20,
+      "endLine": 20,
+      "originalBytesSha256": "f98d44cb74857aa4d8f32325587f69dfcfef2666ab2b37505636bcec82958217",
+      "clauses": [
+        {
+          "id": "claude.P1.5.clause1",
+          "canonicalId": "G27.design",
+          "content": "Placeholder early binding prevents elaboration; avoid repeated PO discard/set-feature loops."
+        }
+      ]
+    },
+    {
+      "id": "claude.P1.6",
+      "runner": "claude",
+      "priority": "P1",
+      "section": "§2 numbered finding 6",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 21,
+      "endLine": 21,
+      "originalBytesSha256": "af2dab4021b2719c885b322ebdaba206c1c5370b16076905f6b5b9c664e4d73e",
+      "clauses": [
+        {
+          "id": "claude.P1.6.clause1",
+          "canonicalId": "G27.criteria",
+          "content": "Criterion table required header and valid AC example must be in template and error."
+        }
+      ]
+    },
+    {
+      "id": "claude.P1.7",
+      "runner": "claude",
+      "priority": "P1",
+      "section": "§2 numbered finding 7",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 22,
+      "endLine": 27,
+      "originalBytesSha256": "37caa17aed83f5b9289cc10d9d228ec4e727199a01ffa4430d525e1a9286e3fd",
+      "clauses": [
+        {
+          "id": "claude.P1.7.clause1",
+          "canonicalId": "G28",
+          "content": "Portable branch audit evidence includes sanitized approvals, Verify/Security and review index, keys/private material remain external."
+        }
+      ]
+    },
+    {
+      "id": "claude.P1.8",
+      "runner": "claude",
+      "priority": "P1",
+      "section": "§2 numbered finding 8",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 38,
+      "endLine": 38,
+      "originalBytesSha256": "1e874bc66b51089147a391ab98191c45910e18d9ce02848a3851ec516f0460d8",
+      "clauses": [
+        {
+          "id": "claude.P1.8.clause1",
+          "canonicalId": "G29",
+          "content": "Public docs/state must track implementing/pushed lifecycle, not stale design instructions or only private projection."
+        }
+      ]
+    },
+    {
+      "id": "claude.P1.9",
+      "runner": "claude",
+      "priority": "P1",
+      "section": "§2 numbered finding 9",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 39,
+      "endLine": 39,
+      "originalBytesSha256": "525a2eebb71a849a175dbf05728947ff3e70e6ae608e7dd01a6a821ac6b9e9d8",
+      "clauses": [
+        {
+          "id": "claude.P1.9.clause1",
+          "canonicalId": "G30",
+          "content": "Trusted stale hook snapshot repair/automatic refresh before commit during session."
+        }
+      ]
+    },
+    {
+      "id": "claude.P1.10",
+      "runner": "claude",
+      "priority": "P1",
+      "section": "§2 numbered finding 10",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 40,
+      "endLine": 40,
+      "originalBytesSha256": "37b8159e0f3eaf429ad2ac2f12171ff09056bea5734b55cfe764a9b1108e66e7",
+      "clauses": [
+        {
+          "id": "claude.P1.10.clause1",
+          "canonicalId": "G31",
+          "content": "Proof path output must comply with external-proof policy and eliminate rejected scratch destination."
+        }
+      ]
+    },
+    {
+      "id": "claude.P1.11",
+      "runner": "claude",
+      "priority": "P1",
+      "section": "§2 numbered finding 11",
+      "report": "AP_test_vox_claude_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_claude_070_1.md",
+      "startLine": 41,
+      "endLine": 42,
+      "originalBytesSha256": "b0a8f91dc4e57913bf01dba90038cf874305bb75865f02b0183c45668d70cd16",
+      "clauses": [
+        {
+          "id": "claude.P1.11.clause1",
+          "canonicalId": "G32",
+          "content": "Configured destination remote identity must not require origin name."
+        }
+      ]
+    },
+    {
+      "id": "agy.P0-1",
+      "runner": "agy",
+      "priority": "P0",
+      "section": "### P0-1 (Kritischer Produktdefekt): Antigravity PreToolUse-Hook überwacht weder `write_file` noch `edit_file` noch `read_file`",
+      "report": "AP_test_vox_agy_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_agy_070_1.md",
+      "startLine": 37,
+      "endLine": 46,
+      "originalBytesSha256": "c663971c15a551cb52394ed5aa985e6e26fa94b19a377a7b911cea4edc17d6bd",
+      "clauses": [
+        {
+          "id": "agy.P0-1.clause1",
+          "canonicalId": "G6",
+          "content": "Plugin and installer user-level hook matcher, native write_file/edit_file/read_file mapping and exact arguments; role/test protection and bootstrap read visibility, post-close writes."
+        }
+      ]
+    },
+    {
+      "id": "agy.P0-2",
+      "runner": "agy",
+      "priority": "P0",
+      "section": "### P0-2 (Kritischer Produktdefekt): Subagent-Dispatch (`invoke_subagent`) scheitert in Antigravity systematisch an `DISPATCH-MODEL-MISSING` / Modell-Enum-Konflikt",
+      "report": "AP_test_vox_agy_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_agy_070_1.md",
+      "startLine": 47,
+      "endLine": 56,
+      "originalBytesSha256": "816944cfe8d434048d51b6203c54fe6fddb2f92045d351a3db7086792634a289",
+      "clauses": [
+        {
+          "id": "agy.P0-2.clause1",
+          "canonicalId": "G7.model",
+          "content": "Runner-specific Model enum/routing and no silent inheritance."
+        },
+        {
+          "id": "agy.P0-2.clause2",
+          "canonicalId": "G7.catalogue",
+          "content": "Draft/implementing sanctioned prepare/model-role-bootstrap/design-review-receipt paths and argument admission."
+        }
+      ]
+    },
+    {
+      "id": "agy.P1-1",
+      "runner": "agy",
+      "priority": "P1",
+      "section": "### P1-1 (Produktdefekt / Sicherheitslücke im Lifecycle): `submit-plan` und `close-coordinator` akzeptieren selbst-erstellte Design-Receipts und schließen Features ohne Ausführungs-Critic ab",
+      "report": "AP_test_vox_agy_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_agy_070_1.md",
+      "startLine": 57,
+      "endLine": 64,
+      "originalBytesSha256": "662d3bda9e21aa44572506f24e327ef52efe2462663ef2bbeaaff0444fa69962",
+      "clauses": [
+        {
+          "id": "agy.P1-1.clause1",
+          "canonicalId": "G8.design",
+          "content": "Submit-plan rejects self-authored design receipt without actual independent dispatch custody."
+        },
+        {
+          "id": "agy.P1-1.clause2",
+          "canonicalId": "G20",
+          "content": "Push/close/close-feature require actual post-implementation candidate-bound execution Critic even when no course record already exists."
+        }
+      ]
+    },
+    {
+      "id": "agy.P1-2",
+      "runner": "agy",
+      "priority": "P1",
+      "section": "### P1-2 (UX- & Operator-Friktion): Mehrstufige Signatur-Kommandos im Terminal brechen bei Zeilenumbruch und Plugin-Update",
+      "report": "AP_test_vox_agy_070_1/docs/pipeline-analyse-greenfield_AP_test_vox_agy_070_1.md",
+      "startLine": 65,
+      "endLine": 75,
+      "originalBytesSha256": "cdfb59a223ddf298c769d0d2719d6513a7303afdc695b72f7cc0abb5409c399d",
+      "clauses": [
+        {
+          "id": "agy.P1-2.clause1",
+          "canonicalId": "G9a.command",
+          "content": "One wrap-safe signing command, no second PO apply command, agent imports proof."
+        },
+        {
+          "id": "agy.P1-2.clause2",
+          "canonicalId": "G9a.delegation",
+          "content": "Agent may apply authentic PO plan proof while preserving anti-self-approval."
+        },
+        {
+          "id": "agy.P1-2.clause3",
+          "canonicalId": "G9b",
+          "content": "Background runner-view update preserves active hook cwd, stable wrapper/view lifetime."
+        }
+      ]
+    }
+  ],
+  "note": "Portable source references and exact original section hashes; raw supplied reports are not republished."
+}

@@ -1,0 +1,52 @@
+command: node --test plugins/pipeline-core/scripts/close-coordinator.test.mjs
+label: close-composed
+exitCode: 0
+head: 20392c08f1648356783b362e238f63500af2662f
+tree: c11dc524b0929d460bda43e10e4b9c626ab329fe
+dirty: true
+--- stdout ---
+✔ active checkpoint preserves activeFeature (2.969552ms)
+✔ completion separates closure completion from workflow terminality (644.997446ms)
+✔ ordered phase 0 (1.66872ms)
+✔ ordered phase 1 (0.913416ms)
+✔ ordered phase 2 (1.192084ms)
+✔ ordered phase 3 (1.078539ms)
+✔ candidate required (1.047239ms)
+✔ candidate replacement denied (0.739595ms)
+✔ publication authorization required (0.897796ms)
+✔ publication exact candidate (1.119257ms)
+✔ cleanup uncertainty recoverable (1.056176ms)
+✔ local terminal (1.183789ms)
+✔ release/promotion descendants require independent authorization (2.264392ms)
+✔ delivery requires exact publication and readback receipts (1.402575ms)
+✔ authority and active-feature identities are closed (0.460004ms)
+✔ architecture impact is required at feature-close preparation and remains durable (0.566957ms)
+✔ published close-coordinator schema tracks the executable phase contract (0.367218ms)
+✔ durable replay (4.338432ms)
+✔ publication-close directory durability is typed only for native Windows limitations (0.55781ms)
+✔ CLI rejects missing activate (25.915349ms)
+✔ CLI rejects wrong digest (25.113242ms)
+✔ CLI rejects unknown phase (26.314798ms)
+✔ replay/CAS guard 0 (0.443262ms)
+✔ replay/CAS guard 1 (0.174982ms)
+✔ replay/CAS guard 2 (0.130237ms)
+✔ replay/CAS guard 3 (0.130628ms)
+✔ replay/CAS guard 4 (0.118465ms)
+✔ replay/CAS guard 5 (0.172277ms)
+✔ replay/CAS guard 6 (0.134666ms)
+✔ replay/CAS guard 7 (0.122633ms)
+✔ replay/CAS guard 8 (0.126891ms)
+✔ replay/CAS guard 9 (0.118114ms)
+✔ process: registered package digest drift blocks close preparation before any transition (2214.797405ms)
+✔ process: local close is read-only planned, replay-safe, candidate-bound and never pushes (9387.863114ms)
+✔ process: authorization, failed publication, exact readback and cleanup stay distinct (9317.053097ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21759.332984
+
+--- stderr ---

@@ -1,9 +1,15 @@
 # Delivery status (current)
 
-Measured: 2026-10-24. HEAD: `31db7853a71d3b9e72c864f5aced91a69a0ecee9`.
+Release0.7.0 scope updated2026-10-24. **194 items**, index **69.20%**.
 
-Counts: 25: 3, 50: 25, 75: 146, 100: 0, UNKNOWN: 0. Index: 70.55%.
+| Stage | Items |
+|---|---:|
+| 25 | 2 |
+| 50 | 41 |
+| 75 | 151 |
+| 100 | 0 |
+| UNKNOWN | 0 |
 
-Snapshot: [specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24/README.md](delivery-remeasure-2026-10-24/README.md)
+[Current scoped snapshot](delivery-remeasure-2026-10-24-scope-0.7.0/README.md). Five deferred items are removed; all original three-runner GreenfieldP0/P1 clauses are included, with exact duplicates counted once. Previous174-item70.55% view remains historical and has a different denominator. Engineering progress is not PO acceptance.
 
-This file is replaced by every remeasure; history lives in the dated directories.
+[Operative runner-neutral plan](../plans/plan_0.7.0-completion-and-greenfield-2026-10-24.md).

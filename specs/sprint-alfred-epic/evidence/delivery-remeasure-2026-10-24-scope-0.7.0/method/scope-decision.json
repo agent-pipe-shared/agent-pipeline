@@ -1,0 +1,199 @@
+{
+  "schema": "pipeline.release-scope-decision.v1",
+  "date": "2026-10-24",
+  "authority": "Explicit PO chat instruction, recorded in the operative runner-neutral completion plan",
+  "release": "0.7.0",
+  "excluded": [
+    {
+      "itemId": "pipeline.codex-own-session-audit-export-missing",
+      "stage": "75",
+      "reason": "Own-session export is AC-175; D64 expressly keeps the current audit-export major deferred under D63.",
+      "currentPath": "backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+      "decisionEvidence": [
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 90,
+          "text": "| D63 (2026-10-20, PO, by question tiles on the per-item re-verification `specs/sprint-alfred-epic/evidence/scope-verify-2026-10-20/`) | **Deferrals:** (a) the earlier deferrals past 0.7.0 stand and narrow D61: AC-175 (forensics export), AC-190 (D21), the AC-191 telemetry clause, AC-209 and the catalog half of AC-147 (D29, Q3), AC-181's sed target detection, AC-224's AGY parallel worktrees, AC-264's plan-readiness clause (D55); they are re-triaged out of 0.7.0, which AC-13 accepts. **Reconstructed acceptance:** (a) the Elephant's reconstructions of AC-122 (R2), AC-204 (R4, report-only), AC-211 and AC-232 (S1-S8) are released as their acceptance; AC-109 closes as not reconstructable. **Superseded list:** (a) confirmed: AC-131 and AC-132 (E12, ADR-0085) and AC-143 (decision L) close as superseded; only the named clauses drop in AC-124 (R4-7, R4-9, R4-10), AC-134 (point 6), AC-151 (v2 run), AC-191 (v2 test clauses), AC-244 (child course, export), AC-245 (end-to-end course), AC-141 (Bash notes write), AC-137 (alternative fix) and AC-195 (nested shell, Q12 B). **Small design calls:** (a) the Elephant writes each with facts, options and a recommendation into `po-ceremonies-pending.md` and puts the ones that matter to the PO as tiles in one batch; meanwhile the uncontested content work is built. | D61 |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 91,
+          "text": "| D64 (2026-10-20, PO, in chat on the Codex WSL greenfield report `scratch/pipeline-analyse-greenfield_codex2_20261020.md`: \"wichtige befunde codex zum happy path die auch fixed werden müssen! der läuft gerade nicht rund\"; \"aus dem bericht sind aber nur majors und blocker relevant\") | The report's blockers (P0) and majors (P1) go into the next candidate, folded into owning Spec items (D60 Q16): prescribed preparation refused as opaque execution, four chat overrides, into AC-123; the review-receipt provenance, the criterion-format check before `present-plan` and the review-chain consistency into AC-155; the unstage recovery loop into AC-207; the Git author lost over the restart and serial actor questions into AC-264. Its audit-export major stays with AC-175, deferred by D63. The report's single table rows count only as evidence for these findings. The criterion check before `present-plan` overlaps AC-264's plan-readiness clause that D55 deferred; only the criterion-locator part is pulled in. | D60, D63 |"
+        },
+        {
+          "path": "backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+          "line": 57,
+          "text": "  This is AC-175 (forensics export): D63 (2026-10-20, po-decisions-2026-10-18.md line 90) lists it among the deferrals past 0.7.0, and D64 repeats that the audit-export major stays with AC-175, deferred by D63."
+        }
+      ],
+      "deferralDecisionDate": "2026-10-20"
+    },
+    {
+      "itemId": "pipeline.declared-system-skill-read-requires-human-override",
+      "stage": "75",
+      "reason": "AC-147/209 whole-row deferral persists for catalog identity and installed-host proof; D96 changes the single-read premise without reopening the deferred remainder.",
+      "currentPath": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+      "decisionEvidence": [
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 90,
+          "text": "| D63 (2026-10-20, PO, by question tiles on the per-item re-verification `specs/sprint-alfred-epic/evidence/scope-verify-2026-10-20/`) | **Deferrals:** (a) the earlier deferrals past 0.7.0 stand and narrow D61: AC-175 (forensics export), AC-190 (D21), the AC-191 telemetry clause, AC-209 and the catalog half of AC-147 (D29, Q3), AC-181's sed target detection, AC-224's AGY parallel worktrees, AC-264's plan-readiness clause (D55); they are re-triaged out of 0.7.0, which AC-13 accepts. **Reconstructed acceptance:** (a) the Elephant's reconstructions of AC-122 (R2), AC-204 (R4, report-only), AC-211 and AC-232 (S1-S8) are released as their acceptance; AC-109 closes as not reconstructable. **Superseded list:** (a) confirmed: AC-131 and AC-132 (E12, ADR-0085) and AC-143 (decision L) close as superseded; only the named clauses drop in AC-124 (R4-7, R4-9, R4-10), AC-134 (point 6), AC-151 (v2 run), AC-191 (v2 test clauses), AC-244 (child course, export), AC-245 (end-to-end course), AC-141 (Bash notes write), AC-137 (alternative fix) and AC-195 (nested shell, Q12 B). **Small design calls:** (a) the Elephant writes each with facts, options and a recommendation into `po-ceremonies-pending.md` and puts the ones that matter to the PO as tiles in one batch; meanwhile the uncontested content work is built. | D61 |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 62,
+          "text": "| 9 | K13 AC-197 D-I, AC-147 | Remaining guard-lifecycle-ready reds; declared-skill read catalogue | No decision needed: guard-lifecycle-ready counts 392 / 389 pass / 0 fail / 3 skipped at HEAD (the 26 reds of 2026-10-19 are gone), AC-147 was deferred past 0.7.0 by the PO on 2026-10-16 | Ledger text corrected; AC-224 liveness readback is covered by `38acd203a` (generator) and K93 (guard) |"
+        },
+        {
+          "path": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+          "line": 139,
+          "text": "  with the deferred Codex-host half (D57 Q3: native-host item after 0.7.0; D63 deferral of the catalog half of AC-147)."
+        }
+      ],
+      "deferralDecisionDate": "2026-10-16"
+    },
+    {
+      "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "stage": "25",
+      "reason": "Whole AC-175 item deferred; committed export admission does not reopen remaining work.",
+      "currentPath": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "decisionEvidence": [
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 90,
+          "text": "| D63 (2026-10-20, PO, by question tiles on the per-item re-verification `specs/sprint-alfred-epic/evidence/scope-verify-2026-10-20/`) | **Deferrals:** (a) the earlier deferrals past 0.7.0 stand and narrow D61: AC-175 (forensics export), AC-190 (D21), the AC-191 telemetry clause, AC-209 and the catalog half of AC-147 (D29, Q3), AC-181's sed target detection, AC-224's AGY parallel worktrees, AC-264's plan-readiness clause (D55); they are re-triaged out of 0.7.0, which AC-13 accepts. **Reconstructed acceptance:** (a) the Elephant's reconstructions of AC-122 (R2), AC-204 (R4, report-only), AC-211 and AC-232 (S1-S8) are released as their acceptance; AC-109 closes as not reconstructable. **Superseded list:** (a) confirmed: AC-131 and AC-132 (E12, ADR-0085) and AC-143 (decision L) close as superseded; only the named clauses drop in AC-124 (R4-7, R4-9, R4-10), AC-134 (point 6), AC-151 (v2 run), AC-191 (v2 test clauses), AC-244 (child course, export), AC-245 (end-to-end course), AC-141 (Bash notes write), AC-137 (alternative fix) and AC-195 (nested shell, Q12 B). **Small design calls:** (a) the Elephant writes each with facts, options and a recommendation into `po-ceremonies-pending.md` and puts the ones that matter to the PO as tiles in one batch; meanwhile the uncontested content work is built. | D61 |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 25,
+          "text": "| 5 | 33 | Deferrals: forensics (AC-175), greenfield-comparisons (AC-190), lifecycle-read-scope (AC-209) | Confirm all three as deferred past 0.7.0 (D63 a / D21) | The matrix rows are carried as deferred; the built forensics parts stay documented |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 55,
+          "text": "| 10 | Index scope | Items deferred past 0.7.0 (forensics AC-175, greenfield-comparisons AC-190, lifecycle-read-scope duplicate) and the four stale rows | Out of the 0.7.0 index, reported separately | The 0.7.0 index counts only rows promised for 0.7.0; a \"deferred past 0.7.0\" table shows the rest with their stage |"
+        },
+        {
+          "path": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+          "line": 76,
+          "text": "  index) is not built. The whole item stays deferred past 0.7.0 by the PO decision of 2026-10-16 (Triage, dated"
+        }
+      ],
+      "deferralDecisionDate": "2026-10-16"
+    },
+    {
+      "itemId": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+      "stage": "25",
+      "reason": "Whole AC-190 item moved after 0.7.0 by D21, confirmed October 23.",
+      "currentPath": "backlog/items/2026-10-19-greenfield-comparisons-need-reproducible-public-evidence.md",
+      "decisionEvidence": [
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 22,
+          "text": "| D21 | Scope: `critic-scratch-name-randomness-has-no-admitted-command` and the enforcement clause of `design-bootstrap-verify-state-contradicts-deferred-contract` are in 0.7.0. `greenfield-comparisons-need-reproducible-public-evidence` moves after 0.7.0. `implementation-without-dispatch-escapes-review-coverage` is in 0.7.0 in its narrow form: a check reports production commits without a Dispatch trailer as uncovered in the Critic batch; it does not block. | four items |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 25,
+          "text": "| 5 | 33 | Deferrals: forensics (AC-175), greenfield-comparisons (AC-190), lifecycle-read-scope (AC-209) | Confirm all three as deferred past 0.7.0 (D63 a / D21) | The matrix rows are carried as deferred; the built forensics parts stay documented |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 55,
+          "text": "| 10 | Index scope | Items deferred past 0.7.0 (forensics AC-175, greenfield-comparisons AC-190, lifecycle-read-scope duplicate) and the four stale rows | Out of the 0.7.0 index, reported separately | The 0.7.0 index counts only rows promised for 0.7.0; a \"deferred past 0.7.0\" table shows the rest with their stage |"
+        },
+        {
+          "path": "backlog/items/2026-10-19-greenfield-comparisons-need-reproducible-public-evidence.md",
+          "line": 20,
+          "text": "it. PO decision D21 moved it after 0.7.0; this file is its public home."
+        }
+      ],
+      "deferralDecisionDate": "2026-10-18"
+    },
+    {
+      "itemId": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+      "stage": "50",
+      "reason": "AC-209 deferred with AC-147; closed merged duplicate now carries no independent current work. Retained in historical snapshot.",
+      "currentPath": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+      "decisionEvidence": [
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+          "line": 90,
+          "text": "| D63 (2026-10-20, PO, by question tiles on the per-item re-verification `specs/sprint-alfred-epic/evidence/scope-verify-2026-10-20/`) | **Deferrals:** (a) the earlier deferrals past 0.7.0 stand and narrow D61: AC-175 (forensics export), AC-190 (D21), the AC-191 telemetry clause, AC-209 and the catalog half of AC-147 (D29, Q3), AC-181's sed target detection, AC-224's AGY parallel worktrees, AC-264's plan-readiness clause (D55); they are re-triaged out of 0.7.0, which AC-13 accepts. **Reconstructed acceptance:** (a) the Elephant's reconstructions of AC-122 (R2), AC-204 (R4, report-only), AC-211 and AC-232 (S1-S8) are released as their acceptance; AC-109 closes as not reconstructable. **Superseded list:** (a) confirmed: AC-131 and AC-132 (E12, ADR-0085) and AC-143 (decision L) close as superseded; only the named clauses drop in AC-124 (R4-7, R4-9, R4-10), AC-134 (point 6), AC-151 (v2 run), AC-191 (v2 test clauses), AC-244 (child course, export), AC-245 (end-to-end course), AC-141 (Bash notes write), AC-137 (alternative fix) and AC-195 (nested shell, Q12 B). **Small design calls:** (a) the Elephant writes each with facts, options and a recommendation into `po-ceremonies-pending.md` and puts the ones that matter to the PO as tiles in one batch; meanwhile the uncontested content work is built. | D61 |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 25,
+          "text": "| 5 | 33 | Deferrals: forensics (AC-175), greenfield-comparisons (AC-190), lifecycle-read-scope (AC-209) | Confirm all three as deferred past 0.7.0 (D63 a / D21) | The matrix rows are carried as deferred; the built forensics parts stay documented |"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+          "line": 55,
+          "text": "| 10 | Index scope | Items deferred past 0.7.0 (forensics AC-175, greenfield-comparisons AC-190, lifecycle-read-scope duplicate) and the four stale rows | Out of the 0.7.0 index, reported separately | The 0.7.0 index counts only rows promised for 0.7.0; a \"deferred past 0.7.0\" table shows the rest with their stage |"
+        },
+        {
+          "path": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+          "line": 59,
+          "text": "  The item is closed as a duplicate (2026-10-22) and merged into 2026-09-28-declared-system-skill-read-requires-human-override.md; both were deferred past the 0.7.0 candidate by PO decision of 2026-10-16 (AC-147 and AC-209 not counted; item Deferral line 2026-10-17). The pin's declared-skill cases are intentionally skipped as NATIVE_HOLD."
+        }
+      ],
+      "deferralDecisionDate": "2026-10-16"
+    }
+  ],
+  "retainedOriginal": 169,
+  "greenfield": {
+    "canonicalIntake": 28,
+    "newRows": 25,
+    "aliases": [
+      {
+        "greenfieldId": "G9a.command",
+        "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+        "stage": "50"
+      },
+      {
+        "greenfieldId": "G23.reads",
+        "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+        "stage": "50"
+      },
+      {
+        "greenfieldId": "G30",
+        "itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+        "stage": "75"
+      }
+    ],
+    "policy": "All original P0/P1 plus already mandated G10 calibration and G17 Critic custody. Other lower-priority intake remains recorded without inventing additional release requirements.",
+    "noncountedIntake": [
+      {
+        "id": "G11",
+        "title": "Read-only tree rev expression is not a push",
+        "stage": "25",
+        "reason": "Canonical retained finding has no current exact regression evidence in the supplied committed repair list."
+      },
+      {
+        "id": "G12",
+        "title": "Close/commit command signatures are discoverable",
+        "stage": "25",
+        "reason": "Retained K155 documentation sweep obligation; current full four-refusal coverage is not supplied."
+      },
+      {
+        "id": "G13",
+        "title": "Antigravity artifact-image copy has a sanctioned route",
+        "stage": "25",
+        "reason": "Retained lower-priority intake; no verified product fix or decision is supplied."
+      },
+      {
+        "id": "G15",
+        "title": "Onboarding questions are bundled without extra PO turns",
+        "stage": "25",
+        "reason": "Retained original P3 intake obligation, no completed source/evidence supplied."
+      },
+      {
+        "id": "G16",
+        "title": "Credential selection uses configured route or one early PO request",
+        "stage": "25",
+        "reason": "Retained K155 ergonomics obligation; no secret-store reads or guesses performed."
+      }
+    ]
+  },
+  "technicalEvidence": "Original retained stages are from31db7853a; new exact Greenfield assessments are fromdaaf074b1. This is a scope merge, not a fresh whole-suite execution."
+}
