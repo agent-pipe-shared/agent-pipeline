@@ -1,0 +1,184 @@
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 0d5012f..6dc3e0e 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
+ import { hostname } from 'node:os';
+ import { canonical } from './po-approval-proof.mjs';
+ import { observeLinuxProcess } from './native-platform-process-observer.mjs';
++import { observeWindowsProcessIdentity } from './windows-process-identity.mjs';
+ import { inspectSignedDescriptorCustodyRepository, withCustodyTopologyScope, withSignedDescriptorCustodyManifestLock } from './worktree-lifecycle.mjs';
+ import { inspectSourceOwnedDescriptorHandle } from './session-requester-bridge.mjs';
+ import * as onboarding from './onboarding-continuity.mjs';
+@@ -180,14 +181,29 @@ function stage(name,record,memberRef,releaseRef=null){const observer=stageContex
+ const LOCK_PATH=`${ROOT}/registry.lock`;
+ const REPAIR_SCRIPT=fileURLToPath(new URL('../scripts/session-authority-repair.mjs',import.meta.url));
+ const hostSha256=()=>hash(hostname());
+-function lockOwner(){
+-  let observed=null;if(process.platform==='linux'){try{observed=observeLinuxProcess(process.pid);}catch{observed=null;}}
+-  return {pid:process.pid,hostSha256:hostSha256(),process:observed?{start:observed.start,bootSha256:observed.bootSha256}:null,acquiredAt:new Date().toISOString()};
+-}
++// W2-R2 (AC-127, C2-P1-WIN-ORPHAN): on Windows the owner names its process start (`win32-<ticks>`), so a later reader can tell a
++// reused pid from the owner. An owner whose start cannot be observed records no process and stays unjudgeable.
++export function sessionAuthorityLockOwner({platform=process.platform,observeWindows=observeWindowsProcessIdentity}={}){
++  let observed=null;if(platform==='linux'){try{observed=observeLinuxProcess(process.pid);}catch{observed=null;}}
++  if(platform==='win32'){try{const found=observeWindows({pid:process.pid});if(found?.status==='present'&&typeof found.processStart==='string'&&found.processStart.startsWith('win32-'))observed={start:found.processStart,bootSha256:null};}catch{observed=null;}}
++  const processFact=observed?(platform==='win32'?{start:observed.start}:{start:observed.start,bootSha256:observed.bootSha256}):null;
++  return {pid:process.pid,hostSha256:hostSha256(),process:processFact,acquiredAt:new Date().toISOString()};
++}
++const lockOwner=()=>sessionAuthorityLockOwner();
+ /** live | dead | unknown. Dead only on proof: no such process, a zombie, another boot or a reused pid. */
+-export function judgeSessionAuthorityLockOwner(value,{observe=observeLinuxProcess,platform=process.platform,host=hostSha256()}={}){
++export function judgeSessionAuthorityLockOwner(value,{observe=observeLinuxProcess,platform=process.platform,host=hostSha256(),observeWindows=observeWindowsProcessIdentity}={}){
+   const owner=value?.owner;
+   if(!owner||typeof owner!=='object'||!Number.isSafeInteger(owner.pid)||owner.pid<1||owner.hostSha256!==host)return 'unknown';
++  if(platform==='win32'){
++    // Same host only (checked above). A vanished pid is dead whatever start was recorded; a present pid is the owner only
++    // when its recorded win32 start matches, and a different win32 start is a reused pid. Anything else is not proof.
++    let found;try{found=observeWindows({pid:owner.pid});}catch{return 'unknown';}
++    if(found?.status==='absent')return 'dead';
++    if(found?.status!=='present'||typeof found.processStart!=='string'||!found.processStart.startsWith('win32-'))return 'unknown';
++    const start=owner.process?.start;
++    if(typeof start!=='string'||!start.startsWith('win32-'))return 'unknown';
++    return found.processStart===start?'live':'dead';
++  }
+   if(platform!=='linux'||!owner.process||typeof owner.process.start!=='string'||typeof owner.process.bootSha256!=='string')return 'unknown';
+   let observed;try{observed=observe(owner.pid);}catch{return 'unknown';}
+   if(observed===null||['Z','X'].includes(observed.state))return 'dead';
+@@ -238,17 +254,20 @@ function sweepRetiredLocks(repo){
+   }catch{/* best effort: a sweep that fails leaves the forensic copies, never the lock */}
+ }
+ /** Moves exactly the observed lock aside. A lock created after it was observed is put back, never removed. */
+-function retireLock(repo,observed,cause){
++function retireLock(repo,observed,cause,io={},report={}){
++  const syncDir=io.syncDirectory??syncDirectory,renameFn=io.rename??renameSync;
+   const dir=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-registry-lock`;
+   privateDirectories(repo,`${dir}/marker`);
+   const lockAbs=safePath(repo,LOCK_PATH),asideAbs=safePath(repo,`${dir}/registry.lock`);
+-  try{renameSync(lockAbs,asideAbs);}catch(error){if(error?.code==='ENOENT')return null;throw error;}
++  try{renameFn(lockAbs,asideAbs);}catch(error){if(error?.code==='ENOENT')return null;throw error;}
+   const moved=lstatSync(asideAbs),bytes=readFileSync(asideAbs);
+   if(String(moved.dev)!==observed.dev||String(moved.ino)!==observed.ino||hash(bytes)!==observed.sha256){
+     try{linkSync(asideAbs,lockAbs);unlinkSync(asideAbs);}catch{}
+     fail('SDC-LOCK-HELD','registry-lock-changed-while-retiring');
+   }
+-  syncDirectory(dirname(lockAbs));
++  // The lock is already moved aside and verified here. A directory fsync the platform refuses (Windows EPERM) no longer
++  // makes the removal look like a failure; it is reported as unsupported durability.
++  try{syncDir(dirname(lockAbs));report.durability='synced';}catch(error){report.durability='unsupported';report.syncErrorCode=typeof error?.code==='string'?error.code:'UNKNOWN';}
+   try{writeFileSync(safePath(repo,`${dir}/retire.json`),canonical({schema:'pipeline.session-authority-lock-retirement.v1',cause,owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,retiredAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});}catch{}
+   sweepRetiredLocks(repo);
+   return dir;
+@@ -290,13 +309,23 @@ function acquireRegistryLock(repo,lockSchema,heldReason){
+ }
+ /** FB3-PF-55 repair: retires a lock whose owner is not confirmed alive, on the caller's word that no Pipeline
+  * process runs. It never takes the lock itself. A live owner is refused. */
+-export function releaseSessionAuthorityLock({repository:input,reason,judge=judgeSessionAuthorityLockOwner}={}){
++export function releaseSessionAuthorityLock({repository:input,reason,judge=judgeSessionAuthorityLockOwner,io={}}={}){
+   if(typeof reason!=='string'||!reason.trim()||reason.length>500||/[\u0000-\u001f\u007f]/u.test(reason))fail('SDC-AUTHORITY-UNAVAILABLE','release-lock-reason');
+   const repo=repository(input),observed=observeLock(repo,judge);
+   if(observed.status==='absent')return freeze({status:'absent'});
+   if(observed.owner==='live')lockHeldFault(repo,observed,'registry-lock-owner-alive');
+-  const aside=retireLock(repo,observed,`released by repair: ${reason.trim()}`);
+-  return freeze(aside===null?{status:'absent'}:{status:'released',aside,owner:observed.owner,pid:observed.pid,ageSeconds:observed.ageSeconds});
++  const report={};let aside;
++  try{aside=retireLock(repo,observed,`released by repair: ${reason.trim()}`,io,report);}
++  catch(error){
++    // A platform fault before the lock moved: report the real postcondition (retained) and a typed next action, never a rollback.
++    if(error?.name==='SessionAuthorityError'||!existsSync(safePath(repo,LOCK_PATH)))throw error;
++    return freeze({status:'retained',owner:observed.owner,pid:observed.pid,ageSeconds:observed.ageSeconds,
++      postcondition:freeze({lock:'retained',durability:'not-attempted',errorCode:typeof error?.code==='string'?error.code:'UNKNOWN'}),
++      nextAction:freeze({kind:'inspect',command:`node ${REPAIR_SCRIPT} inspect --root ${repo.primaryRoot}`})});
++  }
++  if(aside===null)return freeze({status:'absent'});
++  const postcondition=freeze(report.durability==='synced'?{lock:'removed',durability:'synced'}:{lock:'removed',durability:'unsupported',syncErrorCode:report.syncErrorCode});
++  return freeze({status:'released',aside,owner:observed.owner,pid:observed.pid,ageSeconds:observed.ageSeconds,postcondition,nextAction:freeze({kind:'none'})});
+ }
+ 
+ export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active&&boundaryBrands.has(active.token)){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index f4e37af..9d70dc8 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -17,7 +17,7 @@ import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHoo
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "../lib/native-goldfish-host-return.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+-import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
++import { initializeSessionAuthorityRegistry, inspectSessionAuthorityLock, judgeSessionAuthorityLockOwner, releaseSessionAuthorityLock, sessionAuthorityLockOwner } from "../lib/session-authority-registry.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
+ import { prepareApprovedItemCourseFixture, nativeContractFixtureParent } from "../lib/test-item-approved-course-fixture.mjs";
+@@ -357,6 +357,72 @@ const cases = [
+     assert.equal(governedRow(root, "ITEM-AC-0").cancelClass, "superseded");
+     assert.equal(governedRow(root, "ITEM-AC-0").state, "cancelled");
+   }) },
++  // W2-R2 (AC-127; C2-P1-WIN-FSYNC, C2-P1-WIN-ORPHAN): the Windows branches of the registry lock, driven on any host through the
++  // module's injected seams (judge options, io, owner observer). Native Windows qualification stays pending.
++  { id: "SAR12", name: "release-lock reports the real postcondition: removed with directory durability unsupported (an EPERM fsync after removal), removed and synced, or retained, each with a typed next action (AC-127, C2-P1-WIN-FSYNC)", run: () => fixture(({ root }) => {
++    if (process.platform !== "linux") return;
++    const repository = inspectSignedDescriptorCustodyRepository(root);
++    mkdirSync(join(repository.commonDir, "agent-pipeline/session-authority"), { recursive: true, mode: 0o700 });
++    const lockPath = join(repository.commonDir, "agent-pipeline/session-authority/registry.lock");
++    const sha = (text) => createHash("sha256").update(text).digest("hex");
++    const writeLock = () => writeFileSync(lockPath, JSON.stringify({ schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "e".repeat(64),
++      owner: { pid: 9036, hostSha256: sha(hostname()), process: null, acquiredAt: new Date(Date.now() - 3600000).toISOString() } }), { mode: 0o600, flag: "wx" });
++    const eperm = () => { const error = new Error("EPERM: operation not permitted, fsync"); error.code = "EPERM"; throw error; };
++
++    writeLock();
++    const unsupported = releaseSessionAuthorityLock({ repository, reason: "orphan", io: { syncDirectory: eperm } });
++    assert.equal(unsupported.status, "released", JSON.stringify(unsupported));
++    assert.equal(existsSync(lockPath), false, "the lock is gone, so the release must not report a failure");
++    assert.deepEqual(unsupported.postcondition, { lock: "removed", durability: "unsupported", syncErrorCode: "EPERM" });
++    assert.equal(unsupported.nextAction.kind, "none");
++    assert.equal(existsSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", unsupported.aside.split("/").pop(), "registry.lock")), true, "retained aside, never deleted");
++
++    writeLock();
++    const synced = releaseSessionAuthorityLock({ repository, reason: "orphan" });
++    assert.equal(synced.status, "released"); assert.deepEqual(synced.postcondition, { lock: "removed", durability: "synced" }); assert.equal(synced.nextAction.kind, "none");
++
++    writeLock();
++    const retained = releaseSessionAuthorityLock({ repository, reason: "orphan", io: { rename: () => { const error = new Error("EPERM: operation not permitted, rename"); error.code = "EPERM"; throw error; } } });
++    assert.equal(retained.status, "retained", JSON.stringify(retained));
++    assert.equal(existsSync(lockPath), true, "the lock is still there, so no removal and no rollback is claimed");
++    assert.deepEqual(retained.postcondition, { lock: "retained", durability: "not-attempted", errorCode: "EPERM" });
++    assert.equal(retained.nextAction.kind, "inspect"); assert.match(retained.nextAction.command, / inspect --root /u);
++  }) },
++  { id: "SAR13", name: "a Windows lock owner is judged by pid plus process start: gone is dead, the same start is live, a reused pid is dead, and an unknown, unavailable or foreign-host owner is never reclaimable (AC-127, C2-P1-WIN-ORPHAN)", run: () => fixture(({ root }) => {
++    const host = createHash("sha256").update(hostname()).digest("hex");
++    const win = (observeWindows) => (value) => judgeSessionAuthorityLockOwner(value, { platform: "win32", host, observeWindows });
++    const lock = (owner) => ({ schema: "pipeline.session-authority-lock.v2", owner });
++    const stamped = { pid: 9036, hostSha256: host, process: { start: "win32-133000000000000000" }, acquiredAt: "2026-10-25T10:00:00.000Z" };
++    const absent = win(() => ({ status: "absent", pid: 9036 }));
++    assert.equal(absent(lock(stamped)), "dead", "the recorded pid is gone");
++    assert.equal(absent(lock({ ...stamped, process: null })), "dead", "a pid that no longer exists cannot be the owner, recorded start or not");
++    assert.equal(win(() => ({ status: "present", pid: 9036, processStart: "win32-133000000000000000" }))(lock(stamped)), "live");
++    assert.equal(win(() => ({ status: "present", pid: 9036, processStart: "win32-133000000000000001" }))(lock(stamped)), "dead", "pid reused by a later process");
++    assert.equal(win(() => ({ status: "present", pid: 9036, processStart: "win32-133000000000000000" }))(lock({ ...stamped, process: null })), "unknown", "a present pid with no recorded start is not provably the owner");
++    assert.equal(win(() => ({ status: "present", pid: 9036, processStart: "win32-133000000000000001" }))(lock({ ...stamped, process: { start: "12345", bootSha256: "b".repeat(64) } })), "unknown", "a start of another platform's shape is not comparable");
++    assert.equal(win(() => ({ status: "unavailable", reason: "native-query-failed" }))(lock(stamped)), "unknown");
++    assert.equal(win(() => { throw new Error("boom"); })(lock(stamped)), "unknown");
++    let called = false;
++    assert.equal(judgeSessionAuthorityLockOwner(lock({ ...stamped, hostSha256: "f".repeat(64) }), { platform: "win32", host, observeWindows: () => { called = true; return { status: "absent" }; } }), "unknown", "a foreign host is never judged");
++    assert.equal(called, false);
++    assert.equal(absent({ schema: "pipeline.session-authority-lock.v1" }), "unknown", "an owner-less lock stays unjudgeable");
++    assert.equal(absent(lock({ ...stamped, pid: 0 })), "unknown");
++
++    // The owner a Windows process writes names its start, so the next reader can tell a reused pid.
++    assert.equal(sessionAuthorityLockOwner({ platform: "win32", observeWindows: () => ({ status: "present", processStart: "win32-777" }) }).process.start, "win32-777");
++    assert.equal(sessionAuthorityLockOwner({ platform: "win32", observeWindows: () => ({ status: "unavailable", reason: "x" }) }).process, null);
++
++    if (process.platform !== "linux") return;
++    const repository = inspectSignedDescriptorCustodyRepository(root);
++    mkdirSync(join(repository.commonDir, "agent-pipeline/session-authority"), { recursive: true, mode: 0o700 });
++    const lockPath = join(repository.commonDir, "agent-pipeline/session-authority/registry.lock");
++    writeFileSync(lockPath, JSON.stringify(lock(stamped)), { mode: 0o600, flag: "wx" });
++    const seen = inspectSessionAuthorityLock({ repository, judge: absent });
++    assert.equal(seen.owner, "dead"); assert.equal(seen.pid, 9036);
++    assert.equal(inspectSessionAuthorityLock({ repository, judge: win(() => ({ status: "unavailable", reason: "x" })) }).owner, "unknown");
++    const released = releaseSessionAuthorityLock({ repository, reason: "orphan", judge: absent });
++    assert.equal(released.status, "released"); assert.equal(released.owner, "dead"); assert.equal(existsSync(lockPath), false);
++  }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
