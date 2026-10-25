@@ -1,0 +1,10 @@
+command: node scratch/r3-real-scanner.mjs
+label: r3-real-scanner-control
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+{"schema":"pipeline.r3-local-reproduction.v1","source":"synthetic-fixture","historicalIdentity":"unknown","binaryPathAdmission":"admitted","scannerVersion":"version is set by build process","scannerBinarySha256":"8b95a336428cac9a470dc72744b4475fd50ab9221c7be6b7b776edd4d053540a","configSha256":"9b452736af8557a6ed445eb96ecab27248b91768a645c2b5e8ab077ec8ec0d5b","inputSha256":"32993795aa7c9b3e908730df2f7c9a367852a2fd8a7c03f712f6c14f42138e17","reportSha256":"6f10b7efa73a9b0caaa81c33a5c2ecfb0da21929f57bf1a1af02d1178746ad69","scannerStatus":"FINDINGS","classification":"findings","findings":[{"rule":"sentry-access-token","line":1,"column":252,"valueSha256":"e068c2a14c60df1df3bb4058c5e502291c2491ae2c46f8243d4bcd6e96c9cb62"}],"exit":0}
+
+--- stderr ---

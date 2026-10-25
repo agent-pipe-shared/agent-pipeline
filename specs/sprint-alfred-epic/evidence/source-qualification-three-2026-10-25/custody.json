@@ -1,0 +1,154 @@
+{
+  "schema": "pipeline.source-focused-qualification.v1",
+  "sourceCommit": "fb18ac6b0af42d1674129bad07a8d15947372e80",
+  "sourceFiles": [
+    {
+      "path": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+      "sha256": "f1006ad4455d52ac383ed841ccf9b504ab2a18ea67a1976138158f3e511c35fa"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/publish-evidence-run.mjs",
+      "sha256": "9be5828cb283c123e3c9da5d411f957657e69efb455a90c75297f00021fc4e4d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/publish-evidence-run.test.mjs",
+      "sha256": "1b5ada04b39d872059aea14d2198a1f9eacbd6d70a7806a66fe8d413c96c1dfb"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+      "sha256": "81da508574eafeaac4eebd4e7f291d9ecbec4ffa24ce2d44a7bf7515e9b9e48e"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/gitleaks-reproduction-gate.cli.test.mjs",
+      "sha256": "4a8aa3b019db0598cbb82684f58565c8a570164469c0663389dddbe50a33bd0d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs",
+      "sha256": "d6c7091b01eace2fe89e86cb596b732a33f8c970054ff1cdc53e6ad58743ac63"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs",
+      "sha256": "c751f66a18867094d3fdc3602e3e00ba180def26152dd1313566b4242f1b97fe"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+      "sha256": "ae45a7c034c0e7b8982dcd9e9cebae073b1664175814324e62a793a69b741d00"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs",
+      "sha256": "34f45b91ba1838eb02d36fbe6e3498a74bf630aa6c68488b86378abd812ca711"
+    }
+  ],
+  "artifacts": [
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/g24.log",
+      "sourceSha256": "6051ef5974179b66b3ae8ac11165a6b8c7f2c8bcb2056afad381b46af683be7c",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/g24.log.txt",
+      "sha256": "6051ef5974179b66b3ae8ac11165a6b8c7f2c8bcb2056afad381b46af683be7c",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/g24-custody.json",
+      "sourceSha256": "76dc06cebcb060ff38d54476ad89f1191b15f4b658c0c51cd3b811d2bff92d79",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/g24-custody.json.txt",
+      "sha256": "76dc06cebcb060ff38d54476ad89f1191b15f4b658c0c51cd3b811d2bff92d79",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/r3.log",
+      "sourceSha256": "c01658641640165523520fd536a91e38ddc60b94563839c6d71bc4a3845c894d",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/r3.log.txt",
+      "sha256": "c01658641640165523520fd536a91e38ddc60b94563839c6d71bc4a3845c894d",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/r3-custody.json",
+      "sourceSha256": "83090a757e032d3add4f2ed6fbae7c8fb15ce4b77762d5c1e9202df21dedfb69",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/r3-custody.json.txt",
+      "sha256": "83090a757e032d3add4f2ed6fbae7c8fb15ce4b77762d5c1e9202df21dedfb69",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/g27.log",
+      "sourceSha256": "98c4b36f87578d4e142a629c3ed16f94cb48f10d8c91ccf338f5dccd6c8f75fe",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/g27.log.txt",
+      "sha256": "98c4b36f87578d4e142a629c3ed16f94cb48f10d8c91ccf338f5dccd6c8f75fe",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/g27-custody.json",
+      "sourceSha256": "82eb49ec97508968e3d7cf1e39c9b2b224377712a2f6912bffc702326d7a0b7b",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/g27-custody.json.txt",
+      "sha256": "82eb49ec97508968e3d7cf1e39c9b2b224377712a2f6912bffc702326d7a0b7b",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/consumer.log",
+      "sourceSha256": "1706303cd773d76146ad3775a674908676634c97aa23f458cc6be96877a6ea98",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/consumer.log.txt",
+      "sha256": "1706303cd773d76146ad3775a674908676634c97aa23f458cc6be96877a6ea98",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/consumer-custody.json",
+      "sourceSha256": "7f72f24d2a4738b803aa29edb717b8bca31591b023d5e6ed6ebc4801ce8628f1",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/consumer-custody.json.txt",
+      "sha256": "7f72f24d2a4738b803aa29edb717b8bca31591b023d5e6ed6ebc4801ce8628f1",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/run-main-candidate-focused-20261025.mjs",
+      "sourceSha256": "fe72f3556754d3134c9cbf4bd70db5a9ee80c131db033ba67fbc9ac8417c2132",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/launcher.mjs.txt",
+      "sha256": "b28c8eee5c7a07c4b23317e7e85ac1ee08adabc3b1a71ddeeb46be1be27a5282",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/main-candidate-synthetic-preload-20261025.mjs",
+      "sourceSha256": "578630e1315fd099b5b7d179af22f9da5132755cace3912e4dd1ffcc34c0ed0e",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/preload.mjs.txt",
+      "sha256": "578630e1315fd099b5b7d179af22f9da5132755cace3912e4dd1ffcc34c0ed0e",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/r3-scanner-inert/scratch/r3-real-scanner-control.json",
+      "sourceSha256": "3f331b225c47ee2e7ec2c3d24f07301b4a315789fd03dcf5e542e845210688af",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/scanner-positive-control.json.txt",
+      "sha256": "3f331b225c47ee2e7ec2c3d24f07301b4a315789fd03dcf5e542e845210688af",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/r3-scanner-inert/scratch/r3-real-cli-unmatched.json",
+      "sourceSha256": "9fc6a779538ef15d9bc1a58c1754fd5bcdb8b172724e0d769eaf78ac442b77f1",
+      "derivative": "specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/captures/scanner-unmatched.json.txt",
+      "sha256": "9fc6a779538ef15d9bc1a58c1754fd5bcdb8b172724e0d769eaf78ac442b77f1",
+      "sanitizedDerivative": true
+    }
+  ],
+  "counts": {
+    "g24": {
+      "pass": 93,
+      "skip": 2
+    },
+    "r3": {
+      "pass": 83,
+      "skip": 8
+    },
+    "g27": {
+      "pass": 57,
+      "skip": 0
+    },
+    "consumer": {
+      "pass": 9,
+      "skip": 0
+    }
+  },
+  "limits": [
+    "Focused Source-method qualification only; no native independent model or runner PASS.",
+    "Original capture headers retain pre-commit dirty state. Nine exact postimages match committed blobs at the Source commit.",
+    "Historical domain match remains unknown. Real local scanner positive control finds a synthetic credential; unmatched domain CLI refuses gate/ignore generation. No historical false-positive PASS.",
+    "Publication guards cooperative writers and checks pointer preimages; no OS-level atomic CAS against hostile same-UID processes.",
+    "Behavioral output oracle and architecture-before-signature findings remain assigned to separate open R2/AC155 outcomes.",
+    "Scheduled frozen Critic, final Verify/Security and PO acceptance remain pending."
+  ]
+}

@@ -1,0 +1,8 @@
+import os from 'node:os';
+import {syncBuiltinESMExports} from 'node:module';
+const home=process.env.PIPELINE_QUALIFICATION_HOME,temporary=process.env.PIPELINE_QUALIFICATION_TEMP;
+if(!home||!temporary)throw new Error('explicit owned synthetic roots required');
+os.userInfo=()=>({uid:process.getuid?.()??0,gid:process.getgid?.()??0,username:'synthetic-fixture',homedir:home,shell:'/bin/sh'});
+os.homedir=()=>home;os.tmpdir=()=>temporary;syncBuiltinESMExports();
+Object.assign(process.env,{HOME:home,USERPROFILE:home,TMPDIR:temporary,TMP:temporary,TEMP:temporary,XDG_CONFIG_HOME:home+'/config',XDG_STATE_HOME:home+'/state',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:home+'/gitconfig',GIT_CONFIG_SYSTEM:home+'/system-gitconfig'});
+process.env.NODE_OPTIONS=`--import=${import.meta.url}`;

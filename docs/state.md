@@ -8,8 +8,8 @@ The active PO goal is a local candidate with every deliverable at75, then its
 authorized stamp and feature-branch push for the other PC (D153). An ordinary
 turn interruption does not restart bootstrap or close the feature.
 
-Current authoritative matrix: **207items,174at75,22at50,11at25;33below75,
-index69.69%**. [Current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
+Current authoritative matrix: **207items,177at75,19at50,11at25;30below75,
+index70.05%**. [Current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
 The second three-runner analyses and no-pipeline control were fully collected.
 All31high report clauses and14POobservations have dispositions and existing AC
 relations. D152 puts every P0/P1/Kritisch/Wichtig/Hoch in0.7.0. Ten distinct
@@ -23,8 +23,14 @@ The PO applied the protected pair and made the human-only commit after the
 active backstop refused the agent commit. [Custody](../specs/sprint-alfred-epic/evidence/ac168-enforcement-2026-10-25/README.md).
 Live10% and remaining cause/carrier criteria are open.
 
-Main currently has checked G24/R3/G27 proposals applied but not yet committed
-or fully qualified as a combined Main candidate. They get no matrix promotion.
+G24/R3/G27 are committed at `fb18ac6b0af42d1674129bad07a8d15947372e80`.
+Exact nine postimages match the Main captures and committed blobs: G24 93pass/
+2native skips, R3 83pass/8environment skips, G27 57pass and consumer9pass.
+Their three rows move50→75 as focused Source readiness. Unknown historical
+scanner findings remain unresolved; behavioral oracle and architecture scope
+before signature remain separate open outcomes. Native runner qualification,
+the scheduled Critic and final Verify/Security are still pending.
+[Source custody and limits](../specs/sprint-alfred-epic/evidence/source-qualification-three-2026-10-25/README.md).
 G8's same-owner clone has a14-path partial D150 Model producer/readback kernel;
 broad Model regression is RED and author/consumer/valid-fixture work remains.
 Do not integrate its deny-only consumer or claim original native review.

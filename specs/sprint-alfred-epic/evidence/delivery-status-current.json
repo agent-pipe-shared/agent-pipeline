@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-greenfield-second-run/snapshot.json",
-  "sha256": "e3458e13b4513a0945b7f7960fcea4ba57d48ec9db9d502e9f9e372ed81150d8",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-three-qualified/snapshot.json",
+  "sha256": "16f8a20bdaa1c045b1343913705a4b81771da0dcf827bc13a20c5d0893c40b3c",
   "measuredAt": "2026-10-25",
-  "head": "0b80f4f0908faf49eec36fcb5549e63ed80c44ea",
+  "head": "fb18ac6b0af42d1674129bad07a8d15947372e80",
   "counts": {
     "25": 11,
-    "50": 22,
-    "75": 174,
+    "50": 19,
+    "75": 177,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 69.69,
+  "index": 70.05,
   "total": 207,
-  "scope": "D152: all31 second-run high findings+14POobservations mapped; ten distinct new0.7.0 outcomes added at25, two current read/help clauses reopened75→50. Other retained stages unchanged; no promotion from inert code or report prose."
+  "scope": "Same207 identities; G24, R3 and G27.architecture50→75 after committed Source postimage binding and actual focused Main qualification. Historical scanner unknown, native/final verification and separate new R2 outcomes remain open."
 }

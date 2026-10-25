@@ -1,0 +1,10 @@
+command: node scratch/r3-real-cli-unmatched.mjs
+label: r3-real-cli-unmatched
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+{"schema":"pipeline.r3-real-cli-unmatched.v1","scannerBinarySha256":"8b95a336428cac9a470dc72744b4475fd50ab9221c7be6b7b776edd4d053540a","cliExit":1,"gateCreated":false,"ignoreCreated":false,"historicalIdentity":"unknown"}
+
+--- stderr ---

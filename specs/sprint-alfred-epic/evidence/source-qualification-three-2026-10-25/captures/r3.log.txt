@@ -1,0 +1,111 @@
+command: <host-path> --import <repo-root>/scratch/main-candidate-synthetic-preload-20261025.mjs --test plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs plugins/pipeline-core/scripts/gitleaks-reproduction-gate.cli.test.mjs plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs plugins/pipeline-core/scripts/gitleaks-repair-ignore.value-binding.test.mjs plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs
+label: MAIN-CANDIDATE-r3
+exitCode: 0
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+✔ A: an unverified domain-shaped finding stays FINDINGS with its location, never a PASS or an invented false-positive verdict (7.109226ms)
+✔ A: scanner crash, unparseable report and a missing binary are never PASS or success-classified (5.604518ms)
+✔ B: only the exact reviewed domain value is suppressed; a credential at the same file still fails (8.55388ms)
+✔ C: suppression is not blanket: moved line, changed value and legacy/wildcard lines all stay findings (8.467119ms)
+✔ C: RED mirror: a blanket path-only predicate would hide the credential, the real adapter does not (6.950116ms)
+✔ C: a scan never generates or edits ignore files and cannot take scanner config from the candidate (3.898203ms)
+✔ C: shipped scanner config has no secret-prefix whitelist, stopwords, global or regex allowlist (1.129246ms)
+✔ D: scanner verdict is independent of any override or push-authority input (4.221961ms)
+✔ E: value-identity repair keeps its scope: same value re-binds, a different value is refused (13.32178ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ GLCLI001 CLI with no arguments runs main and reports the missing flags (74.174781ms)
+✔ (a) control: the live finding carries the SAME value at the new line -> repair succeeds and re-binds exactly one line to the new line (8.553904ms)
+✔ (b1) defect: the live finding carries a DIFFERENT value at the new line -> repair refuses with a reason (2.5473ms)
+✔ (b2) defect: after the refusal the ignore file is byte-identical to before (2.426981ms)
+✔ (b3) defect: after the refusal the different value is still reported by the scan (never suppressed) (2.813736ms)
+✔ (c) no partial write: the refused repair leaves no temp or backup file next to the ignore file (1.900451ms)
+✔ public CLI requires current exact-value reproduction before mutating a stale ignore (578.477962ms)
+✔ explicit new suppression admits only the reproduced domain and retains credential finding (310.149037ms)
+✔ public approval refuses a hardlinked ignore without touching its other name (218.601741ms)
+✔ public stale repair refuses linked destination and stale ignore, input or scanner facts (940.651658ms)
+✔ public repair rechecks physical facts after its own scanner returns (653.973487ms)
+✔ reproduction binds exact local scanner report, binary, config and input without exposing value (15.014936ms)
+✔ review must match one reproduced plain domain; credential-shaped value cannot enter gate (1.650886ms)
+✔ K98 row 13: repo-root .gitleaks.toml excludes scratch/clones from the scan source and nothing else (2.44751ms)
+✔ K98 row 13: plugin mirror gitleaks-default.toml excludes scratch/clones from the scan source and nothing else (1.951237ms)
+✔ CAPABILITY_CONTRACT_V2 exists and is frozen (1.617554ms)
+✔ CAPABILITY_CONTRACT_V2 fixed top-level fields match the documented v2 contract (1.354333ms)
+✔ CAPABILITY_CONTRACT_V2.tool tracks the real `name` export, not a hardcoded duplicate string (0.251768ms)
+✔ CAPABILITY_CONTRACT_V2.severityNormalization faithfully transcribes the fixed-high rule (0.285061ms)
+✔ CAPABILITY_CONTRACT_V2.coverageLimitations is a non-empty array of factual strings (0.356046ms)
+✔ CAPABILITY_CONTRACT_V2.exitCodeMapping transcribes the real exit-code contract (0.266116ms)
+✔ CAPABILITY_CONTRACT_V2.timeoutContract matches run()'s real default and mechanism (0.197625ms)
+✔ CAPABILITY_CONTRACT_V2.evidenceFields matches the real findings.map(...) object shape (0.272227ms)
+✔ CAPABILITY_CONTRACT_V2.coverageLimitations documents the --no-git file-content-only scope (0.295251ms)
+✔ run() always passes --no-git to `gitleaks detect`, keeping every existing flag (hermetic spy) (1.725318ms)
+✔ gitleaksConfigMissingResult() returns a SKIPPED/success result naming both missing paths (NVA-J-GITLEAKSCONFIG: never a blocking ERROR) (0.285813ms)
+✔ run() short-circuits to gitleaksConfigMissingResult() BEFORE spawning gitleaks when GITLEAKS_CONFIG_PATH is absent (hermetic: fixture binaryPath points at a real, but config-less, sibling dir) (0.972698ms)
+✔ run() never resolves --config from rootDir, even when a candidate tree plants its own .gitleaks.toml (the config must not be attacker/candidate-controlled) (0.66323ms)
+✔ resolveGitleaksConfigPath() in THIS checkout resolves to the repo-root config, not the plugin-shipped default (self-application priority) (0.270424ms)
+✔ run() resolves the plugin-shipped default config from an installed-plugin fixture with no repo root anywhere (real resolution algorithm via a copied module, not a mocked path) (6.10086ms)
+✔ run() degrades to SKIPPED/success (never ERROR) from an installed-plugin fixture where NEITHER the repo-root NOR the plugin-shipped config exists (fail-safe for a stripped/corrupted install) (3.375041ms)
+✔ run() matches a content-v1 authority against the detached snapshot's absolute finding path (2.544374ms)
+✔ run() flags a near-miss: a .gitleaksignore entry exists for the same path+rule+column but a different line, and names both lines plus the literal repair command (2.228524ms)
+✔ run() does NOT add the near-miss diagnostic when no .gitleaksignore entry exists at that path+rule+column at all (genuine new finding stays exactly as loud) (1.595351ms)
+✔ gitleaks-repair-ignore.mjs's repairStaleIgnoreEntry() recomputes a stale entry in place, and the scan then accepts it (5.715809ms)
+✔ repairStaleIgnoreEntry() refuses when no entry matches path+rule+column+old-line (nothing to repair, never guesses) (0.661928ms)
+﹣ run() wires the repo's .gitleaks.toml: a ledger-shaped amendment line at backlog/transitions.ndjson produces no sentry-access-token finding, while the identical secret-shaped string elsewhere still does (real gitleaks binary) (0.159133ms) # no trusted gitleaks binary resolvable on host (status=binary_missing); rule-config regression needs one
+﹣ reproduction: bare `detect` leaks a sibling branch's secret from a detached worktree; --no-git closes it (real gitleaks + git, env-gated) (0.14226ms) # no trusted gitleaks binary resolvable on host (status=binary_missing); real cross-branch reproduction needs one
+✔ run() suppresses a content-v1 entry | ignore file LF | finding path absolute-native-separator | depth0 (root file) (7.031514ms)
+✔ run() suppresses a content-v1 entry | ignore file LF | finding path absolute-native-separator | depth1 (1.745256ms)
+✔ run() suppresses a content-v1 entry | ignore file LF | finding path absolute-native-separator | depth2 (1.706883ms)
+✔ run() suppresses a content-v1 entry | ignore file LF | finding path absolute-forward-slash (the real gitleaks shape on Windows) | depth0 (root file) (2.822062ms)
+✔ run() suppresses a content-v1 entry | ignore file LF | finding path absolute-forward-slash (the real gitleaks shape on Windows) | depth1 (1.855395ms)
+✔ run() suppresses a content-v1 entry | ignore file LF | finding path absolute-forward-slash (the real gitleaks shape on Windows) | depth2 (1.626815ms)
+✔ run() suppresses a content-v1 entry | ignore file LF | finding path relative-forward-slash | depth0 (root file) (1.440527ms)
+✔ run() suppresses a content-v1 entry | ignore file LF | finding path relative-forward-slash | depth1 (1.261948ms)
+✔ run() suppresses a content-v1 entry | ignore file LF | finding path relative-forward-slash | depth2 (4.057028ms)
+﹣ run() suppresses a content-v1 entry | ignore file LF | finding path relative-backslash (defensive; never observed from the real binary) | depth0 (root file) (0.428404ms) # a backslash-separated relative path is only a path separator on Windows; on POSIX it is a legal filename character
+﹣ run() suppresses a content-v1 entry | ignore file LF | finding path relative-backslash (defensive; never observed from the real binary) | depth1 (0.238974ms) # a backslash-separated relative path is only a path separator on Windows; on POSIX it is a legal filename character
+﹣ run() suppresses a content-v1 entry | ignore file LF | finding path relative-backslash (defensive; never observed from the real binary) | depth2 (0.207003ms) # a backslash-separated relative path is only a path separator on Windows; on POSIX it is a legal filename character
+✔ run() suppresses a content-v1 entry | ignore file CRLF | finding path absolute-native-separator | depth0 (root file) (1.607825ms)
+✔ run() suppresses a content-v1 entry | ignore file CRLF | finding path absolute-native-separator | depth1 (1.27348ms)
+✔ run() suppresses a content-v1 entry | ignore file CRLF | finding path absolute-native-separator | depth2 (1.110931ms)
+✔ run() suppresses a content-v1 entry | ignore file CRLF | finding path absolute-forward-slash (the real gitleaks shape on Windows) | depth0 (root file) (1.013565ms)
+✔ run() suppresses a content-v1 entry | ignore file CRLF | finding path absolute-forward-slash (the real gitleaks shape on Windows) | depth1 (1.145417ms)
+✔ run() suppresses a content-v1 entry | ignore file CRLF | finding path absolute-forward-slash (the real gitleaks shape on Windows) | depth2 (1.708607ms)
+✔ run() suppresses a content-v1 entry | ignore file CRLF | finding path relative-forward-slash | depth0 (root file) (1.013095ms)
+✔ run() suppresses a content-v1 entry | ignore file CRLF | finding path relative-forward-slash | depth1 (1.061076ms)
+✔ run() suppresses a content-v1 entry | ignore file CRLF | finding path relative-forward-slash | depth2 (1.058511ms)
+﹣ run() suppresses a content-v1 entry | ignore file CRLF | finding path relative-backslash (defensive; never observed from the real binary) | depth0 (root file) (0.145707ms) # a backslash-separated relative path is only a path separator on Windows; on POSIX it is a legal filename character
+﹣ run() suppresses a content-v1 entry | ignore file CRLF | finding path relative-backslash (defensive; never observed from the real binary) | depth1 (0.12088ms) # a backslash-separated relative path is only a path separator on Windows; on POSIX it is a legal filename character
+﹣ run() suppresses a content-v1 entry | ignore file CRLF | finding path relative-backslash (defensive; never observed from the real binary) | depth2 (0.175674ms) # a backslash-separated relative path is only a path separator on Windows; on POSIX it is a legal filename character
+✔ normalizeCandidateFindingPath() yields the repo-relative forward-slash path | finding path absolute-native-separator | depth0 (root file) (0.930247ms)
+✔ normalizeCandidateFindingPath() yields the repo-relative forward-slash path | finding path absolute-native-separator | depth1 (0.750816ms)
+✔ normalizeCandidateFindingPath() yields the repo-relative forward-slash path | finding path absolute-native-separator | depth2 (0.787356ms)
+✔ normalizeCandidateFindingPath() yields the repo-relative forward-slash path | finding path absolute-forward-slash (the real gitleaks shape on Windows) | depth0 (root file) (1.015038ms)
+✔ normalizeCandidateFindingPath() yields the repo-relative forward-slash path | finding path absolute-forward-slash (the real gitleaks shape on Windows) | depth1 (0.829676ms)
+✔ normalizeCandidateFindingPath() yields the repo-relative forward-slash path | finding path absolute-forward-slash (the real gitleaks shape on Windows) | depth2 (0.892656ms)
+✔ guard: a finding in a different tree is NOT suppressed by an entry for the same repo-relative path (2.432541ms)
+✔ guard: a content-v1 entry that itself uses a backslash path stays a malformed authority (ERROR ignore_authority) (1.127542ms)
+✔ guard: an entry for one secret does NOT suppress a different secret at the same nested path/rule/line/column (1.982667ms)
+✔ guard: an entry recorded at a different line does NOT suppress a nested finding (line binding stays exact) (1.392726ms)
+▶ posix-invariant: a backslash in a relative finding path is rewritten to a slash only on win32
+  ✔ posix-invariant: normalizeCandidateFindingPath() returns a relative backslash path unchanged | platform linux | field File (2.687692ms)
+  ✔ posix-invariant: normalizeCandidateFindingPath() returns a relative backslash path unchanged | platform linux | field file (0.232091ms)
+  ✔ posix-invariant: normalizeCandidateFindingPath() returns a relative backslash path unchanged | platform darwin | field File (0.202415ms)
+  ✔ posix-invariant: control | normalizeCandidateFindingPath() rewrites the same relative backslash path to forward slashes | platform win32 | field File (0.278349ms)
+  ✔ posix-invariant: control | normalizeCandidateFindingPath() rewrites the same relative backslash path to forward slashes | platform win32 | field file (0.358431ms)
+  ✔ posix-invariant: run() does NOT suppress a finding at the literal path a\b\c.txt with a content-v1 entry for a/b/c.txt | platform linux (1.656116ms)
+  ✔ posix-invariant: control | run() DOES suppress the same finding with the same entry | platform win32 (0.955516ms)
+  ✔ posix-invariant: an absolute path to a file whose literal name contains a backslash is not rewritten | real platform, no override (1.202724ms)
+  ✔ posix-invariant: withPlatform() restores process.platform even when the body throws (0.5683ms)
+  ✔ posix-invariant: process.platform is restored to the host value after the overriding tests (0.166496ms)
+✔ posix-invariant: a backslash in a relative finding path is rewritten to a slash only on win32 (9.034028ms)
+ℹ tests 91
+ℹ suites 1
+ℹ pass 83
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 8
+ℹ todo 0
+ℹ duration_ms 2819.247979
+
+--- stderr ---

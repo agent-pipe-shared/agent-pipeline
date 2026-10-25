@@ -1,0 +1,75 @@
+command: <host-path> --import <repo-root>/scratch/main-candidate-synthetic-preload-20261025.mjs --test plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs
+label: MAIN-CANDIDATE-g27
+exitCode: 0
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+✔ missing physical map blocks before any readiness claim and offers only the read-only proposal (5.883878ms)
+✔ malformed physical map blocks even with an authorized adoption disposition (2.622092ms)
+✔ approved design materialization action wins before an invalid scaffold-map diagnostic (1.948452ms)
+✔ missing design block preserves its exact PRD action before scaffold-map validation (1.907565ms)
+✔ incomplete greenfield design keeps the PRD authoring action instead of estate adoption (1.559212ms)
+✔ a materialized map without a project-owned AGENTS pointer has an actionable typed refusal (26.710696ms)
+✔ a PO-deferred adoption reports complete fitness observations without enforcing them (320.683896ms)
+✔ a PO-deferred adoption still enforces fitness for a net-new path and names it (187.759874ms)
+✔ checkpoint map debt blocks the next planning boundary even during adoption deferral (106.190754ms)
+✔ a descendant map repair consumes checkpoint debt only after class-7 passes (287.740696ms)
+✔ unreadable checkpoint debt fails closed with a typed repair route (110.910373ms)
+✔ approved greenfield design defers missing physical surfaces without fabricating fitness pass (219.475065ms)
+✔ calibration-unavailable class 10 is preserved as report-only while other classes decide entry (113.213757ms)
+✔ malformed or incomplete fitness outcomes fail closed (176.107369ms)
+✔ real signed approved-scoped adoption reaches the physical readiness gate (2323.770087ms)
+✔ symlinked physical fitness artifacts fail closed (13.546164ms)
+✔ unresolved adoption authority remains blocked even when the physical bundle is current (137.676338ms)
+✔ planning decisions are projected only for owned task modules (1.31562ms)
+✔ a deferred architecture decision remains visible without changing lifecycle readiness (149.136328ms)
+✔ an unavailable optional decision clock remains diagnostic (0.228103ms)
+✔ pending allowance: a missing planned verification entry point that readiness lists as pending is allowed (0.609147ms)
+✔ pending allowance: missing, empty and stale-empty declared surfaces across classes 2 and 6 are allowed when all pending (0.267057ms)
+✔ pending allowance: no pending-class finding at all is allowed when readiness already approved the deferral (0.172277ms)
+✔ pending allowance: the returned pending list is a copy, and no input is mutated (0.190071ms)
+✔ pending allowance: readiness that is not ready, not a design package, or not deferred is denied with its own code (0.35236ms)
+✔ pending allowance: an empty pending set denies even when the evaluator reports a missing entry point (0.154704ms)
+✔ pending allowance: a finding of any other class denies, including classes whose id and property do not agree (0.392507ms)
+✔ pending allowance: only the two known report-only unavailable shapes are tolerated; any other non-pass outcome denies (0.266076ms)
+✔ pending allowance: a violation target outside the pending set denies, including the zero-entry-point sentinel (0.250255ms)
+✔ pending allowance: a defect that is not absence (unreadable surface) denies even on a pending target (0.133283ms)
+✔ pending allowance: a navigation-currency finding is never allowed, because its violation names no stale contract (0.222623ms)
+✔ pending allowance: malformed input is denied as malformed and never throws (0.445166ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ APM001 one genuine committed signed DAB activates exact future ADR and preserves all proposed/history bytes (7782.907733ms)
+✔ APM002 selected proposal and presented request create no accepted output before actual approval (1223.168736ms)
+✔ APM003 missing or corrupted aggregate proof refuses all activation writes (2256.352035ms)
+✔ APM004 output digest, traversal path, number and exact source digest drift refuse draft and approval (4780.870332ms)
+✔ APM005 manifest must be an actual original candidate blob, not just an ancestor-foreign or uncommitted file (2370.116475ms)
+✔ APM006 a physical manifest outside the signed companions never becomes a prospective authority (1156.176078ms)
+✔ APM007 occupied numbered ADR or target collision preserves foreign bytes and publishes nothing (4481.438585ms)
+✔ APM008 historical Markdown and the original chat evidence remain exact bound inputs (4392.871056ms)
+✔ APM009 genuine authority rechecks and staged failure roll back newly published targets, without visible retained authority (7476.622074ms)
+✔ APM010 a raced create-only target causes rollback while preserving the foreign competing occupant (2852.086075ms)
+✔ APM011 exact partial delivery is resumable; replay preserves materialized bytes and retained authority (8171.652513ms)
+✔ APM012 retained original aggregate proof remains verifiable without the former active feature state; output drift still revokes projection (6637.024857ms)
+✔ APM013 existing closed descriptor v1 is retained; prospective fields require the explicit v2 contract (0.74208ms)
+✔ APM014 existing v1 accepted-file route still consumes a genuine original signed DAB and materializes its greenfield map (6062.119311ms)
+✔ APM015 a later namespace reservation blocks pending numbering while later history does not erase materialized proof (9024.257288ms)
+✔ APM016 draft selection projection must preserve the exact original selected topic/text evidence (1201.492165ms)
+✔ APM017 brownfield ADR-only pending activation inventories all exact targets without claiming map adoption (7257.487912ms)
+✔ APM018 greenfield exact inventory combines ADR and map publication with retained authority last (7937.440036ms)
+✔ G27-PUBLIC-001 approved original Greenfield package routes through public readiness and State materializer (9737.491864ms)
+✔ G27-PUBLIC-002 presented but unapproved package cannot route to materialization or write outputs (1232.768482ms)
+✔ G27-PUBLIC-003 approved package with stale PRD bytes refuses materialization and leaves scaffold intact (2346.874451ms)
+✔ G27-PUBLIC-004 existing estate keeps ADR only course and does not synthesize a Greenfield map (7471.532511ms)
+✔ G27-PUBLIC-005 malformed prospective package is refused by the public route without output (2472.870305ms)
+✔ G27-PUBLIC-006 rebinding approved State to a different physical root is refused (4537.257318ms)
+✔ G27-PUBLIC-007 wrong source root has no Greenfield materialization authority (2120.517739ms)
+ℹ tests 57
+ℹ suites 0
+ℹ pass 57
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 85553.223833
+
+--- stderr ---
