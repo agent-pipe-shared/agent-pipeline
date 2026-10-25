@@ -1,0 +1,11 @@
+{
+  "command": "git -C <home>/src/agent-pipeline-shared_alfred push origin refs/heads/feat/sprint-alfred:refs/heads/feat/sprint-alfred",
+  "guard": "<home>/.codex/plugins/cache/agent-pipeline-local/pipeline-core/0.7.0+codex.20261024154452.355dba9/hooks/guard-push.mjs",
+  "elapsedMs": 14090,
+  "status": 0,
+  "signal": null,
+  "error": null,
+  "stdout": "",
+  "stderr": "",
+  "gitPushExecuted": false
+}

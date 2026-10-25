@@ -2,6 +2,12 @@
 
 > Current runner-neutral handover. Older state text remains in Git and the [October25 archive](../specs/sprint-alfred-epic/plans/state-archive-before-active-goal-2026-10-25.md). Current human matters: [PO queue](../specs/sprint-alfred-epic/plans/po-pending-codex-2026-10-24.md).
 
+## Latest PO direction — stay local and repair G35
+
+The PO CANCELLED the planned PCtransfer/interruption. Remain on thismachine and continue the activegoal. The priorinterim checkpoint/stampbc7 is notthe nextaccepted testcandidate. Its signedpush exposed G35:loaded/currentCodexadapternestedpushcap8s kills validguard evaluation observed14.09s. [DurableG35intake](../specs/sprint-alfred-epic/evidence/codex-push-budget-2026-10-25/README.md). ActualSourcefixandmeaningfulALLOW/failclosedregressionare required; terminalpushalone is notafix.
+
+Next:fixG35andpersistmatrix/evidence → newstamp → localmarketplaceinstallation → reloadthissession/readbacknewloadedversion → parallelrealGreenfieldtests. Backupfeaturepush retainsseparatesignaturebinding. Do notpause/close-featureorcontinuehistoricalPCtransferritual. Preserveoldproofconsumption; newcandidategetsnewproof. Earliertransferlanguagebelow is superseded historical context, notcurrentintent.
+
 ## Intent and boundaries
 
 Deliver the planned0.7.0 local candidate for the next Greenfield series with all active items. The goal is NOT complete. The PO requests this qualified INTERIM candidate, a clean documented checkpoint push on feat/sprint-alfred, then interruption to continue on another PC. Preserve the unfinished feature/goal; never close-feature or claim0.7.0 released. Pause only at the requested transfer boundary after actual remote readback.

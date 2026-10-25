@@ -6,6 +6,10 @@ candidate work. It supersedes older sequencing notes in the Codex transfer and
 next-local-candidate plans. It changes no PRD, Spec, accepted criterion, proof
 authority or review budget.
 
+## Current machine/session course — PO update2026-10-25
+
+Continuehere; the planned PCtransfer/interruptionis cancelled. A signedinterim checkpoint hitG35 (Codexnestedpushguardbudget8s versusvalid14.09sevaluation); amanualpushworkarounddoesnotfulfilthefix. RepairandqualifyG35, updatecompletionmatrixanddurablehandover, thennewstamp/localinstallation/reloadwithruntimeversionreadbackandparallelrealGreenfieldruns. Backupfeaturepushisoptionaldeliverythroughits existingproofgate, notafeaturecloseorapause. Thisimplements theinformativeinstalled-candidateruns in step1 below; itdoesnotwaivetheremainingmatrixcontent, finalfullVerify/Security orfrozenbatchreview.
+
 ## Release scope and matrix
 
 - Remove every explicitly post-0.7.0-deferred item from the active 0.7.0

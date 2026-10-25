@@ -1,0 +1,8 @@
+{
+  "source": "scratch/agent-out/final-checkpoint-push-diagnostic/installed-guard.json",
+  "sourceSha256": "059069918d811ff6db16d7955583f18b889ee8723e30bee655d1c229e7d82991",
+  "derivative": "specs/sprint-alfred-epic/evidence/codex-push-budget-2026-10-25/installed-guard-diagnostic.json",
+  "derivativeSha256": "6f1f1e0ff0a9ab167f507ba770183d01374417d508bffeb148c6f3eedcceaa39",
+  "byteExactOriginal": false,
+  "transformation": "Repository/home path projection only; original retained in ignored Scratch."
+}
