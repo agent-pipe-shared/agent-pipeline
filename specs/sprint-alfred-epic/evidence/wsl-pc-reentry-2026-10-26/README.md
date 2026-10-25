@@ -24,6 +24,13 @@ Every productive Goldfish dispatch is refused by `guard-dispatch`:
    Claude runner until the PO re-approves here or a typed transfer rebind
    exists.
 
+Resolution (same day): `node plugins/pipeline-core/scripts/pipeline-state.mjs
+rebind-approval` (first invoked as `rebind-approval --help`, which executed
+instead of printing help) returned `pipeline.rebind-approval.v1` status
+`verified`, rebound fields `receiptSha256` and `repositoryFingerprint`,
+`signaturesRequested: 0`, `stateChanged: false`. The calibration observation
+then read `eligible` (approval basis `signature`, State revision 35).
+
 Also observed: 73 dispatch records from 2026-10-09 read `unjudgeable`
 (`no-owner-claim`) in `dispatch-record-liveness.mjs`; they only add warnings.
 HGO request namespace was full (Q17) and was swept with the documented repair.

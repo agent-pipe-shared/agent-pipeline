@@ -29,6 +29,19 @@ dispatch, and hand-built briefings are refused with
 `DBG-GENERATED-BRIEFING-REQUIRED`. A transferred clone also arrives with the
 State file at mode 0644 (`CVCT-FILE`).
 
+Correction found the same day: a sanctioned route already exists.
+`pipeline-state.mjs rebind-approval` re-verified the existing signed approval
+for this clone (`reboundFields: receiptSha256, repositoryFingerprint`,
+`signaturesRequested: 0`, `stateChanged: false`, private receipt under
+`.git/agent-pipeline/rebind-approval/`), after which
+`observeCurrentPlanApprovalForCalibration` reads `eligible`. The remaining
+defects are discoverability and CLI safety: (1) `guard-dispatch` repairs
+`CVCT-AUTHORITY-STALE` with "submit the plan again and have the PO approve it
+again" and `calibration-verify-commit-transition.mjs` with "reopen-design and
+approve again", instead of naming `rebind-approval` when only machine-local
+fields differ; neither `inspect`, the bootstrap nor the transfer plan names it;
+(2) `rebind-approval --help` executed the command instead of printing help.
+
 ## PO direction (2026-10-26, chat)
 
 "Spannend! Sowas ist auch ein neues Feature was keiner braucht :-))) wie sollen
@@ -44,7 +57,10 @@ required only when approved content changes. Machine-local material (PO profile
 receipt, local repository fingerprint) is checked as local readiness, not as
 part of the approved identity; the human proof itself (signature over the
 content-bound approval) stays verifiable everywhere and is not weakened or
-replaced by an agent act. A transferred clone's State-file mode is restored by
+replaced by an agent act. When only machine-local fields differ, every refusal
+and `inspect` name the exact `rebind-approval` action (and the bootstrap runs or
+offers it after a transfer); `--help` on any lifecycle verb prints help and
+never executes. A transferred clone's State-file mode is restored by
 onboarding or named with its repair before the first dispatch.
 
 Preserve meaningful negative controls and original evidence. Scheduled batch
