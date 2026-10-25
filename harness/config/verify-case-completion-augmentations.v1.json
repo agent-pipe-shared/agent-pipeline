@@ -1455,6 +1455,25 @@
         ],
         "maxBytes": 65536
       }
+    },
+    {
+      "name": "pin-antigravity-design-phase-scripts-refused-in-draft-tests",
+      "file": "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs",
+      "previousPolicySha256": "4ef076249c3e809c8a7baf6645768c2b854c867254bffc583f7aa02e75988a99",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "K152C001",
+          "K152C002",
+          "K152C003",
+          "K152C004",
+          "K152C005",
+          "K152C006",
+          "K152C007",
+          "K152C008"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }
