@@ -1511,6 +1511,33 @@ function lifecycleRecoveryGuidance(denial) {
   return guidance;
 }
 
+// Pure refusal transport. Run before resolving a repository, eligibility, keys
+// or a ledger. A human-only discard has no capability route; diagnostic shape
+// refusals need a corrected read. Mixed diagnostic/authority sets retain the
+// existing HGO decision path, and every original denial remains visible.
+export function classifyNonLiftableGuardDenials(denials) {
+  if (!Array.isArray(denials) || denials.length === 0) return null;
+  const codes = denials.map(denial => denial?.guard === "guard-lifecycle-ready.mjs"
+    ? String(denial.reason ?? "").match(/^BLOCKED \(guard-lifecycle-ready, plugin pipeline-core\): ([A-Z][A-Z0-9-]+):/u)?.[1] ?? null
+    : null);
+  const humanOnly = codes.includes("PO-DISCARD-HUMAN-ONLY");
+  const diagnosticOnly = codes.every(code => code === "GUARD-READ-COMMAND-UNSUPPORTED" || code === "GUARD-READ-TARGET-MISSING");
+  if (!humanOnly && !diagnosticOnly) return null;
+  return {
+    status: "non-liftable-recovery-required",
+    code: humanOnly ? "PO-DISCARD-HUMAN-ONLY" : codes[0],
+    cause: denials.map(denial => String(denial.reason)).join("\n"),
+    recoveryGuidance: [],
+    coDenialSummary: null,
+    nextAction: {
+      kind: "repair-required",
+      reason: humanOnly
+        ? 'PO recovery: in your own terminal in the project directory, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by "<your name>" --reason "<why this feature is being abandoned>". Use your own name and reason; a signature or chat approval cannot delegate this action to the agent.'
+        : "Correct the read command or target using the original diagnostic and its typed read-only retry actions, then retry. This refusal does not offer an override.",
+    },
+  };
+}
+
 function lifecycleNotReadyRecovery(denials) {
   const lifecycleDenial = Array.isArray(denials)
     ? denials.find(({ reason }) => new RegExp(`\\b${LIFECYCLE_NOT_READY_CODE}\\b`, "u").test(String(reason)))
@@ -3747,6 +3774,8 @@ export function recordHumanGuardDenial({
   appendCommandOffer = appendCommandOfferJournal,
 } = {}) {
   assertRawDenials(denials);
+  const pureRecovery = classifyNonLiftableGuardDenials(denials);
+  if (pureRecovery !== null) return pureRecovery;
   const lifecycleRecovery = lifecycleNotReadyRecovery(denials);
   if (lifecycleRecovery !== null) return lifecycleRecovery;
   const physicalRootDir = physicalRoot(rootDir);
@@ -4876,6 +4905,8 @@ function consumeHumanGuardOverrideCore({
   codexSpawn = spawnSync,
 } = {}) {
   assertRawDenials(denials);
+  const pureRecovery = classifyNonLiftableGuardDenials(denials);
+  if (pureRecovery !== null) return pureRecovery;
   const lifecycleRecovery = lifecycleNotReadyRecovery(denials);
   if (lifecycleRecovery !== null) return lifecycleRecovery;
   // NVA-CROSSREPOLEDGER-1: this is the OTHER entry point codex-pretool-guard.mjs calls

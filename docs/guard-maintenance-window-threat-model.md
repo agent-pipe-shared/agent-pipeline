@@ -98,6 +98,8 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/codex-onboarding-app-server.mjs`,
   `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
   `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,
+  `lib/current-session-artifact-export.mjs` (the current-session PNG admission
+  delegate imported by kernel evaluate),
   `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
   `lib/commit-message-policy.mjs`,
   `lib/critic-route-v3.mjs`, `lib/critic-session-model-route.mjs`,

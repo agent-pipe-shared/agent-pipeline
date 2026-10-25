@@ -163,6 +163,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
   "plugins/pipeline-core/lib/continuity-host-adapter.mjs",
   "plugins/pipeline-core/lib/continuity-state.mjs",
+  "plugins/pipeline-core/lib/current-session-artifact-export.mjs",
   "plugins/pipeline-core/lib/continuity-status.mjs",
   "plugins/pipeline-core/lib/commit-message-policy.mjs",
   "plugins/pipeline-core/lib/critic-export-policy.mjs",

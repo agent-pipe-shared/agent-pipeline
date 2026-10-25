@@ -51,7 +51,7 @@ import { routingProvenance } from "../lib/routing-projection.mjs";
 import { resolveCriticHighRiskRoute, resolveV3DutyRoute, validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
 import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
-import { resolveSessionCodexCriticRoute, recheckHeldCriticFamilyRoute, readHeldCriticFamilyExecution } from "./codex-critic-session-route.mjs";
+import { resolveSessionCodexCriticRoute, recheckHeldCriticFamilyRoute, readHeldCriticFamilyExecution, readHeldCriticFamilyPublications } from "./codex-critic-session-route.mjs";
 import { createModelFamilyExecutionHost, validateInvocationReadback, digest as familyDigest } from "../lib/model-family-execution.mjs";
 import { readValidatedNativeCriticReturn } from "./codex-native-critic-host.mjs";
 import { applyCriticSessionModelRoute } from "../lib/critic-session-model-route.mjs";
@@ -957,7 +957,7 @@ function adminDirectoryInventory(root, label) {
     }
   };
   walk(root);
-  return { count: entries.length, bytes, sha256: sha256(canonicalJson(entries)) };
+  return { count: entries.length, bytes, sha256: sha256(canonicalJson(entries)), entries };
 }
 
 function regularGitIndex(repoRoot, { allowMissing = false } = {}) {
@@ -1002,7 +1002,10 @@ function gitAdministrativeFingerprint(repoRoot) {
   roots.worktreeLink = link.isFile()
     ? { type: "file", sha256: sha256(readFileSync(dotGit)) }
     : { type: link.isDirectory() ? "directory" : "special", mode: link.mode };
-  return { sha256: sha256(canonicalJson(roots)), detail: roots };
+  const inventory = { gitDir, commonDir, git: roots.git.entries, ...(roots.common ? { common: roots.common.entries } : {}) };
+  delete roots.git.entries;
+  if (roots.common) delete roots.common.entries;
+  return { sha256: sha256(canonicalJson(roots)), detail: roots, inventory };
 }
 
 export function captureRepositoryFingerprint(repoRoot, declaredArtifacts = []) {
@@ -1023,9 +1026,10 @@ export function captureRepositoryFingerprint(repoRoot, declaredArtifacts = []) {
     artifacts: Object.fromEntries(declaredArtifacts.map((item) => [item.path, resolveRegularFile(repoRoot, item.path, {
       allowUntracked: item.kind === "evidence" || item.kind === "diff",
     }).sha256])),
-    administrative: gitAdministrativeFingerprint(repoRoot),
   };
-  return { sha256: sha256(canonicalJson(parts)), detail: parts };
+  const administrative = gitAdministrativeFingerprint(repoRoot);
+  parts.administrative = { sha256: administrative.sha256, detail: administrative.detail };
+  return { sha256: sha256(canonicalJson(parts)), detail: parts, administrativeInventory: administrative.inventory };
 }
 
 export function parseObserverArgs(values = []) {
@@ -1108,16 +1112,52 @@ export function readNativeCriticPreparedRoute(context, { repoRoot, preparedSha25
 function familyCustodyPaths(held) {
   return { invocation: `${held.preparedPath}.family-invocation`, consumed: `${held.preparedPath}.family-consumed`, execution: `${held.preparedPath}.family-execution` };
 }
+// Read only original route-bound frozen Source observations; no JSON admission.
+// There is no settled snapshot reset and no namespace/directory exclusion.
+function expectedOriginalPublicationFingerprint(held) {
+  if (!held?.protectedSnapshots) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
+  const snapshots = structuredClone(held.protectedSnapshots);
+  const snapshot = snapshots.candidate, inventory = snapshot?.administrativeInventory; if (!inventory) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
+  const tables = new Map([[inventory.gitDir, new Map(inventory.git.map(row => [row.path, row]))]]);
+  if (inventory.common) tables.set(inventory.commonDir, new Map(inventory.common.map(row => [row.path, row])));
+  for (const effect of readHeldCriticFamilyPublications(held.route)) {
+    const root = tables.has(inventory.commonDir) && isInside(inventory.commonDir, effect.path) ? inventory.commonDir : inventory.gitDir;
+    if (!isInside(root, effect.path)) fail('CRITIC-FAMILY-PUBLICATION-ROOT-DRIFT');
+    const name = relative(root, effect.path).split(sep).join('/'), table = tables.get(root);
+    const prior = table.get(name), image = prior ? Object.fromEntries(Object.entries(prior).filter(([key]) => key !== 'path')) : null;
+    if (canonicalJson(image) !== canonicalJson(effect.preimage)) fail('repository mutation observed during normal Critic run: publication preimage');
+    const parent = name.slice(0, name.lastIndexOf('/')); // New parent directories require separate writer proof; fail closed below.
+    if (parent && table.get(parent)?.type !== 'directory') fail('CRITIC-FAMILY-PUBLICATION-PARENT-DRIFT');
+    table.set(name, { path: name, ...effect.postimage });
+  }
+  const compare = (a,b) => { const x=a.path.split('/'),y=b.path.split('/');for(let i=0;i<Math.min(x.length,y.length);i++){const c=x[i].localeCompare(y[i]);if(c)return c;}return x.length-y.length; };
+  for (const [root, table] of tables) {
+    const entries=[...table.values()].sort(compare), key=root===inventory.gitDir?'git':'common';
+    snapshot.detail.administrative.detail[key]={count:entries.length,bytes:entries.reduce((n,row)=>n+(row.bytes??0),0),sha256:sha256(canonicalJson(entries))};
+  }
+  snapshot.detail.administrative.sha256=sha256(canonicalJson(snapshot.detail.administrative.detail));
+  snapshot.sha256=sha256(canonicalJson(snapshot.detail));
+  return Object.fromEntries(Object.entries(snapshots).map(([name,value])=>[name,value.sha256]));
+}
 function heldPreparedFamilyContext(context) {
   const held = preparedFamilyContexts.get(context);
   if (!held || readJsonBounded(held.preparedPath).sha256 !== held.preparedSha256) fail("CRITIC-FAMILY-PREPARED-CONTEXT-REQUIRED");
   readNativeCriticPreparedRoute(context, { repoRoot: held.repoRoot, preparedSha256: held.preparedSha256 });
   return held;
 }
+function assertOriginalFamilyCustody(held) {
+  if (!held?.protectedSnapshots || !held.invocationSha256 || !held.consumedSha256 || !held.executionSha256) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
+  const paths = familyCustodyPaths(held);
+  const execution = readJsonBounded(paths.execution);
+  if (['pipeline.critic-family-native-custody.v3', 'pipeline.critic-family-native-custody.v4'].includes(execution.value.schema)) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
+  for (const [name, expected] of [['invocation', held.invocationSha256], ['consumed', held.consumedSha256], ['execution', held.executionSha256]]) {
+    if (readJsonBounded(paths[name]).sha256 !== expected) fail('CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT');
+  }
+}
 export function consumeNativeCriticPreparedContext(context, { packet, nativeRequest } = {}) {
   const held = heldPreparedFamilyContext(context), paths = familyCustodyPaths(held);
-  atomicWriteExclusive(paths.consumed, { schema: "pipeline.critic-family-consumption.v1", preparedSha256: held.preparedSha256,
-    packetSha256: familyDigest(packet), nativeRequestSha256: familyDigest(nativeRequest) });
+  held.consumedSha256 = atomicWriteExclusive(paths.consumed, { schema: "pipeline.critic-family-consumption.v1", preparedSha256: held.preparedSha256,
+    packetSha256: familyDigest(packet), nativeRequestSha256: familyDigest(nativeRequest) }).sha256;
 }
 export function recordNativeCriticPreparedExecution(context, { packet, nativeRequest, nativeResult } = {}) {
   const held = heldPreparedFamilyContext(context), paths = familyCustodyPaths(held);
@@ -1127,8 +1167,8 @@ export function recordNativeCriticPreparedExecution(context, { packet, nativeReq
   const execution = readHeldCriticFamilyExecution(held.route);
   if (!execution.ok || execution.value.nativeResultSha256 !== familyDigest(nativeResult)
     || execution.value.packetSha256 !== familyDigest(packet)) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
-  atomicWriteExclusive(paths.execution, { schema: held.generatedHostReturn ? "pipeline.critic-family-native-custody.v2" : "pipeline.critic-family-native-custody.v1", preparedSha256: held.preparedSha256,
-    nativeResult, packet, nativeRequest, execution: execution.value, ...(held.generatedHostReturn ? { hostReturn: held.generatedHostReturn } : {}) });
+  held.executionSha256 = atomicWriteExclusive(paths.execution, { schema: held.generatedHostReturn ? "pipeline.critic-family-native-custody.v2" : "pipeline.critic-family-native-custody.v1", preparedSha256: held.preparedSha256,
+    nativeResult, packet, nativeRequest, execution: execution.value, ...(held.generatedHostReturn ? { hostReturn: held.generatedHostReturn } : {}) }).sha256;
   held.nativeResult = structuredClone(nativeResult);
 }
 export function captureNativeCriticPreparedReturn(context, validatedHandle) {
@@ -1164,53 +1204,19 @@ export function readNativeCriticCapturedReturn(context) {
   return structuredClone(value);
 }
 
-/** Qualified construction ports independently observe original S4/S6 evidence.
- * Persisted JSON is a recipe for those verifiers, never an admission handle. */
+/** Persisted JSON cannot reconstruct the original publication capture.
+ * Qualified construction ports still require a fresh preparation. */
 export function createNativeCriticPreparedContextFactory({ familyInvocationEntry, familyRuntimeHost, familyExecutionPorts } = {}) {
-  return Object.freeze({ async reconstruct({ repoRoot, preparedPath, requireExecution = true } = {}) {
+  return Object.freeze({ async reconstruct({ preparedPath } = {}) {
     if ((!familyInvocationEntry && !familyRuntimeHost) || !familyExecutionPorts?.readOriginalInvocation
       || !familyExecutionPorts?.readLaunchEvidence || !familyExecutionPorts?.contextForInvocation
       || !familyExecutionPorts?.adapters?.codex?.readActualExecutionIdentity) fail("CRITIC-FAMILY-CUSTODY-RECONSTRUCTION-UNQUALIFIED");
     const preparedRecord = readJsonBounded(preparedPath), original = readJsonBounded(`${preparedPath}.family-invocation`).value;
     exactKeys(original, ["schema", "preparedSha256", "receipt"], "family invocation custody");
     if (original.schema !== "pipeline.critic-family-prepared-custody.v1" || original.preparedSha256 !== preparedRecord.sha256) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
-    const i = original.receipt;
-    const route = await resolveSessionCodexCriticRoute({ rootDir: repoRoot, candidateCommit: preparedRecord.value.request.candidate_commit,
-      dutyId: preparedRecord.value.route.duty, invocationId: i.invocationId, familyInvocationEntry, familyRuntimeHost, familyExecutionPorts });
-    const checked = recheckHeldCriticFamilyRoute(route);
-    if (!checked.ok || familyDigest(checked.receipt) !== familyDigest(i)) fail("CRITIC-FAMILY-ORIGINAL-INVOCATION-DRIFT");
-    const held = { route, repoRoot: realpathSync(repoRoot), preparedPath, preparedSha256: preparedRecord.sha256,
-      requestSha256: sha256(canonicalJson(preparedRecord.value.request)) };
-    if (requireExecution) {
-      const custody = readJsonBounded(`${preparedPath}.family-execution`).value;
-      const v2 = custody.schema === "pipeline.critic-family-native-custody.v2";
-      exactKeys(custody, ["schema", "preparedSha256", "nativeResult", "packet", "nativeRequest", "execution", ...(v2 ? ["hostReturn"] : [])], "family execution custody");
-      if (!["pipeline.critic-family-native-custody.v1", "pipeline.critic-family-native-custody.v2"].includes(custody.schema) || custody.preparedSha256 !== preparedRecord.sha256) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
-      const consumption = readJsonBounded(`${preparedPath}.family-consumed`).value;
-      if (consumption.preparedSha256 !== preparedRecord.sha256 || consumption.packetSha256 !== familyDigest(custody.packet)
-        || consumption.nativeRequestSha256 !== familyDigest(custody.nativeRequest)) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
-      const host = createModelFamilyExecutionHost({ ...familyExecutionPorts, readInvocation: async () => {
-        const read = await familyExecutionPorts.readOriginalInvocation({ root: repoRoot, invocationId: i.invocationId, sessionId: i.sessionId, expectedReceiptSha256: i.receiptSha256 });
-        const valid = validateInvocationReadback(read?.value);
-        return read?.ok && valid.ok && familyDigest(valid.value.invocation) === familyDigest(i) ? read : { ok: false, code: "CRITIC-FAMILY-ORIGINAL-INVOCATION-DRIFT", retryable: false };
-      } });
-      const observed = await host.recordModelFamilyExecution({ invocationId: i.invocationId, rawHostResult: custody.nativeResult });
-      if (!observed.ok) fail(observed.code);
-      const receipt = host.readExecutionReceipt(observed.value);
-      if (!receipt.ok || familyDigest(receipt.value) !== familyDigest(custody.execution.executionReceipt)
-        || custody.execution.nativeResultSha256 !== familyDigest(custody.nativeResult)
-        || custody.execution.packetSha256 !== familyDigest(custody.packet)) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
-      held.reconstructedExecution = receipt.value;
-      held.nativeResult = custody.nativeResult;
-      if (v2) {
-        validateHostReturn(preparedRecord.value, preparedRecord.sha256, custody.hostReturn);
-        if (familyDigest(custody.hostReturn.critic_result.verdict) !== familyDigest(JSON.parse(custody.nativeResult.result.answer))) fail("CRITIC-FAMILY-NATIVE-RETURN-CUSTODY-DRIFT");
-        held.generatedHostReturn = custody.hostReturn;
-      }
-    }
-    const context = Object.freeze(Object.create(null)); preparedFamilyContexts.set(context, held);
-    validatePrepared(preparedRecord.value, repoRoot, context);
-    return context;
+    // Serialized recipes cannot recover original publisher captures or inventories.
+    // Reprepare before resolving a route or performing any new Source operation.
+    fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
   } });
 }
 function routeForCriticRequest(repoRoot, request, familyContext = null) {
@@ -1337,7 +1343,9 @@ export function prepareNativeCritic(options, deps = {}) {
     preparedFamilyContexts.set(context, held);
     const result = prepareNativeCriticCore(options, deps, context);
     held.preparedSha256 = result.preparedSha256;
-    atomicWriteExclusive(familyCustodyPaths(held).invocation, { schema: "pipeline.critic-family-prepared-custody.v1", preparedSha256: result.preparedSha256, receipt: recheckHeldCriticFamilyRoute(route).receipt });
+    held.protectedSnapshots = Object.fromEntries(Object.entries(protectedRootPathMap(repoRoot, options.pipelineRoot, options.observers ?? [])).map(([name, root]) => [name, captureRepositoryFingerprint(root)]));
+    assertFingerprintMapEqual(readJsonBounded(options.preparedPath).value.bindings.protectedBefore, Object.fromEntries(Object.entries(held.protectedSnapshots).map(([name, snapshot]) => [name, snapshot.sha256])), "prepared publication capture");
+    held.invocationSha256 = atomicWriteExclusive(familyCustodyPaths(held).invocation, { schema: "pipeline.critic-family-prepared-custody.v1", preparedSha256: result.preparedSha256, receipt: recheckHeldCriticFamilyRoute(route).receipt }).sha256;
     preparedFamilyResults.set(result, context);
     return result;
   })();
@@ -1883,7 +1891,7 @@ function recoverReceiptTransaction({ controlRoot, consumePath, completePath, pen
   return { ok: true, receiptPath, receiptSha256: marker.receiptSha256, reviewPass: recoveredReceipt.reviewPass, recovered: true, cleanupComplete };
 }
 
-function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution) {
+function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution, expectedAfter = prepared.bindings.protectedBefore) {
   if (receipt.assurance !== prepared.assurance || JSON.stringify(receipt.residualRisks) !== JSON.stringify(RESIDUAL_RISKS)) fail("receipt assurance boundary drift");
   if ("normalLaneAuthorization" in receipt) fail("current receipt must not carry legacy normal lane authorization");
   if (receipt.route.providerAttested !== false || receipt.route.coordinatorConfirmed !== true) fail("receipt route claim drift");
@@ -1919,7 +1927,7 @@ function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution
     || receipt.liveness.evidenceEvents.some(({ evidenceSha256 }) => !SHA256.test(evidenceSha256))
     || JSON.stringify(receipt.liveness.evidenceEvents) !== JSON.stringify(expectedLivenessEvents)) fail("receipt liveness binding invalid");
   if (JSON.stringify(receipt.state.before) !== JSON.stringify(prepared.bindings.protectedBefore)
-    || JSON.stringify(receipt.state.after) !== JSON.stringify(prepared.bindings.protectedBefore)) fail("receipt protected-state binding drift");
+    || JSON.stringify(receipt.state.after) !== JSON.stringify(expectedAfter)) fail("receipt protected-state binding drift");
   if (sanitizedVerdict.findings.some(({ detailSha256, evidence, specRef }) => !SHA256.test(detailSha256)
     || !Number.isInteger(evidence.startLine) || evidence.startLine < 1 || !Number.isInteger(evidence.endLine)
     || evidence.endLine < evidence.startLine || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(specRef))) fail("receipt finding binding invalid");
@@ -1952,6 +1960,7 @@ export function finalizeNativeCritic(options) {
   if (familyContext !== null) {
     const route = readNativeCriticPreparedRoute(familyContext, { repoRoot, preparedSha256: preparedRecord.sha256 });
     const held = preparedFamilyContexts.get(familyContext);
+    assertOriginalFamilyCustody(held);
     const executed = held.reconstructedExecution ? { ok: true } : readHeldCriticFamilyExecution(route);
     if (!executed.ok) fail(executed.code);
   }
@@ -1984,7 +1993,8 @@ export function finalizeNativeCritic(options) {
   const reviewAfter = captureRepositoryFingerprint(prepared.review.root, referenceNow.filter(({ source }) => source === "review"));
   const after = protectedFingerprintMap(repoRoot, pipelineRoot, observers);
   const reviewMutation = reviewAfter.sha256 !== prepared.bindings.reviewFingerprintSha256;
-  const protectedMutation = JSON.stringify(after) !== JSON.stringify(prepared.bindings.protectedBefore);
+  const expectedProtected = familyContext === null ? prepared.bindings.protectedBefore : expectedOriginalPublicationFingerprint(preparedFamilyContexts.get(familyContext));
+  const protectedMutation = JSON.stringify(after) !== JSON.stringify(expectedProtected);
   if (reviewMutation || protectedMutation) fail("repository mutation observed during normal Critic run");
   const sanitizedVerdict = sanitizeVerdictForReceipt(validated.result.verdict, prepared.review.root);
 
@@ -2040,7 +2050,7 @@ export function finalizeNativeCritic(options) {
     reviewPass: validated.reviewPass,
   };
   assertSchema(receipt, RECEIPT_SCHEMA_PATH, "receipt");
-  validateReceiptSemantics(receipt, prepared, sanitizedVerdict, validated.execution);
+  validateReceiptSemantics(receipt, prepared, sanitizedVerdict, validated.execution, expectedProtected);
   const published = completeReceiptTransaction({
     controlRoot, consumePath, completePath, pendingPath, receiptPath, receipt, prepared, dispatchState, cleanup: options.cleanup,
   });

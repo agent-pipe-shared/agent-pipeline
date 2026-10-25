@@ -11,6 +11,118 @@ import * as installerModule from "./install-agy.mjs";
 import { resolveAntigravityRegistryInstalledRoot } from "./scripts/installed-plugin-attestation-host.mjs";
 import { observePipelineStartPreflight } from "./scripts/pipeline-start-preflight.mjs";
 import { createGovernanceScopeController } from "./lib/governance-scope.mjs";
+import { createAntigravityRefreshHost } from "./lib/antigravity-topology-refresh-host.mjs";
+
+test("G6: installer refresh expands an owned user-level matcher to native file tools", (t) => {
+  const scratch = fileURLToPath(new URL("../../scratch/", import.meta.url));
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "g6-matcher-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const configRoot = join(root, "home", ".gemini");
+  const workspaceRoot = join(root, "workspace");
+  const source = join(workspaceRoot, "plugins", "pipeline-core");
+  mkdirSync(join(configRoot, "config"), { recursive: true });
+  mkdirSync(join(source, "hooks"), { recursive: true });
+  writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
+  // Use the shipped plugin matcher and scripts as the source of the installer wiring.
+  const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
+  writeFileSync(join(source, "hooks.json"), JSON.stringify(manifest));
+  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint"]) {
+    writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert fixture: never executed\n");
+  }
+  const target = join(configRoot, "config", "hooks.json");
+  const foreign = { matcher: "foreign_tool", hooks: [{ type: "command", command: "foreign-command" }] };
+  writeFileSync(target, JSON.stringify({ PreToolUse: [foreign, {
+    matcher: "run_command",
+    hooks: [{ type: "command", command: `node "${join(source, "hooks", "antigravity-pretool-guard.mjs")}"` }],
+  }] }));
+  const calls = [];
+  const result = refreshAntigravityInstallation({ configRoot, workspaceRoot, approvedSourceRoot: source,
+    scope: "workspace", globalChangeApproved: true }, {
+    runCli: (argv) => { calls.push([...argv]); assert.deepEqual(argv, ["--version"]); return { status: "ok", version: "1.2.12" }; },
+    writeInstalledReceipt: () => { assert.fail("a direct workspace fixture must not create any receipt"); },
+  });
+  assert.equal(result.status, "refreshed", JSON.stringify(result));
+  assert.ok(calls.length > 0);
+  const output = JSON.parse(readFileSync(target, "utf8"));
+  assert.deepEqual(output.PreToolUse[0], foreign);
+  const matcher = output.PreToolUse[1].matcher;
+  const misses = ["run_command", "write_to_file", "replace_file_content", "invoke_subagent", "write_file", "edit_file", "read_file"]
+    .filter((name) => !new RegExp(`^(?:${matcher})$`, "u").test(name));
+  assert.deepEqual(misses, [], "installer must refresh the owned user-level matcher as well as the command path");
+});
+
+test("G6: host matcher ownership, approval, manifest and preimage controls", (t) => {
+  const scratch = fileURLToPath(new URL("../../scratch/", import.meta.url));
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "g6-controls-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const configRoot = join(root, "home", ".gemini"), workspaceRoot = join(root, "workspace");
+  const source = join(workspaceRoot, "plugins", "pipeline-core");
+  mkdirSync(join(configRoot, "config"), { recursive: true });
+  mkdirSync(join(source, "hooks"), { recursive: true });
+  writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
+  const manifestPath = join(source, "hooks.json");
+  const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint"]) writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert\n");
+  const target = join(configRoot, "config", "hooks.json");
+  const owned = { type: "command", command: `node "${join(source, "hooks", "antigravity-pretool-guard.mjs")}"` };
+  const foreignBytes = '{ "matcher":"foreign_tool", "hooks":[{"command":"foreign-command"}], "keep":"\\u00df" }';
+  const put = (hooks = [owned], matcher = "run_command") => writeFileSync(target, '{ "PreToolUse":[' + foreignBytes + ',' + JSON.stringify({ matcher, hooks }) + '] }\n');
+  const dependencies = { runCli: argv => { assert.deepEqual(argv, ["--version"]); return { status: "ok", version: "1.2.12" }; }, writeInstalledReceipt: () => assert.fail("no receipt") };
+  const options = { configRoot, workspaceRoot, approvedSourceRoot: source, scope: "workspace", globalChangeApproved: true };
+  put(); const before = readFileSync(target);
+  assert.equal(refreshAntigravityInstallation({ ...options, globalChangeApproved: false }, dependencies).reason, "ATR-GLOBAL-SCOPE");
+  assert.deepEqual(readFileSync(target), before);
+  assert.equal(refreshAntigravityInstallation(options, dependencies).status, "refreshed");
+  assert.ok(readFileSync(target, "utf8").includes(foreignBytes));
+  assert.equal(JSON.parse(readFileSync(target)).PreToolUse[1].matcher, manifest["pipeline-core"].PreToolUse[0].matcher);
+  const current = readFileSync(target);
+  assert.equal(refreshAntigravityInstallation(options, dependencies).changed, false);
+  assert.deepEqual(readFileSync(target), current);
+  put([owned, { command: "foreign-command" }]); const mixed = readFileSync(target);
+  assert.equal(refreshAntigravityInstallation(options, dependencies).reason, "ATR-WIRING-MIXED-OWNERSHIP");
+  assert.deepEqual(readFileSync(target), mixed);
+  put([{ command: "node /deleted/pipeline-core/hooks/antigravity-pretool-guard.mjs" }]);
+  assert.equal(refreshAntigravityInstallation(options, dependencies).reason, "ATR-WIRING-OWNERSHIP-UNVERIFIABLE");
+  put();
+  const host = createAntigravityRefreshHost({ ...options, ...dependencies });
+  for (const surface of [target, manifestPath]) {
+    const plan = host.prepare(); assert.equal(plan.status, "prepared");
+    const bytes = readFileSync(surface); writeFileSync(surface, Buffer.concat([bytes, Buffer.from(" \n")]));
+    assert.equal(host.apply(plan).reason, "ATR-TOPOLOGY-DRIFT");
+    assert.equal(host.apply(plan).reason, "ATR-UNOWNED-PLAN");
+    writeFileSync(surface, bytes);
+  }
+  const group = manifest["pipeline-core"].PreToolUse[0];
+  manifest["pipeline-core"].PreToolUse.push({ ...group, matcher: "different" });
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  assert.equal(refreshAntigravityInstallation(options, dependencies).reason, "ATR-HOOK-MATCHER");
+});
+
+test("G6: missing and aliased Source scripts refuse before any wiring mutation", (t) => {
+  for (const kind of ["missing", "alias"]) {
+    const root = mkdtempSync(join(tmpdir(), "g6-source-script-"));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const configRoot = join(root, "config"), workspaceRoot = join(root, "workspace"), source = join(workspaceRoot, "source");
+    mkdirSync(join(configRoot, "config"), { recursive: true });
+    mkdirSync(join(source, "hooks"), { recursive: true });
+    writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
+    writeFileSync(join(source, "hooks.json"), JSON.stringify({ "pipeline-core": { PreToolUse: [{ matcher: "write_file", hooks: [{ command: "node hooks/antigravity-pretool-guard.mjs" }] }] } }));
+    const script = join(source, "hooks", "antigravity-pretool-guard.mjs");
+    if (kind === "alias") { const other = join(root, "foreign.mjs"); writeFileSync(other, "// inert foreign\n"); symlinkSync(other, script); }
+    const target = join(configRoot, "config", "hooks.json");
+    const bytes = JSON.stringify({ PreToolUse: [{ matcher: "run_command", hooks: [{ command: `node "${script}"` }] }] });
+    writeFileSync(target, bytes);
+    const calls = [];
+    const result = createAntigravityRefreshHost({ configRoot, workspaceRoot, approvedSourceRoot: source, scope: "workspace", globalChangeApproved: true,
+      runCli: argv => { calls.push(argv); return { status: "ok", version: "1.2.12" }; }, writeInstalledReceipt: () => assert.fail("no receipt") }).refresh();
+    assert.equal(result.status, "refused", kind);
+    assert.match(result.reason, /^(ATR-UNAVAILABLE|ATR-HOOK-SCRIPT|ATR-TOPOLOGY-UNVERIFIABLE)$/u, kind);
+    assert.deepEqual(calls, [["--version"]]); assert.equal(readFileSync(target, "utf8"), bytes);
+  }
+});
 
 test("Agy release-tag checkout creates a named branch without changing the tag commit", (t) => {
   const root = mkdtempSync(join(tmpdir(), "agy-release-tag-checkout-"));

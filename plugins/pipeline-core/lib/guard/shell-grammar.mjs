@@ -178,6 +178,43 @@ function isValidPipelineHeadArgs(argv) {
       && HEAD_PIPELINE_COUNT.test(argv[0].slice(1)));
 }
 
+// Dynamic symbol inspection is data parsing, never execution of the operand.
+// Keep its complete argv closed: GNU response files can introduce loader/output
+// options, so even a physically safe @file must not reach objdump's expander.
+function isSystemDiagnosticSource(segment, root, extraRoots) {
+  // A project executable merely named objdump is not the diagnostic tool.
+  const name = segment.executable;
+  const args = segment.argv;
+  if (name === "objdump" || (process.platform === "win32" && name === "objdump.exe")) {
+    return args.length === 2 && ["-T", "--dynamic-syms"].includes(args[0])
+      && !args[1].startsWith("-") && !args[1].startsWith("@")
+      && isSafeExactPassiveFile(args[1], root, extraRoots);
+  }
+  return false;
+}
+
+function isSystemDiagnosticName(name) {
+  return ["objdump", "objdump.exe", "ldconfig"].includes(basename(name).toLowerCase());
+}
+
+function isSystemDiagnosticPart(command, root) {
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+  return parsed.parseStatus === "accepted"
+    && parsed.segments.some((segment) => isSystemDiagnosticName(segment.executable));
+}
+
+function isBoundedSystemDiagnosticPipeline(parsed, root, extraRoots) {
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 2
+    || parsed.operators.length !== 1 || parsed.operators[0].operator !== "|"
+    || parsed.redirects.length !== 0
+    || !isSystemDiagnosticSource(parsed.segments[0], root, extraRoots)) return false;
+  const windows = parsed.dialect === "windows-readonly-pipeline";
+  const sink = parsed.segments[1];
+  const name = sink.executable;
+  return name === (windows ? "grep.exe" : "grep") ? isValidPipelineGrepArgs(sink.argv)
+    : name === (windows ? "head.exe" : "head") && isValidPipelineHeadArgs(sink.argv);
+}
+
 /**
  * Extends the bounded read-only pipeline family (guard-command-grammar.mjs's
  * isBoundedReadOnlyPipeline, rg-to-rg/rg-to-head only) with the "grep-to-grep"
@@ -756,10 +793,14 @@ export function isBoundedReadOnlyAndChain(command, root, extraRoots = []) {
 
 function isBoundedReadOnlyNewlineChain(command, root, extraRoots = []) {
   const parts = splitTopLevelReadOnlyNewlineChain(command);
-  return parts !== null && parts.every((part) => isReadOnlyDiagnosticCommand(part, root, extraRoots));
+  return parts !== null && parts.every((part) => !isSystemDiagnosticPart(part, root)
+    && isReadOnlyDiagnosticCommand(part, root, extraRoots));
 }
 
 export function isChainSegmentAdmitted(part, root, extraRoots = []) {
+  // This diagnostic family is qualified only alone or with its one closed
+  // grep/head sink; it does not extend the existing chain source inventory.
+  if (isSystemDiagnosticPart(part, root)) return false;
   if (isReadOnlyDiagnosticCommand(part, root, extraRoots)) return true;
   const parsedPart = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   return parsedPart.parseStatus === "accepted"
@@ -1393,6 +1434,14 @@ export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
   command = win32QuotedDrivePathCommand(command);
   const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   const pipelineRoots = [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots];
+  // These new diagnostics have one exact shape family; do not inherit the
+  // generic trailing stderr redirect or any wider pipeline source rule.
+  if (parsed.parseStatus === "accepted" && isSystemDiagnosticName(parsed.segments[0].executable)) {
+    return parsed.redirects.length === 0
+      && ((parsed.segments.length === 1 && parsed.operators.length === 0
+        && isSystemDiagnosticSource(parsed.segments[0], root, pipelineRoots))
+        || isBoundedSystemDiagnosticPipeline(parsed, root, pipelineRoots));
+  }
   if (isBoundedReadOnlyPipeline(parsed, root, pipelineRoots)) return true;
   if (isBoundedGrepPipeline(parsed, root, pipelineRoots)) return true;
   if (isBoundedCatPipeline(parsed, root, pipelineRoots)) return true;
@@ -1409,10 +1458,13 @@ export function isRejectedReadFamilyCommand(command, root) {
     || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
   const { executable, argv } = parsed.segments[0];
   const name = basename(executable).toLowerCase();
-  if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls"].includes(name)) return true;
+  if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls"].includes(name)
+    || isSystemDiagnosticName(name)) return true;
   if (name === "git" && argv[0] === "diff"
     && argv.some((arg) => arg === "--output" || arg.startsWith("--output=")
       || arg === "--ext-diff" || arg === "--textconv")) return true;
+  if (["node", "node.exe"].includes(name)
+    && /^(?:--(?:eval|print)(?:=|$)|-(?:e|p|pe|ep)(?:$|[^-]))/u.test(argv[0] ?? "")) return true;
   if (["node", "node.exe"].includes(name)
     && argv.some((arg) => arg === "--test-reporter-destination"
       || arg.startsWith("--test-reporter-destination="))) return true;
@@ -1516,6 +1568,9 @@ function heredocFileRemediation(command) {
 }
 
 export function grammarRemediation(command) {
+  if (typeof command === "string" && /^\s*node(?:\.exe)?\s+(?:-e|--eval|-p|--print)(?:\s|=|$)/u.test(command)) {
+    return "Remediation: arbitrary inline Node code stays refused. Write the probe to a workspace scratch/browser-probe.mjs file with Write/Edit, then run node scratch/browser-probe.mjs as a separate tool call. Ordinary lifecycle, role and filesystem guards still apply to that script route.";
+  }
   return commitMessageFileRemediation(command) ?? heredocFileRemediation(command);
 }
 

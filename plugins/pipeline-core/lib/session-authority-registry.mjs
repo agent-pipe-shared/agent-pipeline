@@ -43,6 +43,37 @@ const definitions = [
 ];
 const boundaryBrands=new WeakMap(), memberBrands=new WeakMap(), stageBrands=new WeakSet();
 const boundaryContext=new AsyncLocalStorage(), stageContext=new AsyncLocalStorage();
+// Only the private publisher appends receipts; callers retain an opaque capture.
+const publicationScope=new AsyncLocalStorage(),publicationCaptures=new WeakMap();
+export async function captureSessionAuthorityPublications({repository:input,owner},effect){
+  const repo=repository(input),handle=Object.freeze(Object.create(null));
+  if(!owner||typeof owner!=='object'||typeof effect!=='function'||publicationScope.getStore())fail('SDC-AUTHORITY-UNAVAILABLE','publication-capture-context');
+  const held={repo,owner,events:[],closed:false,complete:false};publicationCaptures.set(handle,held);
+  try{const result=await publicationScope.run(held,effect);held.complete=true;return Object.freeze({result,handle});}finally{held.closed=true;}
+}
+export function readSessionAuthorityPublications(handle,{repository:input,owner}={}){
+  const held=publicationCaptures.get(handle);
+  if(!held?.closed||!held.complete||held.owner!==owner||!equal(held.repo,repository(input)))fail('SDC-AUTHORITY-UNAVAILABLE','original-publication-capture-required');
+  return freeze(held.events.map(({boundary,custody,...event})=>structuredClone(event)));
+}
+function publicationImage(repo,path){
+  try{const read=readRaw(repo,path),stat=lstatSync(safePath(repo,path));return {type:'file',mode:stat.mode&0o777,bytes:read.ref.size,sha256:read.ref.sha256};}
+  catch(error){if(error.code==='ENOENT')return null;throw error;}
+}
+function publish(repo,path,value,expected=null){
+  const held=publicationScope.getStore();
+  const originalBoundary=boundaryContext.getStore();
+  if(held&&(!equal(repo,held.repo)||held.closed||!originalBoundary||!boundaryBrands.has(originalBoundary.token)))fail('SDC-AUTHORITY-UNAVAILABLE','publication-capture-boundary');
+  if(held&&held.events.length>=SESSION_AUTHORITY_LIMITS.maxNamespaceEntries)fail('SDC-AUTHORITY-UNAVAILABLE','publication-capture-bound');
+  let checked=null;
+  const result=publishOriginal(repo,path,value,expected,held?image=>{checked=image;}:null);
+  if(held){
+    const {preimage:before,postimage:after}=checked,bytes=Buffer.from(canonical(value));
+    if(after.sha256!==hash(bytes)||after.bytes!==bytes.length||after.mode!==0o600||(before?before.sha256!==expected?.sha256||before.bytes!==expected?.size:expected!==null))fail('SDC-AUTHORITY-CAS','publication-postimage');
+    held.events.push({repositorySha256:repoDigest(repo),path:safePath(repo,path),preimage:freeze(structuredClone(before)),postimage:freeze(structuredClone(after)),expectedRef:freeze(structuredClone(expected)),boundary:originalBoundary.token,producerId:value.producerId??null,custody:checked});
+  }
+  return result;
+}
 const ROOT='agent-pipeline/session-authority';
 const SHA=/^[a-f0-9]{64}$/, ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/;
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -110,7 +141,32 @@ function readRecord(repo,path){const read=readRaw(repo,path);try{const value=JSO
 function readRef(repo,value){ref(value);const read=readRecord(repo,value.path.slice(5));if(!equal(read.ref,value))fail('SDC-AUTHORITY-CAS','reference-preimage-changed');return read;}
 function privateDirectories(repo,path){if(process.platform==='win32'){let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))windowsAuthority.createWindowsOwnedAuthorityDirectory({path:cursor});windowsAuthority.inspectWindowsOwnedAuthorityPath({path:cursor,directory:true});}return;}let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))mkdirSync(cursor,{mode:0o700});owned(lstatSync(cursor),true);}}
 function syncDirectory(path){const fd=openSync(path,constants.O_RDONLY);try{fsyncSync(fd);}finally{closeSync(fd);}}
-function publish(repo,path,value,expected=null){safePath(repo,path);privateDirectories(repo,path);const abs=safePath(repo,path);const bytes=Buffer.from(canonical(value));if(bytes.length>SESSION_AUTHORITY_LIMITS.maxRecordBytes)fail('SDC-AUTHORITY-UNAVAILABLE','oversized-publication');if(expected===null){if(existsSync(abs))fail('SDC-AUTHORITY-CAS','expected-absent');}else if(!equal(readRaw(repo,path).ref,expected))fail('SDC-AUTHORITY-CAS','publication-preimage-changed');if(process.platform==='win32')return nativePublish(repo,path,abs,bytes,expected);const temp=`${path}.tmp-${randomBytes(16).toString('hex')}`;const tempAbs=safePath(repo,temp);let fd=openSync(tempAbs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}if(expected===null){if(existsSync(abs))fail('SDC-AUTHORITY-CAS','publication-race');}else if(!equal(readRaw(repo,path).ref,expected))fail('SDC-AUTHORITY-CAS','publication-race');renameSync(tempAbs,abs);syncDirectory(dirname(abs));const read=readRaw(repo,path);if(read.ref.sha256!==hash(bytes))fail('SDC-AUTHORITY-CAS','publication-readback');return freeze(read.ref);}
+function publishOriginal(repo,path,value,expected=null,record=null){
+  safePath(repo,path);privateDirectories(repo,path);const abs=safePath(repo,path),bytes=Buffer.from(canonical(value));
+  if(bytes.length>SESSION_AUTHORITY_LIMITS.maxRecordBytes)fail('SDC-AUTHORITY-UNAVAILABLE','oversized-publication');
+  let preimage=null;
+  function check(reason){
+    if(expected===null){if(existsSync(abs))fail('SDC-AUTHORITY-CAS',reason);}
+    else{
+      const read=readRaw(repo,path);
+      if(!equal(read.ref,expected))fail('SDC-AUTHORITY-CAS',reason);
+      preimage={type:'file',mode:lstatSync(abs).mode&0o777,bytes:read.ref.size,sha256:read.ref.sha256};
+    }
+  }
+  check('publication-preimage-changed');
+  if(process.platform==='win32'){
+    const result=nativePublish(repo,path,abs,bytes,expected);
+    if(record)record({preimage,postimage:publicationImage(repo,path),originalExpectedRef:expected,originalPostimageRef:result});
+    return result;
+  }
+  const temp=`${path}.tmp-${randomBytes(16).toString('hex')}`,tempAbs=safePath(repo,temp);
+  let fd=openSync(tempAbs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+  try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}
+  check('publication-race');renameSync(tempAbs,abs);syncDirectory(dirname(abs));
+  const read=readRaw(repo,path);if(read.ref.sha256!==hash(bytes))fail('SDC-AUTHORITY-CAS','publication-readback');
+  if(record)record({preimage,postimage:{type:'file',mode:lstatSync(abs).mode&0o777,bytes:read.ref.size,sha256:read.ref.sha256},originalExpectedRef:expected,originalPostimageRef:read.ref});
+  return freeze(read.ref);
+}
 
 export function createSessionAuthorityMethodStageObserver({onStage}){if(typeof onStage!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-stage-observer');const value=Object.freeze({onStage});stageBrands.add(value);return value;}
 export function withSessionAuthorityMethodStages({observer},callback){if(!stageBrands.has(observer)||typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','unbranded-stage-observer');return stageContext.run(observer,callback);}

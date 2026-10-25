@@ -27,10 +27,13 @@ function command(value){
  if(!m)return null;return {path:m[1]??m[2]??m[3],arg:m[4]??null};
 }
 function templates(root){
- const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();
- function visit(v){if(v&&typeof v==='object'){if(typeof v.command==='string'){const c=command(v.command);if(!c||!/^hooks\/[a-z0-9-]+\.mjs$/.test(c.path))throw Error('ATR-HOOK-TEMPLATE');
-    const path=join(root,c.path);const st=lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||realpathSync(path)!==path)throw Error('ATR-HOOK-SCRIPT');set.add(c.path+'\0'+(c.arg??''));}
-    for(const value of Object.values(v))visit(value);}}
+ const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();set.matchers=new Map();
+ function visit(v,location=[],group=null){if(v&&typeof v==='object'){
+   if(Object.hasOwn(v,'matcher')){if(typeof v.matcher!=='string'||!v.matcher.length||!Array.isArray(v.hooks))throw Error('ATR-HOOK-MATCHER');group={event:location.filter(k=>typeof k==='string').at(-1),matcher:v.matcher};}
+   if(typeof v.command==='string'){const c=command(v.command);if(!c||!/^hooks\/[a-z0-9-]+\.mjs$/.test(c.path))throw Error('ATR-HOOK-TEMPLATE');
+    const path=join(root,c.path);const st=lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||realpathSync(path)!==path)throw Error('ATR-HOOK-SCRIPT');const key=c.path+'\0'+(c.arg??'');set.add(key);
+    if(group){const binding=group.event+'\0'+key;if(set.matchers.has(binding)&&set.matchers.get(binding)!==group.matcher)throw Error('ATR-HOOK-MATCHER');set.matchers.set(binding,group.matcher);}}
+    for(const [key,value] of Object.entries(v))visit(value,[...location,Array.isArray(v)?Number(key):key],group);}}
  visit(f.value);return set;
 }
 // Separator-aware containment: the relative path (always '/'-separated) when `path` lies strictly inside `root`, else null.
@@ -44,10 +47,23 @@ function wiring(observation,configRoot,workspaceRoot){
  for(const [scope,path] of [['global',join(configRoot,'config','hooks.json')],['global',join(configRoot,'config','external-hooks.json')],['workspace',join(workspaceRoot,'.agents','hooks.json')],['workspace',join(workspaceRoot,'.agents','external-hooks.json')]]){
   const f=read(path);if(f.status==='absent'){result.push({scope,path,sha256:null,nextBytes:null,changes:0});continue;}
   let changes=0,visits=0;const replacements=[],deletions=[];
+  function ownedKey(value){const c=command(value?.command);if(!c||!isAbsolute(c.path))return null;
+   for(const [root,set] of sets){const rel=within(root,c.path);if(rel!==null&&set.has(rel+'\0'+(c.arg??'')))return rel+'\0'+(c.arg??'');}
+   if(managedGone){const rel=within(managedRoot,c.path);if(rel!==null)return rel+'\0'+(c.arg??'');}return null;
+  }
   function transform(value,location=[],parentArray=false){
    if(++visits>4096)throw Error('ATR-WIRING-BOUND');
    if(Array.isArray(value)){value.forEach((v,i)=>transform(v,[...location,i],true));return;}
    if(value===null||typeof value!=='object')return value;
+   if(Array.isArray(value.hooks)){
+    const keys=value.hooks.map(ownedKey),owned=keys.filter(key=>key!==null&&desired.has(key));
+    if(owned.length){const event=location.filter(k=>typeof k==='string').at(-1),matchers=owned.map(key=>desired.matchers.get(event+'\0'+key));
+     if(!Object.hasOwn(value,'matcher')&&matchers.every(m=>m===undefined)){for(const [key,v] of Object.entries(value))transform(v,[...location,key]);return;}
+     if(!Object.hasOwn(value,'matcher'))throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
+     if(matchers.some(m=>typeof m!=='string')||new Set(matchers).size!==1)throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
+     if(value.matcher!==matchers[0]){if(keys.some(key=>key===null))throw Error('ATR-WIRING-MIXED-OWNERSHIP');changes++;replacements.push({path:[...location,'matcher'],value:matchers[0]});}
+    }
+   }
    if(Object.hasOwn(value,'command')){
     const c=command(value.command);let owner=null,key=null;
     if(c&&isAbsolute(c.path)){
@@ -112,10 +128,11 @@ export function removeAntigravityWorkspaceRegistration({workspaceRoot,expectedSh
   const after=observeAntigravityWorkspaceBindings({workspaceRoot});if(after.status!=='observed'||after.ownedIndexes.length)throw Error('ATR-REGISTRY-READBACK');return {status:'removed'};
  }catch{return {status:'refused',reason:'ATR-WORKSPACE-REGISTRY-UNVERIFIABLE'};}
 }
-export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedSourceRoot,scope,globalChangeApproved=false,cliPath=null,runCli,writeInstalledReceipt}={}){
+export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedSourceRoot,scope,globalChangeApproved=false,cliPath=null,runCli,writeInstalledReceipt,beforeFinalReadback}={}){
  directory(configRoot);directory(workspaceRoot);directory(approvedSourceRoot);
  if(!['global','workspace'].includes(scope))throw Error('ATR-SCOPE');
  if(runCli!==undefined&&typeof runCli!=='function')throw Error('ATR-SEALED-CLI');
+ if(beforeFinalReadback!==undefined&&typeof beforeFinalReadback!=='function')throw Error('ATR-SEALED-OBSERVER');
  // injected function is a sealed host dependency, never read from stdin/JSON.
  const invoke=runCli??((argv)=>{if(configRoot!==join(homedir(),'.gemini'))return {status:'unavailable'};const path=physicalCli(cliPath);const r=spawnSync(path,argv,{encoding:'utf8',timeout:20000,maxBuffer:65536});return r.error||r.signal||r.status!==0?{status:'failed'}:{status:'ok',version:argv[0]==='--version'?r.stdout.trim():null};});
  const args={configRoot,workspaceRoot,approvedSourceRoot},plans=new WeakMap();let active=false;
@@ -190,6 +207,9 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
      const appends=change.append!==null?[{path:['entries'],values:[{path:change.append}]}]:[];
      const next=rewriteAntigravityJsonBytes(original,{deletions:change.removed.map(i=>['entries',i]),...(appends.length?{appends}:{})});changed=true;write(registry.path,next,registry.sha256);completed.push(selected+'-registry-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
    }
+   // Optional in-process host observer: no live ownership objects or verdict input.
+   // Its return value is ignored; every real final check still follows it.
+   if(beforeFinalReadback!==undefined)beforeFinalReadback();
    const final=observeAntigravityPluginTopology(args);if(final.source.content?.sha256!==source.content.sha256||!registryBound(final,scope,scope,source))throw Error('ATR-FINAL-READBACK');
    if(registryPlans.some(({selected})=>!registryBound(final,selected,scope,source)))throw Error('ATR-FINAL-READBACK');
    if(wiring(final,configRoot,workspaceRoot).some(p=>p.changes>0))throw Error('ATR-FINAL-WIRING-READBACK');

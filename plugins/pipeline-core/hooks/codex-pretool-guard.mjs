@@ -16,6 +16,7 @@ import {
 } from "./guard-lifecycle-ready.mjs";
 import {
   consumeHumanGuardOverride,
+  classifyNonLiftableGuardDenials,
   humanGuardOverrideInternals,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
@@ -507,6 +508,10 @@ if (denials.length > 0) {
   // into an alternate authority writer and could bypass signature mode.
   if (bootstrapAcknowledgementWriterOnlyDenial) {
     deny(denials.map((entry) => entry.reason).join("\n"));
+  }
+  const pureRecovery = classifyNonLiftableGuardDenials(denials);
+  if (pureRecovery !== null) {
+    deny([pureRecovery.cause, pureRecovery.nextAction.reason].join("\n"));
   }
   const overrideSpawn = (executable, args, options) => boundedSpawn(
     executable,

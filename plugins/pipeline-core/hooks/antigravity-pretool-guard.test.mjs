@@ -172,7 +172,7 @@ function agyArchitectureDesignBlock() {
 // assert a later or different verdict must not be cut short by the missing-model refusal.
 const AGY_TOOL_LAYER_MODEL = "sonnet";
 
-function readyLifecycleFixture(mode = "chat") {
+function readyLifecycleFixture(mode = "chat", initializeBeforeBinding = null) {
   const root = mkdtempSync(join(tmpdir(), "agy-ready-hgo-"));
   const home = join(root, "fixture-home");
   mkdirSync(home, { recursive: true });
@@ -238,6 +238,9 @@ function readyLifecycleFixture(mode = "chat") {
   const language = readFileSync(prdFile, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
   writeFileSync(join(root, generated.targets.spec.path), "# Completed AGY fixture specification\n\n## Acceptance criteria\n- AC-01: WHEN the AGY adapter fixture is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n\n## Architecture\nThe intake checkpoint owns package paths; the marker writer binds the final specification digest.\n");
   writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n${agyArchitectureDesignBlock()}`);
+  // Optional test inputs must precede document markers, acknowledgement and
+  // binding. Existing consumers retain the original fixture unchanged.
+  initializeBeforeBinding?.({ root, generated });
   const markerPlan = invoke("intake-spec-marker-plan", "--root", root, "--runner", "antigravity");
   invoke("intake-spec-marker-apply", "--root", root, "--plan-sha256", markerPlan.planSha256, "--activate", "--runner", "antigravity");
   // Mini staging still requires the canonical chat acknowledgement before
@@ -329,6 +332,96 @@ function decision(result) {
   } catch (error) {
     assert.fail(`guard produced unparseable decision output: ${trimmed}\n${error.message}`);
   }
+}
+
+// Controlled lifecycle/readback/chat inputs qualify Source composition only.
+// No nested guard result is mocked and no native or human authority is claimed.
+if (process.argv.includes("--g6-aggregate")) {
+  let root;
+  let denials = 0;
+  try {
+    const put = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); };
+    for (const boundary of ["role", "plan", "test"]) {
+      root = readyLifecycleFixture("chat", ({ root: fixtureRoot, generated }) => {
+        const specPath = join(fixtureRoot, generated.targets.spec.path);
+        put(specPath, readFileSync(specPath, "utf8") + `\n| Risk class | ${boundary === "role" ? "high" : "low"} |\n| Rigor level | 2 |\n`);
+        put(join(fixtureRoot, "project", "guard-config.json"), { protectedTestPaths: [{ id: "TP-G6", pattern: "protected\\.test\\.mjs$", reason: "fixture examiner" }] });
+      });
+      const boundState = readFileSync(pipelineStatePath(root), "utf8");
+      const state = JSON.parse(boundState);
+      assert.equal(state.continuity.featureId, state.activeFeature.id);
+      assert.equal(state.continuity.authority.spec.sha256,
+        sha256(readFileSync(join(root, state.continuity.authority.spec.path), "utf8")));
+      for (const tool of ["write_file", "edit_file"]) for (const absolute of [false, true]) {
+        // backlog/ is a real dev-plan exemption; only backlog/items/ is an
+        // EL-01 exemption. This selects the role guard without disabling the
+        // plan gate, manufacturing approval or changing bound lifecycle state.
+        const relativePath = boundary === "test" ? "protected.test.mjs"
+          : boundary === "role" ? "backlog/g6.mjs" : "src/g6.mjs";
+        const path = absolute ? join(root, relativePath) : relativePath;
+        const result = decision(run({ toolCall: { name: tool, args: { Path: path, Content: "x", Target: "a", Replacement: "b" } } }, root, { timeoutMs: 60000 }));
+        assert.equal(result.decision, "deny", `${tool}/${absolute}/${boundary}`);
+        assert.match(result.reason, boundary === "role" ? /guard-el01-tripwire/ : boundary === "plan" ? /guard-devplan/ : /TP-G6/);
+        assert.doesNotMatch(result.reason, /requires-bootstrap|BOOTSTRAP-REQUIRED|GUARD-LIFECYCLE-NOT-READY/);
+        const primary = result.reason.split("\n")[0];
+        assert.match(primary, boundary === "role" ? /guard-el01-tripwire/
+          : boundary === "plan" ? /guard-devplan/ : /guard-testpath/);
+        assert.equal(readFileSync(pipelineStatePath(root), "utf8"), boundState);
+        denials++;
+        console.log(`G6 aggregate ${tool} ${absolute ? "absolute" : "relative"} ${boundary}: intended denial`);
+      }
+      rmSync(root, { recursive: true, force: true });
+      root = null;
+    }
+    assert.equal(denials, 12);
+    console.log(JSON.stringify({ schema: "pipeline.g6-aggregate-result.v1", primaryDenials: denials, expectedDenials: 12 }));
+  } catch (error) { console.error(error.stack); process.exitCode = 1; }
+  finally { if (root) rmSync(root, { recursive: true, force: true }); }
+  process.exit(process.exitCode ?? 0);
+}
+
+// Bounded G6 qualification avoids the lifecycle/native-dispatch fixture graph.
+if (process.argv.includes("--g6-bounded")) {
+  const scratch = join(process.cwd(), "scratch"); mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "g6-native-boundaries-"));
+  const home = join(root, "fixture-home"); mkdirSync(home);
+  const env = { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: root };
+  const put = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); };
+  const guard = (name, input) => spawnSync(process.execPath, [join(hookDir, name)], { cwd: root, env, encoding: "utf8", input: JSON.stringify(input), timeout: 10000 });
+  try {
+    put(join(root, ".agent-pipeline", "onboarding-consent.json"), { schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-10-02T00:00:00.000Z" });
+    put(join(root, ".claude", "pipeline.json"), { project: "test", verify: "node verify.mjs" });
+    put(join(root, ".claude", "guard-config.json"), { protectedTestPaths: [{ id: "TP-G6", pattern: "protected\\.test\\.mjs$", reason: "fixture examiner" }] });
+    put(join(root, ".claude", "pipeline.yaml"), "gates:\n  dev-plan:\n    mode: blocking\n");
+    put(join(root, "specs", "feat-1", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
+    for (const tool of ["write_file", "edit_file"]) for (const absolute of [false, true]) {
+      const path = absolute ? join(root, "src", "code.mjs") : "src/code.mjs";
+      const normalized = normalizeAntigravityToolInput({ toolCall: { name: tool, args: { Path: path, Content: "x", Target: "a", Replacement: "b" } } });
+      assert.equal(normalized.toolName, tool === "write_file" ? "Write" : "Edit");
+      assert.equal(normalized.toolInput.file_path, path);
+      const input = { tool_name: normalized.toolName, tool_input: normalized.toolInput, cwd: root };
+      put(join(root, ".claude", "pipeline-state.json"), { schema: "pipeline.state.v0", planApproved: true, activeFeature: { id: "feat-1", phase: "implementation", planPath: "specs/feat-1/prd.md" } });
+      const role = guard("guard-el01-tripwire.mjs", input); assert.equal(role.status, 2, JSON.stringify(role)); assert.match(role.stderr, /guard-el01-tripwire/);
+      put(join(root, ".claude", "pipeline-state.json"), { schema: "pipeline.state.v0", planApproved: false, activeFeature: { id: "feat-1", phase: "draft", planPath: "specs/feat-1/prd.md" } });
+      const plan = guard("guard-devplan.mjs", input); assert.equal(plan.status, 2, JSON.stringify(plan)); assert.match(plan.stderr, /guard-devplan/);
+      const protectedPath = absolute ? join(root, "protected.test.mjs") : "protected.test.mjs";
+      const testInput = normalizeAntigravityToolInput({ toolCall: { name: tool, args: { Path: protectedPath, Content: "x", Target: "a", Replacement: "b" } } });
+      const test = guard("guard-testpath.mjs", { tool_name: testInput.toolName, tool_input: testInput.toolInput, cwd: root });
+      assert.equal(test.status, 2, JSON.stringify(test)); assert.match(test.stderr, /TP-G6/);
+    }
+    put(join(root, "README.md"), "readme\n"); put(join(root, "vault", "id_rsa"), "inert credential fixture\n");
+    for (const target of ["README.md", join(root, "README.md"), "vault/id_rsa", join(root, "vault", "id_rsa"), "missing.md", join(root, "missing.md")]) {
+      const read = guard("antigravity-pretool-guard.mjs", { workspacePaths: [root], toolCall: { name: "read_file", args: { Path: target } } });
+      const expected = target.endsWith("README.md") ? "allow" : "deny";
+      const result = read.status === 2 ? { decision: "deny", reason: read.stderr } : JSON.parse(read.stdout);
+      assert.equal(result.decision, expected, target);
+      if (target.endsWith("id_rsa")) assert.match(result.reason, /GUARD-READ-CREDENTIAL-TARGET/);
+      if (target.endsWith("missing.md")) assert.match(result.reason, /GUARD-READ-TARGET-MISSING/);
+    }
+    console.log("G6 bounded native normalization -> actual role/plan/test guards: 12 refusals; native read adapter: 6 decisions passed.");
+  } catch (error) { console.error(error.stack); process.exitCode = 1; }
+  finally { rmSync(root, { recursive: true, force: true }); }
+  process.exit(process.exitCode ?? 0);
 }
 
 // 1. Normalization tests

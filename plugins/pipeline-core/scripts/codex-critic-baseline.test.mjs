@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import "./g17-enrollment-fixture-isolation.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+const completionCases = [];
+function test(name, run) { completionCases.push({ id: "G17I" + String(completionCases.length + 1).padStart(3, "0"), name, run }); }
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { captureRepositoryFingerprint } from "./codex-critic-host.mjs";
+
+function assertNativeCriticChildStartUnchanged(before, after) { assert.deepEqual(after, before, "repository mutation observed"); }
+const git = (cwd, ...args) => execFileSync("git", args, { cwd, stdio: "pipe" });
+
+const cases = {
+  worktree: root => writeFileSync(join(root, 'tracked.txt'), 'child\n'),
+  index: root => git(root, 'update-index', '--assume-unchanged', 'tracked.txt'),
+  HEAD: root => git(root, 'symbolic-ref', 'HEAD', 'refs/heads/child'),
+  config: root => git(root, 'config', 'g17.child', 'true'),
+  refs: root => writeFileSync(join(root, '.git', 'refs', 'child'), 'child\n'),
+  objects: root => writeFileSync(join(root, '.git', 'objects', 'child'), 'child\n'),
+  hooks: root => writeFileSync(join(root, '.git', 'hooks', 'child'), 'child\n'),
+  logs: root => writeFileSync(join(root, '.git', 'logs', 'child'), 'child\n'),
+  info: root => writeFileSync(join(root, '.git', 'info', 'child'), 'child\n'),
+  'agent-pipeline': root => writeFileSync(join(root, '.git', 'agent-pipeline', 'session-authority', 'child.json'), 'child\n'),
+  'empty-directory': root => mkdirSync(join(root, '.git', 'child-empty')),
+};
+for (const [name, change] of Object.entries(cases)) test(`independent full Git inventory mutation: ${name}`, () => {
+  const scratch = join(process.cwd(), "scratch", "g17-baseline-fixtures");
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "repo-"));
+  try {
+    git(root, "init", "-q");
+    writeFileSync(join(root, "tracked.txt"), "base\n");
+    git(root, "add", "--", "tracked.txt");
+    git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "base");
+    const fingerprint = () => ({ candidate: captureRepositoryFingerprint(root).sha256 });
+    const prepared = fingerprint();
+    const registry = join(root, ".git", "agent-pipeline", "session-authority");
+    mkdirSync(registry, { recursive: true });
+    writeFileSync(join(registry, "reservation.json"), "host reservation\n");
+    const childStart = fingerprint();
+    assert.notDeepEqual(childStart, prepared, "a host reservation changes the prepare fingerprint");
+    assert.doesNotThrow(() => assertNativeCriticChildStartUnchanged(childStart, fingerprint()));
+    // Every examiner starts with its own unmutated repository and baseline.
+    change(root);
+    assert.throws(() => assertNativeCriticChildStartUnchanged(childStart, fingerprint()), /repository mutation observed|failed/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+registerTestCaseCompletion({ cases: completionCases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });

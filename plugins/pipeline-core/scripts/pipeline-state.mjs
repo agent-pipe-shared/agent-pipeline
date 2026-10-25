@@ -12855,11 +12855,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       const by = flags.by;
       const reason = flags.reason;
       if (isBlank(by)) {
-        console.error('Error: discard-feature requires --by <name> (non-empty) -- an unattributed discard is refused.');
+        console.error('Error: discard-feature requires --by <name> (non-empty) -- an unattributed discard is refused. PO recovery: in your own terminal, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by "<your name>" --reason "<why this feature is being abandoned>". The agent must not supply your name.');
         return 2;
       }
       if (isBlank(reason)) {
-        console.error('Error: discard-feature requires --reason <text> (non-empty) -- an unexplained discard is refused.');
+        console.error('Error: discard-feature requires --reason <text> (non-empty) -- an unexplained discard is refused. PO recovery: in your own terminal, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by "<your name>" --reason "<why this feature is being abandoned>".');
         return 2;
       }
       const activeFeature = base.activeFeature;
@@ -13301,7 +13301,13 @@ directory. There is no --dir flag.
 
 Commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.
 
-Each command validates its own flags and names what it needs when one is missing.`);
+Each command validates its own flags and names what it needs when one is missing.
+
+discard-feature --by "<your name>" --reason "<why this feature is being abandoned>"
+  Human-terminal action: the PO supplies the name and reason and runs the command
+  in the project directory. Agents must not discard to escape an implementation block.
+  This records an abandoned feature; use close-feature when the result is complete.
+  Signed-plan proof import remains agent work; it does not delegate discard.`);
       return 0;
     }
 

@@ -2,6 +2,7 @@
 // Guard module "evaluate" (layer 6), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
 import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { join, relative, resolve } from "node:path";
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { findResidualHostPath } from "../../scripts/capture-evidence.mjs";
@@ -12,7 +13,7 @@ import { TESTPATH_SHELL_DENIAL_CODE } from "../protected-test-paths.mjs";
 import { writeTargetPath } from "../tool-write-target.mjs";
 import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { observeGovernanceScope } from "../governance-scope.mjs";
-import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
 import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
 import { firstUnadmittedFlag } from "../read-command-diagnosis.mjs";
 import { isProjectWritePath } from "./path-containment.mjs";
@@ -20,7 +21,7 @@ import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCo
 import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
 import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
 import { blocked, boundAuthorityDocumentPath, humanOverrideRoute, protectedAuthorityDocumentWriteOnly, protectedStateWriterOnly } from "./denial-route.mjs";
-import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation, isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
+import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation, isSanctionedGovernanceScopeDiagnosticInvocation, resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
 import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
 import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
 import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
@@ -33,6 +34,24 @@ import { isSourceOwnedContinuityVerificationCommand, isFixedOwningVerificationCo
 import { evaluateAfterGrammarAdmission } from "./lifecycle-gate.mjs";
 import { powerShellScopeVerdict, sanctionedPowerShellNodeCall } from "./powershell-dialect.mjs";
 import { envDumpClassifierErrorRefusal, envDumpShellRefusal } from "./env-dump-lane.mjs";
+import { isCurrentSessionArtifactExport } from "../current-session-artifact-export.mjs";
+
+// G2 / EL-36: READY permits agent work, but cannot authorize the human's
+// decision to abandon a feature. Match the actual script and verb, never text
+// mentioning them. The existing parser leaves compound commands to grammar.
+function isHumanOnlyDiscard(command, root) {
+  const invocation = resolveSanctionedScriptInvocation(command, root);
+  if (invocation?.args[0] !== "discard-feature") return false;
+  let script = invocation.script;
+  if (script.startsWith("file:")) {
+    try { script = fileURLToPath(script); } catch { return false; }
+  }
+  // Refusal follows physical identity even when an argv alias (including a
+  // root-relative .. spelling) is deliberately outside lifecycle admission.
+  // This adds no admission and never matches a different script by basename.
+  try { return realpathSync(resolve(root, script)) === realpathSync(PIPELINE_STATE_SCRIPT); }
+  catch { return false; }
+}
 
 /**
  * NVA-B-REBWIRE-1 / Requirement 5, the half that is not a relief: EVERY refusal this guard
@@ -157,6 +176,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   if (toolName === "Bash" && isHumanPoSigningCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return externalPoSigningOnly();
   }
+  if (toolName === "Bash" && isHumanOnlyDiscard(input.tool_input.command ?? input.tool_input.CommandLine, root)) {
+    // Never enter HGO: neither a capability nor a signed plan delegates discard.
+    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-DISCARD-HUMAN-ONLY: discard-feature is a human-terminal action; the agent cannot discard a feature to escape an implementation block or supply --by.\n"
+      + "PO recovery: in the project directory, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by \"<your name>\" --reason \"<why this feature is being abandoned>\" in your own terminal, using your own name and reason.\n");
+  }
   if (SHELL_TOOLS.includes(toolName) && isHumanPoProfileChangeCommand(
     input.tool_input.command ?? input.tool_input.CommandLine, root,
   )) return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-PROFILE-CHANGE-HUMAN-ONLY: profile acknowledgement changes require the existing attended human confirmation outside agent tools.\n");
@@ -273,6 +297,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   // action a later check refuses is surfaced rather than silently swallowed; it is already
   // irreversibly consumed on disk by then, and there is no "un-consume" available here.
   const lifts = [...shellLifts];
+  // Only AGY's original native host envelope can select this exact image-copy
+  // lane. It clears the cross-root objection only; grammar and READY still run.
+  const artifactExport = isCurrentSessionArtifactExport(input, root, dependencies);
   const crossRepoReason = `${CROSS_REPO_DENIAL_CODE}: ${CROSS_REPO_DENIAL_GUIDANCE}`;
   if (WRITE_TOOLS.includes(toolName)) {
     const target = writeTargetPath(input.tool_input, toolName);
@@ -372,6 +399,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   // retryActionsForDeniedCommand call site below that has `input` in scope. Never a module-
   // level constant, unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS: both roots vary per invocation.
   if (toolName === "Bash"
+    && !artifactExport
     && isForbiddenCrossRepositoryMutation((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)) {
     const route = humanOverrideRoute(
       CROSS_REPO_DENIAL_CODE, crossRepoReason, "command", root, toolName, input.tool_input, dependencies,

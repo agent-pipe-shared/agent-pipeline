@@ -8,6 +8,7 @@ function test(name, run) {
   completionCases.push({ id: "RC05C" + String(completionCases.length + 1).padStart(3, "0"), name, run });
 }
 import assert from 'node:assert/strict';
+import focusedTest from 'node:test';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,cpSync,existsSync,symlinkSync} from 'node:fs';
 import {tmpdir, devNull} from 'node:os';
 import {join} from 'node:path';
@@ -178,6 +179,31 @@ test('prepared source, actual hook bytes and registry preimages are bound before
   assert.equal(host.apply(plan).reason,'ATR-TOPOLOGY-DRIFT');assert.deepEqual(f.calls,[['--version']]);assert.deepEqual(readFileSync(f.imports),before);
   assert.equal(host.apply(plan).reason,'ATR-UNOWNED-PLAN','drift consumes the plan');
  }
+});
+
+focusedTest('G6: final matcher drift is refused after the real wiring write and before receipt',t=>{
+ const f=fixture(t),wire=join(f.configRoot,'config','hooks.json');
+ const matcher='run_command|write_file|edit_file|read_file';
+ f.put(join(f.approvedSourceRoot,'hooks.json'),{'pipeline-core':{PreToolUse:[{matcher,hooks:[{command:'node hooks/antigravity-start-hint.mjs'}]}]}});
+ f.put(wire,{PreToolUse:[{matcher:'run_command',hooks:[{command:'node "'+join(f.old,'hooks','antigravity-start-hint.mjs')+'"'}]}]});
+ let observed=0,receipts=0;
+ const result=createAntigravityRefreshHost({...f.args,writeInstalledReceipt:()=>{receipts++;return {status:'written'};},beforeFinalReadback:(...args)=>{
+  assert.deepEqual(args,[]);observed++;
+  const written=JSON.parse(readFileSync(wire));
+  assert.equal(written.PreToolUse[0].matcher,matcher,'actual reconciliation completed');
+  assert.equal(written.PreToolUse[0].hooks[0].command,'node "'+join(f.approvedSourceRoot,'hooks','antigravity-start-hint.mjs')+'"');
+  written.PreToolUse[0].matcher='run_command';f.put(wire,written);
+  return {status:'refreshed'};
+ }}).refresh();
+ assert.equal(observed,1);assert.equal(receipts,0);
+ assert.equal(result.status,'partial');assert.equal(result.reason,'ATR-FINAL-WIRING-READBACK');
+ assert.ok(result.completed.includes('wiring-rebind'));
+});
+focusedTest('G6: final observer accepts only a function and cannot replace authorization',t=>{
+ const f=fixture(t);assert.throws(()=>createAntigravityRefreshHost({...f.args,beforeFinalReadback:{approved:true}}),/ATR-SEALED-OBSERVER/);
+ let observed=0;const before=readFileSync(f.imports);
+ const result=createAntigravityRefreshHost({...f.args,globalChangeApproved:false,beforeFinalReadback:()=>{observed++;}}).refresh();
+ assert.equal(result.reason,'ATR-GLOBAL-SCOPE');assert.equal(observed,0);assert.deepEqual(readFileSync(f.imports),before);
 });
 
 // Each original sibling callback is registered individually; no envelope case.

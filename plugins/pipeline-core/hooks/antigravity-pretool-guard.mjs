@@ -15,6 +15,7 @@ import { isAllowedPassiveReadTarget, isCredentialReadTarget } from "../lib/passi
 import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
 import {
   consumeHumanGuardOverride,
+  classifyNonLiftableGuardDenials,
   humanGuardOverrideInternals,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
@@ -42,6 +43,7 @@ import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispa
 import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
+import { antigravityArtifactHostContext, crossRepositoryDenialReason } from "../lib/current-session-artifact-export.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
 
@@ -308,6 +310,16 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
   const command = typeof toolInput.command === "string" ? toolInput.command : "";
   const isReadOnly = !["Bash", "apply_patch", "Edit", "Write", "Task", "Agent"].includes(toolName);
   return { toolName, toolInput, filePath, command, isReadOnly };
+}
+
+export function antigravityGuardPayload(input, normalized, projectRoot) {
+  return {
+    tool_name: normalized.toolName,
+    tool_input: normalized.toolInput,
+    cwd: projectRoot,
+    tool_use_id: input?.tool_use_id ?? input?.toolUseId,
+    antigravity_artifact_host: antigravityArtifactHostContext(input),
+  };
 }
 
 // PO decision D87 (kept) and D96 (2026-10-22: reading outside the repository is allowed except for credentials): the
@@ -685,12 +697,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
         ? ["guard-dispatch.mjs"]
         : [];
 
-  const canonicalPayload = JSON.stringify({
-    tool_name: toolName,
-    tool_input: toolInput,
-    cwd: projectRoot,
-    tool_use_id: input?.tool_use_id ?? input?.toolUseId,
-  });
+  const canonicalPayload = JSON.stringify(antigravityGuardPayload(input, normalized, projectRoot));
 
   const denials = [];
   const warnings = [];
@@ -853,28 +860,13 @@ export async function runAntigravityPreToolGuard(rawInput) {
       deny(denials.map((entry) => entry.reason).join("\n"));
     }
     if (crossRepositoryOnlyDenial) {
-      deny([
-        denials.map((entry) => entry.reason).join("\n"),
-        "Guard recovery route:",
-        JSON.stringify({
-          status: "external-operator-required",
-          code: "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY",
-          nextAction: {
-            kind: "external-operator",
-            executionBoundary: "separate-session-rooted-at-plugin-cache",
-            invocation: "user-copy-only",
-            action: {
-              toolName,
-              toolInputSha256,
-              repositoryRoot: projectRoot,
-              ...commandDisclosureFields(projectRoot, toolName, toolInput, command),
-            },
-            reason: "the target path is outside this repository's physical authority boundary",
-          },
-        }),
-      ].join("\n"));
+      deny(crossRepositoryDenialReason(denials));
     }
 
+    const pureRecovery = classifyNonLiftableGuardDenials(denials);
+    if (pureRecovery !== null) {
+      deny([pureRecovery.cause, pureRecovery.nextAction.reason].join("\n"));
+    }
     const overrideSpawn = (executable, args, options) => boundedSpawn(
       executable,
       args,

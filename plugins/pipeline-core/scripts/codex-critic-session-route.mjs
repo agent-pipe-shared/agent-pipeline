@@ -8,7 +8,15 @@ import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation
 import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
 import { createModelFamilyExecutionHost, validateInvocationReadback, digest } from "../lib/model-family-execution.mjs";
 
+import { authorityRepositoryFromRoot, captureDomainAuthorityPublications, readDomainAuthorityPublications } from '../lib/session-authority-domain-owner.mjs';
+import { captureSessionAuthorityPublications, readSessionAuthorityPublications } from '../lib/session-authority-registry.mjs';
 const heldFamilyRoutes = new WeakMap();
+export function readHeldCriticFamilyPublications(route){
+  const held=heldFamilyRoutes.get(route),checked=recheckHeldCriticFamilyRoute(route);
+  if(!checked.ok||!held?.publicationHandles)familyFailure('CRITIC-FAMILY-ORIGINAL-PUBLICATIONS-REQUIRED');
+  const binding={repository:authorityRepositoryFromRoot(held.rootDir),owner:route};
+  return Object.freeze([...readDomainAuthorityPublications(held.publicationHandles.domain,binding),...readSessionAuthorityPublications(held.publicationHandles.registry,binding)]);
+}
 function familyFailure(code) { const error = new Error(code); error.code = code; throw error; }
 export function isHeldCriticFamilyRoute(route) { return heldFamilyRoutes.has(route); }
 export function readHeldCriticFamilyExecution(route) {
@@ -39,7 +47,17 @@ export function recheckHeldCriticFamilyRoute(route) {
 
 /** Construction-owned route admission. The returned projection is diagnostic;
  * only its original private object can bind and consume the S5 invocation. */
-export async function launchHeldCriticFamilyRoute({ route, packet, nativeRequest } = {}) {
+export async function launchHeldCriticFamilyRoute(input = {}) {
+  const held=heldFamilyRoutes.get(input.route);
+  if(!held)return {ok:false,code:'CRITIC-FAMILY-ROUTE-HANDLE-REQUIRED'};
+  if(held.consumed||held.publicationHandles)return {ok:false,code:'CRITIC-FAMILY-CONSUMED'};
+  const repository=authorityRepositoryFromRoot(held.rootDir);
+  const binding={repository,owner:input.route};
+  const domain=await captureDomainAuthorityPublications(binding,()=>captureSessionAuthorityPublications(binding,()=>launchHeldCriticFamilyRouteCore(input)));
+  if(domain.result.result?.ok)held.publicationHandles=Object.freeze({domain:domain.handle,registry:domain.result.handle});
+  return domain.result.result;
+}
+async function launchHeldCriticFamilyRouteCore({ route, packet, nativeRequest } = {}) {
   const held = heldFamilyRoutes.get(route), checked = recheckHeldCriticFamilyRoute(route);
   if (!checked.ok) return checked;
   const ports = held.executionPorts;
