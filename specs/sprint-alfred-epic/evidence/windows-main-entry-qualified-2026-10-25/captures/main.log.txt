@@ -1,0 +1,31 @@
+command: <host-path> --import <repo-root>/scratch/main-candidate-synthetic-preload-20261025.mjs --test plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: MAIN-CANDIDATE-winmain
+exitCode: 0
+head: fd624219c368cb08f6919d903d889dc62ff0a4ac
+tree: 82d9240f88f09835d3abb3bef29502b73aa1b314
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.150806ms)
+✔ a clean fixture passes (0.795982ms)
+✔ an allowlisted occurrence passes (0.282236ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.28922ms)
+✔ multiple prefix hits on one line each produce a finding (0.170534ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.204438ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.454503ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (161.363373ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (11.815016ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ PHARI001 Phoenix authority revision imports from a standalone real plugin package without writer execution (756.791575ms)
+✔ PHARI002 direct Phoenix CLI entry with URL-escaped installed path reaches usage (738.100997ms)
+✔ PHARI003 foreign suffix and absent argv never execute imported Phoenix writer (1537.48378ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3108.658967
+
+--- stderr ---

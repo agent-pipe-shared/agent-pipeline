@@ -8,8 +8,8 @@ The active PO goal is a local candidate with every deliverable at75, then its
 authorized stamp and feature-branch push for the other PC (D153). An ordinary
 turn interruption does not restart bootstrap or close the feature.
 
-Current authoritative matrix: **207items,180at75,19at50,8at25;27below75,
-index70.77%**. [Current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
+Current authoritative matrix: **207items,181at75,19at50,7at25;26below75,
+index71.01%**. [Current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
 The second three-runner analyses and no-pipeline control were fully collected.
 All31high report clauses and14POobservations have dispositions and existing AC
 relations. D152 puts every P0/P1/Kritisch/Wichtig/Hoch in0.7.0. Ten distinct
@@ -43,8 +43,18 @@ store mutation plus typed held-state inspection advance recovery25→50;
 unknown/live-owner locks remain held, not falsely recovered. The finalizer's
 original-independent-return P0 remains open.
 [Qualification and exact limits](../specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/README.md).
+Phoenix entry is committed at `17899cc7321d61b396a57ff34a12051917b34ba7`:
+actual installed-package original/escaped-path/foreign-import cases3/3 and
+consumer9/9 pass, supporting25→75 portable Source readiness. Native Windows
+execution remains open.
+[Source custody](../specs/sprint-alfred-epic/evidence/windows-main-entry-qualified-2026-10-25/README.md).
+D154 authorized exactly one frozen AGY shape experiment, executed once. Parent
+exit0/14events yielded no observed child or PostTool hook; independent PASS and
+child settlement remain unproven. Own fixture is retained with a private local
+cleanup pointer; no retry is authorized. This changes no matrix stage.
+[Actual sanitized observation](../specs/sprint-alfred-epic/evidence/agy-native-shape-observation-2026-10-25/README.md).
 G8's same-owner clone has a14-path partial D150 Model producer/readback kernel;
-broad Model regression is RED and author/consumer/valid-fixture work remains.
+broad Model qualification and author/consumer/valid-fixture work remain open.
 Do not integrate its deny-only consumer or claim original native review.
 Original controller calibration5/5 is green in its clone; two private-Critic
 bindings remain RED, so the full216 course is unrun.
@@ -58,7 +68,7 @@ and inventory admission need actual phase-aware reconciliation, not blanket
 expectation flips. The remaining recovery/Source questions and parallel work
 continue under D143/D148/D149 without fabricated host/model/budget receipts.
 
-All material decisions through D153 are in the
+All material decisions through D154 are in the
 [fix-wave record](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-25-fix-wave.md).
 PRD/Spec, installed build and late single Critic/max3diff-review policy remain.
 The session-entry and earlier counts below are historical readbacks, superseded

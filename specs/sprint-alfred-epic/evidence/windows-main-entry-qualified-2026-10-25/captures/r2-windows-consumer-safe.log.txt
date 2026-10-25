@@ -1,0 +1,27 @@
+command: node --import ./scratch/synthetic-test-entry.mjs --test harness/scripts/check-consumer-safe-paths.test.mjs
+label: r2-windows-consumer-safe
+exitCode: 0
+head: 2f05042e714632dd3ee4d7e2b652ffcdada0682b
+tree: 6ee18f34614595103a303c5b6ac6359495ab33ad
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.177527ms)
+✔ a clean fixture passes (0.741418ms)
+✔ an allowlisted occurrence passes (0.266426ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.281314ms)
+✔ multiple prefix hits on one line each produce a finding (0.166817ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.212825ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.288317ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (156.471631ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (12.225788ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 248.011892
+
+--- stderr ---

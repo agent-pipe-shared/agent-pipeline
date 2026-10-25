@@ -1,0 +1,69 @@
+{
+  "schema": "pipeline.windows-main-entry-source-qualification.v1",
+  "sourceCommit": "17899cc7321d61b396a57ff34a12051917b34ba7",
+  "sourceFiles": [
+    {
+      "path": "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+      "sha256": "753f5ffcd03a28f4e1263320885a6ef6bf28e8c05540e342fb0f8cf3f95ea89b"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/phoenix-authority-revision.mjs",
+      "sha256": "c77f493d3a3b7a4572444e54cd60bb18282999c126cd3129b1454fbac7604064"
+    }
+  ],
+  "artifacts": [
+    {
+      "source": "scratch/agent-out/r2-windows-main-entry-20261025/r2-windows-red-3.log",
+      "sourceSha256": "4e074fd5e6558235de70eb6ed2a8820a003df4f0eba22ea165888f96b1201103",
+      "derivative": "specs/sprint-alfred-epic/evidence/windows-main-entry-qualified-2026-10-25/captures/r2-windows-red-3.log.txt",
+      "sha256": "4e074fd5e6558235de70eb6ed2a8820a003df4f0eba22ea165888f96b1201103",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-windows-main-entry-20261025/r2-windows-final-green.log",
+      "sourceSha256": "1ebfe8c1052e153bf8b592d6682be038abcfc22b57d03d70a94d5b84ccfb50ee",
+      "derivative": "specs/sprint-alfred-epic/evidence/windows-main-entry-qualified-2026-10-25/captures/r2-windows-final-green.log.txt",
+      "sha256": "1ebfe8c1052e153bf8b592d6682be038abcfc22b57d03d70a94d5b84ccfb50ee",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-windows-main-entry-20261025/r2-windows-consumer-safe.log",
+      "sourceSha256": "226bdeb061ca3e6a6ceb542c07ffe59fd3d5930ca6fc1202e122bf63cf54dc18",
+      "derivative": "specs/sprint-alfred-epic/evidence/windows-main-entry-qualified-2026-10-25/captures/r2-windows-consumer-safe.log.txt",
+      "sha256": "226bdeb061ca3e6a6ceb542c07ffe59fd3d5930ca6fc1202e122bf63cf54dc18",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-windows-main-entry-20261025/manifest.json",
+      "sourceSha256": "e7ea9524994c1c7a3f5fae2ae3b4a1c8c5a1b33a2d5ea4460bece9dfc96fa088",
+      "derivative": "specs/sprint-alfred-epic/evidence/windows-main-entry-qualified-2026-10-25/captures/worker-manifest.json.txt",
+      "sha256": "e7ea9524994c1c7a3f5fae2ae3b4a1c8c5a1b33a2d5ea4460bece9dfc96fa088",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/winmain.log",
+      "sourceSha256": "f371059d541ee8fc7df11ccfa8c570635d3053bc3e92916e97f33e963197971b",
+      "derivative": "specs/sprint-alfred-epic/evidence/windows-main-entry-qualified-2026-10-25/captures/main.log.txt",
+      "sha256": "f371059d541ee8fc7df11ccfa8c570635d3053bc3e92916e97f33e963197971b",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/winmain-custody.json",
+      "sourceSha256": "090020716b3a9e009459c31b68fc008cfecacfbb6ea431d683b48969c4c17e4d",
+      "derivative": "specs/sprint-alfred-epic/evidence/windows-main-entry-qualified-2026-10-25/captures/main-custody.json.txt",
+      "sha256": "090020716b3a9e009459c31b68fc008cfecacfbb6ea431d683b48969c4c17e4d",
+      "sanitizedDerivative": true
+    }
+  ],
+  "main": {
+    "pass": 12,
+    "fail": 0,
+    "exitCode": 0
+  },
+  "nativeWindowsQualified": false,
+  "limits": [
+    "portable Source behavior only; native Windows occurrence remains unmeasured",
+    "invalid CLI arguments exercise usage before any authority writer",
+    "Main integration, Full Verify, independent Critic, native manual check and PO acceptance are parent-owned"
+  ]
+}

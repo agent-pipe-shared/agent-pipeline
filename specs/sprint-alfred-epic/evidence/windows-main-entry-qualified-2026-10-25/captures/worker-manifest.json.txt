@@ -1,0 +1,47 @@
+{
+  "schema": "pipeline.method-only-windows-main-entry-handoff.v1",
+  "baseCommit": "2f05042e714632dd3ee4d7e2b652ffcdada0682b",
+  "paths": [
+    {
+      "path": "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+      "beforeSha256": "4894fb06d83b1c3fd2b398d89bc1703f60028a4251ef1d41e75a54b6d678039c",
+      "afterSha256": "753f5ffcd03a28f4e1263320885a6ef6bf28e8c05540e342fb0f8cf3f95ea89b"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/phoenix-authority-revision.mjs",
+      "beforeSha256": "b1ebede18137e8fb2a34ea8290453a64b7f25272499404173eb41960ed795e80",
+      "afterSha256": "c77f493d3a3b7a4572444e54cd60bb18282999c126cd3129b1454fbac7604064"
+    }
+  ],
+  "patch": {
+    "path": "patch.diff",
+    "sha256": "fcd4e0bea2a585644f15dd121beb857065467e134327ea163a2b2cc9dc776023",
+    "bytes": 8168
+  },
+  "captures": [
+    {
+      "path": "r2-windows-red-3.log",
+      "sha256": "4e074fd5e6558235de70eb6ed2a8820a003df4f0eba22ea165888f96b1201103"
+    },
+    {
+      "path": "r2-windows-final-green.log",
+      "sha256": "1ebfe8c1052e153bf8b592d6682be038abcfc22b57d03d70a94d5b84ccfb50ee"
+    },
+    {
+      "path": "r2-windows-consumer-safe.log",
+      "sha256": "226bdeb061ca3e6a6ceb542c07ffe59fd3d5930ca6fc1202e122bf63cf54dc18"
+    }
+  ],
+  "focused": {
+    "command": "node --import ./scratch/synthetic-test-entry.mjs --test plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+    "exitCode": 0,
+    "passed": 3,
+    "failed": 0
+  },
+  "fixtureRationale": "A synthetic bootstrap inside the disposable package precedes all child imports. The foreign same-basename file exists only to let older imported entry guards resolve argv while remaining physically distinct from the Phoenix entry. The direct child uses a space, # and % in its installed path; both checks exercise the real packaged CLI.",
+  "limitations": [
+    "portable Source behavior only; native Windows occurrence remains unmeasured",
+    "invalid CLI arguments exercise usage before any authority writer",
+    "Main integration, Full Verify, independent Critic, native manual check and PO acceptance are parent-owned"
+  ]
+}

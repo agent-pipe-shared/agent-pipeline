@@ -1,0 +1,71 @@
+{
+  "schema": "agy.synthetic-native-terminal-shape.v1",
+  "assurance": "attended-synthetic-capability-observation",
+  "fixture": {
+    "baseSha256": "31c352ef26f2b2f862038e3e788db3ad8ec0c5dee0a5cf14c3561eb9f0b7696c",
+    "candidateSha256": "98dae42766775914b525672140bcae3a86637603cf5d16d3b745ec713341f4a3",
+    "treeSha256": "8ed560ea43ed3de3108d9b0cd806622c5da9086f493e1621952adf5971210b53",
+    "diffSha256": "246cca590328026d8e13433f835e50d263a887eea584322142dd96783fc7898a"
+  },
+  "launch": {
+    "executable": "agy",
+    "onePromptRequested": true,
+    "exitCode": 0,
+    "signal": null,
+    "errorCode": null,
+    "elapsedMs": 10011
+  },
+  "stream": {
+    "status": "shape-only",
+    "eventCount": 14,
+    "eventTypes": [
+      "init",
+      "step_update",
+      "result"
+    ],
+    "subagentSteps": [],
+    "observedChildCount": 0,
+    "observedChildTerminalCount": 0,
+    "observedParentTerminalCount": 1,
+    "resultCount": 1,
+    "resultKeys": [
+      [
+        "conversation_id",
+        "string"
+      ],
+      [
+        "sha256:9f3868778cbef9065bb3beb675d0a49cb36485ac160320d3d69e15f23a937d10",
+        "number"
+      ],
+      [
+        "sha256:e63ec88293e93982bec38641330fcd8c0d3c93079231993f24711b92133023d8",
+        "number"
+      ],
+      [
+        "response",
+        "string"
+      ],
+      [
+        "status",
+        "string"
+      ],
+      [
+        "sha256:0a4e4c29432ecb01b95f87d87ffaff9cb4f36ce4b89ff1a1a136ad1c7392ae07",
+        "object"
+      ]
+    ],
+    "terminalStatus": "SUCCESS",
+    "terminalResponseSha256": "7de7ea6c2c59d3dff483273210646214bcf63690f52ea52dfded2ecbe0210f7c"
+  },
+  "postToolHookCount": 0,
+  "postToolHooks": [],
+  "observedNativeChildCount": 0,
+  "observedChildModel": null,
+  "settlement": {
+    "proven": false,
+    "reason": "child-terminal-unobserved"
+  },
+  "cleanup": "retained-cleanup-needed",
+  "failure": null,
+  "nativeIndependentPass": false
+}

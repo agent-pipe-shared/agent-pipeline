@@ -1,7 +1,7 @@
 # Collected PO matters — current interim candidate
 
 Latest: D151 permits unique public `/tmp` fixtures with owned cleanup; D152
-requires all second-run P0/P1 in0.7.0. Current matrix207/180at75/19at50/8at25;
+requires all second-run P0/P1 in0.7.0. Current matrix207/181at75/19at50/7at25;
 D153 authorizes the next75-ready local stamp and subsequent feature push for
 the other PC. AC168 operator application/commit0b80f4f09 is complete. No repeat
 application or commit is requested. G8 contract D150 is approved for implementation;
@@ -9,14 +9,15 @@ its incomplete/RED kernel is not Main-ready. The new finding ledger and active
 work take precedence over historical installation/PC wording below. Any genuine
 new decision or candidate-bound signature is presented only as a concrete package.
 
-Pending actual question: one native AGY capability-shape experiment, prepared
+Resolved D154 question: one native AGY capability-shape experiment, prepared
 at `scratch/agent-out/r2-agy-original-critic-return-20261025/observe-native-terminal-shape.mjs`.
-The PO was offered agent execution, own operator execution, or retaining the
-open native gap. No answer or native-call authorization is inferred yet.
+The PO approved agent execution of exactly one frozen run; it executed once.
+Parent exit0 and14events yielded no observed child or PostTool hook. Original
+child return and child settlement remain unproven, not independent PASS.
 The experiment requests one small research child returning synthetic FAIL,
 exports only structures/digests, and retains own fixture files when child
 settlement is unknown. It supplies no independent Critic PASS. Ordinary Source
-fixes and qualification continue while the answer is pending.
+fixes and qualification continue; no retry has been requested or authorized.
 
 Current work and next actions have one authority: [docs/state.md](../../../docs/state.md). The [historical queue](po-pending-history-before-final-interim-2026-10-25.md) preserves old requests and resolutions; none is a fresh request merely because it appears there.
 

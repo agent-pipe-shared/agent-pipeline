@@ -1,0 +1,21 @@
+command: node --import ./scratch/synthetic-test-entry.mjs --test plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs
+label: r2-windows-final-green
+exitCode: 0
+head: 2f05042e714632dd3ee4d7e2b652ffcdada0682b
+tree: 6ee18f34614595103a303c5b6ac6359495ab33ad
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ PHARI001 Phoenix authority revision imports from a standalone real plugin package without writer execution (743.263617ms)
+✔ PHARI002 direct Phoenix CLI entry with URL-escaped installed path reaches usage (723.025159ms)
+✔ PHARI003 foreign suffix and absent argv never execute imported Phoenix writer (1474.068437ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3018.456848
+
+--- stderr ---

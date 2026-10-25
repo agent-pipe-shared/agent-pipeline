@@ -1,0 +1,34 @@
+{
+  "schema": "pipeline.agy-native-capability-observation.v1",
+  "authority": "D154",
+  "launchCount": 1,
+  "artifacts": [
+    {
+      "source": "scratch/agent-out/r2-agy-original-critic-return-20261025/native-terminal-shape-4dcfdcc6-0dce-4a13-b63c-3e6cd7f8d984.json",
+      "sourceSha256": "0c1602823c7a8d3a0beacba62fc70423b6fa023ba804b017f63e624b175d42c2",
+      "derivative": "specs/sprint-alfred-epic/evidence/agy-native-shape-observation-2026-10-25/observation.json.txt",
+      "sha256": "0c1602823c7a8d3a0beacba62fc70423b6fa023ba804b017f63e624b175d42c2",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-agy-original-critic-return-20261025/observe-native-terminal-shape.mjs",
+      "sourceSha256": "57fde1a8a31fa27e2a666128c6d9dfac97221fa0e316c1274c2146000531b9ec",
+      "derivative": "specs/sprint-alfred-epic/evidence/agy-native-shape-observation-2026-10-25/experiment.mjs.txt",
+      "sha256": "57fde1a8a31fa27e2a666128c6d9dfac97221fa0e316c1274c2146000531b9ec",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-agy-original-critic-return-20261025/native-terminal-return-proposal.md",
+      "sourceSha256": "8eb1441e48f300a4b7dcedbc083103d257ce101ab42e6effdee40db59398c2d9",
+      "derivative": "specs/sprint-alfred-epic/evidence/agy-native-shape-observation-2026-10-25/proposal.md.txt",
+      "sha256": "8eb1441e48f300a4b7dcedbc083103d257ce101ab42e6effdee40db59398c2d9",
+      "sanitizedDerivative": true
+    }
+  ],
+  "parentExitCode": 0,
+  "observedNativeChildCount": 0,
+  "postToolHookCount": 0,
+  "nativeIndependentPass": false,
+  "cleanup": "retained-cleanup-needed",
+  "retryAuthorized": false
+}

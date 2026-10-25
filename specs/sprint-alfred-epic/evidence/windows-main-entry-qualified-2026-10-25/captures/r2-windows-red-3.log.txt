@@ -1,0 +1,74 @@
+command: node --import ./scratch/synthetic-test-entry.mjs --test plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs
+label: r2-windows-red
+exitCode: 1
+head: 2f05042e714632dd3ee4d7e2b652ffcdada0682b
+tree: 6ee18f34614595103a303c5b6ac6359495ab33ad
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ PHARI001 Phoenix authority revision imports from a standalone real plugin package without writer execution (798.023825ms)
+✖ PHARI002 direct Phoenix CLI entry with URL-escaped installed path reaches usage (651.960639ms)
+✖ PHARI003 foreign suffix and absent argv never execute imported Phoenix writer (664.635847ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2191.913072
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ PHARI002 direct Phoenix CLI entry with URL-escaped installed path reaches usage (651.960639ms)
+  AssertionError [ERR_ASSERTION]: direct CLI must run and reject missing arguments
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs:93:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ PHARI003 foreign suffix and absent argv never execute imported Phoenix writer (664.635847ms)
+  AssertionError [ERR_ASSERTION]: foreign import triggered CLI: file://<repo-root>/scratch/alfred-phoenix-package-regression-fixtures-20261011/foreign-ufRJp2/installed/pipeline-core/scripts/phoenix-authority-revision.mjs:12
+    if (!new Set(["plan", "apply"]).has(command) || !values.repoRoot || !values.directory || !values.proposalFile) throw new Error("Usage: phoenix-authority-revision.mjs plan|apply --repo-root <repo> --directory <external-dir> --proposal-file <repo-file> [--request-file <repo-file> --request-sha256 <sha> --lock-token <token>]");
+                                                                                                                         ^
+  
+  Error: Usage: phoenix-authority-revision.mjs plan|apply --repo-root <repo> --directory <external-dir> --proposal-file <repo-file> [--request-file <repo-file> --request-sha256 <sha> --lock-token <token>]
+      at parse (file://<repo-root>/scratch/alfred-phoenix-package-regression-fixtures-20261011/foreign-ufRJp2/installed/pipeline-core/scripts/phoenix-authority-revision.mjs:12:120)
+      at run (file://<repo-root>/scratch/alfred-phoenix-package-regression-fixtures-20261011/foreign-ufRJp2/installed/pipeline-core/scripts/phoenix-authority-revision.mjs:16:18)
+      at file://<repo-root>/scratch/alfred-phoenix-package-regression-fixtures-20261011/foreign-ufRJp2/installed/pipeline-core/scripts/phoenix-authority-revision.mjs:29:86
+  
+  Node.js v24.15.0
+  
+  
+  1 !== 0
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs:110:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

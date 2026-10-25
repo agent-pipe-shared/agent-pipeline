@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-r2-critic-inputs/snapshot.json",
-  "sha256": "7fdb6d84f1066d6c3315c7c75eb985b418d605ee12cfdce9826f1d69cd148cbe",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-windows-main-entry/snapshot.json",
+  "sha256": "325e6647a6bf6bacad12ecdad12ca5199a35cafc7bb7b48d4681a153d503a10e",
   "measuredAt": "2026-10-25",
-  "head": "73afcf74241fd38627161d5a5e9956d12b7e9341",
+  "head": "17899cc7321d61b396a57ff34a12051917b34ba7",
   "counts": {
-    "25": 8,
+    "25": 7,
     "50": 19,
-    "75": 180,
+    "75": 181,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 70.77,
+  "index": 71.01,
   "total": 207,
-  "scope": "Same207 identities; two Critic preparation outcomes25→75 and transaction validation25→50 after committed Source/Main49passes. Unknown-owner recovery remains open; no native finalizer/Verify/acceptance inference."
+  "scope": "Same207 identities; Phoenix main-entry25→75 from committed Source and actual installed-package Main12passes. Native Windows, AGY original-child return and other outcomes remain open. D154 observation grants no stage promotion."
 }
