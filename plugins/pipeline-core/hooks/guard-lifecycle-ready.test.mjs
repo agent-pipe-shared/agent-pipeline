@@ -270,7 +270,9 @@ function tmpdir() {
   mkdirSync(root, { recursive: true });
   return root;
 }
-const VAR_TMP = process.platform === "win32" ? tmpdir() : "/var/tmp";
+// D151: the original outside-root fixtures use the run's unique public temp
+// child, never the private authority HOME or an existing /var/tmp directory.
+const VAR_TMP = tmpdir();
 
 /**
  * A fake home directory rooted under SCRATCH_ROOT, standing in for `os.homedir()` via the
@@ -1780,6 +1782,8 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
       "rg --files . | rg 'guard|deny|permission|settings'",
       "rg -n -S lifecycle plugins | rg guard",
       "rg -l '^status: open' backlog/items | sort",
+      // G23 accepts bounded filename-extension globs, including repeated ones.
+      "rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180",
     ]) {
       const parsed = parseGuardCommand(command, path, POSIX_PARSE);
       assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
@@ -1789,7 +1793,6 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
     // SEC-11: recursive rg keeps default hidden/ignore semantics; globs may expose private paths.
     for (const command of [
       "rg --files --hidden --max-depth 3 . | head -n 500",
-      "rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180",
       "rg --files -uu . | rg 'guard|deny|permission|settings'",
     ]) {
       assert.equal(isBoundedReadOnlyPipeline(parseGuardCommand(command, path, POSIX_PARSE), path), false, command);
@@ -7935,6 +7938,80 @@ test("IR-4 incident replay: a read-only inventory index probe mentioning a prote
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("IR-4 READY inline admission remains literal and leaves credential reads and opaque writes refused", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      `node -e "require('fs').readFileSync('.aws/credentials')"`,
+      `node -e "require('fs').writeFileSync('scratch/note.txt',process.env.SECRET)"`,
+      `node -e "const p='scratch/note.txt'; require('fs').writeFileSync(p,'x')"`,
+      `node -e "require('fs').writeFileSync('scratch/note.txt','x');process.exit(0)"`,
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u, command);
+    }
+    const protectedWrite = tpShellRun(path, `node -e "require('fs').writeFileSync('${TPSHELL_TARGET}','x')"`);
+    assert.equal(protectedWrite.exitCode, 2);
+    assert.match(protectedWrite.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"));
+    mkdirSync(join(path, "scratch"), { recursive: true });
+    mkdirSync(dirname(join(path, TPSHELL_TARGET)), { recursive: true });
+    writeFileSync(join(path, TPSHELL_TARGET), "protected\n");
+    symlinkSync(join(path, TPSHELL_TARGET), join(path, "scratch", "note.txt"));
+    linkSync(join(path, TPSHELL_TARGET), join(path, "scratch", "linked.txt"));
+    for (const name of ["note.txt", "linked.txt"]) {
+      const alias = tpShellRun(path, `node -e "require('fs').writeFileSync('scratch/${name}','x')"`);
+      assert.equal(alias.exitCode, 2, name);
+      assert.match(alias.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u, name);
+    }
+    const preReady = evaluateLifecycleReadyGuard(
+      bash(`node -e "require('fs').writeFileSync('scratch/note.txt','x')"`),
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny(NON_PARTIAL_DENIAL_STATUS); } },
+    );
+    assert.equal(preReady.exitCode, 2);
+    assert.match(preReady.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("IR-4 inventory probe refuses a docs-parent symlink, inventory symlink, or hardlink to synthetic credential bytes", () => {
+  const command = `node -e "const inventory=JSON.parse(require('fs').readFileSync('docs/product-capability-inventory.json','utf8')); console.log(inventory.suites.indexOf('${TPSHELL_TARGET}'))"`;
+  const ordinary = tpShellFixture();
+  try {
+    mkdirSync(join(ordinary, "docs"));
+    writeFileSync(join(ordinary, "docs", "product-capability-inventory.json"), '{"suites":[]}\n');
+    assert.equal(tpShellRun(ordinary, command).exitCode, 0, "ordinary public inventory read was refused");
+    const preReady = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: ordinary, requireProjectOnboardingReadyFn() { deny(NON_PARTIAL_DENIAL_STATUS); },
+    });
+    assert.equal(preReady.exitCode, 2);
+    assert.match(preReady.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+  } finally { rmSync(ordinary, { recursive: true, force: true }); }
+  const observed = [];
+  for (const aliasKind of ["docs-parent-symlink", "inventory-symlink", "inventory-hardlink"]) {
+    const path = tpShellFixture();
+    try {
+      const privateDir = join(path, ".aws");
+      mkdirSync(privateDir, { recursive: true });
+      const privateFile = join(privateDir, aliasKind === "docs-parent-symlink" ? "product-capability-inventory.json" : "credentials");
+      writeFileSync(privateFile, '{"suites":["synthetic private bytes"]}\n');
+      const docsDir = join(path, "docs");
+      if (aliasKind === "docs-parent-symlink") symlinkSync(privateDir, docsDir, "dir");
+      else {
+        mkdirSync(docsDir);
+        const inventory = join(docsDir, "product-capability-inventory.json");
+        if (aliasKind === "inventory-symlink") symlinkSync(privateFile, inventory);
+        else linkSync(privateFile, inventory);
+      }
+      assert.equal(readFileSync(join(docsDir, "product-capability-inventory.json"), "utf8"), readFileSync(privateFile, "utf8"), aliasKind);
+      const result = tpShellRun(path, command);
+      observed.push({ aliasKind, exitCode: result.exitCode, unsupported: /GUARD-READ-COMMAND-UNSUPPORTED/u.test(result.stderr) });
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  }
+  assert.deepEqual(observed, ["docs-parent-symlink", "inventory-symlink", "inventory-hardlink"].map(aliasKind => ({
+    aliasKind, exitCode: 2, unsupported: true,
+  })));
+});
+
 test("NVA-B-UNPARSED-CAVEAT-1: a protected-path mention in an unparsed command is conservatively refused without echoing the raw command", () => {
   const path = tpShellFixture();
   try {
@@ -12420,13 +12497,14 @@ test("TR-B T74/T77 control: the already-admitted rg and grep spellings admit an 
   }
 });
 
-test("TR-B T77 rg -g lane: one bounded basename-extension filter is admitted; multi-dot, path, recursive and negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED (characterisation, GREEN by design -- flip deliberately if TR-B admits one)", () => {
+test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.mjs, are admitted; path, recursive and negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED", () => {
   const path = trbFixture();
   try {
     qp4WithoutAppDataRoots(() => {
       qp4Admit('rg -n -g "*.md" apply scratch/notes.md', path);
       qp4Admit('rg -n apply scratch/notes.md --glob "*.md"', path);
-      for (const glob of ['"*.test.mjs"', '"**/*.md"', '"!*.md"', '"scratch/*.md"']) {
+      qp4Admit('rg -n -g "*.test.mjs" apply scratch/notes.md', path);
+      for (const glob of ['"**/*.md"', '"!*.md"', '"scratch/*.md"']) {
         qp4RefuseUnsupported(`rg -n -g ${glob} apply scratch/notes.md`, path);
       }
     });

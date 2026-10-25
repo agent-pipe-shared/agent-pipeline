@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 // Guard module "evaluate" (layer 6), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
-import { realpathSync } from "node:fs";
+import { lstatSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { join, relative, resolve } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { findResidualHostPath } from "../../scripts/capture-evidence.mjs";
 import { isBootstrapAcknowledgementMarkerMutation } from "../onboarding-staging-authoring.mjs";
@@ -51,6 +51,73 @@ function isHumanOnlyDiscard(command, root) {
   // This adds no admission and never matches a different script by basename.
   try { return realpathSync(resolve(root, script)) === realpathSync(PIPELINE_STATE_SCRIPT); }
   catch { return false; }
+}
+
+function isPhysicalPublicInventoryTarget(root) {
+  const docs = join(root, "docs");
+  const inventory = join(docs, "product-capability-inventory.json");
+  try {
+    const parent = lstatSync(docs);
+    if (!parent.isDirectory() || parent.isSymbolicLink() || realpathSync(docs) !== docs) return false;
+  } catch (error) {
+    // The original IR-4 guard fixture has no inventory file. Admission of a
+    // missing file does not create a read; execution receives ordinary ENOENT.
+    return error?.code === "ENOENT";
+  }
+  try {
+    const file = lstatSync(inventory);
+    return file.isFile() && !file.isSymbolicLink() && file.nlink === 1
+      && realpathSync(inventory) === inventory;
+  } catch (error) {
+    return error?.code === "ENOENT";
+  }
+}
+
+// AC239 / TPSHELL-OPAQUEMENTION / IR-4: two closed, literal inline-script
+// forms have independently classifiable targets. Arbitrary interpreter code
+// (including a computed target, extra statement, or credential read) is not
+// granted by this predicate. The earlier protected-test, gate-strength and
+// cross-repository lanes still decide their own paths before it is consulted.
+function isLiteralReadyNodeInlineCommand(command, root, dependencies) {
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
+  if (!["node", "node.exe"].includes(basename(executable).toLowerCase())
+    || argv.length !== 2 || argv[0] !== "-e") return false;
+  const script = argv[1];
+  // One literal scratch note write, with no escape syntax or further JS. A
+  // physical containment check also excludes a pre-existing symlink escape.
+  const note = /^require\(['"](?:node:)?fs['"]\)\.writeFileSync\(['"](scratch\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.txt)['"],['"]([A-Za-z0-9 ._/-]+)['"]\)$/u.exec(script);
+  if (note) {
+    if (!isProjectWritePath(note[1], root, dependencies)) return false;
+    // Only a fresh file is admitted. Existing links (including hard links)
+    // could alias a protected path even when the typed spelling is benign.
+    let current = root;
+    const parts = note[1].split("/");
+    for (let i = 0; i < parts.length; i += 1) {
+      current = join(current, parts[i]);
+      try {
+        const entry = lstatSync(current);
+        if (entry.isSymbolicLink() || i === parts.length - 1 || !entry.isDirectory()) return false;
+      } catch (error) {
+        if (error?.code !== "ENOENT") return false;
+      }
+    }
+    return true;
+  }
+  // The incident's read-only inventory probe: the sole read is a fixed public
+  // inventory file; the suite name is inert data for indexOf/console.log.
+  return /^const inventory=JSON\.parse\(require\(['"](?:node:)?fs['"]\)\.readFileSync\(['"]docs\/product-capability-inventory\.json['"],['"]utf8['"]\)\); console\.log\(inventory\.suites\.indexOf\(['"][A-Za-z0-9._/-]+['"]\)\)$/u.test(script)
+    && isPhysicalPublicInventoryTarget(root);
+}
+
+function isNodeInlineCommand(command, root) {
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1) return false;
+  const { executable, argv } = parsed.segments[0];
+  return ["node", "node.exe"].includes(basename(executable).toLowerCase())
+    && ["-e", "--eval", "-p", "--print"].includes(argv[0]);
 }
 
 /**
@@ -414,6 +481,17 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   }
   if (toolName === "Bash"
     && isRejectedReadFamilyCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+    const command = input.tool_input.command ?? input.tool_input.CommandLine;
+    if (isNodeInlineCommand(command, root)) {
+      // First ask the normal lifecycle tail. In a non-ready state it supplies
+      // the original lifecycle refusal; in READY it cannot itself authorize an
+      // arbitrary inline script, which still falls into the unsupported row.
+      const phase = evaluateAfterGrammarAdmission(input, root, toolName, consistent);
+      if (phase.exitCode !== 0) return withLifts(lifts, phase);
+      if (isLiteralReadyNodeInlineCommand(command, root, dependencies)) {
+        return withLifts(lifts, withLifecycleReturnedActionTelemetry(phase, input, root, toolName, consistent));
+      }
+    }
     // ALFRED-QP4: label selection ONLY (both refuse, nothing is admitted here). The scope code requires a target that really resolves outside
     // the project root; every other rejected single read-family command is an unsupported command.
     let outsideRoot = false;
