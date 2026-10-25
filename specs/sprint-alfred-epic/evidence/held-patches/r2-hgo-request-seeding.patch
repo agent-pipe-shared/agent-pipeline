@@ -1,0 +1,210 @@
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index db87ca8..351e1d0 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -6081,6 +6081,22 @@ export function sweepHumanGuardOverrideRequests({rootDir} = {}) {
+   }
+   finally { hgoSweepBoundsLifted = lifted; }
+ }
++// AC-160: one-shot sweep. Repeats the same bounded, audited single-batch sweep (at most 61 requests
++// per publication) until nothing eligible remains or HGO_SWEEP_ALL_MAX_RUNS publications ran.
++// Only requests the single-batch selection already deems eligible (expired, not named by an armed
++// capability) are ever removed; every batch keeps its own CAS, audit entry and validation.
++const HGO_SWEEP_ALL_MAX_RUNS = 100;
++export function sweepHumanGuardOverrideRequestsAll({rootDir} = {}) {
++  let runs = 0, removed = 0, last = null;
++  while (runs < HGO_SWEEP_ALL_MAX_RUNS) {
++    last = sweepHumanGuardOverrideRequests({rootDir});
++    if (last.status !== "swept") break;
++    runs += 1; removed += last.removed;
++    if (last.remainingEligible === 0) break;
++  }
++  const status = removed === 0 ? "absent" : last.remainingEligible === 0 ? "swept" : "partial";
++  return Object.freeze({status, runs, removed, retained: last.retained, remainingEligible: last.remainingEligible});
++}
+ 
+ function hgoAuthorityDirectory(path) {
+   const info = lstatSync(path);
+@@ -6106,7 +6122,7 @@ function hgoAuthorityScopePresent(repository, path) {
+ }
+ const HGO_AUTHORITY_SOURCE_BOUND = 1048576, HGO_AUTHORITY_JOURNAL_BOUND = 67108864, HGO_AUTHORITY_INVENTORY_BOUND = 16777216;
+ const HGO_AUTHORITY_JOURNALS = Object.freeze(["audit.jsonl", "command-offers.jsonl"]);
+-const HGO_SWEEP_REPAIR = "remove expired requests with: node <plugin-root>/scripts/guard-human-override.mjs sweep-requests --repo <absolute-root>, repeated until it reports remainingEligible 0";
++const HGO_SWEEP_REPAIR = "remove expired requests with: node <plugin-root>/scripts/guard-human-override.mjs sweep-requests --repo <absolute-root> --all (one invocation; reports removed, retained and remainingEligible)";
+ // New requests stop below the inventory bound, so the namespace never reaches a state that
+ // only a lifted-bound sweep can read (PF-53, Critic F2).
+ const HGO_REQUEST_SOFT_CAP = 3072;
+diff --git a/plugins/pipeline-core/scripts/guard-human-override.mjs b/plugins/pipeline-core/scripts/guard-human-override.mjs
+index ef39d4e..4dd9646 100644
+--- a/plugins/pipeline-core/scripts/guard-human-override.mjs
++++ b/plugins/pipeline-core/scripts/guard-human-override.mjs
+@@ -21,6 +21,7 @@ import {
+   repairHumanGuardOverrideAudit,
+   refreezeHumanGuardOverridePlan,
+   sweepHumanGuardOverrideRequests,
++  sweepHumanGuardOverrideRequestsAll,
+   verifyHumanGuardOverrideAudit,
+ } from "../lib/human-guard-override.mjs";
+ import {
+@@ -55,7 +56,7 @@ function usage() {
+     "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
+     "  guard-human-override.mjs render-copy-safe --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
+     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
+-    "  guard-human-override.mjs sweep-requests --repo <absolute-root>",
++    "  guard-human-override.mjs sweep-requests --repo <absolute-root> [--all]",
+     "  guard-human-override.mjs publish-consumption-action --repo <absolute-root> --plan-sha256 <64hex> --event-out <repo-relative-path>",
+     "  guard-human-override.mjs repair-audit --repo <absolute-root> --preimage-sha256 <64hex> --activate",
+   ].join("\n");
+@@ -191,9 +192,11 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
+   const [command, ...rest] = argv;
+   try {
+     if (command === "sweep-requests") {
+-      const parsed = flags(rest);
++      const all = rest.at(-1) === "--all";
++      const parsed = flags(all ? rest.slice(0, -1) : rest);
+       if (!exactFlagSet(parsed, ["repo"]) || typeof parsed.repo !== "string") throw new Error(usage());
+-      write(`${JSON.stringify(sweepHumanGuardOverrideRequests({rootDir: parsed.repo}))}\n`);
++      const sweep = all ? sweepHumanGuardOverrideRequestsAll : sweepHumanGuardOverrideRequests;
++      write(`${JSON.stringify(sweep({rootDir: parsed.repo}))}\n`);
+       return 0;
+     }
+     if (command === "verify-audit") {
+diff --git a/plugins/pipeline-core/scripts/guard-human-override.test.mjs b/plugins/pipeline-core/scripts/guard-human-override.test.mjs
+index abfbbbf..d2bdc50 100644
+--- a/plugins/pipeline-core/scripts/guard-human-override.test.mjs
++++ b/plugins/pipeline-core/scripts/guard-human-override.test.mjs
+@@ -22,7 +22,7 @@
+  */
+ import assert from "node:assert/strict";
+ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -39,7 +39,7 @@ import {
+   prepareHumanGuardOverrideAuthorization,
+   recordHumanGuardDenial,
+ } from "../lib/human-guard-override.mjs";
+-import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
++import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+ import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
+ import { PTY_HOST_LIMIT, runMainUnderPty } from "../lib/test-hgo-cli-pty-fixture.mjs";
+ 
+@@ -1048,3 +1048,116 @@ test("refreeze-plan validates its flag set like the sibling plan subcommand", ()
+   assert.equal(status, 2);
+   assert.match(captured.stderr, /HGO-USAGE/u);
+ });
++
++// W3-R2-HGO-SWEEP-ALL-C1 (AC-160): a refusal that offers no human override route seeds no request, and
++// sweep-requests --all removes every eligible expired request in one invocation.
++function hgoRequestsDir(root) {
++  return join(realpathSync(root), ".git", "agent-pipeline", "human-guard-overrides", "requests");
++}
++
++function seedRetiredRequests(root, count, expiresAt = "2026-08-31T10:00:00.000Z") {
++  const physical = realpathSync(root), dir = hgoRequestsDir(root), names = [];
++  const digest = (value) => createHash("sha256").update(canonical(value)).digest("hex");
++  for (let n = 0; n < count; n++) {
++    const retired = { schema: "pipeline.human-guard-override-request.v2", root: physical, commandClass: `retired-${n}`,
++      mode: "standard", authorSourceRoot: null, expiresAt };
++    const name = digest(retired);
++    writeFileSync(join(dir, `${name}.json`), JSON.stringify(retired), { mode: 0o600 });
++    names.push(name);
++  }
++  return names;
++}
++
++function seedOverridableDenial(root, content) {
++  return recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
++    toolInput: { file_path: "notes.md", content }, denials: [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL" }], nowMs: Date.now() });
++}
++
++test("AC-160: a read-grammar refusal (GUARD-READ-COMMAND-UNSUPPORTED) seeds no override request; an overridable refusal seeds exactly one", () => {
++  const root = fixture();
++  try {
++    const seeded = seedOverridableDenial(root, "AC-160 overridable\n");
++    assert.equal(typeof seeded.requestSha256, "string", JSON.stringify(seeded));
++    const dir = hgoRequestsDir(root);
++    assert.equal(readdirSync(dir).length, 1, "an overridable refusal seeds exactly one request");
++    for (const code of ["GUARD-READ-COMMAND-UNSUPPORTED"]) {
++      // The real denial reason shape the hook hands to recordHumanGuardDenial (mirrors the live input).
++      const reason = `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${code}: The command is outside the closed Pipeline shell grammar.`;
++      const outcome = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash",
++        toolInput: { command: "rg -rn needle probe.txt" }, denials: [{ guard: "guard-lifecycle-ready.mjs", reason }], nowMs: Date.now() });
++      assert.equal(outcome.status, "non-liftable-recovery-required", `${code}: ${JSON.stringify(outcome)}`);
++      assert.equal(outcome.requestSha256, undefined, `${code}: ${JSON.stringify(outcome)}`);
++      assert.equal(readdirSync(dir).length, 1, `${code} wrote no request file`);
++    }
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("AC-160: sweep-requests --all removes every eligible expired request in one invocation and reports aggregate counts", () => {
++  const root = fixture();
++  try {
++    const live = seedOverridableDenial(root, "AC-160 live request\n");
++    seedRetiredRequests(root, 150);
++    const dir = hgoRequestsDir(root);
++    assert.equal(readdirSync(dir).length, 151);
++    const out = io();
++    assert.equal(main(["sweep-requests", "--repo", root, "--all"], out), 0, out.stderr);
++    const result = JSON.parse(out.stdout);
++    assert.equal(result.removed, 150, out.stdout);
++    assert.equal(result.remainingEligible, 0, out.stdout);
++    assert.equal(result.retained, 1, out.stdout);
++    assert.equal(result.runs, 3, "150 expired requests take three publications of at most 61");
++    assert.deepEqual(readdirSync(dir), [`${live.requestSha256}.json`], "the live unexpired request is never removed");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("AC-160: sweep-requests without --all keeps its bounded single-batch behaviour, and --all must be the trailing flag only", () => {
++  const root = fixture();
++  try {
++    seedOverridableDenial(root, "AC-160 bounded seed\n");
++    seedRetiredRequests(root, 70);
++    const out = io();
++    assert.equal(main(["sweep-requests", "--repo", root], out), 0, out.stderr);
++    const result = JSON.parse(out.stdout);
++    assert.equal(result.removed, 61, out.stdout);
++    assert.equal(result.remainingEligible, 9, out.stdout);
++    const bad = io();
++    assert.notEqual(main(["sweep-requests", "--all", "--repo", root], bad), 0, "a non-trailing --all is a usage error");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("AC-160: sweep-requests --all keeps a request an armed capability names", () => {
++  const root = fixture();
++  try {
++    seedOverridableDenial(root, "AC-160 armed seed\n");
++    const [held] = seedRetiredRequests(root, 70);
++    const base = join(realpathSync(root), ".git", "agent-pipeline", "human-guard-overrides");
++    writeFileSync(join(base, "capabilities", `${"c".repeat(64)}.json`), JSON.stringify({ schema: "pipeline.human-guard-override-capability.v2",
++      status: "armed", requestSha256: held, expiresAt: "2026-08-31T10:00:00.000Z" }), { mode: 0o600 });
++    const out = io();
++    assert.equal(main(["sweep-requests", "--repo", root, "--all"], out), 0, out.stderr);
++    const result = JSON.parse(out.stdout);
++    assert.equal(result.removed, 69, out.stdout);
++    assert.equal(existsSync(join(hgoRequestsDir(root), `${held}.json`)), true, "a request named by an armed capability stays");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("AC-160: the namespace-full refusal names the one-shot sweep-requests --all repair", () => {
++  const root = fixture();
++  try {
++    seedOverridableDenial(root, "AC-160 namespace seed\n");
++    seedRetiredRequests(root, 3100);
++    assert.throws(() => seedOverridableDenial(root, "AC-160 one more\n"),
++      (error) => /HGO-REQUEST-NAMESPACE-FULL|override request namespace holds/u.test(String(error?.code ?? "") + String(error?.message))
++        && /sweep-requests --repo <absolute-root> --all/u.test(String(error?.message)));
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
