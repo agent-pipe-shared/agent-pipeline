@@ -11,6 +11,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
 | Run the Full Verify (candidate mode, no reuse) in a clone with a private HOME, a short TMPDIR and a red-step summary | `scripts/full-verify.mjs` | output file, verify's run record in the clone, temp dirs |
 | Rough token split of session and subagent transcripts into impl / content / admin / dialogue (heuristic, +-10 points; target for admin: about 15 % in user repositories) | `scripts/transcript-token-buckets.mjs` | none (prints JSON) |
 | Check, summarise and apply Goldfish diffs or format-patch files through Node (the shell grammar refuses `git apply`) | `scripts/apply-diff.mjs` | the working tree (stages nothing) |
+| Package a held-kernel-patch scratch work tree into one patch against the candidate commit, with preimage hashes and `git apply --check` | `scripts/pack-held-patch.mjs <candidate> <work-dir> <out-patch> <repo-path>...` | the patch file only |
 | Fill the Goldfish briefing template verbatim from a JSON spec (fix-wave task without an Alfred acceptance row) | `scripts/fill-goldfish-briefing.mjs` | one briefing file under `scratch/` |
 | Run test files one after the other with a private TMPDIR | `scripts/run-in.mjs` (uses `scripts/run-quiet.mjs`) | none tracked |
 | Run the project-onboarding orchestrator suite and read only its failures | `scripts/run-onboarding-full.mjs` | `scratch/onboarding-full.log` |
