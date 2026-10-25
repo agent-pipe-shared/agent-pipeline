@@ -3,6 +3,8 @@
 /** Proof-gated wrapper around the existing continuity authority revision writer. */
 import { run as approve } from "./phoenix-authority-approval.mjs";
 import { run as pipelineState } from "./pipeline-state.mjs";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 function parse(argv) {
   const [command, ...rest] = argv; const values = { command };
@@ -19,4 +21,9 @@ export function run(argv = process.argv.slice(2)) {
     ? pipelineState(["continuity-authority-revision-plan", "--proposal-file", values.proposalFile], deps)
     : pipelineState(["continuity-authority-revision-apply", "--request-file", values.requestFile, "--request-sha256", values.requestSha256, "--lock-token", values.lockToken], deps);
 }
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1])) process.exitCode = run();
+function isMainModule() {
+  if (typeof process.argv[1] !== "string" || process.argv[1].length === 0) return false;
+  try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); }
+  catch { return false; }
+}
+if (isMainModule()) process.exitCode = run();
