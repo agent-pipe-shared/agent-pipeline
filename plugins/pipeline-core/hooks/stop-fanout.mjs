@@ -61,6 +61,7 @@
  * nothing to inject.
  */
 import { readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -70,10 +71,35 @@ import { PLUGIN_ROOT_PLACEHOLDER, evaluateFanoutStop } from "../lib/fanout-gover
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE } from "../lib/project-authority.mjs";
 import { loadSliceQueue } from "../lib/slice-queue.mjs";
+import { readPrivateJson, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
 
 const RUNNER = "claude";
 const MAX_RECORD_BYTES = 1024 * 1024;
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const ADVISORY_MARKER_MAX_BYTES = 4096;
+
+// A session-keyed fingerprint suppresses identical advisory text at consecutive Stops. The
+// marker is advisory state only: any unsafe or failed read/write emits the advice again.
+function advisoryMarker(cwd, sessionId) {
+  const key = createHash("sha256").update(sessionId).digest("hex");
+  return join(cwd, ".claude", `.stop-fanout-${key}.json`);
+}
+
+function priorAdvisoryFingerprint(path) {
+  try {
+    const info = statSync(path);
+    if (!info.isFile() || info.size > ADVISORY_MARKER_MAX_BYTES) return null;
+    const record = readPrivateJson(path, "fanout advisory marker");
+    return typeof record?.fingerprint === "string" && /^[a-f0-9]{64}$/u.test(record.fingerprint) ? record.fingerprint : null;
+  } catch { return null; }
+}
+
+function writeAdvisoryFingerprint(path, fingerprint) {
+  try {
+    writePrivateJsonAtomic(path, { fingerprint });
+    return true;
+  } catch { return false; }
+}
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -180,6 +206,13 @@ export function decideStop(input, options = {}) {
   // Non-block text is advisory output, and only `advisory` / `enforce` may produce it.
   const mode = result?.telemetry?.mode;
   if (result.decision !== "allow" || (mode !== "advisory" && mode !== "enforce")) return "";
+  const marker = advisoryMarker(cwd, sessionId);
+  const fingerprint = createHash("sha256").update(reason).digest("hex");
+  const prior = priorAdvisoryFingerprint(marker);
+  // Only a successfully persisted fingerprint can suppress a later message. Failures
+  // remain visible, and block decisions above never consult this advisory marker.
+  if (prior === fingerprint) return "";
+  writeAdvisoryFingerprint(marker, fingerprint);
   return `${JSON.stringify({ systemMessage: reason, hookSpecificOutput: { hookEventName: "Stop", additionalContext: reason } })}\n`;
 }
 

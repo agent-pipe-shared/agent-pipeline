@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { classifyTranscript, CATEGORIES } from "./elephant-context-measure.mjs";
 
@@ -26,6 +27,9 @@ const fixture = [
 test("classifies wake-up, inline read, guard refusal and authoring with shares", () => {
   const r = classifyTranscript(fixture);
   assert.equal(r.schema, "pipeline.elephant-context-measurement.v1");
+  assert.equal(r.inputSha256, createHash("sha256").update(fixture).digest("hex"));
+  assert.equal(r.sourceClassification, "unverified-input");
+  assert.equal(r.liveHostTargetQualified, false);
   assert.equal(r.malformedLines, 1);
   assert.equal(r.events.inlineRead, 4);
   assert.equal(r.events.guardRefusal, 1);
@@ -106,6 +110,11 @@ test("per-cause before/after comparison reports each cause falling", () => {
   const after = classifyTranscript(afterSession);
   const cmp = compareMeasurements(before, after);
   assert.equal(cmp.schema, "pipeline.elephant-context-comparison.v1");
+  assert.deepEqual(cmp.sources, {
+    before: { inputSha256: before.inputSha256, classification: "unverified-input" },
+    after: { inputSha256: after.inputSha256, classification: "unverified-input" },
+  });
+  assert.equal(cmp.liveHostTargetQualified, false);
   assert.deepEqual(Object.keys(cmp.causes), CAUSES);
   for (const key of CAUSES) {
     assert.equal(cmp.causes[key].improved, true, key);

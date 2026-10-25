@@ -894,7 +894,14 @@ export function isSafeExactPassiveFile(raw, root, extraRoots = []) {
 function isSafeExactGrepArgs(args, root, extraRoots = []) {
   const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching"]); // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
   let index = 0;
-  while (flags.has(args[index])) index += 1;
+  let maxCountSeen = false;
+  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count") {
+    if (flags.has(args[index])) { index += 1; continue; }
+    if (maxCountSeen || !/^[1-9][0-9]{0,2}$/u.test(args[index + 1] ?? "")
+      || Number(args[index + 1]) > 500) return false;
+    maxCountSeen = true;
+    index += 2;
+  }
   const endedOptions = args[index] === "--";
   if (endedOptions) index += 1;
   const pattern = args[index++];

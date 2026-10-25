@@ -4,7 +4,7 @@
 // (queue, evidence, and a stand-in for the git common dir); the real repository's private state is never touched.
 import assert from "node:assert/strict";
 import { devNull, tmpdir } from "node:os";
-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -159,6 +159,22 @@ check("advisory mode emits the governor's advisory text as systemMessage/additio
     assert.equal(out.systemMessage.includes("<plugin-root>"), false, "the placeholder is substituted");
     assert.match(out.systemMessage, /node .+slice-queue\.mjs defer <id>/u);
     assert.deepEqual(ledgerTypes(box), ["stop-eval"], "advisory records the evaluation but never a block");
+    assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode: "advisory" }) }), "unchanged second Stop");
+    assert.deepEqual(ledgerTypes(box), ["stop-eval", "stop-eval"], "both evaluations remain recorded");
+    writeFileSync(box.queuePath, JSON.stringify(queueOf(2)));
+    const changed = hook(box, stopPayload(box), { config: configFor(box, { mode: "advisory" }) });
+    assert.match(JSON.parse(changed.stdout).systemMessage, /2 ready slice\(s\)/u);
+  });
+  withBox({}, (box) => {
+    const outside = mkdtempSync(join(tmpdir(), "fanout-outside-"));
+    try {
+      symlinkSync(outside, join(box.root, ".claude"), "dir");
+      const config = configFor(box, { mode: "advisory" });
+      assert.match(JSON.parse(hook(box, stopPayload(box), { config }).stdout).systemMessage, /^FANOUT-ADVISORY:/u);
+      assert.match(JSON.parse(hook(box, stopPayload(box), { config }).stdout).systemMessage, /^FANOUT-ADVISORY:/u,
+        "unsafe marker parent fails open and does not suppress real advice");
+      assert.deepEqual(readdirSync(outside), [], "a linked parent receives no marker or temporary write");
+    } finally { rmSync(outside, { recursive: true, force: true }); }
   });
 });
 
@@ -257,6 +273,7 @@ check("FANOUT-NO-QUEUE reaches the session in advisory and enforce mode (absent 
       assert.equal(out.systemMessage.includes("<plugin-root>"), false, "the placeholder is substituted");
       assert.deepEqual(out.hookSpecificOutput, { hookEventName: "Stop", additionalContext: out.systemMessage });
       assert.deepEqual(ledgerTypes(box), [], "rules 1-4 log nothing");
+      assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode, implementationPhaseActive: true }) }), `${mode}: unchanged no-queue advice`);
       assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode, implementationPhaseActive: false }) }), `${mode}: absent queue, not implementing`);
     });
     withBox({ queue: false }, (box) => {

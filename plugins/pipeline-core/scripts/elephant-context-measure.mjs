@@ -8,6 +8,7 @@
 // hand-written briefings) and compare two measurements per cause.
 // Metric is a utf8-byte upper bound (not exact model tokens). Claude transcripts only.
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
@@ -75,6 +76,7 @@ function classifyToolUse(block) {
 const tally = () => ({ events: 0, units: 0 });
 
 export function classifyTranscript(jsonlText) {
+  const inputSha256 = createHash("sha256").update(jsonlText).digest("hex");
   const totals = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
   const counts = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
   const toolMeta = new Map();
@@ -189,6 +191,9 @@ export function classifyTranscript(jsonlText) {
     schema: "pipeline.elephant-context-measurement.v1",
     metric: "utf8-byte-upper-bound",
     exactModelTokens: false,
+    inputSha256,
+    sourceClassification: "unverified-input",
+    liveHostTargetQualified: false,
     runner: "claude",
     totalUnits,
     units: totals,
@@ -223,6 +228,11 @@ export function compareMeasurements(before, after) {
     schema: "pipeline.elephant-context-comparison.v1",
     metric: "utf8-byte-upper-bound",
     exactModelTokens: false,
+    sources: {
+      before: { inputSha256: before?.inputSha256 ?? null, classification: before?.sourceClassification ?? "unknown" },
+      after: { inputSha256: after?.inputSha256 ?? null, classification: after?.sourceClassification ?? "unknown" },
+    },
+    liveHostTargetQualified: false,
     causes,
     adminShare: { before: before?.adminShare ?? 0, after: after?.adminShare ?? 0, target: ADMIN_TARGET_SHARE },
     withinAdminTarget: after?.withinAdminTarget === true,
