@@ -1,0 +1,196 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index a902943..581d6e0 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -60,6 +60,7 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
+   Types: goldfish-implementor, goldfish-mechanic, goldfish-deep.
+   Optional: --root, repeated --path, --spec, --criterion, --recon-note.
+   --runner claude|codex defaults to claude; the selected model must match its role route.
++  --effort-escalation MP-05|MP-07 admits an agent definition effort ABOVE its Claude route effort (otherwise a contradiction is refused).
+   --check is included in the write scope. Paths are repository-relative.
+   --criterion selects a consumer Spec criterion (AC-<n> or AC-E<epic>-<story>-<nn>).
+ 
+@@ -132,7 +133,7 @@ const ACCEPTED_CRITERION_STATUSES = Object.freeze(["explicit-actual-independent-
+ const SINGLE_FLAGS = Object.freeze({
+   "--root": "root", "--dispatch-id": "dispatchId", "--item": "item", "--agent-type": "agentType",
+   "--model-id": "modelId", "--check": "check", "--spec": "spec", "--criterion": "criterion", "--recon-note": "reconNote",
+-  "--runner": "runner",
++  "--runner": "runner", "--effort-escalation": "effortEscalation",
+ });
+ // K142 (Greenfield finding G1): the runners a binding can be generated for. `claude` is the default and every Claude
+ // behaviour is unchanged; `codex` checks the model id against the model the Codex route yields for the role, read from
+@@ -189,6 +190,17 @@ function defaultCodexRoute(taskRoute) {
+   } catch { return null; }
+ }
+ 
++/** The Claude task route of a duty (read-only registry projection), or null when the registry yields none. */
++function defaultClaudeRoute(taskRoute) {
++  try {
++    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "claude");
++    return scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute) ?? null : null;
++  } catch { return null; }
++}
++
++const EFFORT_RANK = Object.freeze({ low: 1, medium: 2, high: 3, xhigh: 4, max: 5 });
++const EFFORT_ESCALATION_ACTS = Object.freeze(["MP-05", "MP-07"]);
++
+ /**
+  * What the preflight observation receives. Claude: exactly `{ cwd }`, as before this change. Codex: the same call with an
+  * environment whose runner signals say Codex (the preflight resolves its runner from the environment of the process, so a
+@@ -515,6 +527,7 @@ export function generateDispatchBinding(options, deps = {}) {
+ 
+   const { dispatchId, item, agentType, modelId, check } = options;
+   const runner = options.runner ?? "claude";
++  const effortEscalation = options.effortEscalation;
+   if (!RUNNERS.includes(runner)) refuse("DBG-RUNNER-UNKNOWN", `unknown runner ${JSON.stringify(runner)}; repair: pass --runner ${RUNNERS.join(" or ")} (default ${RUNNERS[0]}), or omit the flag for a Claude dispatch`);
+   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/u.test(dispatchId)) refuse("DBG-DISPATCH-ID", `dispatch id ${JSON.stringify(dispatchId)} must match [A-Za-z0-9][A-Za-z0-9._:-]{0,119}`);
+   if (!/^[a-z0-9][a-z0-9-]{0,127}$/u.test(item)) refuse("DBG-ITEM-SLUG", `item slug ${JSON.stringify(item)} must be lowercase letters, digits and hyphens`);
+@@ -662,7 +675,29 @@ export function generateDispatchBinding(options, deps = {}) {
+     refuse("DBG-MODEL-FAMILY", `model id ${modelId} does not belong to the ${resolved.model} family that agent definition ${agentType} declares; repair: pass a --model-id of the ${resolved.model} family (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}), or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)`);
+   }
+   // The effort the run is briefed with: the Codex route's own effort for a Codex dispatch (the agent definition's effort is the Claude one).
+-  const effort = typeof codexRoute?.effort === "string" && codexRoute.effort !== "" ? codexRoute.effort : resolved.effort;
++  // Claude (W2-R2): the Claude Agent tool cannot pass an effort (MP-29), so the agent definition's frontmatter effort is what the run
++  // really gets. It must therefore EQUAL the configured route's effort for the duty; a contradiction is refused before launch, unless
++  // an explicit MP-05/MP-07 escalation admits an above-route pin. An unreadable route keeps the frontmatter effort and says so.
++  let effort = typeof codexRoute?.effort === "string" && codexRoute.effort !== "" ? codexRoute.effort : resolved.effort;
++  let claudeRouteDuty = null;
++  if (effortEscalation !== undefined && !EFFORT_ESCALATION_ACTS.includes(effortEscalation)) {
++    refuse("DBG-EFFORT-ESCALATION-UNKNOWN", `--effort-escalation ${JSON.stringify(effortEscalation)} is not a recognised escalation act; repair: pass --effort-escalation ${EFFORT_ESCALATION_ACTS.join(" or ")} (the model-policy act that authorises the above-route effort), or omit the flag`);
++  }
++  if (runner !== "codex") {
++    const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
++    const route = (deps.claudeRoute ?? defaultClaudeRoute)(taskRoute);
++    const routeEffort = route && route.state !== "unavailable" && typeof route.effort === "string" && route.effort !== "" ? route.effort : null;
++    if (routeEffort === null) {
++      warnings.push({ code: "DBG-EFFORT-ROUTE-UNKNOWN", message: `the Claude route ${taskRoute} for ${agentType} could not be read from the runner profile registry, so the effort ${resolved.effort} of the agent definition was not checked against the configured route` });
++    } else if (routeEffort === resolved.effort) {
++      claudeRouteDuty = taskRoute;
++    } else if (effortEscalation !== undefined && (EFFORT_RANK[resolved.effort] ?? 0) > (EFFORT_RANK[routeEffort] ?? Infinity)) {
++      claudeRouteDuty = taskRoute;
++      warnings.push({ code: "DBG-EFFORT-ESCALATION", message: `${effortEscalation} escalation: agent definition ${agentType} pins effort ${resolved.effort}, above the ${routeEffort} the configured Claude route ${taskRoute} selects; the binding records ${resolved.effort}, the effort the run will really get` });
++    } else {
++      refuse("DBG-EFFORT-ROUTE-CONTRADICTION", `agent definition ${agentType} pins effort ${resolved.effort} but the configured Claude route ${taskRoute} selects effort ${routeEffort}; the Claude Agent tool cannot pass an effort (MP-29), so the frontmatter pin would silently win; repair: align the effort of agents/${agentType}.md with the route, or change the route in pipeline.user.yaml, or (a deliberate above-route escalation) pass --effort-escalation MP-05 or MP-07 (MP-05/MP-07), or pass the --agent-type whose definition matches the route`);
++    }
++  }
+   let maxTurns;
+   try { maxTurns = Number.parseInt(parseAgentFrontmatter(readFileSync(resolve(agentsDir, `${agentType}.md`), "utf8")).maxTurns, 10); } catch { maxTurns = NaN; }
+   if (!Number.isSafeInteger(maxTurns)) refuse("DBG-AGENT-UNRESOLVED", `agent definition ${agentType} declares no integer maxTurns`);
+@@ -793,7 +828,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     `- Ruleset: ${rulesetVersion ? `\`${rulesetVersion}\` · ` : ""}content identity \`${rulesetSha}\`${rulesetFallback ? ` (fallback: ${rulesetFallback})` : ""}.`,
+     runner === "codex"
+       ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Codex route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
+-      : `- Model/effort: \`${modelId}\` / ${resolved.effort} (${agentType}; agent definition alias \`${resolved.model}\`).`,
++      : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
+     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
+     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
+     `- Slice: ${dispatchId}`,
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 0659bc0..d113686 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -89,6 +89,9 @@ const depsOf = (fx, over = {}) => ({
+   resolveBaseline: () => ({ status: "ready", entries: [] }),
+   defaultSpecPath: () => null,
+   queueRow: () => null,
++  // hermetic: the pre-existing cases never read the real runner-profile registry; the route here equals each fixture agent's own effort
++  // (no contradiction, no unreadable-route warning), and the W2-R2 cases inject their own
++  claudeRoute: (taskRoute) => ({ taskRoute, runner: "claude", role: "worker", state: "default", selector: { kind: "alias", value: "sonnet" }, effort: { "duty.implement": "medium", "duty.mechanic": "low", "duty.deep": "xhigh" }[taskRoute] }),
+   ...over,
+ });
+ 
+@@ -1187,3 +1190,94 @@ test("K142 build: a package that names runner codex renders a Codex briefing tha
+   assert.equal(claudeResult.ok, true, JSON.stringify(claudeResult).slice(0, 300));
+   assert.equal(parseNativeGoldfishBriefing(claudeResult.text).binding.runner, "claude");
+ });
++
++// --- W2-R2 (backlog 2026-10-26-agent-frontmatter-effort-overrides-configured-route, AC-212): the run's effort is the configured route's ---
++
++const claudeRouteOf = (effort, state = "default") => (taskRoute) => ({ taskRoute, runner: "claude", role: "worker", effort, state, selector: { kind: "alias", value: "sonnet" } });
++
++test("W2-R2 the binding and field 6 record the effort the configured Claude route selects when the agent definition pins the same effort", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
++  assert.equal(result.binding.effort, "medium");
++  assert.match(result.skeleton, /`claude-sonnet-5-5` \/ medium/u);
++  assert.match(result.skeleton, /Claude route `duty\.implement`/u, "field 6 names the route the effort came from");
++});
++
++test("W2-R2 each agent type asks the Claude route of its own duty", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const asked = [];
++  for (const [type, effort, modelId] of [["goldfish-implementor", "medium", "claude-sonnet-5-5"], ["goldfish-mechanic", "low", "claude-haiku-4-5"], ["goldfish-deep", "xhigh", "claude-sonnet-5-5"]]) {
++    const result = runDispatchBriefing(argvOf(fx, { "--agent-type": type, "--model-id": modelId }), depsOf(fx, { claudeRoute: (route) => { asked.push(route); return claudeRouteOf(effort)(route); } }));
++    assert.equal(result.ok, true, `${type}: ${JSON.stringify(result).slice(0, 300)}`);
++  }
++  assert.deepEqual(asked, ["duty.implement", "duty.mechanic", "duty.deep"]);
++});
++
++test("W2-R2 a frontmatter effort that contradicts the configured route is refused typed before launch, never run silently", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep" }), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
++  assert.equal(result.ok, false);
++  assert.equal(result.code, "DBG-EFFORT-ROUTE-CONTRADICTION", result.message);
++  assert.equal(result.skeleton, undefined);
++  assert.ok(result.message.includes("xhigh") && result.message.includes("medium") && result.message.includes("duty.deep"), result.message);
++  assert.match(result.message, /repair:/u);
++  assert.match(result.message, /--effort-escalation/u);
++  assert.match(result.message, /MP-05/u);
++  assert.match(result.message, /MP-07/u);
++  assert.match(result.message, /MP-29/u, "the Claude Agent tool cannot pass an effort: the message says why the pin would win");
++});
++
++test("W2-R2 an explicit MP-05/MP-07 escalation admits the above-route effort, records the effort the run really gets and warns", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  for (const act of ["MP-05", "MP-07"]) {
++    const result = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep" }, ["--effort-escalation", act]), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
++    assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
++    assert.equal(result.binding.effort, "xhigh", "the binding states the effort the agent definition will really run");
++    const warning = result.warnings.find((entry) => entry.code === "DBG-EFFORT-ESCALATION");
++    assert.ok(warning, JSON.stringify(result.warnings));
++    assert.ok(warning.message.includes(act) && warning.message.includes("medium") && warning.message.includes("xhigh"), warning.message);
++  }
++  const unknown = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep" }, ["--effort-escalation", "because"]), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
++  assert.equal(unknown.code, "DBG-EFFORT-ESCALATION-UNKNOWN", unknown.message);
++  assert.match(unknown.message, /repair:/u);
++});
++
++test("W2-R2 an escalation flag where the route already equals the pin changes nothing, and a pin below the route contradicts it too", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const same = runDispatchBriefing(argvOf(fx, {}, ["--effort-escalation", "MP-05"]), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
++  assert.equal(same.ok, true);
++  assert.equal(same.warnings.some((entry) => entry.code === "DBG-EFFORT-ESCALATION"), false);
++  const lower = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-implementor" }), depsOf(fx, { claudeRoute: claudeRouteOf("high") }));
++  assert.equal(lower.code, "DBG-EFFORT-ROUTE-CONTRADICTION");
++});
++
++test("W2-R2 an unreadable Claude route is announced and the agent definition's effort stays the briefed one", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { claudeRoute: () => null }));
++  assert.equal(result.ok, true);
++  assert.equal(result.binding.effort, "medium");
++  assert.ok(result.warnings.some((entry) => entry.code === "DBG-EFFORT-ROUTE-UNKNOWN"), JSON.stringify(result.warnings));
++});
++
++test("W2-R2 the default Claude route reader uses the registry route of the duty, and a Codex dispatch never reads the Claude route", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { registeredFunctionalTaskRoutes, functionalTaskRoutesForRunner } = await import("../lib/model-role-route-source.mjs");
++  const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "claude");
++  assert.equal(scoped.ok, true);
++  const route = scoped.taskRoutes.find((entry) => entry.taskRoute === "duty.implement");
++  const fx = makeFixture();
++  const { claudeRoute: _unused, ...rest } = depsOf(fx);
++  const result = runDispatchBriefing(argvOf(fx), rest);
++  if (route.effort === "medium") { assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300)); assert.equal(result.binding.effort, "medium"); }
++  else { assert.equal(result.code, "DBG-EFFORT-ROUTE-CONTRADICTION", result.message); assert.ok(result.message.includes(route.effort)); }
++  const codex = runDispatchBriefing(argvOf(fx, { "--model-id": "fixture-codex-model" }, CODEX), depsOf(fx, { claudeRoute: () => { throw new Error("a Codex dispatch must not read the Claude route"); }, codexRoute: (taskRoute) => ({ taskRoute, runner: "codex", role: "worker", effort: "high", state: "default", selector: { kind: "model-id", value: "fixture-codex-model" } }) }));
++  assert.equal(codex.ok, true, JSON.stringify(codex).slice(0, 300));
++  assert.equal(codex.binding.effort, "high");
++});
